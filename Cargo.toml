@@ -3,6 +3,10 @@ name = "lab_manager"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "lab_manager"
+path = "src/lib.rs"
+
 [dependencies]
 tokio = { version = "1.36", features = ["full"] }
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "json", "chrono"] }
