@@ -75,7 +75,7 @@ jobs:
               ;;
             "api-only")
               cat > Dockerfile.deploy << 'EOF'
-          FROM rust:1.82-slim
+          FROM rustlang/rust:nightly-slim
           WORKDIR /usr/src/app
           
           # Install build dependencies
@@ -100,7 +100,7 @@ jobs:
               ;;
             "storage-only")
               cat > Dockerfile.deploy << 'EOF'
-          FROM rust:1.82-slim
+          FROM rustlang/rust:nightly-slim
           WORKDIR /usr/src/app
           
           # Install build dependencies
