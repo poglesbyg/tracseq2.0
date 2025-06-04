@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "migrations": [
+    {
+      "version": 20240304,
+      "description": "create templates table",
+      "sql": [
+        "20240304_create_templates_table.sql",
+        "20240304_create_templates_table_down.sql"
+      ]
+    }
+  ]
+} 

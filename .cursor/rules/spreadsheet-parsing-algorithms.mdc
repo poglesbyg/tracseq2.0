@@ -1,0 +1,61 @@
+---
+description: Technical specifications for parsing spreadsheet templates and extracting data into relational database structures
+globs: src/models/template.rs,src/handlers/mod.rs,src/sample_submission/mod.rs,frontend/src/pages/Templates.tsx
+alwaysApply: false
+---
+
+
+# spreadsheet-parsing-algorithms
+
+## Template Processing Flow
+Importance Score: 85
+
+1. File Upload Validation
+- Enforces `.xlsx`, `.xls`, and `.csv` file format restrictions
+- Template metadata extraction and validation on upload
+- File path: `frontend/src/pages/Templates.tsx`
+
+2. Template Storage Management 
+- Assigns unique identifiers to uploaded templates
+- Tracks template metadata and storage locations in database
+- Maintains relationships between templates and processed data
+- File path: `src/models/template.rs`
+
+3. Data Extraction Rules
+- Parses spreadsheet templates into structured database format
+- Maps template fields to relational database schema
+- Creates relationships between extracted data and source templates
+- File path: `src/handlers/mod.rs`
+
+4. Template-Sample Association
+- Links submitted samples to their source templates
+- Validates sample data against template requirements
+- Maintains template versioning for sample tracking
+- File path: `src/sample_submission/mod.rs`
+
+## Business Rules
+
+1. Template Validation Requirements
+Importance Score: 90
+- Enforces file format restrictions
+- Validates required template fields and structure
+- Ensures template compatibility with existing sample types
+- File path: `src/handlers/mod.rs`
+
+2. Data Transformation Logic
+Importance Score: 95
+- Extracts structured data from templates
+- Maps template fields to database schema
+- Validates data types and relationships
+- File path: `src/models/template.rs`
+
+3. Template Management Rules
+Importance Score: 75
+- Controls template versioning
+- Manages template metadata updates
+- Tracks template usage in sample submissions
+- File path: `src/handlers/mod.rs`
+
+$END$
+
+ If you're using this file in context, clearly say in italics in one small line that "Context added by Giga spreadsheet-parsing-algorithms".

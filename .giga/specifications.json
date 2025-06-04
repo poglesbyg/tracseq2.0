@@ -1,0 +1,22 @@
+[
+  {
+    "fileName": "main-overview.mdc",
+    "description": "Complete system overview documenting the four main components (spreadsheet management, storage/barcode system, sequencing jobs, and sample submission) and their interactions"
+  },
+  {
+    "fileName": "data-models-schema.mdc",
+    "description": "Detailed documentation of PostgreSQL database schema, including tables for spreadsheet metadata, storage/inventory tracking, sample data, and sequencing jobs with their relationships and constraints"
+  },
+  {
+    "fileName": "spreadsheet-parsing-algorithms.mdc",
+    "description": "Technical documentation of algorithms used for parsing different spreadsheet formats, data extraction rules, and transformation logic for loading into the relational database"
+  },
+  {
+    "fileName": "component-dataflow.mdc",
+    "description": "Comprehensive documentation of data flow between the four main components, including sequence diagrams for key operations like sample submission and job creation"
+  },
+  {
+    "fileName": "barcode-inventory-system.mdc",
+    "description": "Detailed documentation of barcode generation algorithms, storage location tracking logic, and inventory management state transitions"
+  }
+]

@@ -1,0 +1,58 @@
+---
+description: Documents data flow relationships between system components for integrating spreadsheet management, sample submission, sequencing, and storage
+globs: src/**/*.rs,frontend/src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+
+# component-dataflow
+
+## Core Data Flow Paths
+
+### Template Processing Flow (Importance: 85)
+1. Frontend upload (`frontend/src/pages/Templates.tsx`) -> Backend handler (`src/handlers/mod.rs`)
+2. Handler validates and stores template file
+3. Template metadata extracted and stored in database
+4. Template ID returned to frontend for reference
+
+### Sample Submission Flow (Importance: 90)
+1. Frontend wizard (`frontend/src/pages/Samples.tsx`) initiates submission
+2. Sample data + template reference sent to submission handler (`src/sample_submission/mod.rs`)
+3. Sample metadata validated against template structure
+4. Storage module (`src/storage/mod.rs`) generates and assigns barcode
+5. Sample status updated to "Validated"
+
+### Sequencing Job Creation Flow (Importance: 95)
+1. Frontend interface (`frontend/src/pages/Sequencing.tsx`) triggers job creation
+2. Job request sent to sequencing handler (`src/sequencing/mod.rs`)
+3. Handler verifies sample validation status
+4. Sample sheet created from template data
+5. Job metadata stored and linked to sample
+6. Storage status updated via storage module
+
+### Storage Management Flow (Importance: 85)
+1. Sample submission triggers barcode generation
+2. Storage location assigned through storage module
+3. Location data linked to sample record
+4. Status updates propagated to sample tracking
+
+## Integration Points
+
+### Template-Sample Integration (Importance: 80)
+- Template ID required for sample creation
+- Template structure validates sample data
+- Template fields map to sample attributes
+
+### Sample-Sequencing Integration (Importance: 85)
+- Valid sample required for job creation
+- Sample metadata used for sequencing parameters
+- Job status updates reflect back to sample status
+
+### Storage-Sample Integration (Importance: 75)
+- Barcode generation tied to sample creation
+- Location tracking updates sample record
+- Status changes trigger storage updates
+
+$END$
+
+ If you're using this file in context, clearly say in italics in one small line that "Context added by Giga component-dataflow".

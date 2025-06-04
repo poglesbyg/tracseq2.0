@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/lab_manager
+      - RUST_LOG=info
+      - STORAGE_PATH=/usr/local/bin/storage
+    volumes:
+      - app_storage:/usr/local/bin/storage
+    depends_on:
+      - db
+    networks:
+      - lab_network
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=lab_manager
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - lab_network
+
+volumes:
+  postgres_data:
+  app_storage:
+
+networks:
+  lab_network:
+    driver: bridge 
