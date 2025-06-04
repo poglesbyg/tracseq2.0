@@ -14,12 +14,10 @@ RUN apt-get update && apt-get install -y \
 # Copy the source code
 COPY . .
 
-# Prepare SQLx cache
-RUN cargo install sqlx-cli --version 0.7.4 --no-default-features --features postgres
-RUN cargo sqlx prepare -- --lib
-
-# Set SQLx to offline mode during build
-ENV SQLX_OFFLINE=true
+# Skip SQLx offline preparation to avoid dependency conflicts
+# For production, consider using a .sqlx directory committed to repo
+# or building in an environment where database is available
+ENV SQLX_OFFLINE=false
 
 # Build the application
 RUN cargo build --release
@@ -38,11 +36,8 @@ RUN apt-get update && apt-get install -y \
 # Copy the binary from builder
 COPY --from=builder /usr/src/app/target/release/lab_manager .
 
-# Copy migrations
-COPY migrations /usr/local/bin/migrations
-
-# Copy SQLx cache
-COPY --from=builder /usr/src/app/.sqlx /usr/local/bin/.sqlx
+# Copy migrations (if they exist)
+COPY migrations /usr/local/bin/migrations || echo "No migrations directory found"
 
 # Set environment variables
 ENV RUST_LOG=info
