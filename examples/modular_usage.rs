@@ -1,7 +1,7 @@
 use lab_manager::{
     assembly::ComponentBuilder,
     config::AppConfig,
-    errors::{ComponentError, ErrorResponse, HttpErrorHandler},
+    errors::{ComponentError, ErrorHandler, ErrorResponse, HttpErrorHandler},
     services::{Service, ServiceRegistry},
     validation::{ValidationError, ValidationResult, Validator},
 };

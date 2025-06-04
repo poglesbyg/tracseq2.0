@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM rust:1.82-slim as builder
+FROM rustlang/rust:nightly-slim as builder
 
 WORKDIR /usr/src/app
 
@@ -36,8 +36,11 @@ RUN apt-get update && apt-get install -y \
 # Copy the binary from builder
 COPY --from=builder /usr/src/app/target/release/lab_manager .
 
-# Copy migrations (if they exist)
-COPY migrations /usr/local/bin/migrations || echo "No migrations directory found"
+# Copy migrations if they exist
+RUN mkdir -p /usr/local/bin/migrations
+RUN if [ -d "/usr/src/app/migrations" ]; then \
+        cp -r /usr/src/app/migrations/* /usr/local/bin/migrations/ 2>/dev/null || true; \
+    fi
 
 # Set environment variables
 ENV RUST_LOG=info
