@@ -28,18 +28,25 @@ fi
 
 # Function to check if a port is in use
 check_port() {
-    if lsof -Pi :$1 -sTCP:LISTEN -t >/dev/null ; then
-        echo "Port $1 is already in use. Please free up this port and try again."
-        exit 1
+    if lsof -Pi :$1 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo -e "${YELLOW}Warning: Port $1 is already in use. You may need to stop other services.${NC}"
+        return 1
     fi
+    return 0
 }
 
 # Check if required ports are available
-check_port 80
-check_port 3000
-check_port 3001
-check_port 5173
-check_port 5432
+echo -e "${YELLOW}Checking port availability...${NC}"
+ports_in_use=0
+check_port 8080 || ((ports_in_use++))
+check_port 3000 || ((ports_in_use++))
+check_port 3001 || ((ports_in_use++))
+check_port 5173 || ((ports_in_use++))
+check_port 5432 || ((ports_in_use++))
+
+if [ $ports_in_use -gt 0 ]; then
+    echo -e "${YELLOW}$ports_in_use ports are in use. Continuing anyway...${NC}"
+fi
 
 # Stop any existing containers
 echo -e "${YELLOW}Stopping any existing containers...${NC}"
@@ -58,8 +65,8 @@ echo -e "${YELLOW}Checking service status...${NC}"
 if docker-compose ps | grep -q "Up"; then
     echo -e "${GREEN}All services are running!${NC}"
     echo -e "\nAccess points:"
-    echo -e "${GREEN}Frontend:${NC} http://localhost"
-    echo -e "${GREEN}API:${NC} http://localhost/api"
+    echo -e "${GREEN}Frontend:${NC} http://localhost:8080"
+    echo -e "${GREEN}API:${NC} http://localhost:3001"
     echo -e "${GREEN}Development Frontend:${NC} http://localhost:5173"
     echo -e "${GREEN}Development API:${NC} http://localhost:3000"
 else
