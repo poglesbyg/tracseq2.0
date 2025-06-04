@@ -1,16 +1,16 @@
-mod assembly;
-mod config;
-mod errors;
-mod events;
-mod handlers;
-mod models;
-mod router;
-mod sample_submission;
-mod sequencing;
-mod services;
-mod storage;
+pub mod assembly;
+pub mod config;
+pub mod errors;
+pub mod events;
+pub mod handlers;
+pub mod models;
+pub mod router;
+pub mod sample_submission;
+pub mod sequencing;
+pub mod services;
+pub mod storage;
 pub mod tests;
-mod validation;
+pub mod validation;
 
 use sqlx::PgPool;
 use std::{net::SocketAddr, sync::Arc};
