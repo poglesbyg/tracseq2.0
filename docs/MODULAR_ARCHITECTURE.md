@@ -297,5 +297,3 @@ ComponentBuilder::new(config)
 ```
 
 This IKEA-like approach ensures that adding new functionality is as simple as adding a new piece to your furniture assembly!
-
-*Context improved by Giga AI* 
