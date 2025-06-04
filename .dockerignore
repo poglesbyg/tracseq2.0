@@ -1,0 +1,36 @@
+# Rust build artifacts
+target/
+.cargo/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Environment files
+.env
+.env.local
+
+# Logs
+*.log
+
+# Node modules (for frontend)
+frontend/node_modules/
+frontend/dist/
+
+# Docker files (don't copy other Dockerfiles into context)
+Dockerfile.deploy
+
+# Documentation
+docs/
+README.md
+LICENSE 
