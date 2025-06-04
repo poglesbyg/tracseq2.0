@@ -45,3 +45,6 @@ dist-ssr/
 *.tmp
 *.temp
 .cache/
+
+# SQLx
+.sqlx/
