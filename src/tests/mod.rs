@@ -1,6 +1,7 @@
 use crate::sequencing::{CreateJob, JobStatus, SequencingManager};
 use sqlx::postgres::PgPoolOptions;
 
+#[cfg(test)]
 mod template_tests;
 
 pub async fn test_sequencing_crud() -> Result<(), Box<dyn std::error::Error>> {

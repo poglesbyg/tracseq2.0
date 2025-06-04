@@ -179,4 +179,15 @@ For more information about the MIT License, visit [choosealicense.com/licenses/m
 
 ## Support
 
-[Add support information here] 
+For support and questions, please use one of the following channels:
+
+- **GitHub Issues**: Report bugs, request features, or ask questions through our [GitHub Issues](https://github.com/poglesbyg/lab_manager/issues) page
+- **Email**: For urgent matters or private concerns, contact us at paul_grant @ med.unc.edu
+- **Documentation**: Check our [documentation center](docs/README.md) for detailed guides and troubleshooting
+
+
+When seeking support, please include:
+- A clear description of the issue
+- Steps to reproduce (if applicable)
+- Relevant error messages or logs
+- Your environment details (OS, browser, etc.)
