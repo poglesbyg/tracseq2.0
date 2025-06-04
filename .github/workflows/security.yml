@@ -198,19 +198,19 @@ jobs:
           case "${{ matrix.component }}" in
             "handlers")
               echo "Testing input validation and sanitization"
-              cargo test handlers --features security-tests -- --test-threads=1
+              cargo test handlers -- --test-threads=1
               ;;
             "storage")
               echo "Testing file access and path traversal protection"
-              cargo test storage --features security-tests -- --test-threads=1
+              cargo test storage -- --test-threads=1
               ;;
             "config")
               echo "Testing configuration security and secrets handling"
-              cargo test config --features security-tests -- --test-threads=1
+              cargo test config -- --test-threads=1
               ;;
             "assembly")
               echo "Testing component isolation and dependency security"
-              cargo test assembly --features security-tests -- --test-threads=1
+              cargo test assembly -- --test-threads=1
               ;;
           esac
 

@@ -4,6 +4,7 @@ use sqlx::Row;
 use crate::AppComponents;
 
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DashboardStats {
     total_templates: i64,
     total_samples: i64,
