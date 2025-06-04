@@ -66,6 +66,7 @@ async fn main() {
     // Build our application with routes
     let app = Router::new()
         .route("/health", get(handlers::health_check))
+        .route("/api/dashboard/stats", get(handlers::get_dashboard_stats))
         .route("/api/templates/upload", post(handlers::upload_template))
         .route("/api/templates", get(handlers::list_templates))
         .route("/api/samples", post(handlers::create_sample))

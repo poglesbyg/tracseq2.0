@@ -46,5 +46,6 @@ dist-ssr/
 *.temp
 .cache/
 
-# SQLx
+# SQLx query metadata cache
+migrations/.sqlx/
 .sqlx/

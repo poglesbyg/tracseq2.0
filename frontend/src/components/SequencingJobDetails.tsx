@@ -1,7 +1,14 @@
-import { useEffect, useState } from 'react';
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { DocumentIcon, ArrowPathIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+
+interface Sample {
+  id: number;
+  name: string;
+  barcode: string;
+  status?: string;
+}
 
 interface SequencingJob {
   id: number;
@@ -23,7 +30,7 @@ interface JobDetailsProps {
 }
 
 export default function SequencingJobDetails({ jobId, onClose }: JobDetailsProps) {
-  const [isGeneratingSheet, setIsGeneratingSheet] = useState(false);
+  const [isGeneratingSheet, setIsGeneratingSheet] = React.useState(false);
   const queryClient = useQueryClient();
 
   // Fetch job details
@@ -74,7 +81,7 @@ export default function SequencingJobDetails({ jobId, onClose }: JobDetailsProps
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <ArrowPathIcon className="h-8 w-8 animate-spin text-indigo-600" />
+        <ArrowPathIcon className="h-8 w-8 animate-spin text-indigo-600" role="status" />
       </div>
     );
   }
@@ -129,18 +136,30 @@ export default function SequencingJobDetails({ jobId, onClose }: JobDetailsProps
 
         <div className="mt-6">
           <h4 className="text-sm font-medium text-gray-900">Samples</h4>
-          <ul className="mt-2 divide-y divide-gray-200">
-            {job.samples.map((sample) => (
-              <li key={sample.id} className="py-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{sample.name}</p>
-                    <p className="text-sm text-gray-500">{sample.barcode}</p>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Barcode
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {job.samples.map((sample: Sample) => (
+                <tr key={sample.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sample.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sample.barcode}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sample.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
         <div className="mt-6">

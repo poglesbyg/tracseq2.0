@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import StorageManagement from '../components/StorageManagement';
 
 export default function Storage() {

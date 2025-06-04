@@ -6,13 +6,18 @@ WORKDIR /usr/src/app
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Install cargo-watch
+# Install cargo-watch for development
 RUN cargo install cargo-watch
 
 # Copy the source code
 COPY . .
+
+# Prepare SQLx cache
+RUN cargo install sqlx-cli
+RUN cargo sqlx prepare -- --lib
 
 # Set environment variables
 ENV RUST_LOG=info

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { DocumentTextIcon } from '@heroicons/react/24/outline';
@@ -13,6 +13,7 @@ interface Template {
 
 export default function Templates() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: templates, isLoading } = useQuery<Template[]>({
@@ -52,10 +53,41 @@ export default function Templates() {
     }
   };
 
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.name.match(/\.(xlsx|xls|csv)$/i)) {
+        setSelectedFile(file);
+      }
+    }
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div role="status" className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
@@ -70,26 +102,45 @@ export default function Templates() {
           </p>
         </div>
         <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
-          <label
-            htmlFor="file-upload"
-            className="relative cursor-pointer rounded-md bg-white font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500"
+          <div
+            className={`relative cursor-pointer rounded-md bg-white font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500 ${
+              isDragging ? 'ring-2 ring-indigo-600' : ''
+            }`}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            role="button"
+            tabIndex={0}
           >
-            <span>Upload Template</span>
-            <input
-              id="file-upload"
-              name="file-upload"
-              type="file"
-              className="sr-only"
-              accept=".xlsx,.xls,.csv"
-              onChange={handleFileChange}
-            />
-          </label>
+            <div className="p-4 border-2 border-dashed border-gray-300 rounded-md text-center">
+              <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
+              <p className="mt-2 text-sm text-gray-600">
+                Drag and drop your Excel file here, or{' '}
+                <label
+                  htmlFor="file-upload"
+                  className="relative cursor-pointer rounded-md font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500"
+                >
+                  <span>click to select</span>
+                  <input
+                    id="file-upload"
+                    name="file-upload"
+                    type="file"
+                    className="sr-only"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileChange}
+                  />
+                </label>
+              </p>
+              <p className="mt-1 text-xs text-gray-500">Supports .xlsx, .xls, and .csv files</p>
+            </div>
+          </div>
           {selectedFile && (
             <button
               type="button"
               onClick={handleUpload}
               disabled={uploadMutation.isPending}
-              className="ml-3 block rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              className="mt-3 block w-full rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
               {uploadMutation.isPending ? 'Uploading...' : 'Confirm Upload'}
             </button>
