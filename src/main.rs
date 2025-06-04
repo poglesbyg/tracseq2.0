@@ -1,30 +1,50 @@
+mod assembly;
 mod config;
 mod handlers;
 mod models;
+mod router;
 mod sample_submission;
 mod sequencing;
 mod storage;
 pub mod tests;
 
-use axum::{
-    routing::{get, post},
-    Router,
-};
 use sqlx::PgPool;
 use std::{net::SocketAddr, sync::Arc};
-use tower_http::cors::CorsLayer;
 
-use crate::{
-    config::database::create_pool, sample_submission::SampleSubmissionManager,
-    sequencing::SequencingManager, storage::Storage,
-};
+use assembly::assemble_production_components;
+use router::create_app_router;
 
+/// Core application components that can be assembled independently
 #[derive(Clone)]
-pub struct AppState {
+pub struct AppComponents {
+    pub database: DatabaseComponent,
+    pub storage: StorageComponent,
+    pub sample_processing: SampleProcessingComponent,
+    pub sequencing: SequencingComponent,
+}
+
+/// Database component with its own configuration and lifecycle
+#[derive(Clone)]
+pub struct DatabaseComponent {
     pub pool: PgPool,
-    pub storage: Arc<Storage>,
-    pub sample_manager: Arc<SampleSubmissionManager>,
-    pub sequencing_manager: Arc<SequencingManager>,
+}
+
+/// Storage component for managing sample storage
+#[derive(Clone)]
+pub struct StorageComponent {
+    pub storage: Arc<storage::Storage>,
+}
+
+/// Sample processing component for handling sample submissions
+#[derive(Clone)]
+pub struct SampleProcessingComponent {
+    pub manager: Arc<sample_submission::SampleSubmissionManager>,
+}
+
+/// Sequencing component for managing sequencing jobs
+#[derive(Clone)]
+pub struct SequencingComponent {
+    pub manager: Arc<sequencing::SequencingManager>,
 }
 
 #[tokio::main]
@@ -35,58 +55,21 @@ async fn main() {
     // Load environment variables
     dotenv::dotenv().ok();
 
-    // Create database connection pool
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let pool = create_pool(&database_url)
+    // Assemble all components using the new modular system
+    let components = assemble_production_components()
         .await
-        .expect("Failed to create database pool");
+        .expect("Failed to assemble application components");
 
-    // Run migrations using the helper function
-    config::database::run_migrations(&pool)
-        .await
-        .expect("Failed to run migrations");
+    // Create the application router
+    let app = create_app_router().with_state(components);
 
-    // Initialize components
-    let storage = Arc::new(Storage::new(
-        std::env::var("STORAGE_PATH")
-            .expect("STORAGE_PATH must be set")
-            .into(),
-    ));
-    let sample_manager = Arc::new(SampleSubmissionManager::new(pool.clone()));
-    let sequencing_manager = Arc::new(SequencingManager::new(pool.clone()));
+    // Get server configuration
+    let config = config::AppConfig::from_env().expect("Failed to load configuration");
 
-    // Create app state
-    let app_state = AppState {
-        pool,
-        storage,
-        sample_manager,
-        sequencing_manager,
-    };
+    // Run the application
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
+    tracing::info!("Starting server on {}", addr);
 
-    // Build our application with routes
-    let app = Router::new()
-        .route("/health", get(handlers::health_check))
-        .route("/api/dashboard/stats", get(handlers::get_dashboard_stats))
-        .route("/api/templates/upload", post(handlers::upload_template))
-        .route("/api/templates", get(handlers::list_templates))
-        .route("/api/samples", post(handlers::create_sample))
-        .route("/api/samples", get(handlers::list_samples))
-        .route("/api/samples/:id/validate", post(handlers::validate_sample))
-        .route(
-            "/api/sequencing/jobs",
-            post(handlers::create_sequencing_job),
-        )
-        .route("/api/sequencing/jobs", get(handlers::list_sequencing_jobs))
-        .route(
-            "/api/sequencing/jobs/:id/status",
-            post(handlers::update_job_status),
-        )
-        .layer(CorsLayer::permissive())
-        .with_state(app_state);
-
-    // Run it
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
-    tracing::info!("listening on {}", addr);
     axum::serve(
         tokio::net::TcpListener::bind(addr).await.unwrap(),
         app.into_make_service(),

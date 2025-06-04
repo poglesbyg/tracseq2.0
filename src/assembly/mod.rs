@@ -1,0 +1,196 @@
+use sqlx::PgPool;
+use std::sync::Arc;
+
+use crate::{
+    config::{AppConfig, DatabaseConfig, StorageConfig},
+    sample_submission::SampleSubmissionManager,
+    sequencing::SequencingManager,
+    storage::Storage,
+    AppComponents, DatabaseComponent, SampleProcessingComponent, SequencingComponent,
+    StorageComponent,
+};
+
+/// Builder for assembling application components
+pub struct ComponentBuilder {
+    pub config: AppConfig,
+    database_pool: Option<PgPool>,
+    storage: Option<Arc<Storage>>,
+    sample_manager: Option<Arc<SampleSubmissionManager>>,
+    sequencing_manager: Option<Arc<SequencingManager>>,
+}
+
+impl ComponentBuilder {
+    /// Create a new builder with the given configuration
+    pub fn new(config: AppConfig) -> Self {
+        Self {
+            config,
+            database_pool: None,
+            storage: None,
+            sample_manager: None,
+            sequencing_manager: None,
+        }
+    }
+
+    /// Build the database component
+    pub async fn with_database(mut self) -> Result<Self, AssemblyError> {
+        let pool = crate::config::database::create_pool(&self.config.database.url)
+            .await
+            .map_err(AssemblyError::DatabaseConnection)?;
+
+        // Run migrations
+        crate::config::database::run_migrations(&pool)
+            .await
+            .map_err(|e| AssemblyError::Migration(Box::new(e)))?;
+
+        self.database_pool = Some(pool);
+        Ok(self)
+    }
+
+    /// Build the storage component
+    pub async fn with_storage(mut self) -> Result<Self, AssemblyError> {
+        // Create storage directory if it doesn't exist
+        tokio::fs::create_dir_all(&self.config.storage.base_path)
+            .await
+            .map_err(AssemblyError::StorageSetup)?;
+
+        let storage = Arc::new(Storage::new(self.config.storage.base_path.clone()));
+        self.storage = Some(storage);
+        Ok(self)
+    }
+
+    /// Build the sample processing component
+    pub fn with_sample_processing(mut self) -> Result<Self, AssemblyError> {
+        let pool = self
+            .database_pool
+            .as_ref()
+            .ok_or(AssemblyError::MissingDependency(
+                "Database pool required for sample processing",
+            ))?;
+
+        let manager = Arc::new(SampleSubmissionManager::new(pool.clone()));
+        self.sample_manager = Some(manager);
+        Ok(self)
+    }
+
+    /// Build the sequencing component
+    pub fn with_sequencing(mut self) -> Result<Self, AssemblyError> {
+        let pool = self
+            .database_pool
+            .as_ref()
+            .ok_or(AssemblyError::MissingDependency(
+                "Database pool required for sequencing",
+            ))?;
+
+        let manager = Arc::new(SequencingManager::new(pool.clone()));
+        self.sequencing_manager = Some(manager);
+        Ok(self)
+    }
+
+    /// Assemble all components
+    pub fn build(self) -> Result<AppComponents, AssemblyError> {
+        let database_pool = self
+            .database_pool
+            .ok_or(AssemblyError::MissingComponent("Database"))?;
+        let storage = self
+            .storage
+            .ok_or(AssemblyError::MissingComponent("Storage"))?;
+        let sample_manager = self
+            .sample_manager
+            .ok_or(AssemblyError::MissingComponent("Sample Processing"))?;
+        let sequencing_manager = self
+            .sequencing_manager
+            .ok_or(AssemblyError::MissingComponent("Sequencing"))?;
+
+        Ok(AppComponents {
+            database: DatabaseComponent {
+                pool: database_pool,
+            },
+            storage: StorageComponent { storage },
+            sample_processing: SampleProcessingComponent {
+                manager: sample_manager,
+            },
+            sequencing: SequencingComponent {
+                manager: sequencing_manager,
+            },
+        })
+    }
+}
+
+/// Quick assembly method for production use
+pub async fn assemble_production_components() -> Result<AppComponents, AssemblyError> {
+    let config = AppConfig::from_env().map_err(AssemblyError::Configuration)?;
+
+    ComponentBuilder::new(config)
+        .with_database()
+        .await?
+        .with_storage()
+        .await?
+        .with_sample_processing()?
+        .with_sequencing()?
+        .build()
+}
+
+/// Quick assembly method for testing
+pub async fn assemble_test_components() -> Result<AppComponents, AssemblyError> {
+    let config = AppConfig::for_testing();
+
+    ComponentBuilder::new(config)
+        .with_database()
+        .await?
+        .with_storage()
+        .await?
+        .with_sample_processing()?
+        .with_sequencing()?
+        .build()
+}
+
+/// Custom assembly for specific use cases
+pub struct CustomAssembly;
+
+impl CustomAssembly {
+    /// Create components for API-only mode (no storage operations)
+    pub async fn api_only(config: AppConfig) -> Result<AppComponents, AssemblyError> {
+        // Create minimal storage that doesn't write to disk
+        let storage = Arc::new(Storage::new(std::env::temp_dir()));
+
+        let components = ComponentBuilder::new(config)
+            .with_database()
+            .await?
+            .with_sample_processing()?
+            .with_sequencing()?
+            .build()?;
+
+        Ok(AppComponents {
+            database: components.database,
+            storage: StorageComponent { storage },
+            sample_processing: components.sample_processing,
+            sequencing: components.sequencing,
+        })
+    }
+
+    /// Create components for storage-only mode (no database operations)
+    pub async fn storage_only(config: AppConfig) -> Result<StorageComponent, AssemblyError> {
+        tokio::fs::create_dir_all(&config.storage.base_path)
+            .await
+            .map_err(AssemblyError::StorageSetup)?;
+
+        let storage = Arc::new(Storage::new(config.storage.base_path));
+        Ok(StorageComponent { storage })
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AssemblyError {
+    #[error("Configuration error: {0}")]
+    Configuration(#[from] crate::config::ConfigError),
+    #[error("Database connection error: {0}")]
+    DatabaseConnection(#[from] sqlx::Error),
+    #[error("Migration error: {0}")]
+    Migration(Box<dyn std::error::Error + Send + Sync>),
+    #[error("Storage setup error: {0}")]
+    StorageSetup(#[from] std::io::Error),
+    #[error("Missing dependency: {0}")]
+    MissingDependency(&'static str),
+    #[error("Missing component: {0}")]
+    MissingComponent(&'static str),
+}

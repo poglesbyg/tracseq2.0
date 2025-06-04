@@ -4,6 +4,8 @@ use sqlx::postgres::PgPoolOptions;
 #[cfg(test)]
 mod template_tests;
 
+pub mod modular_assembly_test;
+
 pub async fn test_sequencing_crud() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize database connection
     let pool = PgPoolOptions::new()
