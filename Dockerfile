@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
 COPY . .
 
 # Prepare SQLx cache
-RUN cargo install sqlx-cli
+RUN cargo install sqlx-cli --version 0.7.4 --no-default-features --features postgres
 RUN cargo sqlx prepare -- --lib
 
 # Set SQLx to offline mode during build

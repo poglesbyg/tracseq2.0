@@ -106,7 +106,7 @@ jobs:
           key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install SQLx CLI
-        run: cargo install sqlx-cli --no-default-features --features postgres
+        run: cargo install sqlx-cli --version 0.7.4 --no-default-features --features postgres
 
       - name: Run database migrations
         env:
