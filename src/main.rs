@@ -1,12 +1,16 @@
 mod assembly;
 mod config;
+mod errors;
+mod events;
 mod handlers;
 mod models;
 mod router;
 mod sample_submission;
 mod sequencing;
+mod services;
 mod storage;
 pub mod tests;
+mod validation;
 
 use sqlx::PgPool;
 use std::{net::SocketAddr, sync::Arc};
