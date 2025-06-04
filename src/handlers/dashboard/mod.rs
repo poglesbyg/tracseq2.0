@@ -1,4 +1,5 @@
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use sqlx::Row;
 
 use crate::AppComponents;
 
@@ -19,7 +20,7 @@ pub async fn health_check() -> impl IntoResponse {
 pub async fn get_dashboard_stats(
     State(state): State<AppComponents>,
 ) -> Result<Json<DashboardStats>, (StatusCode, String)> {
-    let stats = sqlx::query!(
+    let row = sqlx::query(
         r#"
         WITH stats AS (
             SELECT
@@ -36,9 +37,9 @@ pub async fn get_dashboard_stats(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(DashboardStats {
-        total_templates: stats.total_templates.unwrap_or(0),
-        total_samples: stats.total_samples.unwrap_or(0),
-        pending_sequencing: stats.pending_sequencing.unwrap_or(0),
-        completed_sequencing: stats.completed_sequencing.unwrap_or(0),
+        total_templates: row.try_get("total_templates").unwrap_or(0),
+        total_samples: row.try_get("total_samples").unwrap_or(0),
+        pending_sequencing: row.try_get("pending_sequencing").unwrap_or(0),
+        completed_sequencing: row.try_get("completed_sequencing").unwrap_or(0),
     }))
 }

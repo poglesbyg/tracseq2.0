@@ -4,6 +4,7 @@ use axum::{
     Json,
 };
 use serde_json::json;
+use sqlx::FromRow;
 
 use crate::{
     models::template::{CreateTemplate, Template, TemplateResponse},
@@ -67,19 +68,18 @@ pub async fn upload_template(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Save template metadata to database
-    let template = sqlx::query_as!(
-        Template,
+    let template = sqlx::query_as::<_, Template>(
         r#"
         INSERT INTO templates (name, description, file_path, file_type, metadata)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING *
         "#,
-        template_data.name,
-        template_data.description,
-        &file_path.to_string_lossy(),
-        "xlsx",
-        template_data.metadata.unwrap_or(json!({}))
     )
+    .bind(&template_data.name)
+    .bind(&template_data.description)
+    .bind(&file_path.to_string_lossy())
+    .bind("xlsx")
+    .bind(&template_data.metadata.unwrap_or(json!({})))
     .fetch_one(&state.database.pool)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -97,12 +97,11 @@ pub async fn upload_template(
 pub async fn list_templates(
     State(state): State<AppComponents>,
 ) -> Result<Json<Vec<TemplateResponse>>, (StatusCode, String)> {
-    let templates = sqlx::query_as!(
-        Template,
+    let templates = sqlx::query_as::<_, Template>(
         r#"
         SELECT * FROM templates
         ORDER BY created_at DESC
-        "#
+        "#,
     )
     .fetch_all(&state.database.pool)
     .await

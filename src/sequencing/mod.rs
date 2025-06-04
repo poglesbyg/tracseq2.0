@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct SequencingJob {
     pub id: Uuid,
     pub name: String,
@@ -40,17 +40,16 @@ impl SequencingManager {
     }
 
     pub async fn create_job(&self, job: CreateJob) -> Result<SequencingJob, sqlx::Error> {
-        sqlx::query_as!(
-            SequencingJob,
+        sqlx::query_as::<_, SequencingJob>(
             r#"
             INSERT INTO sequencing_jobs (name, status, sample_sheet_path, metadata)
             VALUES ($1, 'pending', $2, $3)
-            RETURNING id, name, status as "status: JobStatus", sample_sheet_path, created_at, updated_at, metadata
+            RETURNING id, name, status, sample_sheet_path, created_at, updated_at, metadata
             "#,
-            job.name,
-            job.sample_sheet_path,
-            job.metadata.unwrap_or(serde_json::json!({}))
         )
+        .bind(&job.name)
+        .bind(&job.sample_sheet_path)
+        .bind(&job.metadata.unwrap_or(serde_json::json!({})))
         .fetch_one(&self.pool)
         .await
     }
@@ -60,43 +59,40 @@ impl SequencingManager {
         job_id: Uuid,
         status: JobStatus,
     ) -> Result<SequencingJob, sqlx::Error> {
-        sqlx::query_as!(
-            SequencingJob,
+        sqlx::query_as::<_, SequencingJob>(
             r#"
             UPDATE sequencing_jobs
             SET status = $1, updated_at = NOW()
             WHERE id = $2
-            RETURNING id, name, status as "status: JobStatus", sample_sheet_path, created_at, updated_at, metadata
+            RETURNING id, name, status, sample_sheet_path, created_at, updated_at, metadata
             "#,
-            status as JobStatus,
-            job_id
         )
+        .bind(status)
+        .bind(job_id)
         .fetch_one(&self.pool)
         .await
     }
 
     pub async fn get_job(&self, job_id: Uuid) -> Result<SequencingJob, sqlx::Error> {
-        sqlx::query_as!(
-            SequencingJob,
+        sqlx::query_as::<_, SequencingJob>(
             r#"
-            SELECT id, name, status as "status: JobStatus", sample_sheet_path, created_at, updated_at, metadata
+            SELECT id, name, status, sample_sheet_path, created_at, updated_at, metadata
             FROM sequencing_jobs
             WHERE id = $1
             "#,
-            job_id
         )
+        .bind(job_id)
         .fetch_one(&self.pool)
         .await
     }
 
     pub async fn list_jobs(&self) -> Result<Vec<SequencingJob>, sqlx::Error> {
-        sqlx::query_as!(
-            SequencingJob,
+        sqlx::query_as::<_, SequencingJob>(
             r#"
-            SELECT id, name, status as "status: JobStatus", sample_sheet_path, created_at, updated_at, metadata
+            SELECT id, name, status, sample_sheet_path, created_at, updated_at, metadata
             FROM sequencing_jobs
             ORDER BY created_at DESC
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await

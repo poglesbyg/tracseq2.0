@@ -103,7 +103,7 @@ pub struct PaginatedResult<T> {
 
 impl<T> PaginatedResult<T> {
     pub fn new(items: Vec<T>, total: u64, page: u32, per_page: u32) -> Self {
-        let has_next = (page * per_page) < total;
+        let has_next = ((page * per_page) as u64) < total;
         let has_prev = page > 1;
 
         Self {

@@ -4,16 +4,17 @@ use tokio::sync::{broadcast, RwLock};
 use uuid::Uuid;
 
 use super::{
-    Event, EventError, EventFilter, EventHandler, EventMiddleware, EventStats, EventSubscription,
+    Event, EventError, EventFilter, EventHandler, EventMiddleware, EventPayload, EventStats,
+    EventSubscription,
 };
 
 /// In-memory event bus for component communication
 pub struct EventBus {
     /// Broadcast channel for publishing events
-    sender: broadcast::Sender<Arc<dyn Event>>,
+    sender: broadcast::Sender<Arc<EventPayload>>,
 
     /// Event handlers registry
-    handlers: RwLock<HashMap<String, Vec<Arc<dyn EventHandler<dyn Event>>>>>,
+    handlers: RwLock<HashMap<String, Vec<Arc<dyn EventHandler<EventPayload>>>>>,
 
     /// Event subscriptions
     subscriptions: RwLock<HashMap<Uuid, EventSubscription>>,
@@ -46,8 +47,8 @@ impl EventBus {
         }
     }
 
-    /// Publish an event to all subscribers
-    pub async fn publish<E: Event + 'static>(&self, event: E) -> Result<(), EventError> {
+    /// Publish an event to all subscribers  
+    pub async fn publish(&self, event: EventPayload) -> Result<(), EventError> {
         let start_time = std::time::Instant::now();
 
         // Update statistics
@@ -76,7 +77,7 @@ impl EventBus {
 
         let result = async {
             // Send to broadcast channel
-            let event_arc: Arc<dyn Event> = Arc::new(event.clone());
+            let event_arc = Arc::new(event.clone());
             self.sender
                 .send(event_arc)
                 .map_err(|_| EventError::BusError("Failed to broadcast event".to_string()))?;
@@ -148,15 +149,16 @@ impl EventBus {
     }
 
     /// Register an event handler
-    pub async fn register_handler<E: Event + 'static, H: EventHandler<E> + 'static>(
+    pub async fn register_handler<H: EventHandler<EventPayload> + 'static>(
         &self,
         event_type: String,
         handler: H,
     ) {
         let mut handlers = self.handlers.write().await;
-
-        // This is a simplified implementation - in practice you'd need proper type erasure
-        // handlers.entry(event_type).or_insert_with(Vec::new).push(Arc::new(handler));
+        handlers
+            .entry(event_type.clone())
+            .or_insert_with(Vec::new)
+            .push(Arc::new(handler));
 
         tracing::info!("Registered handler for event type: {}", event_type);
     }
@@ -173,7 +175,7 @@ impl EventBus {
     }
 
     /// Create a receiver for listening to all events
-    pub fn create_receiver(&self) -> broadcast::Receiver<Arc<dyn Event>> {
+    pub fn create_receiver(&self) -> broadcast::Receiver<Arc<EventPayload>> {
         self.sender.subscribe()
     }
 
@@ -192,26 +194,24 @@ impl Default for EventBus {
 
 /// Filtered event stream for specific event types/sources
 pub struct FilteredEventStream {
-    receiver: broadcast::Receiver<Arc<dyn Event>>,
+    receiver: broadcast::Receiver<Arc<EventPayload>>,
     filter: EventFilter,
 }
 
 impl FilteredEventStream {
-    pub fn new(receiver: broadcast::Receiver<Arc<dyn Event>>, filter: EventFilter) -> Self {
+    pub fn new(receiver: broadcast::Receiver<Arc<EventPayload>>, filter: EventFilter) -> Self {
         Self { receiver, filter }
     }
 
     /// Get the next event that matches the filter
-    pub async fn next(&mut self) -> Result<Arc<dyn Event>, broadcast::error::RecvError> {
+    pub async fn next(&mut self) -> Result<Arc<EventPayload>, broadcast::error::RecvError> {
         loop {
             let event = self.receiver.recv().await?;
 
-            // Check if event matches filter (simplified - would need proper trait object handling)
-            // if self.filter.matches(&*event) {
-            //     return Ok(event);
-            // }
-
-            return Ok(event); // For now, return all events
+            // Check if event matches filter
+            if self.filter.matches(event.as_ref()) {
+                return Ok(event);
+            }
         }
     }
 }

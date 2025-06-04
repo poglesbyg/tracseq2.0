@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Sample {
     pub id: Uuid,
     pub name: String,
@@ -43,59 +43,55 @@ impl SampleSubmissionManager {
     }
 
     pub async fn create_sample(&self, sample: CreateSample) -> Result<Sample, sqlx::Error> {
-        sqlx::query_as!(
-            Sample,
+        sqlx::query_as::<_, Sample>(
             r#"
             INSERT INTO samples (name, barcode, location, status, metadata)
             VALUES ($1, $2, $3, 'pending', $4)
-            RETURNING id, name, barcode, location, status as "status: SampleStatus", created_at, updated_at, metadata
+            RETURNING id, name, barcode, location, status, created_at, updated_at, metadata
             "#,
-            sample.name,
-            sample.barcode,
-            sample.location,
-            sample.metadata.unwrap_or(serde_json::json!({}))
         )
+        .bind(&sample.name)
+        .bind(&sample.barcode)
+        .bind(&sample.location)
+        .bind(&sample.metadata.unwrap_or(serde_json::json!({})))
         .fetch_one(&self.pool)
         .await
     }
 
     pub async fn validate_sample(&self, sample_id: Uuid) -> Result<Sample, sqlx::Error> {
-        sqlx::query_as!(
-            Sample,
+        sqlx::query_as::<_, Sample>(
             r#"
             UPDATE samples
             SET status = 'validated', updated_at = NOW()
             WHERE id = $1
-            RETURNING id, name, barcode, location, status as "status: SampleStatus", created_at, updated_at, metadata
+            RETURNING id, name, barcode, location, status, created_at, updated_at, metadata
             "#,
-            sample_id
         )
+        .bind(sample_id)
         .fetch_one(&self.pool)
         .await
     }
 
     pub async fn get_sample(&self, sample_id: Uuid) -> Result<Sample, sqlx::Error> {
-        sqlx::query_as!(
-            Sample,
+        sqlx::query_as::<_, Sample>(
             r#"
-            SELECT id, name, barcode, location, status as "status: SampleStatus", created_at, updated_at, metadata
+            SELECT id, name, barcode, location, status, created_at, updated_at, metadata
             FROM samples
             WHERE id = $1
             "#,
-            sample_id
         )
+        .bind(sample_id)
         .fetch_one(&self.pool)
         .await
     }
 
     pub async fn list_samples(&self) -> Result<Vec<Sample>, sqlx::Error> {
-        sqlx::query_as!(
-            Sample,
+        sqlx::query_as::<_, Sample>(
             r#"
-            SELECT id, name, barcode, location, status as "status: SampleStatus", created_at, updated_at, metadata
+            SELECT id, name, barcode, location, status, created_at, updated_at, metadata
             FROM samples
             ORDER BY created_at DESC
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await

@@ -1,5 +1,4 @@
 pub mod bus;
-pub mod handlers;
 pub mod types;
 
 use async_trait::async_trait;
@@ -9,6 +8,92 @@ use uuid::Uuid;
 
 pub use bus::EventBus;
 pub use types::*;
+
+/// Concrete enum holding all possible event types for type-safe event bus
+#[derive(Debug, Clone)]
+pub enum EventPayload {
+    TemplateUploaded(types::TemplateUploadedEvent),
+    SampleCreated(types::SampleCreatedEvent),
+    SampleStatusChanged(types::SampleStatusChangedEvent),
+    FileStored(types::FileStoredEvent),
+    StorageQuotaWarning(types::StorageQuotaWarningEvent),
+    SequencingJobCreated(types::SequencingJobCreatedEvent),
+    SequencingJobCompleted(types::SequencingJobCompletedEvent),
+    ComponentHealthChanged(types::ComponentHealthChangedEvent),
+    ConfigurationChanged(types::ConfigurationChangedEvent),
+}
+
+impl Event for EventPayload {
+    fn event_type(&self) -> &'static str {
+        match self {
+            Self::TemplateUploaded(e) => e.event_type(),
+            Self::SampleCreated(e) => e.event_type(),
+            Self::SampleStatusChanged(e) => e.event_type(),
+            Self::FileStored(e) => e.event_type(),
+            Self::StorageQuotaWarning(e) => e.event_type(),
+            Self::SequencingJobCreated(e) => e.event_type(),
+            Self::SequencingJobCompleted(e) => e.event_type(),
+            Self::ComponentHealthChanged(e) => e.event_type(),
+            Self::ConfigurationChanged(e) => e.event_type(),
+        }
+    }
+
+    fn source(&self) -> &str {
+        match self {
+            Self::TemplateUploaded(e) => e.source(),
+            Self::SampleCreated(e) => e.source(),
+            Self::SampleStatusChanged(e) => e.source(),
+            Self::FileStored(e) => e.source(),
+            Self::StorageQuotaWarning(e) => e.source(),
+            Self::SequencingJobCreated(e) => e.source(),
+            Self::SequencingJobCompleted(e) => e.source(),
+            Self::ComponentHealthChanged(e) => e.source(),
+            Self::ConfigurationChanged(e) => e.source(),
+        }
+    }
+
+    fn timestamp(&self) -> chrono::DateTime<chrono::Utc> {
+        match self {
+            Self::TemplateUploaded(e) => e.timestamp(),
+            Self::SampleCreated(e) => e.timestamp(),
+            Self::SampleStatusChanged(e) => e.timestamp(),
+            Self::FileStored(e) => e.timestamp(),
+            Self::StorageQuotaWarning(e) => e.timestamp(),
+            Self::SequencingJobCreated(e) => e.timestamp(),
+            Self::SequencingJobCompleted(e) => e.timestamp(),
+            Self::ComponentHealthChanged(e) => e.timestamp(),
+            Self::ConfigurationChanged(e) => e.timestamp(),
+        }
+    }
+
+    fn priority(&self) -> EventPriority {
+        match self {
+            Self::TemplateUploaded(e) => e.priority(),
+            Self::SampleCreated(e) => e.priority(),
+            Self::SampleStatusChanged(e) => e.priority(),
+            Self::FileStored(e) => e.priority(),
+            Self::StorageQuotaWarning(e) => e.priority(),
+            Self::SequencingJobCreated(e) => e.priority(),
+            Self::SequencingJobCompleted(e) => e.priority(),
+            Self::ComponentHealthChanged(e) => e.priority(),
+            Self::ConfigurationChanged(e) => e.priority(),
+        }
+    }
+
+    fn metadata(&self) -> &HashMap<String, String> {
+        match self {
+            Self::TemplateUploaded(e) => e.metadata(),
+            Self::SampleCreated(e) => e.metadata(),
+            Self::SampleStatusChanged(e) => e.metadata(),
+            Self::FileStored(e) => e.metadata(),
+            Self::StorageQuotaWarning(e) => e.metadata(),
+            Self::SequencingJobCreated(e) => e.metadata(),
+            Self::SequencingJobCompleted(e) => e.metadata(),
+            Self::ComponentHealthChanged(e) => e.metadata(),
+            Self::ConfigurationChanged(e) => e.metadata(),
+        }
+    }
+}
 
 /// Core event trait that all events must implement
 pub trait Event: Send + Sync + Clone {
@@ -162,7 +247,7 @@ impl EventSubscription {
 }
 
 /// Event statistics for monitoring
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventStats {
     pub total_events: u64,
     pub events_by_type: HashMap<String, u64>,
@@ -176,8 +261,8 @@ pub struct EventStats {
 #[async_trait]
 pub trait EventMiddleware: Send + Sync {
     /// Process event before handlers
-    async fn before_handle<E: Event>(&self, event: &E) -> Result<(), EventError>;
+    async fn before_handle(&self, event: &EventPayload) -> Result<(), EventError>;
 
     /// Process event after handlers
-    async fn after_handle<E: Event>(&self, event: &E, result: &Result<(), EventError>);
+    async fn after_handle(&self, event: &EventPayload, result: &Result<(), EventError>);
 }

@@ -226,10 +226,13 @@ impl StorageService for LocalStorageService {
     }
 
     async fn get_file(&self, path: &Path) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        tokio::fs::read(path).await.map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => StorageError::FileNotFound,
-            std::io::ErrorKind::PermissionDenied => StorageError::PermissionDenied,
-            _ => StorageError::StorageUnavailable,
+        tokio::fs::read(path).await.map_err(|e| {
+            let storage_error = match e.kind() {
+                std::io::ErrorKind::NotFound => StorageError::FileNotFound,
+                std::io::ErrorKind::PermissionDenied => StorageError::PermissionDenied,
+                _ => StorageError::StorageUnavailable,
+            };
+            Box::new(storage_error) as Box<dyn std::error::Error>
         })
     }
 
