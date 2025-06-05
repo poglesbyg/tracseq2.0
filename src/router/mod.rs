@@ -1,5 +1,5 @@
 use axum::{
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
     Router,
 };
 use tower_http::cors::CorsLayer;
@@ -27,6 +27,8 @@ pub fn sample_routes() -> Router<AppComponents> {
     Router::new()
         .route("/api/samples", post(handlers::create_sample))
         .route("/api/samples", get(handlers::list_samples))
+        .route("/api/samples/:id", get(handlers::get_sample))
+        .route("/api/samples/:id", put(handlers::update_sample))
         .route("/api/samples/batch", post(handlers::create_samples_batch))
         .route("/api/samples/:id/validate", post(handlers::validate_sample))
 }
