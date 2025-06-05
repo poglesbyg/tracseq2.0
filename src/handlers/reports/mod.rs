@@ -93,10 +93,7 @@ pub async fn get_schema(
             is_primary_key,
         };
 
-        tables_map
-            .entry(table_name)
-            .or_insert_with(Vec::new)
-            .push(column_info);
+        tables_map.entry(table_name).or_default().push(column_info);
     }
 
     let tables = tables_map
@@ -152,7 +149,7 @@ pub async fn execute_report(
     for row in &rows {
         let mut row_map = HashMap::new();
         for (i, column) in row.columns().iter().enumerate() {
-            let value = convert_sql_value_to_json(&row, i, column.type_info());
+            let value = convert_sql_value_to_json(row, i, column.type_info());
             row_map.insert(column.name().to_string(), value);
         }
         result_rows.push(row_map);

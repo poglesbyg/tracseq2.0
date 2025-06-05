@@ -62,7 +62,7 @@ impl SampleSubmissionManager {
         .bind(&sample.name)
         .bind(&sample.barcode)
         .bind(&sample.location)
-        .bind(&sample.metadata.unwrap_or(serde_json::json!({})))
+        .bind(sample.metadata.unwrap_or(serde_json::json!({})))
         .fetch_one(&self.pool)
         .await
     }

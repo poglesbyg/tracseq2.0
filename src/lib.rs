@@ -17,7 +17,7 @@ pub mod validation;
 
 // Re-export main component types for convenience
 pub use assembly::{AssemblyError, ComponentBuilder};
-pub use config::{AppConfig, DatabaseConfig, ServerConfig, StorageConfig};
+pub use config::{AppConfig, ServerConfig};
 
 // Main application component types
 use sqlx::PgPool;

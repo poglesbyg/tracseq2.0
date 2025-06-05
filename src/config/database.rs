@@ -12,5 +12,5 @@ pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::migrate!("./migrations")
         .run(pool)
         .await
-        .map_err(|e| sqlx::Error::from(e))
+        .map_err(sqlx::Error::from)
 }

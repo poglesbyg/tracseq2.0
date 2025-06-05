@@ -49,7 +49,7 @@ impl SequencingManager {
         )
         .bind(&job.name)
         .bind(&job.sample_sheet_path)
-        .bind(&job.metadata.unwrap_or(serde_json::json!({})))
+        .bind(job.metadata.unwrap_or(serde_json::json!({})))
         .fetch_one(&self.pool)
         .await
     }

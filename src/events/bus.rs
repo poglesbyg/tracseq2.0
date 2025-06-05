@@ -8,13 +8,16 @@ use super::{
     EventSubscription,
 };
 
+/// Type alias for event handlers registry
+type EventHandlersRegistry = RwLock<HashMap<String, Vec<Arc<dyn EventHandler<EventPayload>>>>>;
+
 /// In-memory event bus for component communication
 pub struct EventBus {
     /// Broadcast channel for publishing events
     sender: broadcast::Sender<Arc<EventPayload>>,
 
     /// Event handlers registry
-    handlers: RwLock<HashMap<String, Vec<Arc<dyn EventHandler<EventPayload>>>>>,
+    handlers: EventHandlersRegistry,
 
     /// Event subscriptions
     subscriptions: RwLock<HashMap<Uuid, EventSubscription>>,

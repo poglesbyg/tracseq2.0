@@ -123,7 +123,7 @@ macro_rules! component_error {
             )*
         }
 
-        impl crate::errors::ComponentError for $name {
+        impl $crate::errors::ComponentError for $name {
             fn error_code(&self) -> &'static str {
                 match self {
                     $(
@@ -132,7 +132,7 @@ macro_rules! component_error {
                 }
             }
 
-            fn severity(&self) -> crate::errors::ErrorSeverity {
+            fn severity(&self) -> $crate::errors::ErrorSeverity {
                 match self {
                     $(
                         Self::$variant => $severity,

@@ -24,13 +24,10 @@ pub async fn health_check(
     State(state): State<AppComponents>,
 ) -> Result<Json<HealthStatus>, (StatusCode, String)> {
     // Test database connectivity
-    let database_connected = match sqlx::query("SELECT 1")
+    let database_connected = sqlx::query("SELECT 1")
         .fetch_one(&state.database.pool)
         .await
-    {
-        Ok(_) => true,
-        Err(_) => false,
-    };
+        .is_ok();
 
     let status = if database_connected {
         "healthy"

@@ -164,6 +164,12 @@ pub struct PluginRegistryBuilder {
     plugins: Vec<Box<dyn Plugin>>,
 }
 
+impl Default for PluginRegistryBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PluginRegistryBuilder {
     pub fn new() -> Self {
         Self {

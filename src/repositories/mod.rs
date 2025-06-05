@@ -249,7 +249,7 @@ impl
         .bind(&data.name)
         .bind(&data.barcode)
         .bind(&data.location)
-        .bind(&data.metadata.unwrap_or(serde_json::json!({})))
+        .bind(data.metadata.unwrap_or(serde_json::json!({})))
         .fetch_one(&self.pool)
         .await
     }
@@ -281,7 +281,7 @@ impl
         .bind(&data.name)
         .bind(&data.barcode)
         .bind(&data.location)
-        .bind(&data.metadata.unwrap_or(serde_json::json!({})))
+        .bind(data.metadata.unwrap_or(serde_json::json!({})))
         .fetch_one(&self.pool)
         .await
     }
@@ -321,6 +321,12 @@ pub struct InMemoryRepositoryFactory {
     samples: std::sync::Arc<
         std::sync::RwLock<std::collections::HashMap<Uuid, crate::sample_submission::Sample>>,
     >,
+}
+
+impl Default for InMemoryRepositoryFactory {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl InMemoryRepositoryFactory {
