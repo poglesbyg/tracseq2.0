@@ -1,5 +1,5 @@
 use axum::{
-    routing::{get, post},
+    routing::{delete, get, post},
     Router,
 };
 use tower_http::cors::CorsLayer;
@@ -18,6 +18,8 @@ pub fn template_routes() -> Router<AppComponents> {
     Router::new()
         .route("/api/templates/upload", post(handlers::upload_template))
         .route("/api/templates", get(handlers::list_templates))
+        .route("/api/templates/:id/data", get(handlers::get_template_data))
+        .route("/api/templates/:id", delete(handlers::delete_template))
 }
 
 /// Sample management routes
@@ -42,6 +44,14 @@ pub fn sequencing_routes() -> Router<AppComponents> {
         )
 }
 
+/// Storage management routes
+pub fn storage_routes() -> Router<AppComponents> {
+    Router::new().route(
+        "/api/storage/locations",
+        get(handlers::list_storage_locations),
+    )
+}
+
 /// Assemble all routes into a complete application router
 pub fn create_app_router() -> Router<AppComponents> {
     Router::new()
@@ -49,6 +59,7 @@ pub fn create_app_router() -> Router<AppComponents> {
         .merge(template_routes())
         .merge(sample_routes())
         .merge(sequencing_routes())
+        .merge(storage_routes())
         .layer(CorsLayer::permissive())
 }
 
@@ -66,5 +77,6 @@ pub fn create_api_only_router() -> Router<AppComponents> {
         .route("/api/templates", get(handlers::list_templates))
         .merge(sample_routes())
         .merge(sequencing_routes())
+        .merge(storage_routes())
         .layer(CorsLayer::permissive())
 }

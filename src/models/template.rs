@@ -29,3 +29,25 @@ pub struct TemplateResponse {
     pub created_at: DateTime<Utc>,
     pub metadata: serde_json::Value,
 }
+
+// New structures for spreadsheet data representation
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SpreadsheetData {
+    pub sheet_names: Vec<String>,
+    pub sheets: Vec<SheetData>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SheetData {
+    pub name: String,
+    pub headers: Vec<String>,
+    pub rows: Vec<Vec<String>>,
+    pub total_rows: usize,
+    pub total_columns: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ParsedTemplateResponse {
+    pub template: TemplateResponse,
+    pub data: SpreadsheetData,
+}

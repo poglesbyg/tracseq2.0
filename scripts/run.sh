@@ -20,8 +20,11 @@ mkdir -p storage
 if [ ! -f .env ]; then
     echo -e "${YELLOW}Creating .env file...${NC}"
     cat > .env << EOL
-DATABASE_URL=postgres://postgres:postgres@db:5432/lab_manager
-STORAGE_PATH=/usr/local/bin/storage
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/lab_manager
+STORAGE_PATH=./storage
+SERVER_HOST=0.0.0.0
+SERVER_PORT=3000
+CORS_ENABLED=true
 RUST_LOG=info
 EOL
 fi
@@ -38,9 +41,7 @@ check_port() {
 # Check if required ports are available
 echo -e "${YELLOW}Checking port availability...${NC}"
 ports_in_use=0
-check_port 8080 || ((ports_in_use++))
 check_port 3000 || ((ports_in_use++))
-check_port 3001 || ((ports_in_use++))
 check_port 5173 || ((ports_in_use++))
 check_port 5432 || ((ports_in_use++))
 
@@ -52,27 +53,56 @@ fi
 echo -e "${YELLOW}Stopping any existing containers...${NC}"
 docker-compose down
 
-# Build and start the services
-echo -e "${YELLOW}Building and starting services...${NC}"
-docker-compose up --build -d
+# Start just the database
+echo -e "${YELLOW}Starting PostgreSQL database...${NC}"
+docker-compose up -d db
 
-# Wait for services to be ready
-echo -e "${YELLOW}Waiting for services to be ready...${NC}"
-sleep 10
+# Wait for database to be ready
+echo -e "${YELLOW}Waiting for database to be ready...${NC}"
+sleep 5
 
-# Check if services are running
-echo -e "${YELLOW}Checking service status...${NC}"
-if docker-compose ps | grep -q "Up"; then
-    echo -e "${GREEN}All services are running!${NC}"
-    echo -e "\nAccess points:"
-    echo -e "${GREEN}Frontend:${NC} http://localhost:8080"
-    echo -e "${GREEN}API:${NC} http://localhost:3001"
-    echo -e "${GREEN}Development Frontend:${NC} http://localhost:5173"
-    echo -e "${GREEN}Development API:${NC} http://localhost:3000"
+# Run migrations
+echo -e "${YELLOW}Running database migrations...${NC}"
+if command -v sqlx &> /dev/null; then
+    sqlx migrate run || echo "Migration failed - continuing anyway"
 else
-    echo "Some services failed to start. Check the logs with: docker-compose logs"
+    echo "SQLx CLI not found - skipping migrations"
 fi
 
-# Show logs
-echo -e "\n${YELLOW}Showing logs (press Ctrl+C to exit)...${NC}"
-docker-compose logs -f 
+# Check if we should start services automatically
+if [ "$1" = "--docker" ]; then
+    echo -e "${YELLOW}Starting all services with Docker...${NC}"
+    docker-compose up --build -d
+    sleep 10
+else
+    echo -e "${YELLOW}Database ready! You can now start the services manually:${NC}"
+    echo "Backend: cargo run"
+    echo "Frontend: cd frontend && npm run dev"
+    echo ""
+    echo "Or run with --docker flag to start all services automatically"
+fi
+
+# Check if services are running and show appropriate information
+if [ "$1" = "--docker" ]; then
+    echo -e "${YELLOW}Checking service status...${NC}"
+    if docker-compose ps | grep -q "Up"; then
+        echo -e "${GREEN}All services are running!${NC}"
+        echo -e "\nAccess points:"
+        echo -e "${GREEN}Frontend (Dev):${NC} http://localhost:5173"
+        echo -e "${GREEN}Backend API:${NC} http://localhost:3000"
+        echo -e "${GREEN}Database:${NC} localhost:5432"
+        
+        # Show logs
+        echo -e "\n${YELLOW}Showing logs (press Ctrl+C to exit)...${NC}"
+        docker-compose logs -f
+    else
+        echo "Some services failed to start. Check the logs with: docker-compose logs"
+    fi
+else
+    echo -e "${GREEN}Setup complete!${NC}"
+    echo -e "\nTo start the application:"
+    echo -e "1. ${YELLOW}Backend:${NC} cargo run"
+    echo -e "2. ${YELLOW}Frontend:${NC} cd frontend && npm run dev"
+    echo -e "\nThen access: ${GREEN}http://localhost:5173${NC}"
+    echo -e "\nDatabase is already running on: ${GREEN}localhost:5432${NC}"
+fi 

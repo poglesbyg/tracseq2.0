@@ -1,19 +1,40 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { DocumentTextIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
+import SpreadsheetViewer from '../components/SpreadsheetViewer';
 
 interface Template {
   id: string;
   name: string;
-  version: string;
+  description?: string;
   created_at: string;
-  updated_at: string;
+  metadata: Record<string, any>;
+}
+
+interface SheetData {
+  name: string;
+  headers: string[];
+  rows: string[][];
+  total_rows: number;
+  total_columns: number;
+}
+
+interface SpreadsheetData {
+  sheet_names: string[];
+  sheets: SheetData[];
+}
+
+interface ParsedTemplateResponse {
+  template: Template;
+  data: SpreadsheetData;
 }
 
 export default function Templates() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [viewingTemplate, setViewingTemplate] = useState<ParsedTemplateResponse | null>(null);
+  const [deletingTemplate, setDeletingTemplate] = useState<Template | null>(null);
   const queryClient = useQueryClient();
 
   const { data: templates, isLoading } = useQuery<Template[]>({
@@ -28,6 +49,20 @@ export default function Templates() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
+      
+      // Add template metadata
+      const templateData = {
+        name: file.name.replace(/\.[^/.]+$/, ""), // Remove file extension
+        description: `Uploaded spreadsheet: ${file.name}`,
+        metadata: {
+          originalFileName: file.name,
+          fileSize: file.size,
+          uploadedAt: new Date().toISOString()
+        }
+      };
+      
+      formData.append('template', JSON.stringify(templateData));
+      
       const response = await axios.post('/api/templates/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -41,6 +76,26 @@ export default function Templates() {
     },
   });
 
+  const viewTemplateMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      const response = await axios.get<ParsedTemplateResponse>(`/api/templates/${templateId}/data`);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      setViewingTemplate(data);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      await axios.delete(`/api/templates/${templateId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
+      setDeletingTemplate(null);
+    },
+  });
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       setSelectedFile(event.target.files[0]);
@@ -51,6 +106,24 @@ export default function Templates() {
     if (selectedFile) {
       uploadMutation.mutate(selectedFile);
     }
+  };
+
+  const handleViewTemplate = async (templateId: string) => {
+    viewTemplateMutation.mutate(templateId);
+  };
+
+  const handleDeleteTemplate = async (template: Template) => {
+    setDeletingTemplate(template);
+  };
+
+  const confirmDelete = async () => {
+    if (deletingTemplate) {
+      deleteMutation.mutate(deletingTemplate.id);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeletingTemplate(null);
   };
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -84,6 +157,8 @@ export default function Templates() {
     }
   }, []);
 
+
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -93,7 +168,7 @@ export default function Templates() {
   }
 
   return (
-    <div>
+    <div className="px-4 sm:px-6 lg:px-8 py-8 bg-white min-h-screen">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
           <h1 className="text-2xl font-semibold text-gray-900">Templates</h1>
@@ -159,13 +234,13 @@ export default function Templates() {
                       Name
                     </th>
                     <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                      Version
+                      Description
                     </th>
                     <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                       Created
                     </th>
                     <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                      Updated
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -178,12 +253,29 @@ export default function Templates() {
                           {template.name}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{template.version}</td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        {template.description || '-'}
+                      </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                         {new Date(template.created_at).toLocaleDateString()}
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                        {new Date(template.updated_at).toLocaleDateString()}
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleViewTemplate(template.id)}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-indigo-600 bg-indigo-100 rounded-md hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <EyeIcon className="h-4 w-4 mr-1" />
+                            View Data
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTemplate(template)}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-600 bg-red-100 rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500"
+                          >
+                            <TrashIcon className="h-4 w-4 mr-1" />
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -193,6 +285,51 @@ export default function Templates() {
           </div>
         </div>
       </div>
+
+      {/* Spreadsheet Viewer Modal */}
+      {viewingTemplate && (
+        <SpreadsheetViewer
+          template={viewingTemplate.template}
+          data={viewingTemplate.data}
+          onClose={() => setViewingTemplate(null)}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingTemplate && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3 text-center">
+              <TrashIcon className="mx-auto h-16 w-16 text-red-400" />
+              <h3 className="text-lg leading-6 font-medium text-gray-900 mt-4">
+                Delete Template
+              </h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500">
+                  Are you sure you want to delete the template "{deletingTemplate.name}"?
+                  This action cannot be undone and will permanently remove the template
+                  and its associated file.
+                </p>
+              </div>
+              <div className="flex justify-center space-x-4 px-4 py-3">
+                <button
+                  onClick={cancelDelete}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={deleteMutation.isPending}
+                  className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:opacity-50"
+                >
+                  {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
