@@ -314,14 +314,14 @@ impl ValidationError {
         self
     }
 
-    pub fn with_severity(mut self, severity: ErrorSeverity) -> Self {
+    pub const fn with_severity(mut self, severity: ErrorSeverity) -> Self {
         self.severity = severity;
         self
     }
 }
 
 impl ValidationWarning {
-    pub fn new(code: String, message: String) -> Self {
+    pub const fn new(code: String, message: String) -> Self {
         Self {
             code,
             message,
