@@ -49,3 +49,5 @@ dist-ssr/
 # SQLx query metadata cache
 migrations/.sqlx/
 .sqlx/
+
+.venv
