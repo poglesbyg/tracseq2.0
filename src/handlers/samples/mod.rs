@@ -6,7 +6,7 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    sample_submission::{CreateSample, Sample},
+    sample_submission::{CreateSample, Sample, UpdateSample},
     AppComponents,
 };
 
@@ -46,6 +46,35 @@ pub async fn validate_sample(
         .sample_processing
         .manager
         .validate_sample(sample_id)
+        .await
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+/// Update a sample by its ID
+pub async fn update_sample(
+    State(state): State<AppComponents>,
+    Path(sample_id): Path<Uuid>,
+    Json(updates): Json<UpdateSample>,
+) -> Result<Json<Sample>, (StatusCode, String)> {
+    state
+        .sample_processing
+        .manager
+        .update_sample(sample_id, updates)
+        .await
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+/// Get a single sample by its ID
+pub async fn get_sample(
+    State(state): State<AppComponents>,
+    Path(sample_id): Path<Uuid>,
+) -> Result<Json<Sample>, (StatusCode, String)> {
+    state
+        .sample_processing
+        .manager
+        .get_sample(sample_id)
         .await
         .map(Json)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))

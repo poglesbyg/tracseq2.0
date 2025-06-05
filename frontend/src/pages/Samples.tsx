@@ -2,16 +2,17 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import SampleSubmissionWizard from '../components/SampleSubmissionWizard';
+import SampleEditModal from '../components/SampleEditModal';
 
 interface Sample {
-  id: number;
+  id: string;
   name: string;
-  template_id: number;
-  storage_location_id: number;
   barcode: string;
+  location: string;
+  status: 'Pending' | 'Validated' | 'InStorage' | 'InSequencing' | 'Completed';
   created_at: string;
   updated_at: string;
-  status: string;
+  metadata: any;
 }
 
 interface Template {
@@ -27,6 +28,7 @@ interface StorageLocation {
 
 export default function Samples() {
   const [showWizard, setShowWizard] = useState(false);
+  const [editingSample, setEditingSample] = useState<Sample | null>(null);
 
   // Fetch samples
   const { data: samples, isLoading: isLoadingSamples } = useQuery<Sample[]>({
@@ -56,15 +58,19 @@ export default function Samples() {
   });
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'active':
+    switch (status) {
+      case 'Completed':
         return 'bg-green-100 text-green-800';
-      case 'pending':
+      case 'Pending':
         return 'bg-yellow-100 text-yellow-800';
-      case 'archived':
-        return 'bg-gray-100 text-gray-800';
-      default:
+      case 'Validated':
         return 'bg-blue-100 text-blue-800';
+      case 'InStorage':
+        return 'bg-purple-100 text-purple-800';
+      case 'InSequencing':
+        return 'bg-indigo-100 text-indigo-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -111,6 +117,13 @@ export default function Samples() {
         </div>
       )}
 
+      {editingSample && (
+        <SampleEditModal
+          sample={editingSample}
+          onClose={() => setEditingSample(null)}
+        />
+      )}
+
       <div className="mt-8 flex flex-col">
         <div className="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
           <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
@@ -136,18 +149,21 @@ export default function Samples() {
                     <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                       Created
                     </th>
+                    <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {isLoadingSamples ? (
                     <tr>
-                      <td colSpan={6} className="px-3 py-4 text-sm text-gray-500 text-center">
+                      <td colSpan={7} className="px-3 py-4 text-sm text-gray-500 text-center">
                         Loading samples...
                       </td>
                     </tr>
                   ) : samples?.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-3 py-4 text-sm text-gray-500 text-center">
+                      <td colSpan={7} className="px-3 py-4 text-sm text-gray-500 text-center">
                         No samples found
                       </td>
                     </tr>
@@ -158,10 +174,10 @@ export default function Samples() {
                           {sample.name}
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          {templates?.find((t) => t.id === sample.template_id)?.name}
+                          {sample.metadata?.template_name || 'N/A'}
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          {storageLocations?.find((l) => l.id === sample.storage_location_id)?.name}
+                          {sample.location}
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                           {sample.barcode}
@@ -173,6 +189,14 @@ export default function Samples() {
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                           {new Date(sample.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                          <button
+                            onClick={() => setEditingSample(sample)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            Edit
+                          </button>
                         </td>
                       </tr>
                     ))
