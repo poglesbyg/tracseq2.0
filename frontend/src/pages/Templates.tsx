@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { DocumentTextIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon, EyeIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import SpreadsheetViewer from '../components/SpreadsheetViewer';
 import BatchSampleCreation from '../components/BatchSampleCreation';
+import TemplateEditModal from '../components/TemplateEditModal';
 
 interface Template {
   id: string;
@@ -36,6 +37,7 @@ export default function Templates() {
   const [isDragging, setIsDragging] = useState(false);
   const [viewingTemplate, setViewingTemplate] = useState<ParsedTemplateResponse | null>(null);
   const [deletingTemplate, setDeletingTemplate] = useState<Template | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [creatingFromTemplate, setCreatingFromTemplate] = useState<ParsedTemplateResponse | null>(null);
   const queryClient = useQueryClient();
 
@@ -112,6 +114,10 @@ export default function Templates() {
 
   const handleViewTemplate = async (templateId: string) => {
     viewTemplateMutation.mutate(templateId);
+  };
+
+  const handleEditTemplate = (template: Template) => {
+    setEditingTemplate(template);
   };
 
   const handleDeleteTemplate = async (template: Template) => {
@@ -276,6 +282,13 @@ export default function Templates() {
                             View Data
                           </button>
                           <button
+                            onClick={() => handleEditTemplate(template)}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-green-600 bg-green-100 rounded-md hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+                          >
+                            <PencilIcon className="h-4 w-4 mr-1" />
+                            Edit
+                          </button>
+                          <button
                             onClick={() => handleDeleteTemplate(template)}
                             className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-600 bg-red-100 rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500"
                           >
@@ -300,6 +313,14 @@ export default function Templates() {
           data={viewingTemplate.data}
           onClose={() => setViewingTemplate(null)}
           onCreateSamples={handleCreateSamples}
+        />
+      )}
+
+      {/* Template Edit Modal */}
+      {editingTemplate && (
+        <TemplateEditModal
+          template={editingTemplate}
+          onClose={() => setEditingTemplate(null)}
         />
       )}
 

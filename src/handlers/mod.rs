@@ -10,4 +10,7 @@ pub use samples::{
 };
 pub use sequencing::{create_sequencing_job, list_sequencing_jobs, update_job_status};
 pub use storage::list_storage_locations;
-pub use templates::{delete_template, get_template_data, list_templates, upload_template};
+pub use templates::{
+    delete_template, get_template, get_template_data, list_templates, update_template,
+    upload_template,
+};

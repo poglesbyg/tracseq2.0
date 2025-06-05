@@ -5,21 +5,21 @@ use std::path::Path;
 use uuid::Uuid;
 
 use crate::{
-    models::template::{CreateTemplate, SheetData, SpreadsheetData, Template},
+    models::template::{CreateTemplate, SheetData, SpreadsheetData, Template, UpdateTemplate},
     repositories::{Repository, RepositoryFactory},
     services::{HealthCheck, HealthStatus, Service, ServiceConfig, ServiceHealth},
 };
 
 pub struct TemplateService<R>
 where
-    R: Repository<Template, CreateTemplate, CreateTemplate> + Send + Sync,
+    R: Repository<Template, CreateTemplate, UpdateTemplate> + Send + Sync,
 {
     repository: R,
 }
 
 impl<R> TemplateService<R>
 where
-    R: Repository<Template, CreateTemplate, CreateTemplate> + Send + Sync,
+    R: Repository<Template, CreateTemplate, UpdateTemplate> + Send + Sync,
 {
     pub fn new(repository: R) -> Self {
         Self { repository }
@@ -35,6 +35,14 @@ where
 
     pub async fn list_templates(&self) -> Result<Vec<Template>, R::Error> {
         self.repository.list(None, None).await
+    }
+
+    pub async fn update_template(
+        &self,
+        template_id: Uuid,
+        updates: UpdateTemplate,
+    ) -> Result<Template, R::Error> {
+        self.repository.update(template_id, updates).await
     }
 
     pub async fn delete_template(&self, template_id: Uuid) -> Result<(), R::Error> {
@@ -199,7 +207,7 @@ where
 #[async_trait]
 impl<R> Service for TemplateService<R>
 where
-    R: Repository<Template, CreateTemplate, CreateTemplate> + Send + Sync,
+    R: Repository<Template, CreateTemplate, UpdateTemplate> + Send + Sync,
 {
     fn name(&self) -> &'static str {
         "template_service"
