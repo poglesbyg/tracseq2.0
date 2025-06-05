@@ -252,8 +252,8 @@ jobs:
               && rm -rf /var/lib/apt/lists/*
           
           COPY . .
-          # Build with reports feature only
-          RUN cargo build --release --bin lab_manager --features reports-only
+          # Build the application (reports functionality is controlled via environment variables)
+          RUN cargo build --release --bin lab_manager
           
           FROM debian:bookworm-slim
           WORKDIR /app
