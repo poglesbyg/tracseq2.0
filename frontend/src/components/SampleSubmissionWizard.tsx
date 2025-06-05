@@ -18,6 +18,7 @@ interface StorageLocation {
 
 interface SampleData {
   name: string;
+  barcode: string;
   template_id: string;
   storage_location_id: string;
   metadata: Record<string, string>;
@@ -25,9 +26,9 @@ interface SampleData {
 
 interface SampleSubmissionData {
   name: string;
-  template_id: number;
-  storage_location_id: number;
-  metadata: Record<string, string>;
+  barcode: string;
+  location: string;
+  metadata: Record<string, any>;
 }
 
 const steps = [
@@ -41,6 +42,7 @@ export default function SampleSubmissionWizard() {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<SampleData>({
     name: '',
+    barcode: '',
     template_id: '',
     storage_location_id: '',
     metadata: {},
@@ -88,12 +90,24 @@ export default function SampleSubmissionWizard() {
   };
 
   const handleSubmit = () => {
-    // Convert string IDs back to numbers for submission
-    const submissionData = {
-      ...formData,
-      template_id: Number(formData.template_id),
-      storage_location_id: Number(formData.storage_location_id),
+    // Generate barcode if not provided
+    const barcode = formData.barcode || `LAB-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    
+    // Get location name from storage locations
+    const selectedLocation = storageLocations?.find(l => l.id === Number(formData.storage_location_id));
+    const locationName = selectedLocation?.name || 'Unknown Location';
+    
+    const submissionData: SampleSubmissionData = {
+      name: formData.name,
+      barcode: barcode,
+      location: locationName,
+      metadata: {
+        ...formData.metadata,
+        template_id: formData.template_id,
+        storage_location_id: formData.storage_location_id,
+      },
     };
+    
     submitSample.mutate(submissionData);
   };
 
@@ -129,7 +143,21 @@ export default function SampleSubmissionWizard() {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Barcode (optional)</label>
+              <input
+                type="text"
+                placeholder="Leave empty to auto-generate"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                value={formData.barcode}
+                onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                If left empty, a unique barcode will be generated automatically
+              </p>
             </div>
             {/* Add template-specific metadata fields here */}
           </div>
@@ -155,6 +183,10 @@ export default function SampleSubmissionWizard() {
         );
 
       case 3:
+        const selectedTemplate = templates?.find((t) => t.id === Number(formData.template_id));
+        const selectedLocation = storageLocations?.find((l) => l.id === Number(formData.storage_location_id));
+        const displayBarcode = formData.barcode || `LAB-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+        
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Confirm Submission</h3>
@@ -162,18 +194,24 @@ export default function SampleSubmissionWizard() {
               <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Sample Name</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{formData.name}</dd>
+                  <dd className="mt-1 text-sm text-gray-900">{formData.name || 'Not specified'}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Barcode</dt>
+                  <dd className="mt-1 text-sm text-gray-900">
+                    {formData.barcode ? formData.barcode : <span className="text-gray-500">{displayBarcode} (auto-generated)</span>}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Template</dt>
                   <dd className="mt-1 text-sm text-gray-900">
-                    {templates?.find((t) => t.id === Number(formData.template_id))?.name}
+                    {selectedTemplate?.name || 'Not selected'}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Storage Location</dt>
                   <dd className="mt-1 text-sm text-gray-900">
-                    {storageLocations?.find((l) => l.id === Number(formData.storage_location_id))?.name}
+                    {selectedLocation?.name || 'Not selected'}
                   </dd>
                 </div>
               </dl>
