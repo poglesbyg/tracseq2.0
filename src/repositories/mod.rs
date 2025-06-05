@@ -85,16 +85,33 @@ impl
         &self,
         data: crate::models::template::CreateTemplate,
     ) -> Result<crate::models::template::Template, Self::Error> {
+        // Extract file_path and file_type from metadata if they exist
+        let metadata = data.metadata.unwrap_or(serde_json::json!({}));
+        let file_path = metadata
+            .get("file_path")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let file_type = metadata
+            .get("file_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        let clean_metadata = metadata
+            .get("original_metadata")
+            .unwrap_or(&metadata)
+            .clone();
+
         sqlx::query_as::<_, crate::models::template::Template>(
             r#"
             INSERT INTO templates (name, description, file_path, file_type, metadata)
-            VALUES ($1, $2, '', 'unknown', $3)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING *
             "#,
         )
         .bind(&data.name)
         .bind(&data.description)
-        .bind(&data.metadata.unwrap_or(serde_json::json!({})))
+        .bind(file_path)
+        .bind(file_type)
+        .bind(&clean_metadata)
         .fetch_one(&self.pool)
         .await
     }

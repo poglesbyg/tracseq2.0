@@ -18,6 +18,7 @@ use sqlx::PgPool;
 use std::{net::SocketAddr, sync::Arc};
 
 use assembly::assemble_production_components;
+use repositories::PostgresRepositoryFactory;
 use router::create_app_router;
 
 /// Core application components that can be assembled independently
@@ -27,6 +28,7 @@ pub struct AppComponents {
     pub storage: StorageComponent,
     pub sample_processing: SampleProcessingComponent,
     pub sequencing: SequencingComponent,
+    pub repositories: RepositoriesComponent,
 }
 
 /// Database component with its own configuration and lifecycle
@@ -52,6 +54,9 @@ pub struct SampleProcessingComponent {
 pub struct SequencingComponent {
     pub manager: Arc<sequencing::SequencingManager>,
 }
+
+/// Import RepositoriesComponent from assembly
+pub use assembly::RepositoriesComponent;
 
 #[tokio::main]
 async fn main() {

@@ -3,12 +3,19 @@ use std::sync::Arc;
 
 use crate::{
     config::{AppConfig, DatabaseConfig, StorageConfig},
+    repositories::PostgresRepositoryFactory,
     sample_submission::SampleSubmissionManager,
     sequencing::SequencingManager,
     storage::Storage,
     AppComponents, DatabaseComponent, SampleProcessingComponent, SequencingComponent,
     StorageComponent,
 };
+
+/// Repositories component for data access abstraction
+#[derive(Clone)]
+pub struct RepositoriesComponent {
+    pub factory: Arc<PostgresRepositoryFactory>,
+}
 
 /// Builder for assembling application components
 pub struct ComponentBuilder {
@@ -17,6 +24,7 @@ pub struct ComponentBuilder {
     storage: Option<Arc<Storage>>,
     sample_manager: Option<Arc<SampleSubmissionManager>>,
     sequencing_manager: Option<Arc<SequencingManager>>,
+    repository_factory: Option<Arc<PostgresRepositoryFactory>>,
 }
 
 impl ComponentBuilder {
@@ -28,6 +36,7 @@ impl ComponentBuilder {
             storage: None,
             sample_manager: None,
             sequencing_manager: None,
+            repository_factory: None,
         }
     }
 
@@ -86,6 +95,20 @@ impl ComponentBuilder {
         Ok(self)
     }
 
+    /// Build the repository factory
+    pub fn with_repositories(mut self) -> Result<Self, AssemblyError> {
+        let pool = self
+            .database_pool
+            .as_ref()
+            .ok_or(AssemblyError::MissingDependency(
+                "Database pool required for repositories",
+            ))?;
+
+        let factory = Arc::new(PostgresRepositoryFactory::new(pool.clone()));
+        self.repository_factory = Some(factory);
+        Ok(self)
+    }
+
     /// Assemble all components
     pub fn build(self) -> Result<AppComponents, AssemblyError> {
         let database_pool = self
@@ -100,6 +123,9 @@ impl ComponentBuilder {
         let sequencing_manager = self
             .sequencing_manager
             .ok_or(AssemblyError::MissingComponent("Sequencing"))?;
+        let repository_factory = self
+            .repository_factory
+            .ok_or(AssemblyError::MissingComponent("Repositories"))?;
 
         Ok(AppComponents {
             database: DatabaseComponent {
@@ -112,6 +138,9 @@ impl ComponentBuilder {
             sequencing: SequencingComponent {
                 manager: sequencing_manager,
             },
+            repositories: RepositoriesComponent {
+                factory: repository_factory,
+            },
         })
     }
 }
@@ -123,6 +152,7 @@ pub async fn assemble_production_components() -> Result<AppComponents, AssemblyE
     ComponentBuilder::new(config)
         .with_database()
         .await?
+        .with_repositories()?
         .with_storage()
         .await?
         .with_sample_processing()?
@@ -137,6 +167,7 @@ pub async fn assemble_test_components() -> Result<AppComponents, AssemblyError> 
     ComponentBuilder::new(config)
         .with_database()
         .await?
+        .with_repositories()?
         .with_storage()
         .await?
         .with_sample_processing()?
@@ -156,6 +187,7 @@ impl CustomAssembly {
         let components = ComponentBuilder::new(config)
             .with_database()
             .await?
+            .with_repositories()?
             .with_sample_processing()?
             .with_sequencing()?
             .build()?;
@@ -165,6 +197,7 @@ impl CustomAssembly {
             storage: StorageComponent { storage },
             sample_processing: components.sample_processing,
             sequencing: components.sequencing,
+            repositories: components.repositories,
         })
     }
 

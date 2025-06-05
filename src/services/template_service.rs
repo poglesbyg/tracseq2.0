@@ -1,72 +1,44 @@
 use async_trait::async_trait;
 use calamine::{open_workbook_auto, DataType, Range, Reader};
-use sqlx::PgPool;
 use std::collections::HashMap;
 use std::path::Path;
 use uuid::Uuid;
 
 use crate::{
     models::template::{CreateTemplate, SheetData, SpreadsheetData, Template},
+    repositories::{Repository, RepositoryFactory},
     services::{HealthCheck, HealthStatus, Service, ServiceConfig, ServiceHealth},
 };
 
-pub struct TemplateService {
-    pool: PgPool,
+pub struct TemplateService<R>
+where
+    R: Repository<Template, CreateTemplate, CreateTemplate> + Send + Sync,
+{
+    repository: R,
 }
 
-impl TemplateService {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+impl<R> TemplateService<R>
+where
+    R: Repository<Template, CreateTemplate, CreateTemplate> + Send + Sync,
+{
+    pub fn new(repository: R) -> Self {
+        Self { repository }
     }
 
-    pub async fn create_template(&self, template: CreateTemplate) -> Result<Template, sqlx::Error> {
-        sqlx::query_as::<_, Template>(
-            r#"
-            INSERT INTO templates (name, description, file_path, file_type, metadata)
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING *
-            "#,
-        )
-        .bind(&template.name)
-        .bind(&template.description)
-        .bind("") // file_path will be set by upload handler
-        .bind("xlsx")
-        .bind(&template.metadata.unwrap_or(serde_json::json!({})))
-        .fetch_one(&self.pool)
-        .await
+    pub async fn create_template(&self, template: CreateTemplate) -> Result<Template, R::Error> {
+        self.repository.create(template).await
     }
 
-    pub async fn get_template(&self, template_id: Uuid) -> Result<Template, sqlx::Error> {
-        sqlx::query_as::<_, Template>(
-            r#"
-            SELECT * FROM templates WHERE id = $1
-            "#,
-        )
-        .bind(template_id)
-        .fetch_one(&self.pool)
-        .await
+    pub async fn get_template(&self, template_id: Uuid) -> Result<Option<Template>, R::Error> {
+        self.repository.find_by_id(template_id).await
     }
 
-    pub async fn list_templates(&self) -> Result<Vec<Template>, sqlx::Error> {
-        sqlx::query_as::<_, Template>(
-            r#"
-            SELECT * FROM templates ORDER BY created_at DESC
-            "#,
-        )
-        .fetch_all(&self.pool)
-        .await
+    pub async fn list_templates(&self) -> Result<Vec<Template>, R::Error> {
+        self.repository.list(None, None).await
     }
 
-    pub async fn delete_template(&self, template_id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            r#"
-            DELETE FROM templates WHERE id = $1
-            "#,
-        )
-        .bind(template_id)
-        .execute(&self.pool)
-        .await?;
-        Ok(())
+    pub async fn delete_template(&self, template_id: Uuid) -> Result<(), R::Error> {
+        self.repository.delete(template_id).await
     }
 
     // New method to parse spreadsheet data
@@ -225,7 +197,10 @@ impl TemplateService {
 }
 
 #[async_trait]
-impl Service for TemplateService {
+impl<R> Service for TemplateService<R>
+where
+    R: Repository<Template, CreateTemplate, CreateTemplate> + Send + Sync,
+{
     fn name(&self) -> &'static str {
         "template_service"
     }
@@ -233,22 +208,22 @@ impl Service for TemplateService {
     async fn health_check(&self) -> ServiceHealth {
         let mut checks = HashMap::new();
 
-        // Test database connectivity by listing templates
+        // Test repository connectivity by listing templates
         let start = std::time::Instant::now();
         let db_check = match self.list_templates().await {
             Ok(_) => HealthCheck {
                 status: HealthStatus::Healthy,
                 duration_ms: start.elapsed().as_millis() as u64,
-                details: Some("Database connection successful".to_string()),
+                details: Some("Repository connection successful".to_string()),
             },
-            Err(e) => HealthCheck {
+            Err(_) => HealthCheck {
                 status: HealthStatus::Unhealthy,
                 duration_ms: start.elapsed().as_millis() as u64,
-                details: Some(format!("Database error: {}", e)),
+                details: Some("Repository error".to_string()),
             },
         };
 
-        checks.insert("database".to_string(), db_check.clone());
+        checks.insert("repository".to_string(), db_check.clone());
 
         ServiceHealth {
             status: db_check.status,
@@ -261,7 +236,7 @@ impl Service for TemplateService {
         ServiceConfig {
             name: "template_service".to_string(),
             version: "1.0.0".to_string(),
-            dependencies: vec!["database".to_string()],
+            dependencies: vec!["repository".to_string()],
             settings: HashMap::new(),
         }
     }

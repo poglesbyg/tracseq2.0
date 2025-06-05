@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     models::template::{CreateTemplate, ParsedTemplateResponse, Template, TemplateResponse},
+    repositories::{Repository, RepositoryFactory},
     services::template_service::TemplateService,
     AppComponents,
 };
@@ -80,22 +81,19 @@ pub async fn upload_template(
         .and_then(|ext| ext.to_str())
         .unwrap_or("unknown");
 
-    // Save template metadata to database
-    let template = sqlx::query_as::<_, Template>(
-        r#"
-        INSERT INTO templates (name, description, file_path, file_type, metadata)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING *
-        "#,
-    )
-    .bind(&template_data.name)
-    .bind(&template_data.description)
-    .bind(&file_path.to_string_lossy())
-    .bind(file_type)
-    .bind(&template_data.metadata.unwrap_or(json!({})))
-    .fetch_one(&state.database.pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    // Save template metadata to database using repository
+    let template_repo = state.repositories.factory.template_repository();
+    let mut create_template = template_data;
+    create_template.metadata = Some(json!({
+        "file_path": file_path.to_string_lossy(),
+        "file_type": file_type,
+        "original_metadata": create_template.metadata.unwrap_or(json!({}))
+    }));
+
+    let template = template_repo
+        .create(create_template)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(TemplateResponse {
         id: template.id,
@@ -110,15 +108,11 @@ pub async fn upload_template(
 pub async fn list_templates(
     State(state): State<AppComponents>,
 ) -> Result<Json<Vec<TemplateResponse>>, (StatusCode, String)> {
-    let templates = sqlx::query_as::<_, Template>(
-        r#"
-        SELECT * FROM templates
-        ORDER BY created_at DESC
-        "#,
-    )
-    .fetch_all(&state.database.pool)
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let template_repo = state.repositories.factory.template_repository();
+    let templates = template_repo
+        .list(None, None)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let responses = templates
         .into_iter()
@@ -139,17 +133,16 @@ pub async fn get_template_data(
     State(state): State<AppComponents>,
     Path(template_id): Path<Uuid>,
 ) -> Result<Json<ParsedTemplateResponse>, (StatusCode, String)> {
-    // Create template service instance
-    let template_service = TemplateService::new(state.database.pool.clone());
+    // Create template service instance with repository
+    let template_repo = state.repositories.factory.template_repository();
+    let template_service = TemplateService::new(template_repo);
 
     // Get template from database
     let template = template_service
         .get_template(template_id)
         .await
-        .map_err(|e| match e {
-            sqlx::Error::RowNotFound => (StatusCode::NOT_FOUND, "Template not found".to_string()),
-            _ => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-        })?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "Template not found".to_string()))?;
 
     // Parse the spreadsheet data
     let spreadsheet_data = template_service
@@ -181,17 +174,16 @@ pub async fn delete_template(
     State(state): State<AppComponents>,
     Path(template_id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    // Create template service instance
-    let template_service = TemplateService::new(state.database.pool.clone());
+    // Create template service instance with repository
+    let template_repo = state.repositories.factory.template_repository();
+    let template_service = TemplateService::new(template_repo);
 
     // Get template to find the file path before deleting
     let template = template_service
         .get_template(template_id)
         .await
-        .map_err(|e| match e {
-            sqlx::Error::RowNotFound => (StatusCode::NOT_FOUND, "Template not found".to_string()),
-            _ => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-        })?;
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "Template not found".to_string()))?;
 
     // Delete the template from database
     template_service

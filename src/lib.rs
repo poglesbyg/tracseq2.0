@@ -29,6 +29,7 @@ pub struct AppComponents {
     pub storage: StorageComponent,
     pub sample_processing: SampleProcessingComponent,
     pub sequencing: SequencingComponent,
+    pub repositories: assembly::RepositoriesComponent,
 }
 
 #[derive(Clone)]
