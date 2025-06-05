@@ -18,6 +18,13 @@ interface StorageLocation {
 
 interface SampleData {
   name: string;
+  template_id: string;
+  storage_location_id: string;
+  metadata: Record<string, string>;
+}
+
+interface SampleSubmissionData {
+  name: string;
   template_id: number;
   storage_location_id: number;
   metadata: Record<string, string>;
@@ -34,8 +41,8 @@ export default function SampleSubmissionWizard() {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<SampleData>({
     name: '',
-    template_id: 0,
-    storage_location_id: 0,
+    template_id: '',
+    storage_location_id: '',
     metadata: {},
   });
 
@@ -59,7 +66,7 @@ export default function SampleSubmissionWizard() {
 
   // Submit sample mutation
   const submitSample = useMutation({
-    mutationFn: async (data: SampleData) => {
+    mutationFn: async (data: SampleSubmissionData) => {
       const response = await axios.post('/api/samples', data);
       return response.data;
     },
@@ -81,7 +88,13 @@ export default function SampleSubmissionWizard() {
   };
 
   const handleSubmit = () => {
-    submitSample.mutate(formData);
+    // Convert string IDs back to numbers for submission
+    const submissionData = {
+      ...formData,
+      template_id: Number(formData.template_id),
+      storage_location_id: Number(formData.storage_location_id),
+    };
+    submitSample.mutate(submissionData);
   };
 
   const renderStep = () => {
@@ -93,7 +106,7 @@ export default function SampleSubmissionWizard() {
             <select
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               value={formData.template_id}
-              onChange={(e) => setFormData({ ...formData, template_id: Number(e.target.value) })}
+              onChange={(e) => setFormData({ ...formData, template_id: e.target.value })}
             >
               <option value="">Select a template</option>
               {templates?.map((template) => (
@@ -129,7 +142,7 @@ export default function SampleSubmissionWizard() {
             <select
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               value={formData.storage_location_id}
-              onChange={(e) => setFormData({ ...formData, storage_location_id: Number(e.target.value) })}
+              onChange={(e) => setFormData({ ...formData, storage_location_id: e.target.value })}
             >
               <option value="">Select a storage location</option>
               {storageLocations?.map((location) => (
@@ -154,13 +167,13 @@ export default function SampleSubmissionWizard() {
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Template</dt>
                   <dd className="mt-1 text-sm text-gray-900">
-                    {templates?.find((t) => t.id === formData.template_id)?.name}
+                    {templates?.find((t) => t.id === Number(formData.template_id))?.name}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Storage Location</dt>
                   <dd className="mt-1 text-sm text-gray-900">
-                    {storageLocations?.find((l) => l.id === formData.storage_location_id)?.name}
+                    {storageLocations?.find((l) => l.id === Number(formData.storage_location_id))?.name}
                   </dd>
                 </div>
               </dl>

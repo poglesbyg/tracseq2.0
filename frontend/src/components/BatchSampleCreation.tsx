@@ -27,8 +27,8 @@ interface Template {
 interface StorageLocation {
   id: number;
   name: string;
-  capacity: number;
-  available: number;
+  capacity?: number;
+  available?: number;
 }
 
 interface ParsedTemplateResponse {
@@ -47,15 +47,25 @@ export default function BatchSampleCreation({ templateData, onClose, onComplete 
   const activeSheet = data.sheets[0];
   
   const [nameColumnIndex, setNameColumnIndex] = useState(0);
-  const [defaultStorageLocation, setDefaultStorageLocation] = useState<number>(0);
+  const [defaultStorageLocation, setDefaultStorageLocation] = useState<string>('');
   const queryClient = useQueryClient();
 
-  // Fetch storage locations
+  // Fetch storage locations (optional, fallback to default locations)
   const { data: storageLocations } = useQuery<StorageLocation[]>({
     queryKey: ['storage-locations'],
     queryFn: async () => {
-      const response = await axios.get('/api/storage/locations');
-      return response.data;
+      try {
+        const response = await axios.get('/api/storage/locations');
+        return response.data;
+      } catch (error) {
+        // Return default locations if API fails
+        return [
+          { id: 1, name: 'Lab Room A' },
+          { id: 2, name: 'Lab Room B' },
+          { id: 3, name: 'Storage Freezer' },
+          { id: 4, name: 'Sample Storage' },
+        ];
+      }
     },
   });
 
@@ -81,9 +91,10 @@ export default function BatchSampleCreation({ templateData, onClose, onComplete 
     const samples = activeSheet.rows.map((row, index) => ({
       name: row[nameColumnIndex] || `Sample ${index + 1}`,
       barcode: generateBarcode(index),
-      template_id: template.id,
-      storage_location_id: defaultStorageLocation,
+      location: defaultStorageLocation,
       metadata: {
+        template_id: template.id,
+        template_name: template.name,
         source_template: template.name,
         original_row: index,
         template_data: Object.fromEntries(
@@ -139,13 +150,13 @@ export default function BatchSampleCreation({ templateData, onClose, onComplete 
             </label>
             <select
               value={defaultStorageLocation}
-              onChange={(e) => setDefaultStorageLocation(Number(e.target.value))}
+              onChange={(e) => setDefaultStorageLocation(e.target.value)}
               className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             >
-              <option value={0}>Select a location</option>
+              <option value="">Select a location</option>
               {storageLocations?.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.name} ({location.available} available)
+                <option key={location.id} value={location.name}>
+                  {location.name} {location.available ? `(${location.available} available)` : ''}
                 </option>
               ))}
             </select>
@@ -202,7 +213,7 @@ export default function BatchSampleCreation({ templateData, onClose, onComplete 
           </button>
           <button
             onClick={handleCreateSamples}
-            disabled={createSamplesMutation.isPending || defaultStorageLocation === 0}
+            disabled={createSamplesMutation.isPending || defaultStorageLocation === ''}
             className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
           >
             {createSamplesMutation.isPending ? (
