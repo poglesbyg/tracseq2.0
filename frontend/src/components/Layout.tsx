@@ -6,6 +6,7 @@ import {
   BeakerIcon,
   QueueListIcon,
   MapPinIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 
 interface LayoutProps {
@@ -18,6 +19,7 @@ const navigation = [
   { name: 'Samples', href: '/samples', icon: BeakerIcon },
   { name: 'Sequencing', href: '/sequencing', icon: QueueListIcon },
   { name: 'Storage', href: '/storage', icon: MapPinIcon },
+  { name: 'Reports', href: '/reports', icon: ChartBarIcon },
 ];
 
 export default function Layout({ children }: LayoutProps) {

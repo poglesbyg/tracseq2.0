@@ -57,6 +57,17 @@ pub fn storage_routes() -> Router<AppComponents> {
     )
 }
 
+/// Reports and analytics routes
+pub fn reports_routes() -> Router<AppComponents> {
+    Router::new()
+        .route("/api/reports/execute", post(handlers::execute_report))
+        .route(
+            "/api/reports/templates",
+            get(handlers::get_report_templates),
+        )
+        .route("/api/reports/schema", get(handlers::get_schema))
+}
+
 /// Assemble all routes into a complete application router
 pub fn create_app_router() -> Router<AppComponents> {
     Router::new()
@@ -65,6 +76,7 @@ pub fn create_app_router() -> Router<AppComponents> {
         .merge(sample_routes())
         .merge(sequencing_routes())
         .merge(storage_routes())
+        .merge(reports_routes())
         .layer(CorsLayer::permissive())
 }
 

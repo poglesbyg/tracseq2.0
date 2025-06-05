@@ -1,10 +1,12 @@
 pub mod dashboard;
+pub mod reports;
 pub mod samples;
 pub mod sequencing;
 pub mod storage;
 pub mod templates;
 
 pub use dashboard::{get_dashboard_stats, health_check, DashboardStats, HealthStatus};
+pub use reports::{execute_report, get_report_templates, get_schema};
 pub use samples::{
     create_sample, create_samples_batch, get_sample, list_samples, update_sample, validate_sample,
 };

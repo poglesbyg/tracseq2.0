@@ -6,6 +6,7 @@ import Templates from './pages/Templates';
 import Samples from './pages/Samples';
 import Sequencing from './pages/Sequencing';
 import Storage from './pages/Storage';
+import Reports from './pages/Reports';
 
 const queryClient = new QueryClient();
 
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/samples" element={<Samples />} />
             <Route path="/sequencing" element={<Sequencing />} />
             <Route path="/storage" element={<Storage />} />
+            <Route path="/reports" element={<Reports />} />
           </Routes>
         </Layout>
       </Router>
