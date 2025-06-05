@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { BeakerIcon, DocumentIcon, MapPinIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
@@ -31,6 +31,11 @@ interface SampleSubmissionData {
   metadata: Record<string, any>;
 }
 
+interface SampleSubmissionWizardProps {
+  onSuccess?: () => void;
+  onClose?: () => void;
+}
+
 const steps = [
   { id: 'template', name: 'Template Selection', icon: DocumentIcon },
   { id: 'details', name: 'Sample Details', icon: BeakerIcon },
@@ -38,7 +43,7 @@ const steps = [
   { id: 'confirm', name: 'Confirmation', icon: CheckCircleIcon },
 ];
 
-export default function SampleSubmissionWizard() {
+export default function SampleSubmissionWizard({ onSuccess, onClose }: SampleSubmissionWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<SampleData>({
     name: '',
@@ -47,6 +52,7 @@ export default function SampleSubmissionWizard() {
     storage_location_id: '',
     metadata: {},
   });
+  const queryClient = useQueryClient();
 
   // Fetch available templates
   const { data: templates } = useQuery<Template[]>({
@@ -73,7 +79,17 @@ export default function SampleSubmissionWizard() {
       return response.data;
     },
     onSuccess: () => {
-      // Handle success (e.g., show success message, redirect)
+      // Refresh the samples list
+      queryClient.invalidateQueries({ queryKey: ['samples'] });
+      
+      // Notify parent component of success
+      onSuccess?.();
+      
+      // Close the modal
+      onClose?.();
+    },
+    onError: (error) => {
+      console.error('Failed to create sample:', error);
     },
   });
 
@@ -248,6 +264,15 @@ export default function SampleSubmissionWizard() {
         {renderStep()}
       </div>
 
+      {submitSample.error && (
+        <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-red-800">Error Creating Sample</h4>
+          <p className="mt-2 text-sm text-red-700">
+            {submitSample.error.message || 'Failed to create sample. Please try again.'}
+          </p>
+        </div>
+      )}
+
       <div className="mt-8 flex justify-between">
         <button
           type="button"
@@ -261,9 +286,20 @@ export default function SampleSubmissionWizard() {
           <button
             type="button"
             onClick={handleSubmit}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            disabled={submitSample.isPending || !formData.name.trim() || !formData.storage_location_id}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
           >
-            Submit Sample
+            {submitSample.isPending ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Creating Sample...
+              </>
+            ) : (
+              'Submit Sample'
+            )}
           </button>
         ) : (
           <button

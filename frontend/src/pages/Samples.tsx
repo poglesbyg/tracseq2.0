@@ -86,7 +86,13 @@ export default function Samples() {
                   </svg>
                 </button>
               </div>
-              <SampleSubmissionWizard />
+              <SampleSubmissionWizard 
+                onClose={() => setShowWizard(false)}
+                onSuccess={() => {
+                  // Additional success handling can be added here
+                  // (e.g., show success toast)
+                }}
+              />
             </div>
           </div>
         </div>
