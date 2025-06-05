@@ -7,7 +7,9 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
-    models::template::{CreateTemplate, ParsedTemplateResponse, Template, TemplateResponse},
+    models::template::{
+        CreateTemplate, ParsedTemplateResponse, Template, TemplateResponse, UpdateTemplate,
+    },
     repositories::{Repository, RepositoryFactory},
     services::template_service::TemplateService,
     AppComponents,
@@ -126,6 +128,52 @@ pub async fn list_templates(
         .collect();
 
     Ok(Json(responses))
+}
+
+/// Get a single template by ID
+pub async fn get_template(
+    State(state): State<AppComponents>,
+    Path(template_id): Path<Uuid>,
+) -> Result<Json<TemplateResponse>, (StatusCode, String)> {
+    let template_repo = state.repositories.factory.template_repository();
+    let template_service = TemplateService::new(template_repo);
+
+    let template = template_service
+        .get_template(template_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "Template not found".to_string()))?;
+
+    Ok(Json(TemplateResponse {
+        id: template.id,
+        name: template.name,
+        description: template.description,
+        created_at: template.created_at,
+        metadata: template.metadata,
+    }))
+}
+
+/// Update a template by ID
+pub async fn update_template(
+    State(state): State<AppComponents>,
+    Path(template_id): Path<Uuid>,
+    Json(updates): Json<UpdateTemplate>,
+) -> Result<Json<TemplateResponse>, (StatusCode, String)> {
+    let template_repo = state.repositories.factory.template_repository();
+    let template_service = TemplateService::new(template_repo);
+
+    let template = template_service
+        .update_template(template_id, updates)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(TemplateResponse {
+        id: template.id,
+        name: template.name,
+        description: template.description,
+        created_at: template.created_at,
+        metadata: template.metadata,
+    }))
 }
 
 /// Get parsed spreadsheet data for a specific template

@@ -22,7 +22,7 @@ pub trait RepositoryFactory {
     type TemplateRepo: Repository<
         crate::models::template::Template,
         crate::models::template::CreateTemplate,
-        crate::models::template::CreateTemplate,
+        crate::models::template::UpdateTemplate,
         Error = sqlx::Error,
     >;
     type SampleRepo: Repository<
@@ -76,7 +76,7 @@ impl
     Repository<
         crate::models::template::Template,
         crate::models::template::CreateTemplate,
-        crate::models::template::CreateTemplate,
+        crate::models::template::UpdateTemplate,
     > for PostgresTemplateRepository
 {
     type Error = sqlx::Error;
@@ -131,22 +131,61 @@ impl
     async fn update(
         &self,
         id: Uuid,
-        data: crate::models::template::CreateTemplate,
+        data: crate::models::template::UpdateTemplate,
     ) -> Result<crate::models::template::Template, Self::Error> {
-        sqlx::query_as::<_, crate::models::template::Template>(
+        // Build dynamic query based on provided fields
+        let mut query_parts = Vec::new();
+        let mut param_count = 1;
+
+        if data.name.is_some() {
+            query_parts.push(format!("name = ${}", param_count));
+            param_count += 1;
+        }
+        if data.description.is_some() {
+            query_parts.push(format!("description = ${}", param_count));
+            param_count += 1;
+        }
+        if data.metadata.is_some() {
+            query_parts.push(format!("metadata = ${}", param_count));
+            param_count += 1;
+        }
+
+        if query_parts.is_empty() {
+            // No updates provided, just return the existing template
+            return self
+                .find_by_id(id)
+                .await?
+                .ok_or_else(|| sqlx::Error::RowNotFound);
+        }
+
+        let query = format!(
             r#"
             UPDATE templates 
-            SET name = $2, description = $3, metadata = $4, updated_at = NOW()
-            WHERE id = $1
+            SET {}, updated_at = NOW()
+            WHERE id = ${}
             RETURNING *
             "#,
-        )
-        .bind(id)
-        .bind(&data.name)
-        .bind(&data.description)
-        .bind(&data.metadata.unwrap_or(serde_json::json!({})))
-        .fetch_one(&self.pool)
-        .await
+            query_parts.join(", "),
+            param_count
+        );
+
+        let mut query_builder = sqlx::query_as::<_, crate::models::template::Template>(&query);
+
+        // Bind parameters in the same order they were added
+        if let Some(name) = data.name {
+            query_builder = query_builder.bind(name);
+        }
+        if let Some(description) = data.description {
+            query_builder = query_builder.bind(description);
+        }
+        if let Some(metadata) = data.metadata {
+            query_builder = query_builder.bind(metadata);
+        }
+
+        // Bind the template_id last
+        query_builder = query_builder.bind(id);
+
+        query_builder.fetch_one(&self.pool).await
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), Self::Error> {

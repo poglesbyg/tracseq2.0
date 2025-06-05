@@ -18,6 +18,8 @@ pub fn template_routes() -> Router<AppComponents> {
     Router::new()
         .route("/api/templates/upload", post(handlers::upload_template))
         .route("/api/templates", get(handlers::list_templates))
+        .route("/api/templates/:id", get(handlers::get_template))
+        .route("/api/templates/:id", put(handlers::update_template))
         .route("/api/templates/:id/data", get(handlers::get_template_data))
         .route("/api/templates/:id", delete(handlers::delete_template))
 }

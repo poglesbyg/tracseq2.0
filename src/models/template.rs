@@ -21,6 +21,13 @@ pub struct CreateTemplate {
     pub metadata: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct UpdateTemplate {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct TemplateResponse {
     pub id: Uuid,
