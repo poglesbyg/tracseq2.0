@@ -1,6 +1,5 @@
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{extract::State, http::StatusCode, Json};
 use serde::Serialize;
-use sqlx::Row;
 
 use crate::AppComponents;
 

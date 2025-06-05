@@ -7,9 +7,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
-    models::template::{
-        CreateTemplate, ParsedTemplateResponse, Template, TemplateResponse, UpdateTemplate,
-    },
+    models::template::{CreateTemplate, ParsedTemplateResponse, TemplateResponse, UpdateTemplate},
     repositories::{Repository, RepositoryFactory},
     services::template_service::TemplateService,
     AppComponents,

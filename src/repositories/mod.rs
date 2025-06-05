@@ -313,6 +313,7 @@ impl
 }
 
 /// In-memory repository for testing
+#[allow(dead_code)]
 pub struct InMemoryRepositoryFactory {
     templates: std::sync::Arc<
         std::sync::RwLock<std::collections::HashMap<Uuid, crate::models::template::Template>>,

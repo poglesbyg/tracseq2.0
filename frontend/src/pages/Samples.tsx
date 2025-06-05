@@ -15,16 +15,7 @@ interface Sample {
   metadata: any;
 }
 
-interface Template {
-  id: number;
-  name: string;
-  version: string;
-}
 
-interface StorageLocation {
-  id: number;
-  name: string;
-}
 
 export default function Samples() {
   const [showWizard, setShowWizard] = useState(false);
@@ -39,23 +30,7 @@ export default function Samples() {
     },
   });
 
-  // Fetch templates for reference
-  const { data: templates } = useQuery<Template[]>({
-    queryKey: ['templates'],
-    queryFn: async () => {
-      const response = await axios.get('/api/templates');
-      return response.data;
-    },
-  });
 
-  // Fetch storage locations for reference
-  const { data: storageLocations } = useQuery<StorageLocation[]>({
-    queryKey: ['storage-locations'],
-    queryFn: async () => {
-      const response = await axios.get('/api/storage/locations');
-      return response.data;
-    },
-  });
 
   const getStatusColor = (status: string) => {
     switch (status) {

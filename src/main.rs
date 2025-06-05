@@ -18,7 +18,6 @@ use sqlx::PgPool;
 use std::{net::SocketAddr, sync::Arc};
 
 use assembly::assemble_production_components;
-use repositories::PostgresRepositoryFactory;
 use router::create_app_router;
 
 /// Core application components that can be assembled independently
@@ -78,7 +77,9 @@ async fn main() {
     let config = config::AppConfig::from_env().expect("Failed to load configuration");
 
     // Run the application
-    let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
+    let addr = format!("{}:{}", config.server.host, config.server.port)
+        .parse::<SocketAddr>()
+        .expect("Invalid host:port combination");
     tracing::info!("Starting server on {}", addr);
 
     axum::serve(

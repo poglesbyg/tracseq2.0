@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::{
     models::template::{CreateTemplate, SheetData, SpreadsheetData, Template, UpdateTemplate},
-    repositories::{Repository, RepositoryFactory},
+    repositories::Repository,
     services::{HealthCheck, HealthStatus, Service, ServiceConfig, ServiceHealth},
 };
 

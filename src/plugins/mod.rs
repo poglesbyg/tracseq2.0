@@ -23,7 +23,7 @@ pub trait Plugin: Send + Sync {
     fn config_schema(&self) -> serde_json::Value;
 
     /// Handle plugin-specific events
-    async fn handle_event(&self, event: &PluginEvent) -> Result<(), PluginError> {
+    async fn handle_event(&self, _event: &PluginEvent) -> Result<(), PluginError> {
         Ok(()) // Default: ignore events
     }
 }
@@ -145,7 +145,7 @@ pub mod examples {
 
         async fn handle_event(&self, event: &PluginEvent) -> Result<(), PluginError> {
             match event {
-                PluginEvent::Custom(event_type, data) if event_type == "sample_created" => {
+                PluginEvent::Custom(event_type, _data) if event_type == "sample_created" => {
                     // Send notification
                     if let Some(url) = &self.webhook_url {
                         println!("📧 Sending notification to: {}", url);

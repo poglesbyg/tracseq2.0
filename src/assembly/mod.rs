@@ -2,11 +2,8 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 use crate::{
-    config::{AppConfig, DatabaseConfig, StorageConfig},
-    repositories::PostgresRepositoryFactory,
-    sample_submission::SampleSubmissionManager,
-    sequencing::SequencingManager,
-    storage::Storage,
+    config::AppConfig, repositories::PostgresRepositoryFactory,
+    sample_submission::SampleSubmissionManager, sequencing::SequencingManager, storage::Storage,
     AppComponents, DatabaseComponent, SampleProcessingComponent, SequencingComponent,
     StorageComponent,
 };

@@ -52,6 +52,8 @@ services:
       - "3000:3000"
     environment:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/lab_manager
+      - HOST=0.0.0.0
+      - PORT=3000
       - RUST_LOG=info
       - STORAGE_PATH=/usr/local/bin/storage
     depends_on:

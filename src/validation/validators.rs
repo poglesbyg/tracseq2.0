@@ -30,7 +30,7 @@ where
 {
     fn validate(&self, item: &T) -> ValidationResult {
         let mut errors = Vec::new();
-        let mut warnings = Vec::new();
+        let warnings = Vec::new();
         let mut metadata = HashMap::new();
 
         // Validate sample name
@@ -145,7 +145,7 @@ where
 {
     fn validate(&self, item: &T) -> ValidationResult {
         let mut errors = Vec::new();
-        let mut warnings = Vec::new();
+        let warnings = Vec::new();
         let mut metadata = HashMap::new();
 
         // Validate template name
