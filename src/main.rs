@@ -63,7 +63,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // Load environment variables
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     // Assemble all components using the new modular system
     let components = assemble_production_components()
