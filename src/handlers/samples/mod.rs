@@ -50,3 +50,55 @@ pub async fn validate_sample(
         .map(Json)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
+
+/// Create multiple samples in a batch from template data
+pub async fn create_samples_batch(
+    State(state): State<AppComponents>,
+    Json(batch_request): Json<BatchCreateSamplesRequest>,
+) -> Result<Json<BatchCreateSamplesResponse>, (StatusCode, String)> {
+    let mut created_samples = Vec::new();
+    let mut errors = Vec::new();
+
+    for (index, sample_data) in batch_request.samples.iter().enumerate() {
+        match state
+            .sample_processing
+            .manager
+            .create_sample((*sample_data).clone())
+            .await
+        {
+            Ok(sample) => created_samples.push(sample),
+            Err(e) => errors.push(BatchError {
+                index,
+                error: e.to_string(),
+            }),
+        }
+    }
+
+    let response = BatchCreateSamplesResponse {
+        created: created_samples.len(),
+        failed: errors.len(),
+        samples: created_samples,
+        errors,
+    };
+
+    Ok(Json(response))
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct BatchCreateSamplesRequest {
+    pub samples: Vec<CreateSample>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct BatchCreateSamplesResponse {
+    pub created: usize,
+    pub failed: usize,
+    pub samples: Vec<Sample>,
+    pub errors: Vec<BatchError>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct BatchError {
+    pub index: usize,
+    pub error: String,
+}

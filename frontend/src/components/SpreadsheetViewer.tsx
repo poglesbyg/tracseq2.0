@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronLeftIcon, ChevronRightIcon, BeakerIcon } from '@heroicons/react/24/outline';
 
 interface SheetData {
   name: string;
@@ -26,9 +26,10 @@ interface SpreadsheetViewerProps {
   template: Template;
   data: SpreadsheetData;
   onClose: () => void;
+  onCreateSamples?: (template: Template, data: SpreadsheetData) => void;
 }
 
-export default function SpreadsheetViewer({ template, data, onClose }: SpreadsheetViewerProps) {
+export default function SpreadsheetViewer({ template, data, onClose, onCreateSamples }: SpreadsheetViewerProps) {
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
   const rowsPerPage = 50;
@@ -90,15 +91,26 @@ export default function SpreadsheetViewer({ template, data, onClose }: Spreadshe
               {template.description || 'Spreadsheet data viewer'}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <span className="sr-only">Close</span>
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center space-x-4">
+            {onCreateSamples && (
+              <button
+                onClick={() => onCreateSamples(template, data)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <BeakerIcon className="h-4 w-4 mr-2" />
+                Create Samples
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <span className="sr-only">Close</span>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Sheet Tabs */}

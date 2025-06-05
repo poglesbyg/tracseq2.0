@@ -25,7 +25,7 @@ pub enum SampleStatus {
     Completed,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct CreateSample {
     pub name: String,
     pub barcode: String,

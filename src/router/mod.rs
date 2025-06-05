@@ -27,6 +27,7 @@ pub fn sample_routes() -> Router<AppComponents> {
     Router::new()
         .route("/api/samples", post(handlers::create_sample))
         .route("/api/samples", get(handlers::list_samples))
+        .route("/api/samples/batch", post(handlers::create_samples_batch))
         .route("/api/samples/:id/validate", post(handlers::validate_sample))
 }
 

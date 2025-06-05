@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { DocumentTextIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
 import SpreadsheetViewer from '../components/SpreadsheetViewer';
+import BatchSampleCreation from '../components/BatchSampleCreation';
 
 interface Template {
   id: string;
@@ -35,6 +36,7 @@ export default function Templates() {
   const [isDragging, setIsDragging] = useState(false);
   const [viewingTemplate, setViewingTemplate] = useState<ParsedTemplateResponse | null>(null);
   const [deletingTemplate, setDeletingTemplate] = useState<Template | null>(null);
+  const [creatingFromTemplate, setCreatingFromTemplate] = useState<ParsedTemplateResponse | null>(null);
   const queryClient = useQueryClient();
 
   const { data: templates, isLoading } = useQuery<Template[]>({
@@ -124,6 +126,11 @@ export default function Templates() {
 
   const cancelDelete = () => {
     setDeletingTemplate(null);
+  };
+
+  const handleCreateSamples = (template: Template, data: SpreadsheetData) => {
+    setCreatingFromTemplate({ template, data });
+    setViewingTemplate(null);
   };
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -292,6 +299,19 @@ export default function Templates() {
           template={viewingTemplate.template}
           data={viewingTemplate.data}
           onClose={() => setViewingTemplate(null)}
+          onCreateSamples={handleCreateSamples}
+        />
+      )}
+
+      {/* Batch Sample Creation Modal */}
+      {creatingFromTemplate && (
+        <BatchSampleCreation
+          templateData={creatingFromTemplate}
+          onClose={() => setCreatingFromTemplate(null)}
+          onComplete={() => {
+            setCreatingFromTemplate(null);
+            // Optionally show success message or redirect to samples page
+          }}
         />
       )}
 
