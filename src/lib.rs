@@ -6,6 +6,8 @@ pub mod errors;
 pub mod events;
 pub mod handlers;
 pub mod models;
+pub mod plugins;
+pub mod repositories;
 pub mod router;
 pub mod sample_submission;
 pub mod sequencing;
