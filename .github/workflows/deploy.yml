@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow
 
 name: 🚀 Enhanced Lab Manager Deployment
 
@@ -169,7 +169,7 @@ jobs:
           COPY frontend/ ./
           RUN npm run build || echo "No frontend build step"
           
-          FROM rust:1.85-slim AS backend-builder
+          FROM rust:nightly-slim AS backend-builder
           WORKDIR /usr/src/app
           
           # Install build dependencies
@@ -207,7 +207,7 @@ jobs:
               ;;
             "api-only")
               cat > Dockerfile.deploy << 'EOF'
-          FROM rust:1.85-slim AS builder
+          FROM rust:nightly-slim AS builder
           WORKDIR /usr/src/app
           
           # Install build dependencies
@@ -242,7 +242,7 @@ jobs:
               ;;
             "reports-only")
               cat > Dockerfile.deploy << 'EOF'
-          FROM rust:1.85-slim AS builder
+          FROM rust:nightly-slim AS builder
           WORKDIR /usr/src/app
           
           RUN apt-get update && apt-get install -y \
