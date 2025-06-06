@@ -135,21 +135,21 @@ export default function Dashboard() {
 
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case 'completed': return 'text-green-600';
-      case 'pending': return 'text-yellow-600';
-      case 'validated': return 'text-blue-600';
-      case 'in_progress': return 'text-indigo-600';
-      case 'failed': return 'text-red-600';
-      default: return 'text-gray-600';
+      case 'completed': return 'text-green-600 bg-green-50';
+      case 'pending': return 'text-yellow-600 bg-yellow-50';
+      case 'validated': return 'text-blue-600 bg-blue-50';
+      case 'in_progress': return 'text-indigo-600 bg-indigo-50';
+      case 'failed': return 'text-red-600 bg-red-50';
+      default: return 'text-gray-600 bg-gray-50';
     }
   };
 
   if (statsLoading) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8">
+      <div className="px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-          <span className="ml-3 text-gray-600">Loading dashboard...</span>
+          <span className="ml-3 text-gray-600 font-medium">Loading dashboard...</span>
         </div>
       </div>
     );
@@ -157,8 +157,8 @@ export default function Dashboard() {
 
   if (statsError) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8">
-        <div className="rounded-md bg-red-50 p-4">
+      <div className="px-4 sm:px-6 lg:px-8 py-8">
+        <div className="rounded-lg bg-red-50 p-6 border border-red-200">
           <div className="flex">
             <div className="flex-shrink-0">
               <ExclamationTriangleIcon className="h-5 w-5 text-red-400" aria-hidden="true" />
@@ -169,7 +169,7 @@ export default function Dashboard() {
               </h3>
               <div className="mt-2 text-sm text-red-700">
                 <p>Unable to connect to the server. Please check if the backend service is running.</p>
-                <p className="mt-1 text-xs">Error: {statsError.message}</p>
+                <p className="mt-1 text-xs font-mono bg-red-100 p-2 rounded">Error: {statsError.message}</p>
               </div>
             </div>
           </div>
@@ -179,90 +179,130 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8">
+    <div className="px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-        <p className="mt-2 text-sm text-gray-700">
-          Welcome to Lab Manager. Here's an overview of your lab's current status.
-        </p>
+        <div className="md:flex md:items-center md:justify-between">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-3xl font-bold leading-tight text-gray-900">Dashboard</h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Welcome to Lab Manager. Here's an overview of your lab's current status.
+            </p>
+          </div>
+          <div className="mt-4 flex md:mt-0 md:ml-4">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              System Online
+            </span>
+          </div>
+        </div>
       </div>
       
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         {/* Templates Card */}
-        <div className="relative overflow-hidden rounded-lg bg-white px-4 py-5 shadow hover:shadow-md transition-shadow sm:p-6">
-          <dt className="truncate text-sm font-medium text-gray-500">Total Templates</dt>
-          <dd className="mt-1 flex items-baseline">
-            <div className="text-3xl font-semibold tracking-tight text-gray-900">
-              {stats?.totalTemplates ?? 0}
+        <div className="dashboard-card group">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <DocumentIcon className="h-8 w-8 text-blue-600" />
             </div>
-            <div className="ml-2 flex items-baseline text-sm font-semibold text-green-600">
-              <ArrowTrendingUpIcon className="h-4 w-4 flex-shrink-0 self-center" />
+            <div className="ml-5 w-0 flex-1">
+              <dl>
+                <dt className="dashboard-stat-label">Total Templates</dt>
+                <dd className="dashboard-stat-number">
+                  {stats?.totalTemplates ?? 0}
+                </dd>
+              </dl>
             </div>
-          </dd>
-          <div className="absolute right-4 top-4">
-            <DocumentIcon className="h-8 w-8 text-gray-300" />
+          </div>
+          <div className="mt-4 flex items-center text-sm text-gray-500">
+            <ArrowTrendingUpIcon className="h-4 w-4 text-green-500 mr-1" />
+            <span>Active templates in system</span>
           </div>
         </div>
 
         {/* Samples Card */}
-        <div className="relative overflow-hidden rounded-lg bg-white px-4 py-5 shadow hover:shadow-md transition-shadow sm:p-6">
-          <dt className="truncate text-sm font-medium text-gray-500">Total Samples</dt>
-          <dd className="mt-1 flex items-baseline">
-            <div className="text-3xl font-semibold tracking-tight text-gray-900">
-              {stats?.totalSamples ?? 0}
+        <div className="dashboard-card group">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <BeakerIcon className="h-8 w-8 text-green-600" />
             </div>
-            <div className="ml-2 flex items-baseline text-sm font-semibold text-blue-600">
-              <ArrowTrendingUpIcon className="h-4 w-4 flex-shrink-0 self-center" />
+            <div className="ml-5 w-0 flex-1">
+              <dl>
+                <dt className="dashboard-stat-label">Total Samples</dt>
+                <dd className="dashboard-stat-number">
+                  {stats?.totalSamples ?? 0}
+                </dd>
+              </dl>
             </div>
-          </dd>
-          <div className="absolute right-4 top-4">
-            <BeakerIcon className="h-8 w-8 text-gray-300" />
+          </div>
+          <div className="mt-4 flex items-center text-sm text-gray-500">
+            <ArrowTrendingUpIcon className="h-4 w-4 text-green-500 mr-1" />
+            <span>Samples in storage</span>
           </div>
         </div>
 
         {/* Pending Sequencing Card */}
-        <div className="relative overflow-hidden rounded-lg bg-white px-4 py-5 shadow hover:shadow-md transition-shadow sm:p-6">
-          <dt className="truncate text-sm font-medium text-gray-500">Pending Sequencing</dt>
-          <dd className="mt-1 flex items-baseline">
-            <div className="text-3xl font-semibold tracking-tight text-gray-900">
-              {stats?.pendingSequencing ?? 0}
+        <div className="dashboard-card group">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <QueueListIcon className="h-8 w-8 text-yellow-600" />
             </div>
-            {stats?.pendingSequencing && stats.pendingSequencing > 0 && (
-              <div className="ml-2 flex items-baseline text-sm font-semibold text-yellow-600">
-                <ClockIcon className="h-4 w-4 flex-shrink-0 self-center" />
-              </div>
+            <div className="ml-5 w-0 flex-1">
+              <dl>
+                <dt className="dashboard-stat-label">Pending Sequencing</dt>
+                <dd className="dashboard-stat-number">
+                  {stats?.pendingSequencing ?? 0}
+                </dd>
+              </dl>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm text-gray-500">
+            {stats?.pendingSequencing && stats.pendingSequencing > 0 ? (
+              <>
+                <ClockIcon className="h-4 w-4 text-yellow-500 mr-1" />
+                <span>Awaiting processing</span>
+              </>
+            ) : (
+              <>
+                <CheckCircleIcon className="h-4 w-4 text-green-500 mr-1" />
+                <span>All caught up!</span>
+              </>
             )}
-          </dd>
-          <div className="absolute right-4 top-4">
-            <QueueListIcon className="h-8 w-8 text-gray-300" />
           </div>
         </div>
 
         {/* Completed Sequencing Card */}
-        <div className="relative overflow-hidden rounded-lg bg-white px-4 py-5 shadow hover:shadow-md transition-shadow sm:p-6">
-          <dt className="truncate text-sm font-medium text-gray-500">Completed Sequencing</dt>
-          <dd className="mt-1 flex items-baseline">
-            <div className="text-3xl font-semibold tracking-tight text-gray-900">
-              {stats?.completedSequencing ?? 0}
+        <div className="dashboard-card group">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <CheckCircleIcon className="h-8 w-8 text-indigo-600" />
             </div>
-            {stats?.completedSequencing && stats.completedSequencing > 0 && (
-              <div className="ml-2 flex items-baseline text-sm font-semibold text-green-600">
-                <CheckCircleIcon className="h-4 w-4 flex-shrink-0 self-center" />
-              </div>
-            )}
-          </dd>
-          <div className="absolute right-4 top-4">
-            <CheckCircleIcon className="h-8 w-8 text-gray-300" />
+            <div className="ml-5 w-0 flex-1">
+              <dl>
+                <dt className="dashboard-stat-label">Completed Sequencing</dt>
+                <dd className="dashboard-stat-number">
+                  {stats?.completedSequencing ?? 0}
+                </dd>
+              </dl>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm text-gray-500">
+            <CheckCircleIcon className="h-4 w-4 text-green-500 mr-1" />
+            <span>Successfully processed</span>
           </div>
         </div>
       </div>
 
       {/* Recent Activity Section */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h2>
+      <div className="dashboard-card">
+        <div className="px-6 py-5 border-b border-gray-200">
+          <h2 className="text-lg font-medium text-gray-900 flex items-center">
+            <ClockIcon className="h-5 w-5 text-gray-400 mr-2" />
+            Recent Activity
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">Latest updates from your lab operations</p>
+        </div>
+        <div className="px-6 py-5">
           {recentActivity.length > 0 ? (
             <div className="flow-root">
               <ul className="-mb-8">
@@ -273,13 +313,13 @@ export default function Dashboard() {
                       <div className="relative pb-8">
                         {activityIdx !== recentActivity.length - 1 ? (
                           <span
-                            className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200"
+                            className="absolute top-5 left-5 -ml-px h-full w-0.5 bg-gray-200"
                             aria-hidden="true"
                           />
                         ) : null}
-                        <div className="relative flex space-x-3">
+                        <div className="relative flex items-start space-x-3">
                           <div>
-                            <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${
+                            <span className={`activity-icon ${
                               activity.type === 'template' ? 'bg-blue-500' :
                               activity.type === 'sample' ? 'bg-green-500' :
                               'bg-indigo-500'
@@ -287,21 +327,25 @@ export default function Dashboard() {
                               <Icon className="h-4 w-4 text-white" aria-hidden="true" />
                             </span>
                           </div>
-                          <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
+                          <div className="min-w-0 flex-1">
                             <div>
-                              <p className="text-sm text-gray-900">
-                                {activity.description}
+                              <div className="text-sm">
+                                <p className="font-medium text-gray-900">
+                                  {activity.description}
+                                </p>
+                              </div>
+                              <div className="mt-2 flex items-center space-x-2">
+                                <p className="text-sm text-gray-500">
+                                  <time dateTime={activity.timestamp}>
+                                    {formatTimeAgo(activity.timestamp)}
+                                  </time>
+                                </p>
                                 {activity.status && (
-                                  <span className={`ml-2 text-xs font-medium ${getStatusColor(activity.status)}`}>
-                                    ({activity.status})
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(activity.status)}`}>
+                                    {activity.status}
                                   </span>
                                 )}
-                              </p>
-                            </div>
-                            <div className="text-right text-sm whitespace-nowrap text-gray-500">
-                              <time dateTime={activity.timestamp}>
-                                {formatTimeAgo(activity.timestamp)}
-                              </time>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -312,12 +356,20 @@ export default function Dashboard() {
               </ul>
             </div>
           ) : (
-            <div className="text-center py-6">
+            <div className="text-center py-12">
               <ClockIcon className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No recent activity</h3>
-              <p className="mt-1 text-sm text-gray-500">
+              <h3 className="mt-4 text-sm font-medium text-gray-900">No recent activity</h3>
+              <p className="mt-2 text-sm text-gray-500">
                 Start by uploading templates or creating samples to see activity here.
               </p>
+              <div className="mt-6">
+                <button
+                  type="button"
+                  className="btn-primary"
+                >
+                  Get Started
+                </button>
+              </div>
             </div>
           )}
         </div>
