@@ -169,7 +169,7 @@ jobs:
           COPY frontend/ ./
           RUN npm run build || echo "No frontend build step"
           
-          FROM rust:nightly AS backend-builder
+          FROM rustlang/rust:nightly AS backend-builder
           WORKDIR /usr/src/app
           
           # Install build dependencies
@@ -207,7 +207,7 @@ jobs:
               ;;
             "api-only")
               cat > Dockerfile.deploy << 'EOF'
-          FROM rust:nightly AS builder
+          FROM rustlang/rust:nightly AS builder
           WORKDIR /usr/src/app
           
           # Install build dependencies
@@ -242,7 +242,7 @@ jobs:
               ;;
             "reports-only")
               cat > Dockerfile.deploy << 'EOF'
-          FROM rust:nightly AS builder
+          FROM rustlang/rust:nightly AS builder
           WORKDIR /usr/src/app
           
           RUN apt-get update && apt-get install -y \
