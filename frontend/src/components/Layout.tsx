@@ -9,6 +9,7 @@ import {
   ChartBarIcon,
   Bars3Icon,
   XMarkIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 
 interface LayoutProps {
@@ -19,6 +20,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Templates', href: '/templates', icon: DocumentIcon },
   { name: 'Samples', href: '/samples', icon: BeakerIcon },
+  { name: 'AI Submissions', href: '/rag-submissions', icon: SparklesIcon },
   { name: 'Sequencing', href: '/sequencing', icon: QueueListIcon },
   { name: 'Storage', href: '/storage', icon: MapPinIcon },
   { name: 'Reports', href: '/reports', icon: ChartBarIcon },
