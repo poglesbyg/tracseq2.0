@@ -17,7 +17,7 @@ use crate::{
 
 /// Process a laboratory document using RAG and create samples from extracted data
 pub async fn process_document_and_create_samples(
-    State(state): State<AppComponents>,
+    State(_state): State<AppComponents>,
     mut multipart: Multipart,
 ) -> Result<Json<RagEnhancedSampleResult>, (StatusCode, String)> {
     let start_time = std::time::Instant::now();

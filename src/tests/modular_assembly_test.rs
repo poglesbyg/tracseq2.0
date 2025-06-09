@@ -57,6 +57,7 @@ mod tests {
                 port: 8080,
                 cors_enabled: false,
             },
+            rag: crate::config::RagIntegrationConfig::default(),
         };
 
         assert_eq!(custom_config.server.port, 8080);
