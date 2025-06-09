@@ -26,7 +26,9 @@ pub enum JobStatus {
 #[derive(Debug, Deserialize)]
 pub struct CreateJob {
     pub name: String,
-    pub sample_sheet_path: String,
+    #[serde(default)]
+    pub sample_sheet_path: Option<String>,
+    pub sample_ids: Option<Vec<i32>>,
     pub metadata: Option<serde_json::Value>,
 }
 
@@ -40,6 +42,27 @@ impl SequencingManager {
     }
 
     pub async fn create_job(&self, job: CreateJob) -> Result<SequencingJob, sqlx::Error> {
+        // Generate sample sheet path if not provided but sample_ids are available
+        let sample_sheet_path = job.sample_sheet_path.unwrap_or_else(|| {
+            if let Some(ref sample_ids) = job.sample_ids {
+                format!(
+                    "/sample_sheets/job_{}_{}.csv",
+                    chrono::Utc::now().format("%Y%m%d_%H%M%S"),
+                    sample_ids.len()
+                )
+            } else {
+                "/sample_sheets/default.csv".to_string()
+            }
+        });
+
+        // Add sample_ids to metadata if provided
+        let mut metadata = job.metadata.unwrap_or(serde_json::json!({}));
+        if let Some(sample_ids) = job.sample_ids {
+            if let serde_json::Value::Object(ref mut map) = metadata {
+                map.insert("sample_ids".to_string(), serde_json::json!(sample_ids));
+            }
+        }
+
         sqlx::query_as::<_, SequencingJob>(
             r#"
             INSERT INTO sequencing_jobs (name, status, sample_sheet_path, metadata)
@@ -48,8 +71,8 @@ impl SequencingManager {
             "#,
         )
         .bind(&job.name)
-        .bind(&job.sample_sheet_path)
-        .bind(job.metadata.unwrap_or(serde_json::json!({})))
+        .bind(&sample_sheet_path)
+        .bind(metadata)
         .fetch_one(&self.pool)
         .await
     }

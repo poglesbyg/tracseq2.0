@@ -72,10 +72,16 @@ pub fn sequencing_routes() -> Router<AppComponents> {
 
 /// Storage management routes
 pub fn storage_routes() -> Router<AppComponents> {
-    Router::new().route(
-        "/api/storage/locations",
-        get(handlers::list_storage_locations),
-    )
+    Router::new()
+        .route(
+            "/api/storage/locations",
+            get(handlers::list_storage_locations),
+        )
+        .route("/api/storage/move", post(handlers::move_sample))
+        .route(
+            "/api/storage/scan/:barcode",
+            get(handlers::scan_sample_barcode),
+        )
 }
 
 /// Reports and analytics routes

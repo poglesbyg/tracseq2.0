@@ -30,7 +30,8 @@ pub async fn test_sequencing_crud() -> Result<(), Box<dyn std::error::Error>> {
     println!("1. Testing CREATE operation...");
     let new_job = CreateJob {
         name: "Test Sequencing Run".to_string(),
-        sample_sheet_path: "/path/to/sample_sheet.csv".to_string(),
+        sample_sheet_path: Some("/path/to/sample_sheet.csv".to_string()),
+        sample_ids: Some(vec![1, 2, 3]),
         metadata: Some(serde_json::json!({
             "instrument": "NovaSeq",
             "read_length": "2x150",
