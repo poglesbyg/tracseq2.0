@@ -33,6 +33,27 @@ pub fn sample_routes() -> Router<AppComponents> {
         .route("/api/samples/:id", put(handlers::update_sample))
         .route("/api/samples/batch", post(handlers::create_samples_batch))
         .route("/api/samples/:id/validate", post(handlers::validate_sample))
+        // RAG-enhanced sample processing routes
+        .route(
+            "/api/samples/rag/process-document",
+            post(handlers::process_document_and_create_samples),
+        )
+        .route(
+            "/api/samples/rag/preview",
+            post(handlers::preview_document_extraction),
+        )
+        .route(
+            "/api/samples/rag/create-from-data",
+            post(handlers::create_samples_from_rag_data),
+        )
+        .route(
+            "/api/samples/rag/query",
+            post(handlers::query_submission_information),
+        )
+        .route(
+            "/api/samples/rag/status",
+            get(handlers::get_rag_system_status),
+        )
 }
 
 /// Sequencing management routes

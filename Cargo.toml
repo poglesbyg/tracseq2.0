@@ -28,3 +28,5 @@ anyhow = "1.0"
 thiserror = "1.0"
 dotenvy = "0.15"
 async-trait = "0.1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls"] }
+fastrand = "2.0"

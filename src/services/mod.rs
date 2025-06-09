@@ -1,3 +1,4 @@
+pub mod rag_integration_service;
 pub mod sample_service;
 pub mod sequencing_service;
 pub mod storage_service;

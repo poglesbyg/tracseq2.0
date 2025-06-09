@@ -13,6 +13,13 @@ For detailed documentation, please visit our [Documentation Center](docs/README.
 
 ## Features
 
+- **🤖 AI-Powered Document Processing**
+  - RAG (Retrieval-Augmented Generation) LLM integration
+  - Automatic extraction from laboratory documents (PDF, DOCX)
+  - Intelligent sample data population with confidence scoring
+  - Natural language querying of submission information
+  - See [RAG Integration Guide](docs/RAG_INTEGRATION.md) for details
+
 - **Template Management**
   - Spreadsheet template upload and processing
   - Metadata extraction and tracking
@@ -61,6 +68,8 @@ For detailed documentation, please visit our [Documentation Center](docs/README.
 - Docker and Docker Compose
 - Git
 - Ports 80, 3000, 3001, 5173, and 5432 available
+- **For RAG Integration**: Python RAG system running on port 8000 (see [RAG Integration Guide](docs/RAG_INTEGRATION.md))
+- **For RAG Features**: OpenAI or Anthropic API keys (configured in RAG system)
 
 ## Quick Start
 

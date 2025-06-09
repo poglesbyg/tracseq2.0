@@ -10,6 +10,10 @@ use crate::{
     AppComponents,
 };
 
+// Re-export RAG enhanced functionality
+pub mod rag_enhanced_handlers;
+pub use rag_enhanced_handlers::*;
+
 /// Create a new sample from the provided data
 pub async fn create_sample(
     State(state): State<AppComponents>,

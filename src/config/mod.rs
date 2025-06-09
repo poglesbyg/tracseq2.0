@@ -8,6 +8,7 @@ pub struct AppConfig {
     pub database: DatabaseConfig,
     pub storage: StorageConfig,
     pub server: ServerConfig,
+    pub rag: RagIntegrationConfig,
 }
 
 /// Database configuration
@@ -32,6 +33,32 @@ pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub cors_enabled: bool,
+}
+
+/// RAG integration configuration
+#[derive(Debug, Clone)]
+pub struct RagIntegrationConfig {
+    pub enabled: bool,
+    pub base_url: String,
+    pub timeout_seconds: u64,
+    pub max_file_size_mb: u64,
+    pub supported_formats: Vec<String>,
+    pub default_confidence_threshold: f64,
+    pub auto_create_samples: bool,
+}
+
+impl Default for RagIntegrationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            base_url: "http://localhost:8000".to_string(),
+            timeout_seconds: 300,
+            max_file_size_mb: 50,
+            supported_formats: vec!["pdf".to_string(), "docx".to_string(), "txt".to_string()],
+            default_confidence_threshold: 0.7,
+            auto_create_samples: false,
+        }
+    }
 }
 
 impl AppConfig {
@@ -65,6 +92,7 @@ impl AppConfig {
                 port,
                 cors_enabled: true,
             },
+            rag: RagIntegrationConfig::default(),
         })
     }
 
@@ -86,6 +114,7 @@ impl AppConfig {
                 port: 0, // Random port for tests
                 cors_enabled: false,
             },
+            rag: RagIntegrationConfig::default(),
         }
     }
 }

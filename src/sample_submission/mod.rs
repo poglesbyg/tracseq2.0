@@ -25,7 +25,7 @@ pub enum SampleStatus {
     Completed,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct CreateSample {
     pub name: String,
     pub barcode: String,
@@ -33,7 +33,7 @@ pub struct CreateSample {
     pub metadata: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct UpdateSample {
     pub name: Option<String>,
     pub barcode: Option<String>,
