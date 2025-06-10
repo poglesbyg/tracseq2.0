@@ -1,3 +1,4 @@
+pub mod auth_service;
 pub mod barcode_service;
 pub mod rag_integration_service;
 pub mod sample_service;

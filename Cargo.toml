@@ -32,3 +32,11 @@ async-trait = "0.1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls"] }
 fastrand = "2.0"
 rand = "0.9.1"
+
+# Authentication and Security Dependencies
+jsonwebtoken = "9.2"
+argon2 = "0.5"
+validator = { version = "0.18", features = ["derive"] }
+axum-extra = { version = "0.9", features = ["typed-header"] }
+tower = { version = "0.4", features = ["util"] }
+headers = "0.4"

@@ -108,6 +108,49 @@ pub fn reports_routes() -> Router<AppComponents> {
         .route("/api/reports/schema", get(handlers::get_schema))
 }
 
+/// User management and authentication routes
+pub fn user_routes() -> Router<AppComponents> {
+    use crate::middleware::auth::auth_middleware;
+    use axum::middleware;
+
+    Router::new()
+        // Public authentication routes
+        .route("/api/auth/login", post(handlers::login))
+        .route(
+            "/api/auth/reset-password",
+            post(handlers::request_password_reset),
+        )
+        .route(
+            "/api/auth/confirm-reset",
+            post(handlers::confirm_password_reset),
+        )
+        // Protected user routes (require authentication)
+        .route("/api/auth/logout", post(handlers::logout))
+        .route("/api/users/me", get(handlers::get_current_user))
+        .route("/api/users/me", put(handlers::update_current_user))
+        .route("/api/users/me/password", put(handlers::change_password))
+        .route("/api/users/me/sessions", get(handlers::get_user_sessions))
+        .route(
+            "/api/users/me/sessions",
+            delete(handlers::revoke_all_sessions),
+        )
+        .route(
+            "/api/users/me/sessions/:session_id",
+            delete(handlers::revoke_session),
+        )
+        // Admin-only routes (require authentication + admin role)
+        .route("/api/users", post(handlers::create_user))
+        .route("/api/users", get(handlers::list_users))
+        .route("/api/users/:user_id", get(handlers::get_user))
+        .route("/api/users/:user_id", put(handlers::update_user))
+        .route("/api/users/:user_id", delete(handlers::delete_user))
+        // Apply authentication middleware to protected routes
+        .route_layer(middleware::from_fn_with_state(
+            AppComponents::default(), // This will need to be properly injected
+            auth_middleware,
+        ))
+}
+
 /// Assemble all routes into a complete application router
 pub fn create_app_router() -> Router<AppComponents> {
     Router::new()
@@ -117,6 +160,7 @@ pub fn create_app_router() -> Router<AppComponents> {
         .merge(sequencing_routes())
         .merge(storage_routes())
         .merge(reports_routes())
+        .merge(user_routes())
         .layer(CorsLayer::permissive())
 }
 
