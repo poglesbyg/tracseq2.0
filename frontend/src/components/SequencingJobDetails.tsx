@@ -11,21 +11,19 @@ interface Sample {
 }
 
 interface SequencingJob {
-  id: number;
+  id: string;
   name: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'Pending' | 'InProgress' | 'Completed' | 'Failed';
   created_at: string;
   updated_at: string;
-  sample_sheet_url: string | null;
-  samples: {
-    id: number;
-    name: string;
-    barcode: string;
-  }[];
+  sample_sheet_path: string | null;
+  metadata?: {
+    sample_ids: number[];
+  };
 }
 
 interface JobDetailsProps {
-  jobId: number;
+  jobId: string;
   onClose: () => void;
 }
 
@@ -67,11 +65,11 @@ export default function SequencingJobDetails({ jobId, onClose }: JobDetailsProps
 
   const getStatusColor = (status: SequencingJob['status']) => {
     switch (status) {
-      case 'completed':
+      case 'Completed':
         return 'bg-green-100 text-green-800';
-      case 'running':
+      case 'InProgress':
         return 'bg-blue-100 text-blue-800';
-      case 'failed':
+      case 'Failed':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-yellow-100 text-yellow-800';
@@ -136,38 +134,38 @@ export default function SequencingJobDetails({ jobId, onClose }: JobDetailsProps
 
         <div className="mt-6">
           <h4 className="text-sm font-medium text-gray-900">Samples</h4>
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Barcode
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {job.samples.map((sample: Sample) => (
-                <tr key={sample.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sample.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sample.barcode}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sample.status}</td>
+          {job.metadata?.sample_ids && job.metadata.sample_ids.length > 0 ? (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Sample ID
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {job.metadata.sample_ids.map((sampleId: number) => (
+                  <tr key={sampleId}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Sample {sampleId}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">In Sequencing</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="text-sm text-gray-500 mt-2">No samples assigned to this job.</p>
+          )}
         </div>
 
         <div className="mt-6">
           <h4 className="text-sm font-medium text-gray-900">Sample Sheet</h4>
           <div className="mt-2">
-            {job.sample_sheet_url ? (
+            {job.sample_sheet_path ? (
               <a
-                href={job.sample_sheet_url}
+                href={job.sample_sheet_path}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -206,16 +204,16 @@ export default function SequencingJobDetails({ jobId, onClose }: JobDetailsProps
           <div className="mt-2 flex space-x-4">
             <button
               type="button"
-              onClick={() => updateJobStatus.mutate('running')}
-              disabled={job.status === 'running'}
+              onClick={() => updateJobStatus.mutate('InProgress')}
+              disabled={job.status === 'InProgress'}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
               Start Job
             </button>
             <button
               type="button"
-              onClick={() => updateJobStatus.mutate('completed')}
-              disabled={job.status === 'completed'}
+              onClick={() => updateJobStatus.mutate('Completed')}
+              disabled={job.status === 'Completed'}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
             >
               <CheckCircleIcon className="h-5 w-5 mr-2" />
@@ -223,8 +221,8 @@ export default function SequencingJobDetails({ jobId, onClose }: JobDetailsProps
             </button>
             <button
               type="button"
-              onClick={() => updateJobStatus.mutate('failed')}
-              disabled={job.status === 'failed'}
+              onClick={() => updateJobStatus.mutate('Failed')}
+              disabled={job.status === 'Failed'}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
             >
               <XCircleIcon className="h-5 w-5 mr-2" />
