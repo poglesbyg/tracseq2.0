@@ -10,7 +10,7 @@ NC='\033[0m' # No Color
 # Configuration
 BACKEND_PORT=3000
 FRONTEND_PORT=5173
-DB_PORT=5432
+DB_PORT=5433
 BACKEND_HOST="127.0.0.1"
 
 # PID files for process tracking
@@ -124,7 +124,7 @@ create_env_file() {
     if [ ! -f .env ]; then
         print_info "Creating .env file..."
         cat > .env << EOL
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/lab_manager
+DATABASE_URL=postgres://postgres:postgres@localhost:5433/lab_manager
 STORAGE_PATH=./storage
 SERVER_HOST=127.0.0.1
 SERVER_PORT=3000
