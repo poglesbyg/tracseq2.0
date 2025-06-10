@@ -56,31 +56,44 @@ Use this checklist to verify that the RAG chatbot is working correctly.
 
 ## Test Questions
 
-Try these questions to verify AI functionality:
+Try these questions to verify enhanced AI functionality:
 
-### Sample Management
+### Enhanced Sample Management
 ```
-How do I submit a new sample?
+How do I submit a new sample using the AI document processing feature?
 ```
-Expected: Information about sample submission process
+Expected: Detailed workflow with specific steps, best practices, and tips
 
-### Storage Requirements
+### Advanced Storage Requirements
 ```
-What are the storage requirements for DNA samples?
+What are the optimal storage conditions for different sample types and why?
 ```
-Expected: Temperature and storage condition details
+Expected: Comprehensive temperature guidelines, scientific rationale, and Lab Manager integration
 
-### System Help
+### Complex Workflow Help
 ```
-How do I track my submission status?
+I need to set up a sequencing job for 50 RNA samples. Walk me through the entire process.
 ```
-Expected: Navigation guidance for tracking submissions
+Expected: Step-by-step workflow, quality requirements, sample sheet generation, and troubleshooting
 
-### Technical Details
+### Contextual Intelligence Test
 ```
-What file formats are supported for documents?
+First ask: "What's the difference between batch and individual sample submission?"
+Then ask: "Which method would you recommend for my use case?"
 ```
-Expected: List of supported file types (PDF, DOCX, etc.)
+Expected: Detailed comparison, then context-aware recommendation based on previous question
+
+### Multi-Step Problem Solving
+```
+I have a PDF form with sample information, but some data is missing. How should I proceed?
+```
+Expected: Comprehensive approach including RAG processing, manual completion, validation steps
+
+### System Integration Knowledge
+```
+How do I export my sequencing results and integrate them with external analysis tools?
+```
+Expected: Export procedures, file formats, integration options, and best practices
 
 ## Error Handling Tests
 

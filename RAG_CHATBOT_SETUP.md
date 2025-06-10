@@ -147,22 +147,32 @@ Once the system is running:
 
 ## Features
 
+### 🧠 **Enhanced Intelligence**
+- **Conversation Memory**: Remembers context throughout your chat session
+- **Lab-Specific Knowledge**: Deep understanding of Lab Manager system workflows
+- **Smarter Responses**: More detailed, actionable answers with step-by-step guidance
+- **Advanced Models**: Uses GPT-4, Claude-3, or enhanced Ollama models for better accuracy
+
 ### 🎯 **Intelligent Assistance**
 - Natural language queries about lab procedures
-- Context-aware responses based on processed documents
-- Suggested questions to help users get started
+- Context-aware responses based on processed documents and conversation history
+- Suggested questions covering advanced lab management topics
+- Actionable recommendations with specific next steps
 
 ### 💬 **User-Friendly Interface**
 - Clean, modern chat interface
 - Typing indicators and smooth animations
 - Minimizable window that doesn't interfere with workflow
 - Mobile-responsive design
+- Enhanced error messages with troubleshooting guidance
 
-### 🔍 **Lab-Specific Knowledge**
-- Information about sample submission processes
-- Storage requirements and conditions
-- Sequencing platform details
-- Barcode and tracking procedures
+### 🔍 **Comprehensive Lab Knowledge**
+- Complete Lab Manager system navigation and workflows
+- Sample submission processes (manual, batch, AI-powered)
+- Storage requirements and best practices for all sample types
+- Sequencing platform details and job management
+- Quality control standards and validation procedures
+- Template processing and data export capabilities
 
 ## Usage Examples
 
@@ -287,21 +297,50 @@ EOF
 
 ### Setting up Local Ollama (Recommended)
 
-For privacy and cost-effectiveness, use local Ollama:
+For privacy and cost-effectiveness, use local Ollama with enhanced models:
 
 ```bash
 # Install Ollama (if not already installed)
 curl -fsSL https://ollama.ai/install.sh | sh
 
-# Pull a suitable model
-ollama pull llama3.1:8b
+# Pull enhanced models for better intelligence
+ollama pull llama3.1:8b    # Recommended for balanced performance
+ollama pull mistral:7b     # Alternative option
+ollama pull codellama:7b   # Good for technical queries
 
 # Verify Ollama is running
 curl http://localhost:11434/api/tags
 
-# Update .env to use Ollama
-echo "USE_OLLAMA=true" >> lab_submission_rag/app/.env
-echo "OLLAMA_MODEL=llama3.1:8b" >> lab_submission_rag/app/.env
+# Configure for enhanced intelligence
+cat >> lab_submission_rag/app/.env << EOF
+USE_OLLAMA=true
+OLLAMA_MODEL=llama3.1:8b
+LLM_TEMPERATURE=0.3
+MAX_TOKENS=2048
+MAX_SEARCH_RESULTS=5
+EOF
+```
+
+### Intelligence Configuration
+
+The enhanced assistant can be fine-tuned with these settings:
+
+```bash
+# In lab_submission_rag/app/.env
+
+# === Enhanced Intelligence Settings ===
+LLM_TEMPERATURE=0.3          # Lower = more focused responses (0.1-0.8)
+MAX_TOKENS=2048              # Longer responses for detailed help
+MAX_SEARCH_RESULTS=5         # More context from documents
+
+# === Model Selection for Best Intelligence ===
+# For local privacy (Ollama):
+OLLAMA_MODEL=llama3.1:8b     # Best overall performance
+# OLLAMA_MODEL=mistral:7b    # Good alternative
+
+# For maximum intelligence (Cloud APIs):
+# LLM_PROVIDER=openai        # Uses GPT-4 automatically
+# LLM_PROVIDER=anthropic     # Uses Claude-3 Sonnet automatically
 ```
 
 ### Customizing Suggested Questions

@@ -22,10 +22,11 @@ interface ChatBotProps {
 }
 
 export const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
+  const [sessionId] = useState(() => `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: "Hi! I'm your lab assistant. I can help you with:\n\n• Processing laboratory submissions\n• Understanding sample requirements\n• Navigating the lab manager system\n• Answering questions about protocols\n\nWhat would you like to know?",
+      content: "Hi! I'm your enhanced lab assistant. I can help you with:\n\n• Processing laboratory submissions\n• Understanding sample requirements\n• Navigating the lab manager system\n• Answering questions about protocols\n• Storage conditions and best practices\n• Sequencing workflows and requirements\n\nI have access to comprehensive lab knowledge and will remember our conversation. What would you like to know?",
       type: 'assistant',
       timestamp: new Date(),
     },
@@ -83,6 +84,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
         },
         body: JSON.stringify({
           query: userMessage.content,
+          session_id: sessionId, // Persistent session ID for conversation context
         }),
       });
 
@@ -111,7 +113,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
       
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "I'm sorry, I'm having trouble connecting to my knowledge base right now. Please check that the RAG system is running or try again later.",
+        content: "I'm sorry, I'm having trouble connecting to my knowledge base right now. This could be because:\n\n• The RAG system isn't running (check Docker containers)\n• Network connectivity issues\n• System maintenance in progress\n\nPlease try:\n1. Refreshing the page\n2. Checking system status\n3. Contacting your administrator if the issue persists\n\nI'll be back as soon as the connection is restored!",
         type: 'assistant',
         timestamp: new Date(),
       };
@@ -133,7 +135,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
     setMessages([
       {
         id: '1',
-        content: "Hi! I'm your lab assistant. I can help you with:\n\n• Processing laboratory submissions\n• Understanding sample requirements\n• Navigating the lab manager system\n• Answering questions about protocols\n\nWhat would you like to know?",
+        content: "Hi! I'm your enhanced lab assistant. I can help you with:\n\n• Processing laboratory submissions\n• Understanding sample requirements\n• Navigating the lab manager system\n• Answering questions about protocols\n• Storage conditions and best practices\n• Sequencing workflows and requirements\n\nI have access to comprehensive lab knowledge and will remember our conversation. What would you like to know?",
         type: 'assistant',
         timestamp: new Date(),
       },
@@ -141,11 +143,14 @@ export const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
   };
 
   const suggestedQuestions = [
-    "How do I submit a new sample?",
-    "What are the storage requirements for DNA samples?",
-    "How do I track my submission status?",
-    "What file formats are supported for documents?",
-    "How do I generate barcodes for samples?",
+    "How do I submit a new sample using the AI document processing?",
+    "What are the storage temperature requirements for different sample types?",
+    "How do I set up a sequencing job and generate sample sheets?",
+    "How can I batch upload samples using Excel templates?",
+    "What quality metrics should I include for DNA and RNA samples?",
+    "How do I track sample locations and manage storage capacity?",
+    "What are the best practices for barcode generation and labeling?",
+    "How do I export data and generate reports from the system?",
   ];
 
   const handleSuggestedQuestion = (question: string) => {
