@@ -3,6 +3,7 @@ pub mod config;
 pub mod errors;
 pub mod events;
 pub mod handlers;
+pub mod middleware;
 pub mod models;
 pub mod plugins;
 pub mod repositories;
@@ -28,6 +29,8 @@ pub struct AppComponents {
     pub sample_processing: SampleProcessingComponent,
     pub sequencing: SequencingComponent,
     pub repositories: RepositoriesComponent,
+    pub user_manager: models::user::UserManager,
+    pub auth_service: services::auth_service::AuthService,
 }
 
 /// Database component with its own configuration and lifecycle

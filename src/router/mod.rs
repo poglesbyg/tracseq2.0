@@ -110,9 +110,6 @@ pub fn reports_routes() -> Router<AppComponents> {
 
 /// User management and authentication routes
 pub fn user_routes() -> Router<AppComponents> {
-    use crate::middleware::auth::auth_middleware;
-    use axum::middleware;
-
     Router::new()
         // Public authentication routes
         .route("/api/auth/login", post(handlers::login))
@@ -124,7 +121,7 @@ pub fn user_routes() -> Router<AppComponents> {
             "/api/auth/confirm-reset",
             post(handlers::confirm_password_reset),
         )
-        // Protected user routes (require authentication)
+        // Protected user routes (authentication handled in handlers)
         .route("/api/auth/logout", post(handlers::logout))
         .route("/api/users/me", get(handlers::get_current_user))
         .route("/api/users/me", put(handlers::update_current_user))
@@ -138,17 +135,12 @@ pub fn user_routes() -> Router<AppComponents> {
             "/api/users/me/sessions/:session_id",
             delete(handlers::revoke_session),
         )
-        // Admin-only routes (require authentication + admin role)
+        // Admin-only routes (authentication + authorization handled in handlers)
         .route("/api/users", post(handlers::create_user))
         .route("/api/users", get(handlers::list_users))
         .route("/api/users/:user_id", get(handlers::get_user))
         .route("/api/users/:user_id", put(handlers::update_user))
         .route("/api/users/:user_id", delete(handlers::delete_user))
-        // Apply authentication middleware to protected routes
-        .route_layer(middleware::from_fn_with_state(
-            AppComponents::default(), // This will need to be properly injected
-            auth_middleware,
-        ))
 }
 
 /// Assemble all routes into a complete application router

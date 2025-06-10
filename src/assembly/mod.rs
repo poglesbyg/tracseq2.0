@@ -2,10 +2,10 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 use crate::{
-    config::AppConfig, repositories::PostgresRepositoryFactory,
-    sample_submission::SampleSubmissionManager, sequencing::SequencingManager, storage::Storage,
-    AppComponents, DatabaseComponent, SampleProcessingComponent, SequencingComponent,
-    StorageComponent,
+    config::AppConfig, models::user::UserManager, repositories::PostgresRepositoryFactory,
+    sample_submission::SampleSubmissionManager, sequencing::SequencingManager,
+    services::auth_service::AuthService, storage::Storage, AppComponents, DatabaseComponent,
+    SampleProcessingComponent, SequencingComponent, StorageComponent,
 };
 
 /// Repositories component for data access abstraction
@@ -22,6 +22,8 @@ pub struct ComponentBuilder {
     sample_manager: Option<Arc<SampleSubmissionManager>>,
     sequencing_manager: Option<Arc<SequencingManager>>,
     repository_factory: Option<Arc<PostgresRepositoryFactory>>,
+    user_manager: Option<UserManager>,
+    auth_service: Option<AuthService>,
 }
 
 impl ComponentBuilder {
@@ -34,6 +36,8 @@ impl ComponentBuilder {
             sample_manager: None,
             sequencing_manager: None,
             repository_factory: None,
+            user_manager: None,
+            auth_service: None,
         }
     }
 
@@ -106,6 +110,38 @@ impl ComponentBuilder {
         Ok(self)
     }
 
+    /// Build the user management component
+    pub fn with_user_management(mut self) -> Result<Self, AssemblyError> {
+        let pool = self
+            .database_pool
+            .as_ref()
+            .ok_or(AssemblyError::MissingDependency(
+                "Database pool required for user management",
+            ))?;
+
+        let user_manager = UserManager::new(pool.clone());
+        self.user_manager = Some(user_manager);
+        Ok(self)
+    }
+
+    /// Build the authentication service
+    pub fn with_authentication(mut self) -> Result<Self, AssemblyError> {
+        let pool = self
+            .database_pool
+            .as_ref()
+            .ok_or(AssemblyError::MissingDependency(
+                "Database pool required for authentication",
+            ))?;
+
+        // Get JWT secret from environment or use default (should be configurable)
+        let jwt_secret = std::env::var("JWT_SECRET")
+            .unwrap_or_else(|_| "your-very-secure-secret-key-change-in-production".to_string());
+
+        let auth_service = AuthService::new(pool.clone(), jwt_secret);
+        self.auth_service = Some(auth_service);
+        Ok(self)
+    }
+
     /// Assemble all components
     pub fn build(self) -> Result<AppComponents, AssemblyError> {
         let database_pool = self
@@ -123,6 +159,12 @@ impl ComponentBuilder {
         let repository_factory = self
             .repository_factory
             .ok_or(AssemblyError::MissingComponent("Repositories"))?;
+        let user_manager = self
+            .user_manager
+            .ok_or(AssemblyError::MissingComponent("User Manager"))?;
+        let auth_service = self
+            .auth_service
+            .ok_or(AssemblyError::MissingComponent("Auth Service"))?;
 
         Ok(AppComponents {
             database: DatabaseComponent {
@@ -138,6 +180,8 @@ impl ComponentBuilder {
             repositories: RepositoriesComponent {
                 factory: repository_factory,
             },
+            user_manager,
+            auth_service,
         })
     }
 }
@@ -154,6 +198,8 @@ pub async fn assemble_production_components() -> Result<AppComponents, AssemblyE
         .await?
         .with_sample_processing()?
         .with_sequencing()?
+        .with_user_management()?
+        .with_authentication()?
         .build()
 }
 
@@ -169,6 +215,8 @@ pub async fn assemble_test_components() -> Result<AppComponents, AssemblyError> 
         .await?
         .with_sample_processing()?
         .with_sequencing()?
+        .with_user_management()?
+        .with_authentication()?
         .build()
 }
 
@@ -187,6 +235,8 @@ impl CustomAssembly {
             .with_repositories()?
             .with_sample_processing()?
             .with_sequencing()?
+            .with_user_management()?
+            .with_authentication()?
             .build()?;
 
         Ok(AppComponents {
@@ -195,6 +245,8 @@ impl CustomAssembly {
             sample_processing: components.sample_processing,
             sequencing: components.sequencing,
             repositories: components.repositories,
+            user_manager: components.user_manager,
+            auth_service: components.auth_service,
         })
     }
 

@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::{
     models::spreadsheet::{SpreadsheetDataset, SpreadsheetSearchQuery, SpreadsheetSearchResult},
-    services::spreadsheet_service::SpreadsheetService,
+    services::{spreadsheet_service::SpreadsheetService, Service},
 };
 
 /// Upload request parameters

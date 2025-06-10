@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 
 use anyhow::{anyhow, Result};
+use argon2::password_hash::{rand_core::OsRng, SaltString};
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use sqlx::PgPool;
@@ -12,6 +14,7 @@ use crate::models::user::{
     ResetPasswordRequest, User, UserManager, UserSafeProfile, UserSession, UserStatus,
 };
 
+#[derive(Clone)]
 pub struct AuthService {
     pool: PgPool,
     user_manager: UserManager,
@@ -184,12 +187,12 @@ impl AuthService {
         }
 
         // Hash new password
-        let new_password_hash = argon2::hash_encoded(
-            request.new_password.as_bytes(),
-            b"lab_manager_salt",
-            &argon2::Config::default(),
-        )
-        .map_err(|_| anyhow!("Password hashing failed"))?;
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        let new_password_hash = argon2
+            .hash_password(request.new_password.as_bytes(), &salt)
+            .map_err(|_| anyhow!("Password hashing failed"))?
+            .to_string();
 
         // Update password in database
         sqlx::query(
@@ -284,12 +287,12 @@ impl AuthService {
         .map_err(|_| anyhow!("Invalid or expired reset token"))?;
 
         // Hash new password
-        let new_password_hash = argon2::hash_encoded(
-            request.new_password.as_bytes(),
-            b"lab_manager_salt",
-            &argon2::Config::default(),
-        )
-        .map_err(|_| anyhow!("Password hashing failed"))?;
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        let new_password_hash = argon2
+            .hash_password(request.new_password.as_bytes(), &salt)
+            .map_err(|_| anyhow!("Password hashing failed"))?
+            .to_string();
 
         // Update password and mark token as used
         let mut tx = self.pool.begin().await?;
@@ -448,6 +451,9 @@ impl AuthService {
         let temp_token = format!("{}:{}", session_id, expires_at.timestamp());
         let token_hash = self.hash_token(&temp_token);
 
+        // Convert IpAddr to String for database storage
+        let ip_str = ip_address.map(|ip| ip.to_string());
+
         let session = sqlx::query_as::<_, UserSession>(
             r#"
             INSERT INTO user_sessions (id, user_id, token_hash, device_info, ip_address, expires_at)
@@ -459,7 +465,7 @@ impl AuthService {
         .bind(user_id)
         .bind(&token_hash)
         .bind(user_agent)
-        .bind(ip_address)
+        .bind(ip_str)
         .bind(expires_at)
         .fetch_one(&self.pool)
         .await?;
@@ -509,6 +515,9 @@ impl AuthService {
         user_agent: Option<String>,
         details: Option<serde_json::Value>,
     ) -> Result<()> {
+        // Convert IpAddr to String for database storage
+        let ip_str = ip_address.map(|ip| ip.to_string());
+
         sqlx::query(
             r#"
             INSERT INTO user_activity_log 
@@ -520,7 +529,7 @@ impl AuthService {
         .bind(action)
         .bind(resource_type)
         .bind(resource_id)
-        .bind(ip_address)
+        .bind(ip_str)
         .bind(user_agent)
         .bind(details)
         .execute(&self.pool)

@@ -1,3 +1,5 @@
+pub mod auth_helpers;
+
 use std::net::SocketAddr;
 
 use axum::{
@@ -18,6 +20,8 @@ use crate::{
     services::auth_service::AuthService,
     AppComponents,
 };
+
+use auth_helpers::{require_admin, require_auth, verify_auth_token};
 
 /// Login endpoint
 pub async fn login(
@@ -71,12 +75,13 @@ pub async fn login(
 /// Logout endpoint
 pub async fn logout(
     State(components): State<AppComponents>,
-    Extension(current_user): Extension<User>,
-    Extension(session_id): Extension<Uuid>,
+    headers: HeaderMap,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let (current_user, session) = verify_auth_token(&components, &headers).await?;
+
     match components
         .auth_service
-        .logout(session_id, Some(current_user.id))
+        .logout(session.id, Some(current_user.id))
         .await
     {
         Ok(()) => Ok(Json(json!({
@@ -97,8 +102,10 @@ pub async fn logout(
 
 /// Get current user profile
 pub async fn get_current_user(
-    Extension(current_user): Extension<User>,
+    State(components): State<AppComponents>,
+    headers: HeaderMap,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let current_user = require_auth(&components, &headers).await?;
     let user_profile: UserSafeProfile = current_user.into();
     Ok(Json(json!({
         "success": true,
@@ -352,26 +359,11 @@ pub async fn revoke_all_sessions(
 /// Create new user (admin only)
 pub async fn create_user(
     State(components): State<AppComponents>,
-    Extension(current_user): Extension<User>,
+    headers: HeaderMap,
     Json(request): Json<CreateUserRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    // Check admin permission
-    if !components
-        .user_manager
-        .check_permission(&current_user.role, "users", "create")
-        .await
-        .unwrap_or(false)
-    {
-        return Err((
-            StatusCode::FORBIDDEN,
-            Json(json!({
-                "error": {
-                    "code": "INSUFFICIENT_PERMISSIONS",
-                    "message": "You don't have permission to create users"
-                }
-            })),
-        ));
-    }
+    // Require admin privileges
+    let current_user = require_admin(&components, &headers).await?;
 
     // Validate request
     if let Err(validation_errors) = request.validate() {

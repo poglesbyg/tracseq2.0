@@ -34,7 +34,7 @@ pub struct ServiceHealth {
     pub checks: HashMap<String, HealthCheck>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum HealthStatus {
     Healthy,
     Degraded,

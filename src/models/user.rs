@@ -1,3 +1,5 @@
+use argon2::password_hash::{rand_core::OsRng, SaltString};
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
@@ -5,7 +7,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 use validator::Validate;
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "user_role", rename_all = "snake_case")]
 pub enum UserRole {
     LabAdministrator,
@@ -62,7 +64,7 @@ impl UserRole {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "user_status", rename_all = "snake_case")]
 pub enum UserStatus {
     Active,
@@ -82,7 +84,7 @@ impl UserStatus {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct User {
     pub id: Uuid,
     pub email: String,
@@ -256,7 +258,7 @@ pub struct UserSession {
     pub user_id: Uuid,
     pub token_hash: String,
     pub device_info: Option<String>,
-    pub ip_address: Option<std::net::IpAddr>,
+    pub ip_address: Option<String>, // Store as string for PostgreSQL compatibility
     pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub last_used_at: Option<DateTime<Utc>>,
@@ -296,7 +298,7 @@ pub struct UserActivityLog {
     pub action: String,
     pub resource_type: Option<String>,
     pub resource_id: Option<Uuid>,
-    pub ip_address: Option<std::net::IpAddr>,
+    pub ip_address: Option<String>, // Store as string for PostgreSQL compatibility
     pub user_agent: Option<String>,
     pub details: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
@@ -321,6 +323,7 @@ pub struct UserListResponse {
     pub total_pages: u32,
 }
 
+#[derive(Clone)]
 pub struct UserManager {
     pool: PgPool,
 }
@@ -336,12 +339,12 @@ impl UserManager {
         created_by: Option<Uuid>,
     ) -> Result<User, sqlx::Error> {
         // Hash password using Argon2
-        let password_hash = argon2::hash_encoded(
-            request.password.as_bytes(),
-            b"lab_manager_salt", // In production, use a proper salt
-            &argon2::Config::default(),
-        )
-        .map_err(|_| sqlx::Error::Protocol("Password hashing failed".into()))?;
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        let password_hash = argon2
+            .hash_password(request.password.as_bytes(), &salt)
+            .map_err(|_| sqlx::Error::Protocol("Password hashing failed".into()))?
+            .to_string();
 
         sqlx::query_as::<_, User>(
             r#"
@@ -632,7 +635,13 @@ impl UserManager {
     }
 
     pub async fn verify_password(&self, password: &str, hash: &str) -> bool {
-        argon2::verify_encoded(hash, password.as_bytes()).unwrap_or(false)
+        if let Ok(parsed_hash) = PasswordHash::new(hash) {
+            Argon2::default()
+                .verify_password(password.as_bytes(), &parsed_hash)
+                .is_ok()
+        } else {
+            false
+        }
     }
 
     pub async fn increment_failed_login(&self, user_id: Uuid) -> Result<(), sqlx::Error> {
