@@ -19,10 +19,16 @@ interface RagExtractionResult {
     metadata: any;
   }>;
   confidence_score: number;
-  warnings: string[];
+  validation_warnings: string[];
   processing_time: number;
-  source_document: string;
-  message: string;
+  source_document?: string;
+  extraction_result?: {
+    success: boolean;
+    confidence_score: number;
+    warnings: string[];
+    source_document: string;
+    submission?: any;
+  };
 }
 
 export default function RagSubmissions() {
@@ -343,11 +349,25 @@ export default function RagSubmissions() {
                   <span className="text-sm text-gray-900">{extractionResult.processing_time.toFixed(2)}s</span>
                 </div>
 
-                {extractionResult.warnings.length > 0 && (
+                {extractionResult.validation_warnings && extractionResult.validation_warnings.length > 0 && (
                   <div>
                     <span className="text-sm font-medium text-gray-700 block mb-2">Warnings</span>
                     <div className="space-y-1">
-                      {extractionResult.warnings.map((warning, index) => (
+                      {extractionResult.validation_warnings.map((warning: string, index: number) => (
+                        <div key={index} className="flex items-center text-xs text-yellow-600">
+                          <ExclamationTriangleIcon className="h-3 w-3 mr-1" />
+                          {warning}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {extractionResult.extraction_result?.warnings && extractionResult.extraction_result.warnings.length > 0 && (
+                  <div>
+                    <span className="text-sm font-medium text-gray-700 block mb-2">Extraction Warnings</span>
+                    <div className="space-y-1">
+                      {extractionResult.extraction_result.warnings.map((warning: string, index: number) => (
                         <div key={index} className="flex items-center text-xs text-yellow-600">
                           <ExclamationTriangleIcon className="h-3 w-3 mr-1" />
                           {warning}

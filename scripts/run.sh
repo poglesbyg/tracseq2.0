@@ -30,9 +30,24 @@ command_exists() {
 
 # Function to check if a port is in use
 check_port() {
-    if lsof -Pi :$1 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    local port=$1
+    
+    # Try multiple methods to detect if port is in use
+    # Method 1: lsof (works for most local processes)
+    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
         return 0  # Port is in use
     fi
+    
+    # Method 2: netstat (works better for Docker containers)
+    if netstat -tln 2>/dev/null | grep -q ":$port "; then
+        return 0  # Port is in use
+    fi
+    
+    # Method 3: Direct connection test (most reliable)
+    if timeout 2 bash -c "</dev/tcp/localhost/$port" >/dev/null 2>&1; then
+        return 0  # Port is in use
+    fi
+    
     return 1  # Port is free
 }
 
@@ -67,6 +82,12 @@ stop_all_processes() {
     # Kill any remaining lab_manager processes
     pkill -f "lab_manager" 2>/dev/null || true
     pkill -f "vite.*frontend" 2>/dev/null || true
+    
+    # Stop database container
+    if command_exists docker-compose; then
+        print_info "Stopping database container..."
+        docker-compose down 2>/dev/null || true
+    fi
     
     # Wait a moment for cleanup
     sleep 2
@@ -230,13 +251,25 @@ start_frontend() {
     fi
 }
 
+# Function to check database health
+check_database_health() {
+    # Check if Docker container is running
+    if docker ps --format "table {{.Names}}" 2>/dev/null | grep -q "lab_manager_db"; then
+        # Check if port is accessible
+        if check_port $DB_PORT; then
+            return 0  # Database is healthy
+        fi
+    fi
+    return 1  # Database is not healthy
+}
+
 # Function to show status
 show_status() {
     print_info "Lab Manager Status:"
     echo
     
     # Check database
-    if check_port $DB_PORT; then
+    if check_database_health; then
         print_success "✓ Database: Running on localhost:$DB_PORT"
     else
         print_error "✗ Database: Not running"
@@ -257,7 +290,7 @@ show_status() {
     fi
     
     echo
-    if check_port $DB_PORT && check_port $BACKEND_PORT && check_port $FRONTEND_PORT; then
+    if check_database_health && check_port $BACKEND_PORT && check_port $FRONTEND_PORT; then
         print_success "🎉 All services are running! Access the app at: http://localhost:$FRONTEND_PORT"
     fi
 }
