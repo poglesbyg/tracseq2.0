@@ -108,6 +108,39 @@ pub fn reports_routes() -> Router<AppComponents> {
         .route("/api/reports/schema", get(handlers::get_schema))
 }
 
+/// Spreadsheet processing routes
+pub fn spreadsheet_routes() -> Router<AppComponents> {
+    Router::new()
+        .route(
+            "/api/spreadsheets/upload",
+            post(handlers::spreadsheets::upload_spreadsheet),
+        )
+        .route(
+            "/api/spreadsheets/search",
+            get(handlers::spreadsheets::search_data),
+        )
+        .route(
+            "/api/spreadsheets/datasets",
+            get(handlers::spreadsheets::list_datasets),
+        )
+        .route(
+            "/api/spreadsheets/datasets/:id",
+            get(handlers::spreadsheets::get_dataset),
+        )
+        .route(
+            "/api/spreadsheets/datasets/:id",
+            delete(handlers::spreadsheets::delete_dataset),
+        )
+        .route(
+            "/api/spreadsheets/health",
+            get(handlers::spreadsheets::health_check),
+        )
+        .route(
+            "/api/spreadsheets/supported-types",
+            get(handlers::spreadsheets::supported_types),
+        )
+}
+
 /// User management and authentication routes
 pub fn user_routes() -> Router<AppComponents> {
     Router::new()
@@ -152,6 +185,7 @@ pub fn create_app_router() -> Router<AppComponents> {
         .merge(sequencing_routes())
         .merge(storage_routes())
         .merge(reports_routes())
+        .merge(spreadsheet_routes())
         .merge(user_routes())
         .layer(CorsLayer::permissive())
 }

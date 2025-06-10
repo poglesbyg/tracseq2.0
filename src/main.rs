@@ -15,50 +15,46 @@ pub mod storage;
 pub mod tests;
 pub mod validation;
 
-use sqlx::PgPool;
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 
 use assembly::assemble_production_components;
 use router::create_app_router;
 
-/// Core application components that can be assembled independently
+// Re-export the component types from the library for binary usage
+use sqlx::PgPool;
+use std::sync::Arc;
+
 #[derive(Clone)]
 pub struct AppComponents {
     pub database: DatabaseComponent,
     pub storage: StorageComponent,
     pub sample_processing: SampleProcessingComponent,
     pub sequencing: SequencingComponent,
-    pub repositories: RepositoriesComponent,
+    pub repositories: assembly::RepositoriesComponent,
     pub user_manager: models::user::UserManager,
     pub auth_service: services::auth_service::AuthService,
+    pub spreadsheet_service: services::spreadsheet_service::SpreadsheetService,
 }
 
-/// Database component with its own configuration and lifecycle
 #[derive(Clone)]
 pub struct DatabaseComponent {
     pub pool: PgPool,
 }
 
-/// Storage component for managing sample storage
 #[derive(Clone)]
 pub struct StorageComponent {
     pub storage: Arc<storage::Storage>,
 }
 
-/// Sample processing component for handling sample submissions
 #[derive(Clone)]
 pub struct SampleProcessingComponent {
     pub manager: Arc<sample_submission::SampleSubmissionManager>,
 }
 
-/// Sequencing component for managing sequencing jobs
 #[derive(Clone)]
 pub struct SequencingComponent {
     pub manager: Arc<sequencing::SequencingManager>,
 }
-
-/// Import RepositoriesComponent from assembly
-pub use assembly::RepositoriesComponent;
 
 #[tokio::main]
 async fn main() {

@@ -2,10 +2,15 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 use crate::{
-    config::AppConfig, models::user::UserManager, repositories::PostgresRepositoryFactory,
-    sample_submission::SampleSubmissionManager, sequencing::SequencingManager,
-    services::auth_service::AuthService, storage::Storage, AppComponents, DatabaseComponent,
-    SampleProcessingComponent, SequencingComponent, StorageComponent,
+    config::AppConfig,
+    models::{spreadsheet::SpreadsheetDataManager, user::UserManager},
+    repositories::PostgresRepositoryFactory,
+    sample_submission::SampleSubmissionManager,
+    sequencing::SequencingManager,
+    services::{auth_service::AuthService, spreadsheet_service::SpreadsheetService},
+    storage::Storage,
+    AppComponents, DatabaseComponent, SampleProcessingComponent, SequencingComponent,
+    StorageComponent,
 };
 
 /// Repositories component for data access abstraction
@@ -24,6 +29,7 @@ pub struct ComponentBuilder {
     repository_factory: Option<Arc<PostgresRepositoryFactory>>,
     user_manager: Option<UserManager>,
     auth_service: Option<AuthService>,
+    spreadsheet_service: Option<SpreadsheetService>,
 }
 
 impl ComponentBuilder {
@@ -38,6 +44,7 @@ impl ComponentBuilder {
             repository_factory: None,
             user_manager: None,
             auth_service: None,
+            spreadsheet_service: None,
         }
     }
 
@@ -142,6 +149,21 @@ impl ComponentBuilder {
         Ok(self)
     }
 
+    /// Build the spreadsheet service
+    pub fn with_spreadsheet(mut self) -> Result<Self, AssemblyError> {
+        let pool = self
+            .database_pool
+            .as_ref()
+            .ok_or(AssemblyError::MissingDependency(
+                "Database pool required for spreadsheet service",
+            ))?;
+
+        let manager = SpreadsheetDataManager::new(pool.clone());
+        let spreadsheet_service = SpreadsheetService::new(manager);
+        self.spreadsheet_service = Some(spreadsheet_service);
+        Ok(self)
+    }
+
     /// Assemble all components
     pub fn build(self) -> Result<AppComponents, AssemblyError> {
         let database_pool = self
@@ -165,6 +187,9 @@ impl ComponentBuilder {
         let auth_service = self
             .auth_service
             .ok_or(AssemblyError::MissingComponent("Auth Service"))?;
+        let spreadsheet_service = self
+            .spreadsheet_service
+            .ok_or(AssemblyError::MissingComponent("Spreadsheet Service"))?;
 
         Ok(AppComponents {
             database: DatabaseComponent {
@@ -182,6 +207,7 @@ impl ComponentBuilder {
             },
             user_manager,
             auth_service,
+            spreadsheet_service,
         })
     }
 }
@@ -200,6 +226,7 @@ pub async fn assemble_production_components() -> Result<AppComponents, AssemblyE
         .with_sequencing()?
         .with_user_management()?
         .with_authentication()?
+        .with_spreadsheet()?
         .build()
 }
 
@@ -217,6 +244,7 @@ pub async fn assemble_test_components() -> Result<AppComponents, AssemblyError> 
         .with_sequencing()?
         .with_user_management()?
         .with_authentication()?
+        .with_spreadsheet()?
         .build()
 }
 
@@ -237,6 +265,7 @@ impl CustomAssembly {
             .with_sequencing()?
             .with_user_management()?
             .with_authentication()?
+            .with_spreadsheet()?
             .build()?;
 
         Ok(AppComponents {
@@ -247,6 +276,7 @@ impl CustomAssembly {
             repositories: components.repositories,
             user_manager: components.user_manager,
             auth_service: components.auth_service,
+            spreadsheet_service: components.spreadsheet_service,
         })
     }
 

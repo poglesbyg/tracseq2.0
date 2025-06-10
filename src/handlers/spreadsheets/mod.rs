@@ -2,8 +2,6 @@ use axum::{
     extract::{Multipart, Path, Query, State},
     http::StatusCode,
     response::Json,
-    routing::{delete, get, post},
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -12,7 +10,7 @@ use uuid::Uuid;
 
 use crate::{
     models::spreadsheet::{SpreadsheetDataset, SpreadsheetSearchQuery, SpreadsheetSearchResult},
-    services::{spreadsheet_service::SpreadsheetService, Service},
+    services::Service,
 };
 
 /// Upload request parameters
@@ -75,10 +73,11 @@ impl<T> ApiResponse<T> {
 
 /// Upload spreadsheet file
 pub async fn upload_spreadsheet(
-    State(service): State<SpreadsheetService>,
+    State(components): State<crate::AppComponents>,
     Query(params): Query<UploadParams>,
     mut multipart: Multipart,
 ) -> Result<Json<UploadResponse>, StatusCode> {
+    let service = &components.spreadsheet_service;
     info!("Received spreadsheet upload request");
 
     while let Some(field) = multipart.next_field().await.map_err(|e| {
@@ -163,10 +162,11 @@ pub async fn upload_spreadsheet(
 
 /// Search spreadsheet data
 pub async fn search_data(
-    State(service): State<SpreadsheetService>,
+    State(components): State<crate::AppComponents>,
     Query(params): Query<SearchParams>,
     Query(raw_params): Query<HashMap<String, String>>,
 ) -> Result<Json<ApiResponse<SpreadsheetSearchResult>>, StatusCode> {
+    let service = &components.spreadsheet_service;
     info!("Received data search request");
 
     // Extract column filters from query parameters
@@ -210,9 +210,10 @@ pub async fn search_data(
 
 /// Get dataset by ID
 pub async fn get_dataset(
-    State(service): State<SpreadsheetService>,
+    State(components): State<crate::AppComponents>,
     Path(dataset_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<SpreadsheetDataset>>, StatusCode> {
+    let service = &components.spreadsheet_service;
     info!("Received request to get dataset: {}", dataset_id);
 
     match service.get_dataset(dataset_id).await {
@@ -236,9 +237,10 @@ pub async fn get_dataset(
 
 /// List datasets
 pub async fn list_datasets(
-    State(service): State<SpreadsheetService>,
+    State(components): State<crate::AppComponents>,
     Query(params): Query<ListParams>,
 ) -> Result<Json<ApiResponse<Vec<SpreadsheetDataset>>>, StatusCode> {
+    let service = &components.spreadsheet_service;
     info!("Received request to list datasets");
 
     match service.list_datasets(params.limit, params.offset).await {
@@ -258,9 +260,10 @@ pub async fn list_datasets(
 
 /// Delete dataset
 pub async fn delete_dataset(
-    State(service): State<SpreadsheetService>,
+    State(components): State<crate::AppComponents>,
     Path(dataset_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<u64>>, StatusCode> {
+    let service = &components.spreadsheet_service;
     info!("Received request to delete dataset: {}", dataset_id);
 
     match service.delete_dataset(dataset_id).await {
@@ -285,32 +288,21 @@ pub async fn delete_dataset(
 
 /// Get service health
 pub async fn health_check(
-    State(service): State<SpreadsheetService>,
+    State(components): State<crate::AppComponents>,
 ) -> Result<Json<crate::services::ServiceHealth>, StatusCode> {
+    let service = &components.spreadsheet_service;
     let health = service.health_check().await;
     Ok(Json(health))
 }
 
 /// Get supported file types
 pub async fn supported_types(
-    State(service): State<SpreadsheetService>,
+    State(components): State<crate::AppComponents>,
 ) -> Result<Json<ApiResponse<Vec<&'static str>>>, StatusCode> {
+    let service = &components.spreadsheet_service;
     let types = service.supported_file_types();
     Ok(Json(ApiResponse::success(
         types,
         "Supported file types retrieved",
     )))
-}
-
-/// Create router for spreadsheet endpoints
-pub fn create_router(service: SpreadsheetService) -> Router {
-    Router::new()
-        .route("/upload", post(upload_spreadsheet))
-        .route("/search", get(search_data))
-        .route("/datasets", get(list_datasets))
-        .route("/datasets/:id", get(get_dataset))
-        .route("/datasets/:id", delete(delete_dataset))
-        .route("/health", get(health_check))
-        .route("/supported-types", get(supported_types))
-        .with_state(service)
 }

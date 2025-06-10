@@ -33,6 +33,7 @@ pub struct AppComponents {
     pub repositories: assembly::RepositoriesComponent,
     pub user_manager: models::user::UserManager,
     pub auth_service: services::auth_service::AuthService,
+    pub spreadsheet_service: services::spreadsheet_service::SpreadsheetService,
 }
 
 #[derive(Clone)]
