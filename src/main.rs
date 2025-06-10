@@ -23,6 +23,7 @@ use router::create_app_router;
 /// Core application components that can be assembled independently
 #[derive(Clone)]
 pub struct AppComponents {
+    pub config: config::AppConfig,
     pub database: DatabaseComponent,
     pub storage: StorageComponent,
     pub sample_processing: SampleProcessingComponent,

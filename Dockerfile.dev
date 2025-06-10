@@ -32,4 +32,4 @@ RUN mkdir -p /usr/local/bin/storage
 EXPOSE 3000
 
 # Start cargo-watch
-CMD ["cargo", "watch", "-x", "run"] 
+CMD ["cargo", "watch", "-x", "run --bin lab_manager"] 

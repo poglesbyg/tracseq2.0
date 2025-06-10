@@ -25,6 +25,7 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct AppComponents {
+    pub config: config::AppConfig,
     pub database: DatabaseComponent,
     pub storage: StorageComponent,
     pub sample_processing: SampleProcessingComponent,

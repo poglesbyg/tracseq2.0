@@ -76,6 +76,9 @@ impl AppConfig {
             .parse()
             .map_err(ConfigError::InvalidPort)?;
 
+        let rag_base_url = std::env::var("RAG_SERVICE_URL")
+            .unwrap_or_else(|_| "http://host.docker.internal:8000".to_string());
+
         Ok(Self {
             database: DatabaseConfig {
                 url: database_url,
@@ -92,7 +95,10 @@ impl AppConfig {
                 port,
                 cors_enabled: true,
             },
-            rag: RagIntegrationConfig::default(),
+            rag: RagIntegrationConfig {
+                base_url: rag_base_url,
+                ..RagIntegrationConfig::default()
+            },
         })
     }
 

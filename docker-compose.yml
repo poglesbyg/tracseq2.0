@@ -23,6 +23,9 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
+      - BACKEND_URL=http://dev:3000
+    depends_on:
+      - dev
     networks:
       - lab_network
 
@@ -34,8 +37,11 @@ services:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/lab_manager
       - RUST_LOG=info
       - STORAGE_PATH=/usr/local/bin/storage
+      - RAG_SERVICE_URL=http://host.docker.internal:8000
     volumes:
       - app_storage:/usr/local/bin/storage
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - db
     networks:
@@ -56,6 +62,9 @@ services:
       - PORT=3000
       - RUST_LOG=info
       - STORAGE_PATH=/usr/local/bin/storage
+      - RAG_SERVICE_URL=http://host.docker.internal:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - db
     networks:
@@ -80,4 +89,4 @@ volumes:
 
 networks:
   lab_network:
-    driver: bridge 
+    driver: bridge

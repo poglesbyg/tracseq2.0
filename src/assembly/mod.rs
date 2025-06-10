@@ -125,6 +125,7 @@ impl ComponentBuilder {
             .ok_or(AssemblyError::MissingComponent("Repositories"))?;
 
         Ok(AppComponents {
+            config: self.config,
             database: DatabaseComponent {
                 pool: database_pool,
             },
@@ -190,6 +191,7 @@ impl CustomAssembly {
             .build()?;
 
         Ok(AppComponents {
+            config: components.config,
             database: components.database,
             storage: StorageComponent { storage },
             sample_processing: components.sample_processing,

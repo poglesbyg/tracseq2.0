@@ -90,8 +90,13 @@ pub async fn process_document_and_create_samples(
         "No document file provided".to_string(),
     ))?;
 
-    // Initialize RAG service (in production, this would be injected)
-    let rag_config = RagConfig::default();
+    // Initialize RAG service using app config
+    let rag_config = RagConfig {
+        base_url: _state.config.rag.base_url.clone(),
+        timeout_seconds: _state.config.rag.timeout_seconds,
+        max_file_size_mb: _state.config.rag.max_file_size_mb,
+        supported_formats: _state.config.rag.supported_formats.clone(),
+    };
     let rag_service = RagIntegrationService::new(rag_config);
 
     // Process document with RAG
@@ -279,8 +284,13 @@ pub async fn query_submission_information(
     State(_state): State<AppComponents>,
     Json(query_request): Json<QueryRequest>,
 ) -> Result<Json<QueryResponse>, (StatusCode, String)> {
-    // Initialize RAG service
-    let rag_config = RagConfig::default();
+    // Initialize RAG service using app config
+    let rag_config = RagConfig {
+        base_url: _state.config.rag.base_url.clone(),
+        timeout_seconds: _state.config.rag.timeout_seconds,
+        max_file_size_mb: _state.config.rag.max_file_size_mb,
+        supported_formats: _state.config.rag.supported_formats.clone(),
+    };
     let rag_service = RagIntegrationService::new(rag_config);
 
     // Query the RAG system
@@ -305,7 +315,12 @@ pub async fn query_submission_information(
 pub async fn get_rag_system_status(
     State(_state): State<AppComponents>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let rag_config = RagConfig::default();
+    let rag_config = RagConfig {
+        base_url: _state.config.rag.base_url.clone(),
+        timeout_seconds: _state.config.rag.timeout_seconds,
+        max_file_size_mb: _state.config.rag.max_file_size_mb,
+        supported_formats: _state.config.rag.supported_formats.clone(),
+    };
     let rag_service = RagIntegrationService::new(rag_config);
 
     let health_data = rag_service.check_health().await.map_err(|e| {
@@ -394,7 +409,12 @@ pub async fn preview_document_extraction(
     ))?;
 
     // Initialize RAG service and process document
-    let rag_config = RagConfig::default();
+    let rag_config = RagConfig {
+        base_url: _state.config.rag.base_url.clone(),
+        timeout_seconds: _state.config.rag.timeout_seconds,
+        max_file_size_mb: _state.config.rag.max_file_size_mb,
+        supported_formats: _state.config.rag.supported_formats.clone(),
+    };
     let rag_service = RagIntegrationService::new(rag_config);
 
     let extraction_result = rag_service

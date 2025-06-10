@@ -234,6 +234,8 @@ impl RagIntegrationService {
     pub fn new(config: RagConfig) -> Self {
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(config.timeout_seconds))
+            .danger_accept_invalid_certs(true)
+            .danger_accept_invalid_hostnames(true)
             .build()
             .expect("Failed to create HTTP client");
 
@@ -407,6 +409,11 @@ impl RagIntegrationService {
             "query": query
         });
 
+        eprintln!(
+            "RAG Query: Attempting to connect to {} with query: {}",
+            url, query
+        );
+
         let response = self
             .client
             .post(&url)
@@ -414,11 +421,18 @@ impl RagIntegrationService {
             .send()
             .await
             .map_err(|e| {
+                eprintln!("RAG Query Error: {}", e);
                 ApiError::ServiceUnavailable(format!("RAG system is unavailable: {}", e))
             })?;
 
+        eprintln!(
+            "RAG Query: Received response with status {}",
+            response.status()
+        );
+
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
+            eprintln!("RAG Query: Error response: {}", error_text);
             return Err(ApiError::InternalServerError(format!(
                 "RAG query error: {}",
                 error_text
@@ -426,9 +440,11 @@ impl RagIntegrationService {
         }
 
         let answer: Value = response.json().await.map_err(|e| {
+            eprintln!("RAG Query: Failed to parse JSON: {}", e);
             ApiError::InternalServerError(format!("Failed to parse RAG response: {}", e))
         })?;
 
+        eprintln!("RAG Query: Success - received answer");
         Ok(answer
             .get("answer")
             .and_then(|a| a.as_str())
@@ -565,22 +581,31 @@ impl RagIntegrationService {
     /// Check if the RAG system is available and healthy
     pub async fn check_health(&self) -> Result<Value, ApiError> {
         let url = format!("{}/health", self.config.base_url);
+        eprintln!("RAG Health Check: Attempting to connect to {}", url);
 
-        let response =
-            self.client.get(&url).send().await.map_err(|_| {
-                ApiError::ServiceUnavailable("RAG system is unavailable".to_string())
-            })?;
+        let response = self.client.get(&url).send().await.map_err(|e| {
+            eprintln!("RAG Health Check Error: {}", e);
+            ApiError::ServiceUnavailable(format!("RAG system is unavailable: {}", e))
+        })?;
+
+        eprintln!(
+            "RAG Health Check: Received response with status {}",
+            response.status()
+        );
 
         if !response.status().is_success() {
-            return Err(ApiError::ServiceUnavailable(
-                "RAG system health check failed".to_string(),
-            ));
+            return Err(ApiError::ServiceUnavailable(format!(
+                "RAG system health check failed with status: {}",
+                response.status()
+            )));
         }
 
         let health_data: Value = response.json().await.map_err(|e| {
+            eprintln!("RAG Health Check: Failed to parse JSON: {}", e);
             ApiError::InternalServerError(format!("Failed to parse health response: {}", e))
         })?;
 
+        eprintln!("RAG Health Check: Success - {}", health_data);
         Ok(health_data)
     }
 }
