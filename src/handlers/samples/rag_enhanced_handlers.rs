@@ -293,9 +293,14 @@ pub async fn query_submission_information(
     };
     let rag_service = RagIntegrationService::new(rag_config);
 
-    // Query the RAG system
+    // Query the enhanced RAG system with session support
     let answer = rag_service
-        .query_submissions(&query_request.query)
+        .query_submissions_with_session(
+            &query_request.query,
+            &query_request
+                .session_id
+                .unwrap_or_else(|| format!("rust_session_{}", chrono::Utc::now().timestamp())),
+        )
         .await
         .map_err(|e| {
             (
@@ -464,6 +469,7 @@ pub async fn preview_document_extraction(
 #[derive(serde::Deserialize)]
 pub struct QueryRequest {
     pub query: String,
+    pub session_id: Option<String>,
 }
 
 #[derive(serde::Serialize)]

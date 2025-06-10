@@ -452,6 +452,47 @@ impl RagIntegrationService {
             .to_string())
     }
 
+    /// Query the enhanced RAG system with session support for conversation context
+    pub async fn query_submissions_with_session(
+        &self,
+        query: &str,
+        session_id: &str,
+    ) -> Result<String, ApiError> {
+        let url = format!("{}/query", self.config.base_url);
+        let request_body = serde_json::json!({
+            "query": query,
+            "session_id": session_id
+        });
+
+        let response = self
+            .client
+            .post(&url)
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| {
+                ApiError::ServiceUnavailable(format!("Enhanced RAG system is unavailable: {}", e))
+            })?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await.unwrap_or_default();
+            return Err(ApiError::InternalServerError(format!(
+                "Enhanced RAG query error: {}",
+                error_text
+            )));
+        }
+
+        let answer: Value = response.json().await.map_err(|e| {
+            ApiError::InternalServerError(format!("Failed to parse enhanced RAG response: {}", e))
+        })?;
+
+        Ok(answer
+            .get("answer")
+            .and_then(|a| a.as_str())
+            .unwrap_or("No answer available from enhanced system")
+            .to_string())
+    }
+
     /// Convert RAG extraction result to lab manager sample format
     pub fn convert_to_samples(
         &self,

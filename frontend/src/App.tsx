@@ -9,6 +9,7 @@ import Templates from './pages/Templates';
 import Samples from './pages/Samples';
 import RagSubmissions from './pages/RagSubmissions';
 import Sequencing from './pages/Sequencing';
+import Spreadsheets from './pages/Spreadsheets';
 import Storage from './pages/Storage';
 import Reports from './pages/Reports';
 
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="/samples" element={<Samples />} />
             <Route path="/rag-submissions" element={<RagSubmissions />} />
             <Route path="/sequencing" element={<Sequencing />} />
+            <Route path="/spreadsheets" element={<Spreadsheets />} />
             <Route path="/storage" element={<Storage />} />
             <Route path="/reports" element={<Reports />} />
           </Routes>

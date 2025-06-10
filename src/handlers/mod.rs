@@ -2,6 +2,7 @@ pub mod dashboard;
 pub mod reports;
 pub mod samples;
 pub mod sequencing;
+pub mod spreadsheets;
 pub mod storage;
 pub mod templates;
 
