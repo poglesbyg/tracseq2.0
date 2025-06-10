@@ -24,8 +24,8 @@ pub struct RagConfig {
 impl Default for RagConfig {
     fn default() -> Self {
         Self {
-            base_url: "http://localhost:8000".to_string(),
-            timeout_seconds: 300,
+            base_url: "http://127.0.0.1:8000".to_string(),
+            timeout_seconds: 30,
             max_file_size_mb: 50,
             supported_formats: vec!["pdf".to_string(), "docx".to_string(), "txt".to_string()],
         }
@@ -42,6 +42,16 @@ pub struct RagExtractionResult {
     pub warnings: Vec<String>,
     pub processing_time: f64,
     pub source_document: String,
+}
+
+/// Temporary adapter for Python API response format
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct PythonApiResponse {
+    submission_id: String,
+    status: String,
+    message: String,
+    success: Option<bool>,
+    confidence_score: Option<f64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -210,7 +220,7 @@ impl RagIntegrationService {
         }
 
         // Make request to RAG system
-        let url = format!("{}/process-document", self.config.base_url);
+        let url = format!("{}/process", self.config.base_url);
 
         // Read file and create form
         let file_bytes = fs::read(document_path)
@@ -224,7 +234,7 @@ impl RagIntegrationService {
                 .to_string(),
         );
 
-        let form = reqwest::multipart::Form::new().part("document", file_part);
+        let form = reqwest::multipart::Form::new().part("file", file_part);
 
         let response = self
             .client
@@ -244,9 +254,41 @@ impl RagIntegrationService {
             )));
         }
 
-        let extraction_result: RagExtractionResult = response.json().await.map_err(|e| {
-            ApiError::InternalServerError(format!("Failed to parse RAG response: {}", e))
+        // Try to parse as the expected format first, then fallback to Python API format
+        let response_text = response.text().await.map_err(|e| {
+            ApiError::InternalServerError(format!("Failed to read RAG response: {}", e))
         })?;
+
+        // Try parsing as RagExtractionResult first
+        if let Ok(extraction_result) = serde_json::from_str::<RagExtractionResult>(&response_text) {
+            return Ok(extraction_result);
+        }
+
+        // Fallback to Python API response format
+        let python_response: PythonApiResponse =
+            serde_json::from_str(&response_text).map_err(|e| {
+                ApiError::InternalServerError(format!(
+                    "Failed to parse RAG response: {}. Response: {}",
+                    e, response_text
+                ))
+            })?;
+
+        // Convert Python API response to expected format
+        let extraction_result = RagExtractionResult {
+            success: python_response
+                .success
+                .unwrap_or(python_response.status == "success"),
+            submission: None, // Python API doesn't return full submission data yet
+            confidence_score: python_response.confidence_score.unwrap_or(0.0),
+            missing_fields: vec![],
+            warnings: if python_response.status == "failed" {
+                vec![python_response.message.clone()]
+            } else {
+                vec![]
+            },
+            processing_time: 0.0,
+            source_document: document_path.to_string(),
+        };
 
         Ok(extraction_result)
     }
