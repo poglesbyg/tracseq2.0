@@ -51,7 +51,7 @@ impl Default for RagIntegrationConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            base_url: "http://localhost:8000".to_string(),
+            base_url: "http://127.0.0.1:8000".to_string(),
             timeout_seconds: 300,
             max_file_size_mb: 50,
             supported_formats: vec!["pdf".to_string(), "docx".to_string(), "txt".to_string()],

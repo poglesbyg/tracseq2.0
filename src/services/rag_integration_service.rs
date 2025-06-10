@@ -24,8 +24,8 @@ pub struct RagConfig {
 impl Default for RagConfig {
     fn default() -> Self {
         Self {
-            base_url: "http://localhost:8000".to_string(),
-            timeout_seconds: 300,
+            base_url: "http://127.0.0.1:8000".to_string(),
+            timeout_seconds: 30,
             max_file_size_mb: 50,
             supported_formats: vec!["pdf".to_string(), "docx".to_string(), "txt".to_string()],
         }
@@ -42,6 +42,70 @@ pub struct RagExtractionResult {
     pub warnings: Vec<String>,
     pub processing_time: f64,
     pub source_document: String,
+}
+
+/// Temporary adapter for Python API response format
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct PythonApiResponse {
+    submission_id: String,
+    status: String,
+    message: String,
+    success: Option<bool>,
+    confidence_score: Option<f64>,
+}
+
+/// Make fields more flexible to handle actual RAG API responses
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FlexibleRagSubmission {
+    pub administrative_info: AdministrativeInfo,
+    pub source_material: FlexibleSourceMaterial,
+    pub pooling_info: PoolingInfo,
+    pub sequence_generation: FlexibleSequenceGeneration,
+    pub container_info: FlexibleContainerInfo,
+    pub informatics_info: InformaticsInfo,
+    pub sample_details: SampleDetails,
+    pub submission_id: Option<String>,
+    pub status: String,
+    pub extracted_confidence: Option<f64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FlexibleSourceMaterial {
+    #[serde(alias = "source_type")]
+    pub material_type: String,
+    pub extraction_method: Option<String>,
+    #[serde(alias = "storage_conditions")]
+    pub storage_temperature: Option<String>,
+    pub collection_date: Option<String>,
+    pub collection_method: Option<String>,
+    pub source_organism: Option<String>,
+    pub tissue_type: Option<String>,
+    pub preservation_method: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FlexibleSequenceGeneration {
+    pub sequencing_platform: Option<String>,
+    #[serde(alias = "read_length")]
+    pub read_length: Option<String>, // Changed to String to handle "150bp paired-end"
+    pub read_type: Option<String>,
+    pub target_coverage: Option<String>, // Changed to String to handle "30x"
+    pub library_prep_kit: Option<String>,
+    pub index_sequences: Option<Vec<String>>,
+    pub quality_metrics: Option<HashMap<String, f64>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FlexibleContainerInfo {
+    pub container_type: Option<String>,
+    pub container_id: Option<String>,
+    #[serde(alias = "volume_ul")]
+    pub volume: Option<f64>,
+    #[serde(alias = "concentration_ng_ul")]
+    pub concentration: Option<f64>,
+    pub diluent_used: Option<String>,
+    pub storage_temperature: Option<String>,
+    pub container_barcode: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -85,8 +149,11 @@ pub struct PoolingInfo {
     pub is_pooled: bool,
     pub pool_id: Option<String>,
     pub samples_in_pool: Vec<String>,
+    #[serde(default)]
     pub pooling_ratio: HashMap<String, f64>,
+    #[serde(default)]
     pub barcode_sequences: HashMap<String, String>,
+    #[serde(alias = "pooling_strategy")]
     pub multiplex_strategy: Option<String>,
 }
 
@@ -97,7 +164,9 @@ pub struct SequenceGeneration {
     pub read_type: Option<String>,
     pub target_coverage: Option<f64>,
     pub library_prep_kit: Option<String>,
+    #[serde(default)]
     pub index_sequences: Vec<String>,
+    #[serde(default)]
     pub quality_metrics: HashMap<String, f64>,
 }
 
@@ -117,6 +186,7 @@ pub struct InformaticsInfo {
     pub analysis_type: String,
     pub reference_genome: Option<String>,
     pub analysis_pipeline: Option<String>,
+    #[serde(default)]
     pub custom_parameters: HashMap<String, Value>,
     pub data_delivery_format: Option<String>,
     pub computational_requirements: Option<String>,
@@ -210,7 +280,7 @@ impl RagIntegrationService {
         }
 
         // Make request to RAG system
-        let url = format!("{}/process-document", self.config.base_url);
+        let url = format!("{}/process", self.config.base_url);
 
         // Read file and create form
         let file_bytes = fs::read(document_path)
@@ -224,7 +294,7 @@ impl RagIntegrationService {
                 .to_string(),
         );
 
-        let form = reqwest::multipart::Form::new().part("document", file_part);
+        let form = reqwest::multipart::Form::new().part("file", file_part);
 
         let response = self
             .client
@@ -244,9 +314,88 @@ impl RagIntegrationService {
             )));
         }
 
-        let extraction_result: RagExtractionResult = response.json().await.map_err(|e| {
-            ApiError::InternalServerError(format!("Failed to parse RAG response: {}", e))
+        // Parse the response
+        let response_text = response.text().await.map_err(|e| {
+            ApiError::InternalServerError(format!("Failed to read RAG response: {}", e))
         })?;
+
+        // Parse the actual RAG response format with flexible structures
+        #[derive(Debug, Serialize, Deserialize)]
+        struct FlexibleRagResponse {
+            success: bool,
+            submission: Option<FlexibleRagSubmission>,
+            confidence_score: f64,
+            missing_fields: Vec<String>,
+            warnings: Vec<String>,
+            processing_time: f64,
+            source_document: String,
+        }
+
+        let flexible_response: FlexibleRagResponse =
+            serde_json::from_str(&response_text).map_err(|e| {
+                ApiError::InternalServerError(format!(
+                    "Failed to parse RAG response: {}. Response: {}",
+                    e, response_text
+                ))
+            })?;
+
+        // Convert flexible response to expected format
+        let submission = if let Some(flex_submission) = flexible_response.submission {
+            Some(RagSubmission {
+                administrative_info: flex_submission.administrative_info,
+                source_material: SourceMaterial {
+                    source_type: flex_submission.source_material.material_type,
+                    collection_date: flex_submission.source_material.collection_date,
+                    collection_method: flex_submission.source_material.collection_method,
+                    source_organism: flex_submission.source_material.source_organism,
+                    tissue_type: flex_submission.source_material.tissue_type,
+                    preservation_method: flex_submission.source_material.preservation_method,
+                    storage_conditions: flex_submission.source_material.storage_temperature,
+                },
+                pooling_info: flex_submission.pooling_info,
+                sequence_generation: SequenceGeneration {
+                    sequencing_platform: flex_submission.sequence_generation.sequencing_platform,
+                    read_length: None, // Parse from string if needed
+                    read_type: flex_submission.sequence_generation.read_type,
+                    target_coverage: None, // Parse from string if needed
+                    library_prep_kit: flex_submission.sequence_generation.library_prep_kit,
+                    index_sequences: flex_submission
+                        .sequence_generation
+                        .index_sequences
+                        .unwrap_or_default(),
+                    quality_metrics: flex_submission
+                        .sequence_generation
+                        .quality_metrics
+                        .unwrap_or_default(),
+                },
+                container_info: ContainerInfo {
+                    container_type: flex_submission.container_info.container_type,
+                    container_id: flex_submission.container_info.container_id,
+                    volume: flex_submission.container_info.volume,
+                    concentration: flex_submission.container_info.concentration,
+                    diluent_used: flex_submission.container_info.diluent_used,
+                    storage_temperature: flex_submission.container_info.storage_temperature,
+                    container_barcode: flex_submission.container_info.container_barcode,
+                },
+                informatics_info: flex_submission.informatics_info,
+                sample_details: flex_submission.sample_details,
+                submission_id: flex_submission.submission_id,
+                status: flex_submission.status,
+                extracted_confidence: flex_submission.extracted_confidence,
+            })
+        } else {
+            None
+        };
+
+        let extraction_result = RagExtractionResult {
+            success: flexible_response.success,
+            submission,
+            confidence_score: flexible_response.confidence_score,
+            missing_fields: flexible_response.missing_fields,
+            warnings: flexible_response.warnings,
+            processing_time: flexible_response.processing_time,
+            source_document: flexible_response.source_document,
+        };
 
         Ok(extraction_result)
     }

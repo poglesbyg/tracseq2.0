@@ -345,7 +345,7 @@ mod tests {
 
         // Test RAG configuration is properly included
         assert!(config.rag.enabled);
-        assert_eq!(config.rag.base_url, "http://localhost:8000");
+        assert_eq!(config.rag.base_url, "http://127.0.0.1:8000");
         assert_eq!(config.rag.default_confidence_threshold, 0.7);
         assert!(!config.rag.auto_create_samples);
 
