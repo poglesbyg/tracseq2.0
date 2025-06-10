@@ -65,6 +65,10 @@ pub fn sequencing_routes() -> Router<AppComponents> {
         )
         .route("/api/sequencing/jobs", get(handlers::list_sequencing_jobs))
         .route(
+            "/api/sequencing/jobs/:id",
+            get(handlers::get_sequencing_job),
+        )
+        .route(
             "/api/sequencing/jobs/:id/status",
             post(handlers::update_job_status),
         )
@@ -77,10 +81,19 @@ pub fn storage_routes() -> Router<AppComponents> {
             "/api/storage/locations",
             get(handlers::list_storage_locations),
         )
+        .route(
+            "/api/storage/locations",
+            post(handlers::create_storage_location),
+        )
+        .route("/api/storage/store", post(handlers::store_sample))
         .route("/api/storage/move", post(handlers::move_sample))
         .route(
             "/api/storage/scan/:barcode",
             get(handlers::scan_sample_barcode),
+        )
+        .route(
+            "/api/storage/capacity",
+            get(handlers::get_capacity_overview),
         )
 }
 

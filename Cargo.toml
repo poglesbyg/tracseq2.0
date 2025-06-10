@@ -30,3 +30,4 @@ dotenvy = "0.15"
 async-trait = "0.1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls"] }
 fastrand = "2.0"
+rand = "0.9.1"

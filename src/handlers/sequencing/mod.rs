@@ -24,6 +24,21 @@ pub async fn create_sequencing_job(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
+/// Get a sequencing job by ID
+pub async fn get_sequencing_job(
+    State(state): State<AppComponents>,
+    Path(job_id): Path<Uuid>,
+) -> Result<Json<SequencingJob>, (StatusCode, String)> {
+    match state.sequencing.manager.get_job(job_id).await {
+        Ok(job) => Ok(Json(job)),
+        Err(sqlx::Error::RowNotFound) => Err((
+            StatusCode::NOT_FOUND,
+            format!("Sequencing job {} not found", job_id),
+        )),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    }
+}
+
 /// List all sequencing jobs
 pub async fn list_sequencing_jobs(
     State(state): State<AppComponents>,

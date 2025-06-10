@@ -339,3 +339,6 @@ impl InMemoryRepositoryFactory {
         }
     }
 }
+
+// Export storage repository module
+pub mod storage_repository;

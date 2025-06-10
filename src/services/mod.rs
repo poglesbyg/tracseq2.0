@@ -1,6 +1,8 @@
+pub mod barcode_service;
 pub mod rag_integration_service;
 pub mod sample_service;
 pub mod sequencing_service;
+pub mod storage_management_service;
 pub mod storage_service;
 pub mod template_service;
 

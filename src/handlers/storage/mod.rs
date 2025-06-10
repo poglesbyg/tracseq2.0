@@ -1,161 +1,268 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
 use serde::{Deserialize, Serialize};
 
+use crate::models::storage::{StorageRequirement, TemperatureZone};
+use crate::repositories::storage_repository::{CreateStorageLocation, PostgresStorageRepository};
+use crate::services::storage_management_service::{
+    CapacityOverview, StorageManagementError, StorageManagementService,
+};
 use crate::AppComponents;
 
+// Response DTOs for API
 #[derive(Debug, Serialize, Deserialize)]
-pub struct StorageLocation {
+pub struct StorageLocationResponse {
     pub id: i32,
     pub name: String,
+    pub description: Option<String>,
+    pub temperature_zone: String,
     pub capacity: i32,
     pub available: i32,
-    pub samples: Vec<StoredSample>,
+    pub utilization_percentage: f64,
+    pub is_active: bool,
+    pub samples: Vec<StoredSampleResponse>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct StoredSample {
+pub struct StoredSampleResponse {
     pub id: i32,
+    pub sample_id: i32,
     pub name: String,
     pub barcode: String,
-    pub template_id: i32,
-    pub template_name: String,
+    pub position: Option<String>,
+    pub storage_state: String,
     pub stored_at: String,
+    pub stored_by: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct MoveSampleRequest {
     pub sample_id: i32,
     pub location_id: i32,
+    pub reason: Option<String>,
+    pub moved_by: String,
 }
 
 #[derive(Debug, Serialize)]
 pub struct MoveSampleResponse {
     pub success: bool,
     pub message: String,
+    pub new_location: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct ScannedSampleInfo {
-    pub id: i32,
-    pub name: String,
+    pub sample_id: i32,
     pub barcode: String,
-    pub location: String,
-    pub template_name: String,
+    pub location_name: String,
+    pub location_id: i32,
+    pub temperature_zone: String,
+    pub position: Option<String>,
+    pub storage_state: String,
     pub stored_at: String,
+    pub stored_by: Option<String>,
+    pub notes: Option<String>,
 }
 
-/// List all available storage locations
-/// TODO: This is a placeholder implementation. In production, this should fetch from database.
-pub async fn list_storage_locations(
-    State(_state): State<AppComponents>,
-) -> Result<Json<Vec<StorageLocation>>, (StatusCode, String)> {
-    // Mock data for now - this should be replaced with database queries
-    let locations = vec![
-        StorageLocation {
-            id: 1,
-            name: "Freezer A (-80°C)".to_string(),
-            capacity: 100,
-            available: 85,
-            samples: vec![
-                StoredSample {
-                    id: 1,
-                    name: "DNA Sample 001".to_string(),
-                    barcode: "DNA001-2024-01".to_string(),
-                    template_id: 1,
-                    template_name: "DNA Extraction Template".to_string(),
-                    stored_at: "2024-01-15T10:30:00Z".to_string(),
-                },
-                StoredSample {
-                    id: 2,
-                    name: "DNA Sample 002".to_string(),
-                    barcode: "DNA002-2024-01".to_string(),
-                    template_id: 1,
-                    template_name: "DNA Extraction Template".to_string(),
-                    stored_at: "2024-01-15T11:00:00Z".to_string(),
-                },
-            ],
-        },
-        StorageLocation {
-            id: 2,
-            name: "Freezer B (-20°C)".to_string(),
-            capacity: 80,
-            available: 65,
-            samples: vec![StoredSample {
-                id: 3,
-                name: "RNA Sample 001".to_string(),
-                barcode: "RNA001-2024-01".to_string(),
-                template_id: 2,
-                template_name: "RNA Isolation Template".to_string(),
-                stored_at: "2024-01-16T09:15:00Z".to_string(),
-            }],
-        },
-        StorageLocation {
-            id: 3,
-            name: "Refrigerator (4°C)".to_string(),
-            capacity: 50,
-            available: 45,
-            samples: vec![],
-        },
-        StorageLocation {
-            id: 4,
-            name: "Room Temperature Storage".to_string(),
-            capacity: 200,
-            available: 180,
-            samples: vec![StoredSample {
-                id: 4,
-                name: "Buffer Solution".to_string(),
-                barcode: "BUF001-2024-01".to_string(),
-                template_id: 3,
-                template_name: "Buffer Template".to_string(),
-                stored_at: "2024-01-10T14:20:00Z".to_string(),
-            }],
-        },
-        StorageLocation {
-            id: 5,
-            name: "Incubator (37°C)".to_string(),
-            capacity: 30,
-            available: 25,
-            samples: vec![],
-        },
-    ];
+#[derive(Debug, Deserialize)]
+pub struct StoreSampleRequest {
+    pub sample_id: i32,
+    pub location_id: i32,
+    pub sample_type: String,
+    pub template_name: Option<String>,
+    pub stored_by: String,
+    pub position: Option<String>,
+    pub temperature_requirement: Option<String>,
+    pub special_conditions: Option<Vec<String>>,
+}
 
-    Ok(Json(locations))
+#[derive(Debug, Serialize)]
+pub struct StoreSampleResponse {
+    pub success: bool,
+    pub barcode: String,
+    pub location_name: String,
+    pub warnings: Vec<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateLocationRequest {
+    pub name: String,
+    pub description: Option<String>,
+    pub temperature_zone: String,
+    pub capacity: i32,
+    pub container_type: String,
+    pub location_path: Option<String>,
+}
+
+/// List all available storage locations with real data
+pub async fn list_storage_locations(
+    State(components): State<AppComponents>,
+) -> Result<Json<Vec<StorageLocationResponse>>, (StatusCode, String)> {
+    // Get storage management service from components
+    let storage_service = get_storage_service(&components).await?;
+
+    match storage_service.get_capacity_overview().await {
+        Ok(overview) => {
+            let mut locations = Vec::new();
+
+            for location_stats in overview.location_stats {
+                // Get samples in this location
+                let samples = match storage_service
+                    .get_samples_in_location(location_stats.location_id)
+                    .await
+                {
+                    Ok(samples) => samples
+                        .into_iter()
+                        .map(|sample| StoredSampleResponse {
+                            id: sample.id,
+                            sample_id: sample.sample_id,
+                            name: format!("Sample {}", sample.sample_id), // Would come from samples table
+                            barcode: sample.barcode,
+                            position: sample.position,
+                            storage_state: format!("{:?}", sample.storage_state),
+                            stored_at: sample.stored_at.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+                            stored_by: sample.stored_by,
+                        })
+                        .collect(),
+                    Err(_) => Vec::new(),
+                };
+
+                locations.push(StorageLocationResponse {
+                    id: location_stats.location_id,
+                    name: location_stats.location_name,
+                    description: None, // Would need to get from full location data
+                    temperature_zone: location_stats.temperature_zone.display_name().to_string(),
+                    capacity: location_stats.total_capacity,
+                    available: location_stats.available_capacity,
+                    utilization_percentage: location_stats.utilization_percentage,
+                    is_active: true,
+                    samples,
+                });
+            }
+
+            Ok(Json(locations))
+        }
+        Err(e) => {
+            eprintln!("Error getting storage locations: {}", e);
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to retrieve storage locations".to_string(),
+            ))
+        }
+    }
+}
+
+/// Store a sample in a storage location
+pub async fn store_sample(
+    State(components): State<AppComponents>,
+    Json(request): Json<StoreSampleRequest>,
+) -> Result<Json<StoreSampleResponse>, (StatusCode, String)> {
+    let storage_service = get_storage_service(&components).await?;
+
+    // Parse temperature requirement if provided
+    let requirements = if let Some(temp_req) = request.temperature_requirement {
+        let temperature_zone =
+            parse_temperature_zone(&temp_req).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+
+        Some(StorageRequirement {
+            temperature_zone,
+            container_type: None,
+            special_conditions: request.special_conditions.unwrap_or_default(),
+            max_storage_duration_days: None,
+        })
+    } else {
+        None
+    };
+
+    match storage_service
+        .store_sample(
+            request.sample_id,
+            request.location_id,
+            &request.sample_type,
+            request.template_name.as_deref(),
+            &request.stored_by,
+            request.position,
+            requirements,
+        )
+        .await
+    {
+        Ok(result) => {
+            let barcode = result.barcode.clone();
+            Ok(Json(StoreSampleResponse {
+                success: true,
+                barcode: result.barcode,
+                location_name: result.location.name,
+                warnings: result.warnings,
+                message: format!(
+                    "Sample {} successfully stored with barcode {}",
+                    request.sample_id, barcode
+                ),
+            }))
+        }
+        Err(e) => {
+            let (status, message) = map_storage_error(&e);
+            Err((status, message))
+        }
+    }
 }
 
 /// Move a sample from one storage location to another
 pub async fn move_sample(
-    State(_state): State<AppComponents>,
+    State(components): State<AppComponents>,
     Json(request): Json<MoveSampleRequest>,
 ) -> Result<Json<MoveSampleResponse>, (StatusCode, String)> {
-    // TODO: Implement actual database operations for moving samples
-    // For now, return a success response to prevent 404 errors
+    let storage_service = get_storage_service(&components).await?;
 
-    // Validate input
-    if request.sample_id <= 0 || request.location_id <= 0 {
-        return Ok(Json(MoveSampleResponse {
-            success: false,
-            message: "Invalid sample ID or location ID".to_string(),
-        }));
+    let reason = request.reason.as_deref().unwrap_or("Sample relocation");
+
+    match storage_service
+        .move_sample(
+            request.sample_id,
+            request.location_id,
+            &request.moved_by,
+            reason,
+            None, // No specific requirements for moving
+        )
+        .await
+    {
+        Ok(_moved_sample) => {
+            // Get new location name
+            let new_location_name = match storage_service
+                .get_locations_by_temperature(TemperatureZone::UltraLowFreezer)
+                .await
+            {
+                Ok(locations) => locations
+                    .iter()
+                    .find(|loc| loc.id == request.location_id)
+                    .map(|loc| loc.name.clone()),
+                Err(_) => None,
+            };
+
+            Ok(Json(MoveSampleResponse {
+                success: true,
+                message: format!(
+                    "Sample {} successfully moved to location {}",
+                    request.sample_id, request.location_id
+                ),
+                new_location: new_location_name,
+            }))
+        }
+        Err(e) => {
+            let (status, message) = map_storage_error(&e);
+            Err((status, message))
+        }
     }
-
-    // Mock successful move operation
-    Ok(Json(MoveSampleResponse {
-        success: true,
-        message: format!(
-            "Sample {} successfully moved to location {}",
-            request.sample_id, request.location_id
-        ),
-    }))
 }
 
 /// Scan a sample barcode to get its information
 pub async fn scan_sample_barcode(
-    State(_state): State<AppComponents>,
-    axum::extract::Path(barcode): axum::extract::Path<String>,
+    State(components): State<AppComponents>,
+    Path(barcode): Path<String>,
 ) -> Result<Json<ScannedSampleInfo>, (StatusCode, String)> {
-    // TODO: Implement actual database lookup for barcode
-    // For now, return mock data based on the barcode pattern
-
     if barcode.is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -163,28 +270,202 @@ pub async fn scan_sample_barcode(
         ));
     }
 
-    // Mock scanned sample info based on barcode pattern
-    let sample_info = if barcode.starts_with("DNA") {
-        ScannedSampleInfo {
-            id: 1,
-            name: "DNA Sample".to_string(),
-            barcode: barcode.clone(),
-            location: "Freezer A (-80°C)".to_string(),
-            template_name: "DNA Extraction Template".to_string(),
-            stored_at: "2024-01-15T10:30:00Z".to_string(),
+    let storage_service = get_storage_service(&components).await?;
+
+    match storage_service.scan_barcode(&barcode).await {
+        Ok(scan_result) => Ok(Json(ScannedSampleInfo {
+            sample_id: scan_result.sample_location.sample_id,
+            barcode: scan_result.sample_location.barcode,
+            location_name: scan_result.location.name,
+            location_id: scan_result.location.id,
+            temperature_zone: scan_result
+                .location
+                .temperature_zone
+                .display_name()
+                .to_string(),
+            position: scan_result.sample_location.position,
+            storage_state: format!("{:?}", scan_result.sample_location.storage_state),
+            stored_at: scan_result
+                .sample_location
+                .stored_at
+                .format("%Y-%m-%d %H:%M:%S UTC")
+                .to_string(),
+            stored_by: scan_result.sample_location.stored_by,
+            notes: scan_result.sample_location.notes,
+        })),
+        Err(StorageManagementError::BarcodeNotFound(_)) => {
+            Err((StatusCode::NOT_FOUND, "Sample not found".to_string()))
         }
-    } else if barcode.starts_with("RNA") {
-        ScannedSampleInfo {
-            id: 2,
-            name: "RNA Sample".to_string(),
-            barcode: barcode.clone(),
-            location: "Freezer B (-20°C)".to_string(),
-            template_name: "RNA Isolation Template".to_string(),
-            stored_at: "2024-01-16T09:15:00Z".to_string(),
+        Err(e) => {
+            let (status, message) = map_storage_error(&e);
+            Err((status, message))
         }
-    } else {
-        return Err((StatusCode::NOT_FOUND, "Sample not found".to_string()));
+    }
+}
+
+/// Create a new storage location
+pub async fn create_storage_location(
+    State(components): State<AppComponents>,
+    Json(request): Json<CreateLocationRequest>,
+) -> Result<Json<StorageLocationResponse>, (StatusCode, String)> {
+    let storage_service = get_storage_service(&components).await?;
+
+    let temperature_zone = parse_temperature_zone(&request.temperature_zone)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+
+    let container_type =
+        parse_container_type(&request.container_type).map_err(|e| (StatusCode::BAD_REQUEST, e))?;
+
+    let location_data = CreateStorageLocation {
+        name: request.name,
+        description: request.description,
+        temperature_zone,
+        capacity: request.capacity,
+        container_type,
+        location_path: request.location_path,
     };
 
-    Ok(Json(sample_info))
+    match storage_service.create_storage_location(location_data).await {
+        Ok(location) => {
+            let description = location.description.clone();
+            let name = location.name.clone();
+            Ok(Json(StorageLocationResponse {
+                id: location.id,
+                name,
+                description,
+                temperature_zone: location.temperature_zone.display_name().to_string(),
+                capacity: location.capacity,
+                available: location.available_capacity(),
+                utilization_percentage: location.utilization_percentage(),
+                is_active: location.is_active,
+                samples: Vec::new(), // New location has no samples
+            }))
+        }
+        Err(e) => {
+            let (status, message) = map_storage_error(&e);
+            Err((status, message))
+        }
+    }
+}
+
+/// Get storage capacity overview
+pub async fn get_capacity_overview(
+    State(components): State<AppComponents>,
+) -> Result<Json<CapacityOverview>, (StatusCode, String)> {
+    let storage_service = get_storage_service(&components).await?;
+
+    match storage_service.get_capacity_overview().await {
+        Ok(overview) => Ok(Json(overview)),
+        Err(e) => {
+            let (status, message) = map_storage_error(&e);
+            Err((status, message))
+        }
+    }
+}
+
+// Helper functions
+async fn get_storage_service(
+    components: &AppComponents,
+) -> Result<StorageManagementService<PostgresStorageRepository>, (StatusCode, String)> {
+    // This would normally be injected as a component
+    // For now, create it using the database pool from components
+    use crate::services::barcode_service::BarcodeService;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+
+    // Get database pool from components
+    let storage_repo = Arc::new(PostgresStorageRepository::new(
+        components.database.pool.clone(),
+    ));
+    let barcode_service = Arc::new(RwLock::new(BarcodeService::with_default_config()));
+
+    Ok(StorageManagementService::new(storage_repo, barcode_service))
+}
+
+fn parse_temperature_zone(zone_str: &str) -> Result<TemperatureZone, String> {
+    match zone_str {
+        "-80C" | "ultra_low_freezer" => Ok(TemperatureZone::UltraLowFreezer),
+        "-20C" | "freezer" => Ok(TemperatureZone::Freezer),
+        "4C" | "refrigerator" => Ok(TemperatureZone::Refrigerator),
+        "RT" | "room_temperature" => Ok(TemperatureZone::RoomTemperature),
+        "37C" | "incubator" => Ok(TemperatureZone::Incubator),
+        _ => Err(format!("Invalid temperature zone: {}", zone_str)),
+    }
+}
+
+fn parse_container_type(
+    container_str: &str,
+) -> Result<crate::models::storage::ContainerType, String> {
+    use crate::models::storage::ContainerType;
+
+    match container_str.to_lowercase().as_str() {
+        "tube" => Ok(ContainerType::Tube),
+        "plate" => Ok(ContainerType::Plate),
+        "box" => Ok(ContainerType::Box),
+        "rack" => Ok(ContainerType::Rack),
+        "bag" => Ok(ContainerType::Bag),
+        _ => Err(format!("Invalid container type: {}", container_str)),
+    }
+}
+
+fn map_storage_error(error: &StorageManagementError) -> (StatusCode, String) {
+    match error {
+        StorageManagementError::LocationNotFound(id) => (
+            StatusCode::NOT_FOUND,
+            format!("Storage location {} not found", id),
+        ),
+        StorageManagementError::SampleNotFound(id) => {
+            (StatusCode::NOT_FOUND, format!("Sample {} not found", id))
+        }
+        StorageManagementError::BarcodeNotFound(barcode) => (
+            StatusCode::NOT_FOUND,
+            format!("Barcode {} not found", barcode),
+        ),
+        StorageManagementError::InsufficientCapacity {
+            location_id,
+            requested,
+            available,
+        } => (
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Insufficient capacity in location {}: requested {}, available {}",
+                location_id, requested, available
+            ),
+        ),
+        StorageManagementError::IncompatibleTemperature {
+            sample_temp_requirement,
+            location_temp,
+        } => (
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Temperature incompatible: sample requires {:?}, location has {:?}",
+                sample_temp_requirement, location_temp
+            ),
+        ),
+        StorageManagementError::LocationInactive(id) => (
+            StatusCode::BAD_REQUEST,
+            format!("Storage location {} is inactive", id),
+        ),
+        StorageManagementError::InvalidStateTransition {
+            current_state,
+            requested_state,
+        } => (
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Invalid state transition from {:?} to {:?}",
+                current_state, requested_state
+            ),
+        ),
+        StorageManagementError::BarcodeGenerationError(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Barcode generation failed: {}", e),
+        ),
+        StorageManagementError::DatabaseError(e) => {
+            eprintln!("Database error: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error".to_string(),
+            )
+        }
+    }
 }
