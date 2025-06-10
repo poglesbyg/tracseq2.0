@@ -120,8 +120,8 @@ mod tests {
     #[test]
     fn test_rag_config_default() {
         let config = RagConfig::default();
-        assert_eq!(config.base_url, "http://localhost:8000");
-        assert_eq!(config.timeout_seconds, 300);
+        assert_eq!(config.base_url, "http://127.0.0.1:8000");
+        assert_eq!(config.timeout_seconds, 30);
         assert_eq!(config.max_file_size_mb, 50);
         assert!(config.supported_formats.contains(&"pdf".to_string()));
         assert!(config.supported_formats.contains(&"docx".to_string()));
@@ -132,7 +132,7 @@ mod tests {
     fn test_rag_integration_config() {
         let config = RagIntegrationConfig::default();
         assert!(config.enabled);
-        assert_eq!(config.base_url, "http://localhost:8000");
+        assert_eq!(config.base_url, "http://127.0.0.1:8000");
         assert_eq!(config.default_confidence_threshold, 0.7);
         assert!(!config.auto_create_samples);
     }
@@ -141,7 +141,7 @@ mod tests {
     fn test_app_config_with_rag() {
         let config = AppConfig::for_testing();
         assert!(config.rag.enabled);
-        assert_eq!(config.rag.base_url, "http://localhost:8000");
+        assert_eq!(config.rag.base_url, "http://127.0.0.1:8000");
         assert_eq!(config.rag.default_confidence_threshold, 0.7);
     }
 
