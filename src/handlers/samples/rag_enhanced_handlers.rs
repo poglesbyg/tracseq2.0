@@ -35,7 +35,7 @@ pub async fn process_document_and_create_samples(
         let field_name = field.name().unwrap_or("");
 
         match field_name {
-            "document" => {
+            "file" => {
                 let file_name = field
                     .file_name()
                     .ok_or((StatusCode::BAD_REQUEST, "No filename provided".to_string()))?
@@ -327,6 +327,7 @@ pub async fn preview_document_extraction(
 
     // Extract file from multipart form (similar to process_document_and_create_samples)
     let mut file_path = None;
+    let mut confidence_threshold = 0.7; // Default threshold
 
     while let Some(field) = multipart.next_field().await.map_err(|e| {
         (
@@ -334,39 +335,56 @@ pub async fn preview_document_extraction(
             format!("Failed to read multipart field: {}", e),
         )
     })? {
-        if field.name() == Some("document") {
-            let file_name = field
-                .file_name()
-                .ok_or((StatusCode::BAD_REQUEST, "No filename provided".to_string()))?
-                .to_string();
+        let field_name = field.name().unwrap_or("");
 
-            let upload_dir = Path::new("uploads");
-            fs::create_dir_all(upload_dir).await.map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to create upload directory: {}", e),
-                )
-            })?;
+        match field_name {
+            "file" => {
+                let file_name = field
+                    .file_name()
+                    .ok_or((StatusCode::BAD_REQUEST, "No filename provided".to_string()))?
+                    .to_string();
 
-            let file_uuid = Uuid::new_v4();
-            let temp_file_path = upload_dir.join(format!("preview_{}_{}", file_uuid, file_name));
+                let upload_dir = Path::new("uploads");
+                fs::create_dir_all(upload_dir).await.map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Failed to create upload directory: {}", e),
+                    )
+                })?;
 
-            let file_data = field.bytes().await.map_err(|e| {
-                (
-                    StatusCode::BAD_REQUEST,
-                    format!("Failed to read file data: {}", e),
-                )
-            })?;
+                let file_uuid = Uuid::new_v4();
+                let temp_file_path =
+                    upload_dir.join(format!("preview_{}_{}", file_uuid, file_name));
 
-            fs::write(&temp_file_path, file_data).await.map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to save uploaded file: {}", e),
-                )
-            })?;
+                let file_data = field.bytes().await.map_err(|e| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        format!("Failed to read file data: {}", e),
+                    )
+                })?;
 
-            file_path = Some(temp_file_path.to_string_lossy().to_string());
-            break;
+                fs::write(&temp_file_path, file_data).await.map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Failed to save uploaded file: {}", e),
+                    )
+                })?;
+
+                file_path = Some(temp_file_path.to_string_lossy().to_string());
+            }
+            "confidence_threshold" => {
+                let threshold_str = field.text().await.map_err(|e| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        format!("Failed to read confidence threshold: {}", e),
+                    )
+                })?;
+
+                confidence_threshold = threshold_str.parse().unwrap_or(0.7);
+            }
+            _ => {
+                // Skip unknown fields
+            }
         }
     }
 
@@ -393,7 +411,9 @@ pub async fn preview_document_extraction(
     let _ = fs::remove_file(&document_path).await;
 
     // Convert to sample format for preview
-    let samples = if extraction_result.success {
+    let samples = if extraction_result.success
+        && extraction_result.confidence_score >= confidence_threshold
+    {
         rag_service
             .convert_to_samples(&extraction_result)
             .unwrap_or_default()
@@ -403,11 +423,20 @@ pub async fn preview_document_extraction(
 
     let processing_time = start_time.elapsed().as_secs_f64();
 
+    // Add confidence threshold warning if needed
+    let mut validation_warnings = extraction_result.warnings.clone();
+    if extraction_result.confidence_score < confidence_threshold {
+        validation_warnings.push(format!(
+            "Extraction confidence ({:.2}) below threshold ({:.2}). Review required.",
+            extraction_result.confidence_score, confidence_threshold
+        ));
+    }
+
     Ok(Json(RagEnhancedSampleResult {
         samples,
         extraction_result: Some(extraction_result.clone()),
         confidence_score: extraction_result.confidence_score,
-        validation_warnings: extraction_result.warnings.clone(),
+        validation_warnings,
         processing_time,
     }))
 }
