@@ -430,18 +430,18 @@ pub async fn get_sheet_names(
                 Some(ft) => ft,
                 None => {
                     warn!("Unsupported file type for file: {}", filename);
-                    return Ok(ApiResponse::error(
+                    return Ok(Json(ApiResponse::error(
                         "Unsupported file type. Only Excel files (xlsx, xls) are supported for sheet name detection.",
-                    ));
+                    )));
                 }
             };
 
             // Only Excel files have multiple sheets
             if file_type.to_lowercase() == "csv" {
-                return Ok(ApiResponse::success(
+                return Ok(Json(ApiResponse::success(
                     vec!["Sheet1".to_string()],
                     "CSV files have only one sheet",
-                ));
+                )));
             }
 
             match service.get_excel_sheet_names(&file_data) {
@@ -451,24 +451,24 @@ pub async fn get_sheet_names(
                         sheet_names.len(),
                         filename
                     );
-                    return Ok(ApiResponse::success(
+                    return Ok(Json(ApiResponse::success(
                         sheet_names,
                         "Sheet names retrieved successfully",
-                    ));
+                    )));
                 }
                 Err(e) => {
                     error!("Failed to get sheet names from file {}: {}", filename, e);
-                    return Ok(ApiResponse::error(&format!(
+                    return Ok(Json(ApiResponse::error(&format!(
                         "Failed to read sheet names: {}",
                         e
-                    )));
+                    ))));
                 }
             }
         }
     }
 
     warn!("No file field found in sheet names request");
-    Ok(ApiResponse::error("No file provided in request"))
+    Ok(Json(ApiResponse::error("No file provided in request")))
 }
 
 /// Upload spreadsheet file with multiple sheets support
@@ -513,7 +513,7 @@ pub async fn upload_spreadsheet_multiple_sheets(
     }
 
     if filename.is_empty() || file_data.is_empty() {
-        return Ok(ApiResponse::error("No file provided in request"));
+        return Ok(Json(ApiResponse::error("No file provided in request")));
     }
 
     // Detect file type from filename
@@ -521,20 +521,20 @@ pub async fn upload_spreadsheet_multiple_sheets(
         Some(ft) => ft,
         None => {
             warn!("Unsupported file type for file: {}", filename);
-            return Ok(ApiResponse::error(&format!(
+            return Ok(Json(ApiResponse::error(&format!(
                 "Unsupported file type. Supported types: {:?}",
                 service.supported_file_types()
-            )));
+            ))));
         }
     };
 
     // Validate file type
     if !service.is_supported_file_type(&file_type) {
         warn!("File type not supported: {}", file_type);
-        return Ok(ApiResponse::error(&format!(
+        return Ok(Json(ApiResponse::error(&format!(
             "File type '{}' not supported",
             file_type
-        )));
+        ))));
     }
 
     // Generate unique filename for storage
@@ -558,17 +558,17 @@ pub async fn upload_spreadsheet_multiple_sheets(
                 filename,
                 datasets.len()
             );
-            Ok(ApiResponse::success(
+            Ok(Json(ApiResponse::success(
                 datasets,
                 "File uploaded and processed successfully",
-            ))
+            )))
         }
         Err(e) => {
             error!("Failed to process upload for file {}: {}", filename, e);
-            Ok(ApiResponse::error(&format!(
+            Ok(Json(ApiResponse::error(&format!(
                 "Failed to process file: {}",
                 e
-            )))
+            ))))
         }
     }
 }
