@@ -110,7 +110,7 @@ impl<R: StorageRepository> StorageManagementService<R> {
         Ok(StoredSampleResult {
             sample_location: stored_sample,
             barcode,
-            location: location,
+            location,
             warnings: self.check_storage_warnings(location_id).await?,
         })
     }

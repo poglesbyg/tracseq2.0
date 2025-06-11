@@ -290,7 +290,7 @@ impl ValidationResult {
         self
     }
 
-    pub fn merge(mut self, other: ValidationResult) -> Self {
+    pub fn merge(mut self, other: Self) -> Self {
         self.errors.extend(other.errors);
         self.warnings.extend(other.warnings);
         self.metadata.extend(other.metadata);
@@ -300,7 +300,7 @@ impl ValidationResult {
 }
 
 impl ValidationError {
-    pub fn new(code: String, message: String) -> Self {
+    pub const fn new(code: String, message: String) -> Self {
         Self {
             code,
             message,

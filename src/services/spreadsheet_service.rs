@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use calamine::{open_workbook_auto_from_rs, Reader, Xls, Xlsx};
+use calamine::{open_workbook_auto_from_rs, Reader};
 use serde_json::json;
 use std::collections::HashMap;
 use std::io::Cursor;

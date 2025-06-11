@@ -259,7 +259,7 @@ impl SpreadsheetDataManager {
         }
 
         // Add pool/sample/project filters with smart column detection
-        if let Some(pool_filter) = &query.pool_filter {
+        if query.pool_filter.is_some() {
             where_conditions.push(format!(
                 "(sr.row_data ->> 'Pool' ILIKE ${} OR sr.row_data ->> 'Pool_ID' ILIKE ${} OR sr.row_data ->> 'PoolID' ILIKE ${})",
                 param_count, param_count, param_count
@@ -267,7 +267,7 @@ impl SpreadsheetDataManager {
             param_count += 1;
         }
 
-        if let Some(sample_filter) = &query.sample_filter {
+        if query.sample_filter.is_some() {
             where_conditions.push(format!(
                 "(sr.row_data ->> 'Sample' ILIKE ${} OR sr.row_data ->> 'Sample_ID' ILIKE ${} OR sr.row_data ->> 'SampleID' ILIKE ${} OR sr.row_data ->> 'Sample_Name' ILIKE ${})",
                 param_count, param_count, param_count, param_count

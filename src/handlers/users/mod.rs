@@ -17,7 +17,6 @@ use crate::{
         ChangePasswordRequest, ConfirmResetPasswordRequest, CreateUserRequest, LoginRequest,
         ResetPasswordRequest, UpdateUserRequest, User, UserListQuery, UserSafeProfile,
     },
-    services::auth_service::AuthService,
     AppComponents,
 };
 

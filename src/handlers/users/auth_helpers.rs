@@ -1,5 +1,4 @@
 use axum::{
-    extract::{Request, State},
     http::{header::AUTHORIZATION, StatusCode},
     response::Json,
 };
