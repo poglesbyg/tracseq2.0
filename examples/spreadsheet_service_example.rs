@@ -98,7 +98,9 @@ LAB20240003,P34567,Tissue,2024-01-13,Dr. Brown,Neurology,High,Targeted Panel,-80
 
     // 1. Test CSV parsing
     info!("1. Testing CSV parsing...");
-    let parsed_data = service.parse_csv_data(csv_data.as_bytes())?;
+    let parsed_data = service
+        .parse_csv_data(csv_data.as_bytes())
+        .map_err(|e| -> Box<dyn std::error::Error> { e })?;
     info!(
         "Parsed {} rows with {} columns",
         parsed_data.total_rows, parsed_data.total_columns
@@ -149,6 +151,9 @@ LAB20240003,P34567,Tissue,2024-01-13,Dr. Brown,Neurology,High,Targeted Panel,-80
             let search_query = SpreadsheetSearchQuery {
                 search_term: Some("LAB20240001".to_string()),
                 dataset_id: Some(dataset.id),
+                pool_filter: None,
+                sample_filter: None,
+                project_filter: None,
                 column_filters: None,
                 limit: Some(10),
                 offset: None,
@@ -171,6 +176,9 @@ LAB20240003,P34567,Tissue,2024-01-13,Dr. Brown,Neurology,High,Targeted Panel,-80
             let filter_query = SpreadsheetSearchQuery {
                 search_term: None,
                 dataset_id: Some(dataset.id),
+                pool_filter: None,
+                sample_filter: None,
+                project_filter: None,
                 column_filters: Some(column_filters),
                 limit: Some(10),
                 offset: None,

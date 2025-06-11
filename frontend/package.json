@@ -15,10 +15,10 @@
   "dependencies": {
     "@headlessui/react": "^2.2.4",
     "@heroicons/react": "^2.2.0",
-    "@tanstack/react-query": "^5.80.3",
+    "@tanstack/react-query": "^5.80.6",
     "axios": "^1.9.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-router-dom": "^7.6.2"
   },
   "devDependencies": {
@@ -29,8 +29,8 @@
     "@testing-library/react": "^14.2.1",
     "@testing-library/user-event": "^14.5.2",
     "@types/jest": "^29.5.12",
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.4.1",
     "autoprefixer": "^10.4.14",
     "eslint": "^9.25.0",

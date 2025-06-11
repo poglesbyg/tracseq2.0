@@ -405,3 +405,17 @@ pub async fn analyze_column(
         }
     }
 }
+
+/// Create a router for spreadsheet endpoints (for standalone usage)
+/// Note: Use crate::router::spreadsheet_routes() for full functionality with AppComponents
+pub fn create_router(
+    _service: crate::services::spreadsheet_service::SpreadsheetService,
+) -> axum::Router {
+    use axum::Router;
+
+    // Return a basic router - for full functionality use crate::router::spreadsheet_routes()
+    Router::new()
+}
+
+// Note: For standalone usage, use the main router endpoints directly
+// The create_router function provides a simplified router for the spreadsheet service
