@@ -82,12 +82,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           });
 
           if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-              setUser(data.data);
-            } else {
-              localStorage.removeItem('auth_token');
-            }
+            const userData = await response.json();
+            setUser(userData);
           } else {
             localStorage.removeItem('auth_token');
           }
@@ -104,7 +100,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (credentials: LoginRequest): Promise<void> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/users/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -118,13 +114,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       const data = await response.json();
-      if (data.success) {
-        const { user: userData, token } = data.data;
-        setUser(userData);
-        localStorage.setItem('auth_token', token);
-      } else {
-        throw new Error('Login failed');
-      }
+      const { user: userData, token } = data;
+      setUser(userData);
+      localStorage.setItem('auth_token', token);
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -135,7 +127,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const token = localStorage.getItem('auth_token');
       if (token) {
-        await fetch(`${API_BASE_URL}/api/users/logout`, {
+        await fetch(`${API_BASE_URL}/api/auth/logout`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
