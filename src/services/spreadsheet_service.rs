@@ -14,6 +14,7 @@ use crate::{
     services::{HealthCheck, HealthStatus, Service, ServiceConfig, ServiceHealth},
 };
 
+#[derive(Clone)]
 pub struct SpreadsheetService {
     manager: SpreadsheetDataManager,
 }
@@ -108,7 +109,7 @@ impl SpreadsheetService {
         // Extract headers from first row
         for col in 0..col_count {
             let header = sheet
-                .get_value((0, col))
+                .get_value((0, col as u32))
                 .map(|v| v.to_string())
                 .unwrap_or_else(|| format!("Column_{}", col + 1));
             headers.push(header);
@@ -120,7 +121,7 @@ impl SpreadsheetService {
 
             for col in 0..col_count {
                 let value = sheet
-                    .get_value((row, col))
+                    .get_value((row as u32, col as u32))
                     .map(|v| v.to_string())
                     .unwrap_or_default();
 
@@ -131,10 +132,11 @@ impl SpreadsheetService {
             rows.push(row_map);
         }
 
+        let total_rows = rows.len();
         Ok(ParsedSpreadsheetData {
             headers,
-            rows: rows,
-            total_rows: rows.len(),
+            rows,
+            total_rows,
             total_columns: col_count,
         })
     }
@@ -164,7 +166,7 @@ impl SpreadsheetService {
             })),
         };
 
-        let mut dataset = self
+        let initial_dataset = self
             .manager
             .create_dataset(create_dataset)
             .await
@@ -183,7 +185,7 @@ impl SpreadsheetService {
                 let mut records = Vec::new();
                 for (index, row) in data.rows.iter().enumerate() {
                     records.push(CreateSpreadsheetRecord {
-                        dataset_id: dataset.id,
+                        dataset_id: initial_dataset.id,
                         row_number: (index + 1) as i32, // 1-based indexing
                         row_data: json!(row),
                     });
@@ -197,10 +199,10 @@ impl SpreadsheetService {
                     .map_err(|e| format!("Failed to insert records: {}", e))?;
 
                 // Update dataset with final counts and status
-                dataset = self
+                let dataset = self
                     .manager
                     .update_dataset_status(
-                        dataset.id,
+                        initial_dataset.id,
                         UploadStatus::Completed,
                         None,
                         Some(data.total_rows as i32),
@@ -214,10 +216,10 @@ impl SpreadsheetService {
             Err(e) => {
                 // Update dataset with error status
                 let error_message = format!("Failed to parse file: {}", e);
-                dataset = self
+                let _dataset = self
                     .manager
                     .update_dataset_status(
-                        dataset.id,
+                        initial_dataset.id,
                         UploadStatus::Failed,
                         Some(error_message.clone()),
                         None,
