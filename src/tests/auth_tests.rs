@@ -9,7 +9,7 @@ mod auth_tests {
     use argon2::password_hash::{rand_core::OsRng, PasswordHasher, SaltString};
     use argon2::Argon2;
     use chrono::{Duration, Utc};
-    use jsonwebtoken::{encode, Header, EncodingKey};
+    use jsonwebtoken::{encode, EncodingKey, Header};
     use sqlx::postgres::PgPoolOptions;
     use std::net::IpAddr;
     use uuid::Uuid;
@@ -30,6 +30,10 @@ mod auth_tests {
 
     // Test helper to create a test user
     async fn create_test_user(pool: &sqlx::PgPool) -> User {
+        create_test_user_with_email(pool, None).await
+    }
+
+    async fn create_test_user_with_email(pool: &sqlx::PgPool, email: Option<&str>) -> User {
         let user_manager = UserManager::new(pool.clone());
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
@@ -39,6 +43,17 @@ mod auth_tests {
             .to_string();
 
         let user_id = Uuid::new_v4();
+        let user_email = email.unwrap_or_else(|| {
+            // Generate unique email using UUID to avoid conflicts
+            Box::leak(format!("test-{}@lab.local", user_id).into_boxed_str())
+        });
+
+        // Clean up any existing user with this email first (defensive cleanup)
+        let _ = sqlx::query("DELETE FROM users WHERE email = $1")
+            .bind(user_email)
+            .execute(pool)
+            .await;
+
         sqlx::query(
             r#"
             INSERT INTO users (
@@ -50,7 +65,7 @@ mod auth_tests {
             "#,
         )
         .bind(user_id)
-        .bind("test@lab.local")
+        .bind(user_email)
         .bind(&password_hash)
         .bind("Test")
         .bind("User")
@@ -68,6 +83,13 @@ mod auth_tests {
             .get_user_by_id(user_id)
             .await
             .expect("Failed to get test user")
+    }
+
+    async fn cleanup_test_user(pool: &sqlx::PgPool, email: &str) {
+        let _ = sqlx::query("DELETE FROM users WHERE email = $1")
+            .bind(email)
+            .execute(pool)
+            .await;
     }
 
     #[tokio::test]
@@ -99,10 +121,7 @@ mod auth_tests {
         assert!(user.email_verified);
 
         // Cleanup
-        sqlx::query("DELETE FROM users WHERE email = 'newuser@lab.local'")
-            .execute(&pool)
-            .await
-            .expect("Failed to cleanup test user");
+        cleanup_test_user(&pool, "newuser@lab.local").await;
     }
 
     #[tokio::test]
@@ -144,16 +163,19 @@ mod auth_tests {
 
     #[test]
     fn test_auth_claims() {
+        let user_id = Uuid::new_v4();
+        let test_email = format!("test-{}@lab.local", user_id);
+
         let claims = AuthClaims {
-            sub: Uuid::new_v4(),
-            email: "test@lab.local".to_string(),
+            sub: user_id,
+            email: test_email.clone(),
             role: UserRole::LabAdministrator,
             exp: (Utc::now() + Duration::hours(1)).timestamp(),
             iat: Utc::now().timestamp(),
             jti: Uuid::new_v4(),
         };
 
-        assert_eq!(claims.email, "test@lab.local");
+        assert_eq!(claims.email, test_email);
         assert_eq!(claims.role, UserRole::LabAdministrator);
         assert!(claims.exp > claims.iat);
     }
@@ -203,10 +225,7 @@ mod auth_tests {
         );
 
         // Cleanup
-        sqlx::query("DELETE FROM users WHERE email = 'test@lab.local'")
-            .execute(&pool)
-            .await
-            .expect("Failed to cleanup test user");
+        cleanup_test_user(&pool, &user.email).await;
     }
 
     #[tokio::test]
@@ -216,7 +235,7 @@ mod auth_tests {
         let auth_service = AuthService::new(pool.clone(), "test-secret".to_string());
 
         let login_request = LoginRequest {
-            email: "test@lab.local".to_string(),
+            email: user.email.clone(),
             password: "test123".to_string(),
         };
 
@@ -234,7 +253,7 @@ mod auth_tests {
         );
 
         let login_response = result.unwrap();
-        assert_eq!(login_response.user.email, "test@lab.local");
+        assert_eq!(login_response.user.email, user.email);
         assert!(
             !login_response.token.is_empty(),
             "JWT token should be generated"
@@ -245,10 +264,7 @@ mod auth_tests {
         );
 
         // Cleanup
-        sqlx::query("DELETE FROM users WHERE email = 'test@lab.local'")
-            .execute(&pool)
-            .await
-            .expect("Failed to cleanup test user");
+        cleanup_test_user(&pool, &user.email).await;
     }
 
     #[tokio::test]
@@ -259,7 +275,7 @@ mod auth_tests {
 
         // Test with wrong password
         let login_request = LoginRequest {
-            email: "test@lab.local".to_string(),
+            email: user.email.clone(),
             password: "wrongpassword".to_string(),
         };
 
@@ -290,10 +306,7 @@ mod auth_tests {
         assert!(result.is_err(), "Login should fail with non-existent user");
 
         // Cleanup
-        sqlx::query("DELETE FROM users WHERE email = 'test@lab.local'")
-            .execute(&pool)
-            .await
-            .expect("Failed to cleanup test user");
+        cleanup_test_user(&pool, &user.email).await;
     }
 
     #[tokio::test]
@@ -304,7 +317,7 @@ mod auth_tests {
 
         // Login to get a token
         let login_request = LoginRequest {
-            email: "test@lab.local".to_string(),
+            email: user.email.clone(),
             password: "test123".to_string(),
         };
 
@@ -325,7 +338,7 @@ mod auth_tests {
         );
 
         let (verified_user, session) = verification_result.unwrap();
-        assert_eq!(verified_user.email, "test@lab.local");
+        assert_eq!(verified_user.email, user.email);
         assert_eq!(verified_user.id, user.id);
         assert!(
             session.expires_at > Utc::now(),
@@ -340,10 +353,7 @@ mod auth_tests {
         );
 
         // Cleanup
-        sqlx::query("DELETE FROM users WHERE email = 'test@lab.local'")
-            .execute(&pool)
-            .await
-            .expect("Failed to cleanup test user");
+        cleanup_test_user(&pool, &user.email).await;
     }
 
     #[tokio::test]
@@ -362,7 +372,7 @@ mod auth_tests {
 
         // Test login with new password
         let login_request = LoginRequest {
-            email: "test@lab.local".to_string(),
+            email: user.email.clone(),
             password: "newpassword123".to_string(),
         };
 
@@ -381,7 +391,7 @@ mod auth_tests {
 
         // Test login with old password fails
         let old_login_request = LoginRequest {
-            email: "test@lab.local".to_string(),
+            email: user.email.clone(),
             password: "test123".to_string(),
         };
 
@@ -399,10 +409,7 @@ mod auth_tests {
         );
 
         // Cleanup
-        sqlx::query("DELETE FROM users WHERE email = 'test@lab.local'")
-            .execute(&pool)
-            .await
-            .expect("Failed to cleanup test user");
+        cleanup_test_user(&pool, &user.email).await;
     }
 
     #[tokio::test]
@@ -413,7 +420,7 @@ mod auth_tests {
 
         // Login to create a session
         let login_request = LoginRequest {
-            email: "test@lab.local".to_string(),
+            email: user.email.clone(),
             password: "test123".to_string(),
         };
 
@@ -452,10 +459,7 @@ mod auth_tests {
         );
 
         // Cleanup
-        sqlx::query("DELETE FROM users WHERE email = 'test@lab.local'")
-            .execute(&pool)
-            .await
-            .expect("Failed to cleanup test user");
+        cleanup_test_user(&pool, &user.email).await;
     }
 
     #[tokio::test]
@@ -476,10 +480,7 @@ mod auth_tests {
         );
 
         // Cleanup
-        sqlx::query("DELETE FROM users WHERE email = 'test@lab.local'")
-            .execute(&pool)
-            .await
-            .expect("Failed to cleanup test user");
+        cleanup_test_user(&pool, &user.email).await;
     }
 
     #[tokio::test]
@@ -587,7 +588,9 @@ mod auth_tests {
 
     #[test]
     fn test_user_role_descriptions() {
-        assert!(UserRole::LabAdministrator.description().contains("management"));
+        assert!(UserRole::LabAdministrator
+            .description()
+            .contains("management"));
         assert!(UserRole::LabTechnician.description().contains("processing"));
         assert!(UserRole::Guest.description().contains("Limited"));
     }

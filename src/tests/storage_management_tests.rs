@@ -55,9 +55,9 @@ mod storage_management_tests {
     #[test]
     fn test_temperature_monitoring() {
         let readings = vec![
-            (-80.0, -82.0, true),  // Within range
-            (4.0, 3.5, true),      // Within range
-            (-80.0, -75.0, false), // Out of range
+            (-80.0_f64, -82.0_f64, true),  // Within range
+            (4.0_f64, 3.5_f64, true),      // Within range
+            (-80.0_f64, -75.0_f64, false), // Out of range
         ];
 
         for (target, actual, should_be_valid) in readings {

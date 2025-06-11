@@ -106,6 +106,108 @@ function New-RequiredDirectories {
     Write-Success "Directories created"
 }
 
+# Function to wait for backend to be ready
+function Wait-ForBackend {
+    param(
+        [string]$BackendUrl = "http://localhost:3000",
+        [int]$TimeoutSeconds = 120,
+        [int]$CheckIntervalSeconds = 5
+    )
+    
+    Write-Info "Waiting for backend to be ready at $BackendUrl..."
+    $elapsed = 0
+    
+    while ($elapsed -lt $TimeoutSeconds) {
+        try {
+            $response = Invoke-WebRequest -Uri "$BackendUrl/health" -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
+            if ($response.StatusCode -eq 200) {
+                Write-Success "Backend is ready and responding!"
+                return $true
+            }
+        }
+        catch {
+            # Backend not ready yet, continue waiting
+        }
+        
+        Write-Info "Backend not ready yet, waiting... ($elapsed/$TimeoutSeconds seconds)"
+        Start-Sleep -Seconds $CheckIntervalSeconds
+        $elapsed += $CheckIntervalSeconds
+    }
+    
+    Write-Warning "Backend did not become ready within $TimeoutSeconds seconds"
+    return $false
+}
+
+# Function to start services in development mode with proper coordination
+function Start-DevelopmentServicesCoordinated {
+    Write-Header "Starting Development Mode (Coordinated)"
+    
+    if (-not (Test-Docker)) { return }
+    if (-not (Test-RequiredFiles)) { return }
+    
+    $composeCmd = Get-DockerComposeCommand
+    New-RequiredDirectories
+    
+    # Step 1: Start database first
+    Write-Info "Starting database..."
+    Invoke-Expression "$composeCmd up -d db"
+    Start-Sleep -Seconds 3
+    
+    # Step 2: Start backend and wait for it to be ready
+    Write-Info "Starting backend (this may take a few minutes for first build)..."
+    Invoke-Expression "$composeCmd up -d dev"
+    
+    # Step 3: Wait for backend to be fully ready
+    if (Wait-ForBackend) {
+        # Step 4: Start frontend now that backend is ready
+        Write-Info "Starting frontend..."
+        
+        # Try Docker frontend first, fall back to local if it fails
+        $frontendStarted = $false
+        try {
+            Invoke-Expression "$composeCmd up -d frontend-dev"
+            if ($LASTEXITCODE -eq 0) {
+                $frontendStarted = $true
+                Write-Success "Frontend started in Docker"
+            }
+        }
+        catch {
+            Write-Warning "Docker frontend failed, will provide alternative"
+        }
+        
+        if (-not $frontendStarted) {
+            Write-Info "Docker frontend had issues. You can start it manually with:"
+            Write-Host "cd frontend && npm run dev" -ForegroundColor Yellow
+        }
+        
+        Write-Success "Lab Manager services started successfully!"
+        Write-Host ""
+        Write-Host "Services available at:" -ForegroundColor Green
+        Write-Host "  Frontend: http://localhost:5173" -ForegroundColor Cyan
+        Write-Host "  Backend:  http://localhost:3000" -ForegroundColor Cyan
+        Write-Host "  Database: localhost:5433" -ForegroundColor Cyan
+        
+        # Test backend connectivity
+        Write-Info "Testing backend connectivity..."
+        try {
+            $healthCheck = Invoke-WebRequest -Uri "http://localhost:3000/health" -UseBasicParsing -TimeoutSec 10
+            $healthData = $healthCheck.Content | ConvertFrom-Json
+            if ($healthData.status -eq "healthy") {
+                Write-Success "Backend health check passed - database connected: $($healthData.database_connected)"
+            }
+        }
+        catch {
+            Write-Warning "Backend health check failed, but services are starting"
+        }
+    }
+    else {
+        Write-Error-Custom "Backend failed to start properly. Check logs with: .\run.ps1 logs dev"
+        return $false
+    }
+    
+    return $true
+}
+
 # Function to start services in production mode
 function Start-ProductionServices {
     Write-Header "Starting Production Mode"
@@ -124,27 +226,6 @@ function Start-ProductionServices {
     Write-Host "Services available at:" -ForegroundColor Green
     Write-Host "  Frontend: http://localhost:8080" -ForegroundColor Cyan
     Write-Host "  Backend:  http://localhost:3001" -ForegroundColor Cyan
-    Write-Host "  Database: localhost:5433" -ForegroundColor Cyan
-}
-
-# Function to start services in development mode
-function Start-DevelopmentServices {
-    Write-Header "Starting Development Mode"
-    
-    if (-not (Test-Docker)) { return }
-    if (-not (Test-RequiredFiles)) { return }
-    
-    $composeCmd = Get-DockerComposeCommand
-    New-RequiredDirectories
-    
-    Write-Info "Starting Lab Manager services (Development)..."
-    Invoke-Expression "$composeCmd up -d frontend-dev dev db"
-    
-    Write-Success "Lab Manager services started successfully!"
-    Write-Host ""
-    Write-Host "Services available at:" -ForegroundColor Green
-    Write-Host "  Frontend: http://localhost:5173" -ForegroundColor Cyan
-    Write-Host "  Backend:  http://localhost:3000" -ForegroundColor Cyan
     Write-Host "  Database: localhost:5433" -ForegroundColor Cyan
 }
 
@@ -291,7 +372,8 @@ function Show-Help {
     Write-Host ""
     Write-Host "Service Commands:" -ForegroundColor Yellow
     Write-Host "  start-prod     Start services in production mode"
-    Write-Host "  start-dev      Start services in development mode"
+    Write-Host "  start-dev      Start services in development mode (coordinated startup)"
+    Write-Host "  quick-start    Quick start with automatic browser opening"
     Write-Host "  stop           Stop all services"
     Write-Host "  restart-prod   Restart services in production mode"
     Write-Host "  restart-dev    Restart services in development mode"
@@ -341,8 +423,18 @@ switch ($Command.ToLower()) {
         if ($?) { Open-WebInterfaces "prod" }
     }
     "start-dev" { 
-        Start-DevelopmentServices 
+        Start-DevelopmentServicesCoordinated 
         if ($?) { Open-WebInterfaces "dev" }
+    }
+    "quick-start" {
+        if (Start-DevelopmentServicesCoordinated) {
+            Write-Success "Opening web interfaces..."
+            Open-WebInterfaces "dev"
+            Write-Host ""
+            Write-Host "🎉 TracSeq 2.0 is ready!" -ForegroundColor Green
+            Write-Host "Frontend: http://localhost:5173" -ForegroundColor Cyan
+            Write-Host "Backend:  http://localhost:3000" -ForegroundColor Cyan
+        }
     }
     "stop" { Stop-AllServices }
     "restart-prod" { 
@@ -353,7 +445,7 @@ switch ($Command.ToLower()) {
     "restart-dev" { 
         Stop-AllServices
         Start-Sleep -Seconds 2
-        Start-DevelopmentServices 
+        Start-DevelopmentServicesCoordinated 
     }
     "status" { Show-ServiceStatus }
     "logs" { Show-ServiceLogs $Service }

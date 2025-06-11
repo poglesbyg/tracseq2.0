@@ -272,10 +272,10 @@ mod sequencing_workflow_tests {
     fn test_quality_control_thresholds() {
         let qc_metrics = vec![
             ("cluster_density", 200000, 300000, 245000, true),
-            ("clusters_pf", 80.0, 95.0, 92.5, true),
-            ("q30_percentage", 75.0, 100.0, 87.5, true),
-            ("error_rate", 0.0, 2.0, 0.8, true),
-            ("adapter_contamination", 0.0, 5.0, 2.1, true),
+            ("clusters_pf", 80, 95, 92, true),
+            ("q30_percentage", 75, 100, 87, true),
+            ("error_rate", 0, 2, 1, true),
+            ("adapter_contamination", 0, 5, 2, true),
         ];
 
         for (metric_name, min_threshold, max_threshold, actual_value, should_pass) in qc_metrics {
