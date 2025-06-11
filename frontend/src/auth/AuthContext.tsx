@@ -62,7 +62,8 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+// Use relative URLs to go through Vite proxy
+const API_BASE_URL = '';
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -82,7 +83,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           });
 
           if (response.ok) {
-            const userData = await response.json();
+            const data = await response.json();
+            // Handle both possible response formats
+            const userData = data.data ? data.data : data;
             setUser(userData);
           } else {
             localStorage.removeItem('auth_token');
