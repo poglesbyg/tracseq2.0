@@ -5,6 +5,7 @@ pub mod sequencing;
 pub mod spreadsheets;
 pub mod storage;
 pub mod templates;
+pub mod users;
 
 pub use dashboard::{get_dashboard_stats, health_check, DashboardStats, HealthStatus};
 pub use reports::{execute_report, get_report_templates, get_schema};
@@ -23,4 +24,9 @@ pub use storage::{
 pub use templates::{
     delete_template, get_template, get_template_data, list_templates, update_template,
     upload_template,
+};
+pub use users::{
+    change_password, confirm_password_reset, create_user, delete_user, get_current_user, get_user,
+    get_user_sessions, list_users, login, logout, request_password_reset, revoke_all_sessions,
+    revoke_session, update_current_user, update_user,
 };

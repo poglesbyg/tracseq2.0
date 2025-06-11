@@ -1,3 +1,4 @@
+pub mod auth_service;
 pub mod barcode_service;
 pub mod rag_integration_service;
 pub mod sample_service;
@@ -33,7 +34,7 @@ pub struct ServiceHealth {
     pub checks: HashMap<String, HealthCheck>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum HealthStatus {
     Healthy,
     Degraded,
