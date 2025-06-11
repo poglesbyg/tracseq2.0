@@ -84,6 +84,7 @@ pub struct ParsedSpreadsheetData {
     pub total_columns: usize,
 }
 
+#[derive(Clone)]
 pub struct SpreadsheetDataManager {
     pool: PgPool,
 }
