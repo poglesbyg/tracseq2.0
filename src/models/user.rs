@@ -220,7 +220,7 @@ pub struct UpdateUserRequest {
     pub office_location: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct LoginRequest {
     #[validate(email(message = "Invalid email format"))]
     pub email: String,

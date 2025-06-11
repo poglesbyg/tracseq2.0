@@ -13,6 +13,18 @@ mod repository_tests;
 #[cfg(test)]
 mod rag_integration_workflow_tests;
 
+#[cfg(test)]
+mod auth_tests;
+
+#[cfg(test)]
+mod auth_integration_tests;
+
+#[cfg(test)]
+mod validation_tests;
+
+#[cfg(test)]
+mod session_security_tests;
+
 pub mod modular_assembly_test;
 
 pub async fn test_sequencing_crud() -> Result<(), Box<dyn std::error::Error>> {
