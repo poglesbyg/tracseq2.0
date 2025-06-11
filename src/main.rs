@@ -83,7 +83,7 @@ async fn main() {
 
     axum::serve(
         tokio::net::TcpListener::bind(addr).await.unwrap(),
-        app.into_make_service(),
+        app.into_make_service_with_connect_info::<SocketAddr>(),
     )
     .await
     .unwrap();

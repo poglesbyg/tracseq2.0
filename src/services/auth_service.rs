@@ -135,7 +135,7 @@ impl AuthService {
         // Get session from database
         let session = sqlx::query_as::<_, UserSession>(
             r#"
-            SELECT id, user_id, token_hash, device_info, ip_address,
+            SELECT id, user_id, token_hash, device_info, ip_address::text,
                    expires_at, created_at, last_used_at
             FROM user_sessions
             WHERE id = $1 AND expires_at > NOW()
@@ -344,7 +344,7 @@ impl AuthService {
     pub async fn get_user_sessions(&self, user_id: Uuid) -> Result<Vec<UserSession>> {
         let sessions = sqlx::query_as::<_, UserSession>(
             r#"
-            SELECT id, user_id, token_hash, device_info, ip_address,
+            SELECT id, user_id, token_hash, device_info, ip_address::text,
                    expires_at, created_at, last_used_at
             FROM user_sessions
             WHERE user_id = $1 AND expires_at > NOW()
@@ -454,21 +454,18 @@ impl AuthService {
         let temp_token = format!("{}:{}", session_id, expires_at.timestamp());
         let token_hash = self.hash_token(&temp_token);
 
-        // Convert IpAddr to String for database storage
-        let ip_str = ip_address.map(|ip| ip.to_string());
-
         let session = sqlx::query_as::<_, UserSession>(
             r#"
             INSERT INTO user_sessions (id, user_id, token_hash, device_info, ip_address, expires_at)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING id, user_id, token_hash, device_info, ip_address, expires_at, created_at, last_used_at
+            VALUES ($1, $2, $3, $4, $5::inet, $6)
+            RETURNING id, user_id, token_hash, device_info, ip_address::text, expires_at, created_at, last_used_at
             "#,
         )
         .bind(session_id)
         .bind(user_id)
         .bind(&token_hash)
         .bind(user_agent)
-        .bind(ip_str)
+        .bind(ip_address.map(|ip| ip.to_string()))
         .bind(expires_at)
         .fetch_one(&self.pool)
         .await?;
@@ -518,21 +515,18 @@ impl AuthService {
         user_agent: Option<String>,
         details: Option<serde_json::Value>,
     ) -> Result<()> {
-        // Convert IpAddr to String for database storage
-        let ip_str = ip_address.map(|ip| ip.to_string());
-
         sqlx::query(
             r#"
             INSERT INTO user_activity_log 
             (user_id, action, resource_type, resource_id, ip_address, user_agent, details)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            VALUES ($1, $2, $3, $4, $5::inet, $6, $7)
             "#,
         )
         .bind(user_id)
         .bind(action)
         .bind(resource_type)
         .bind(resource_id)
-        .bind(ip_str)
+        .bind(ip_address.map(|ip| ip.to_string()))
         .bind(user_agent)
         .bind(details)
         .execute(&self.pool)
