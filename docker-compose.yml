@@ -36,6 +36,7 @@ services:
       - RUST_LOG=info
       - STORAGE_PATH=/usr/local/bin/storage
       - RAG_SERVICE_URL=http://host.docker.internal:8000
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
     volumes:
       - app_storage:/usr/local/bin/storage
     extra_hosts:
@@ -61,6 +62,7 @@ services:
       - RUST_LOG=info
       - STORAGE_PATH=/usr/local/bin/storage
       - RAG_SERVICE_URL=http://host.docker.internal:8000
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
