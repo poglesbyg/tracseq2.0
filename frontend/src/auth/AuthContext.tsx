@@ -69,7 +69,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize auth state from localStorage
+  // Initialize auth state from localStorage or auto-login as admin
   useEffect(() => {
     const initializeAuth = async () => {
       const token = localStorage.getItem('auth_token');
@@ -87,6 +87,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Handle both possible response formats
             const userData = data.data ? data.data : data;
             setUser(userData);
+            setIsLoading(false);
+            return;
           } else {
             localStorage.removeItem('auth_token');
           }
@@ -95,6 +97,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           localStorage.removeItem('auth_token');
         }
       }
+      
+      // Auto-login as admin if no valid token exists
+      try {
+        console.log('Auto-logging in as admin...');
+        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: 'admin@lab.local', password: 'admin123' }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const { user: userData, token } = data.data;
+          setUser(userData);
+          localStorage.setItem('auth_token', token);
+          console.log('Auto-login successful');
+        } else {
+          throw new Error('Login request failed');
+        }
+      } catch (error) {
+        console.log('Auto-login failed, creating mock admin user for development');
+        // If login fails, create a mock admin user for development
+        const mockAdminUser: User = {
+          id: 'mock-admin-id',
+          email: 'admin@lab.local',
+          first_name: 'Admin',
+          last_name: 'User',
+          role: 'lab_administrator',
+          status: 'active',
+          email_verified: true,
+          created_at: new Date().toISOString(),
+        };
+        setUser(mockAdminUser);
+        localStorage.setItem('auth_token', 'mock-admin-token');
+      }
+      
       setIsLoading(false);
     };
 
