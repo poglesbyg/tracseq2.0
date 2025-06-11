@@ -1,6 +1,6 @@
 # 🧬 Lab Manager - Advanced Laboratory Information Management System
 
-[![Build Status](https://github.com/poglesbyg/lab_manager/workflows/CI/badge.svg)](https://github.com/poglesbyg/lab_manager/actions)
+[![Build Status](https://github.com/poglesbyg/lab_manager/actions/workflows/ci.yml/badge.svg)](https://github.com/poglesbyg/lab_manager/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.75+-blue.svg)](https://www.rust-lang.org)
 [![React](https://img.shields.io/badge/react-18.3+-61dafb.svg)](https://reactjs.org)
