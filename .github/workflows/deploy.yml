@@ -173,10 +173,14 @@ jobs:
           # Multi-stage build for full-stack deployment
           FROM node:20-alpine AS frontend-builder
           WORKDIR /app/frontend
+          
+          # Copy package files and install ALL dependencies (including dev dependencies for build)
           COPY frontend/package*.json ./
-          RUN npm ci --ignore-scripts --production || echo "No frontend package.json found"
+          RUN npm ci --include=dev || echo "No frontend package.json found"
+          
+          # Copy frontend source and build
           COPY frontend/ ./
-          RUN npm run build || echo "No frontend build step"
+          RUN npm run build || (echo "Frontend build failed - creating empty dist" && mkdir -p dist && echo '<!DOCTYPE html><html><head><title>Frontend Build Failed</title></head><body><h1>Frontend assets not available</h1></body></html>' > dist/index.html)
           
           FROM rust:1.75-slim AS backend-builder
           WORKDIR /usr/src/app
@@ -207,7 +211,10 @@ jobs:
           
           # Copy built assets
           COPY --from=backend-builder /usr/src/app/target/release/lab_manager /app/
-          COPY --from=frontend-builder /app/frontend/dist/ /app/static/ || true
+          
+          # Copy frontend assets safely
+          RUN mkdir -p /app/static
+          COPY --from=frontend-builder /app/frontend/dist/ /app/static/
           
           # Set ownership and permissions
           RUN chown -R labmanager:labmanager /app

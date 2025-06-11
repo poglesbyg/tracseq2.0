@@ -819,7 +819,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {dataResponse && dataResponse.total_count > 0 && (
           <div className="flex items-center justify-between border-t border-gray-200 bg-white px-6 py-3">
             <div className="flex flex-1 justify-between sm:hidden">
               <button
