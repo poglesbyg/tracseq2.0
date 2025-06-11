@@ -114,7 +114,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       const data = await response.json();
-      const { user: userData, token } = data;
+      const { user: userData, token } = data.data;
       setUser(userData);
       localStorage.setItem('auth_token', token);
     } catch (error) {
