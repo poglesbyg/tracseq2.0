@@ -167,6 +167,10 @@ jobs:
 
       - name: Create optimized Dockerfile for variant
         run: |
+          # Add cache busting
+          CACHE_BUST=$(date +%s)
+          echo "Cache bust: $CACHE_BUST"
+          
           case "${{ matrix.variant }}" in
             "full-stack")
               cat > Dockerfile.deploy << 'EOF'
@@ -174,13 +178,26 @@ jobs:
           FROM node:20-alpine AS frontend-builder
           WORKDIR /app/frontend
           
+          # Cache busting for fresh build
+          RUN echo "Build timestamp: $(date)" > /tmp/build_time
+          
           # Copy package files and install ALL dependencies (including dev dependencies for build)
           COPY frontend/package*.json ./
           RUN npm ci --include=dev || echo "No frontend package.json found"
           
           # Copy frontend source and build
           COPY frontend/ ./
+          
+          # Debug: List files and check package.json
+          RUN echo "=== Frontend files ===" && ls -la
+          RUN echo "=== Package.json content ===" && cat package.json || echo "No package.json"
+          RUN echo "=== Node modules check ===" && ls -la node_modules/ | head -10 || echo "No node_modules"
+          
+          # Run the build
           RUN npm run build || (echo "Frontend build failed - creating empty dist" && mkdir -p dist && echo '<!DOCTYPE html><html><head><title>Frontend Build Failed</title></head><body><h1>Frontend assets not available</h1></body></html>' > dist/index.html)
+          
+          # Debug: Check what was created
+          RUN echo "=== Build output ===" && ls -la dist/ || echo "No dist directory"
           
           FROM rust:1.75-slim AS backend-builder
           WORKDIR /usr/src/app
@@ -317,6 +334,12 @@ jobs:
               ;;
           esac
 
+      - name: Debug Dockerfile content
+        run: |
+          echo "=== Generated Dockerfile.deploy content ==="
+          cat Dockerfile.deploy
+          echo "=== End of Dockerfile.deploy ==="
+
       - name: Build and push Docker image
         id: build
         uses: docker/build-push-action@v5
@@ -327,8 +350,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.variant }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.variant }}
+          no-cache: true
           build-args: |
             BUILDKIT_INLINE_CACHE=1
 
