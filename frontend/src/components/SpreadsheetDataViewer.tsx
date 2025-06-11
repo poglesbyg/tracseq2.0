@@ -97,7 +97,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
 
   // Fetch data
   const { data: dataResponse, isLoading, error } = useQuery<DataResponse>({
-    queryKey: ['spreadsheet-data', dataset.id, currentPage, searchTerm, columnFilters],
+    queryKey: ['spreadsheet-data', dataset.id, currentPage, searchTerm, columnFilters, rowsPerPage],
     queryFn: async () => {
       const query = buildSearchQuery();
       const response = await axios.get(`/api/spreadsheets/search?${query}`);
