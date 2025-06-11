@@ -4,12 +4,13 @@
 
 ### **🚀 One-Command Setup**
 ```bash
-./scripts/run.sh
+./run_full_app.sh
 ```
 
 This will start all services including:
 - **Frontend Development Server** (http://localhost:5173)
 - **Backend API** (http://localhost:3000)
+- **RAG Service** (http://localhost:8000)
 - **PostgreSQL Database** (localhost:5432)
 
 ### **🔧 Manual Setup**
