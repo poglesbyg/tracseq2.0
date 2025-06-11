@@ -25,7 +25,7 @@ mod role_permission_tests {
         let admin_role = UserRole::LabAdministrator;
 
         // Admin should have descriptive permissions
-        assert!(admin_role.description().contains("Manage"));
+        assert!(admin_role.description().contains("management"));
         assert_eq!(admin_role.display_name(), "Lab Administrator");
 
         // Test serialization

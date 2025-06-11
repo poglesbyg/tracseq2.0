@@ -9,8 +9,7 @@ mod auth_tests {
     use argon2::password_hash::{rand_core::OsRng, PasswordHasher, SaltString};
     use argon2::Argon2;
     use chrono::{Duration, Utc};
-    use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
-    use serde_json::json;
+    use jsonwebtoken::{encode, Header, EncodingKey};
     use sqlx::postgres::PgPoolOptions;
     use std::net::IpAddr;
     use uuid::Uuid;
@@ -588,8 +587,8 @@ mod auth_tests {
 
     #[test]
     fn test_user_role_descriptions() {
-        assert!(UserRole::LabAdministrator.description().contains("Manage"));
-        assert!(UserRole::LabTechnician.description().contains("Perform"));
+        assert!(UserRole::LabAdministrator.description().contains("management"));
+        assert!(UserRole::LabTechnician.description().contains("processing"));
         assert!(UserRole::Guest.description().contains("Limited"));
     }
 

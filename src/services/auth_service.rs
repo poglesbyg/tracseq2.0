@@ -1,9 +1,8 @@
-use std::collections::HashMap;
 use std::net::IpAddr;
 
 use anyhow::{anyhow, Result};
 use argon2::password_hash::{rand_core::OsRng, SaltString};
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
+use argon2::{Argon2, PasswordHasher};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use sqlx::{PgPool, Row};
@@ -11,7 +10,7 @@ use uuid::Uuid;
 
 use crate::models::user::{
     AuthClaims, ChangePasswordRequest, ConfirmResetPasswordRequest, LoginRequest, LoginResponse,
-    ResetPasswordRequest, User, UserManager, UserSafeProfile, UserSession, UserStatus,
+    ResetPasswordRequest, User, UserManager, UserSession, UserStatus,
 };
 
 #[derive(Clone)]
