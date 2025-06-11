@@ -12,29 +12,29 @@ print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-print_info "🚀 Starting Complete Lab Manager Application with User System"
+print_info "🚀 Starting Lab Manager Application"
 echo
 
 # Check if we're in the right directory
-if [ ! -d "lab_manager" ] || [ ! -d "lab_submission_rag" ]; then
-    print_error "Please run this script from the tracseq2.0 directory containing both lab_manager and lab_submission_rag folders"
+if [ ! -f "Cargo.toml" ] || [ ! -d "frontend" ]; then
+    print_error "Please run this script from the lab_manager root directory"
     exit 1
 fi
 
-# Kill any existing processes
-print_info "Cleaning up existing processes..."
-pkill -f "lab_manager" 2>/dev/null || true
-pkill -f "uvicorn.*main:app" 2>/dev/null || true
-pkill -f "vite.*frontend" 2>/dev/null || true
+# Check Docker installation
+if ! command -v docker &> /dev/null; then
+    print_error "Docker is not installed. Please install Docker Desktop first."
+    exit 1
+fi
 
-# Function to check if port is available
-check_port() {
-    local port=$1
-    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-        return 0  # Port is in use
-    fi
-    return 1  # Port is free
-}
+if ! docker info &> /dev/null; then
+    print_error "Docker is not running. Please start Docker Desktop first."
+    exit 1
+fi
+
+# Stop any existing containers
+print_info "Stopping existing containers..."
+docker-compose down 2>/dev/null || true
 
 # Function to wait for service
 wait_for_service() {
@@ -57,180 +57,98 @@ wait_for_service() {
     return 1
 }
 
-# Check if PostgreSQL is running locally
-print_info "Checking PostgreSQL database..."
-if ! pg_isready -q 2>/dev/null; then
-    print_warning "PostgreSQL not running locally. Starting with Docker..."
-    cd lab_manager
-    docker-compose down 2>/dev/null || true
-    docker-compose up -d db
-    DB_PORT=5433
-    DB_HOST=localhost
-    cd ..
-    # Wait for database
-    print_info "Waiting for Docker database to be ready..."
-    sleep 8
+# Check if port is available
+check_port() {
+    local port=$1
+    if command -v lsof &> /dev/null; then
+        if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+            return 0  # Port is in use
+        fi
+    elif command -v ss &> /dev/null; then
+        if ss -ln | grep -q ":$port "; then
+            return 0  # Port is in use
+        fi
+    elif command -v netstat &> /dev/null; then
+        if netstat -ln | grep -q ":$port "; then
+            return 0  # Port is in use
+        fi
+    fi
+    return 1  # Port is free
+}
+
+# Kill any processes that might be using our ports
+print_info "Cleaning up any processes using our ports..."
+for port in 3000 5173 8000; do
+    if check_port $port; then
+        print_warning "Port $port is in use, attempting to free it..."
+        if command -v lsof &> /dev/null; then
+            lsof -ti:$port | xargs kill -9 2>/dev/null || true
+        fi
+    fi
+done
+
+# Start database first
+print_info "Starting PostgreSQL database..."
+docker-compose up -d db
+
+# Wait for database to be ready
+print_info "Waiting for database to be ready..."
+sleep 8
+
+# Check if database is accessible
+DB_READY=false
+for i in {1..15}; do
+    if docker-compose exec -T db pg_isready -U postgres >/dev/null 2>&1; then
+        DB_READY=true
+        break
+    fi
+    sleep 2
+done
+
+if [ "$DB_READY" = true ]; then
+    print_success "Database is ready!"
 else
-    print_success "Using local PostgreSQL database"
-    DB_PORT=5432
-    DB_HOST=localhost
+    print_error "Database failed to start properly"
+    exit 1
 fi
 
-# Setup database and user system
-print_info "Setting up database and user system..."
-cd lab_manager
-
-# Create .env file with correct configuration
-cat > .env << EOF
-DATABASE_URL=postgres://lab_manager:lab_manager@${DB_HOST}:${DB_PORT}/lab_manager
-STORAGE_PATH=./storage
-HOST=0.0.0.0
-PORT=8080
-CORS_ENABLED=true
-RUST_LOG=info
-RAG_API_URL=http://127.0.0.1:8000
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-EOF
-
-# Run database setup if needed
-if [ "$DB_PORT" = "5432" ]; then
-    print_info "Setting up local database..."
-    ./scripts/setup.sh 2>/dev/null || true
-fi
-
-# Run migrations
+# Run migrations if sqlx is available
 if command -v sqlx >/dev/null 2>&1; then
     print_info "Running database migrations..."
-    sqlx migrate run || print_warning "Migration failed - continuing anyway"
+    export DATABASE_URL="postgres://postgres:postgres@localhost:5433/lab_manager"
+    sqlx migrate run || print_warning "Migration failed - this is normal if migrations have already been run"
 fi
 
-# Create storage directory
-mkdir -p storage
+# Start backend development server
+print_info "Starting Rust backend on port 3000..."
+docker-compose up -d dev
 
-# Ensure admin user has correct password
-print_info "Setting up admin user with correct password..."
-export DATABASE_URL="postgres://lab_manager:lab_manager@${DB_HOST}:${DB_PORT}/lab_manager"
-export PGPASSWORD="lab_manager"
-
-# Update admin password hash using SQL directly
-psql -h $DB_HOST -p $DB_PORT -U lab_manager -d lab_manager -c "
-UPDATE users 
-SET password_hash = '\$argon2id\$v=19\$m=19456,t=2,p=1\$PvuEaXN3YH/FJTijYPcxHQ\$ou3lWvq/bw3z4Y2ax7unRqeG26+C7shIX0VW9UGSVa0' 
-WHERE email = 'admin@lab.local';
-" 2>/dev/null || print_warning "Could not update admin password - continuing anyway"
-
-cd ..
-
-# Start Python RAG API
-print_info "Starting Python RAG API on port 8000..."
-cd lab_submission_rag
-
-if [ ! -d ".venv" ]; then
-    print_info "Creating Python virtual environment..."
-    python3 -m venv .venv
-fi
-
-source .venv/bin/activate
-pip install -r requirements.txt > /dev/null 2>&1
-
-# Set environment variables for RAG
-export PYTHONPATH="${PYTHONPATH}:$(pwd)/app"
-export RAG_DATA_PATH="$(pwd)/app/data"
-
-cd app
-nohup python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 > /tmp/rag_api.log 2>&1 &
-RAG_PID=$!
-echo $RAG_PID > /tmp/rag_api.pid
-cd ../..
-
-# Start Rust Backend on port 8080
-print_info "Starting Rust backend on port 8080..."
-cd lab_manager
-
-# Source the environment file and start the backend with correct binary
-source .env
-nohup cargo run --bin lab_manager > /tmp/lab_manager_backend.log 2>&1 &
-BACKEND_PID=$!
-echo $BACKEND_PID > /tmp/lab_manager_backend.pid
-cd ..
-
-# Start React Frontend
+# Start frontend development server
 print_info "Starting React frontend on port 5173..."
-cd lab_manager/frontend
-
-# Ensure Vite config is correct for proxy
-cat > vite.config.ts << 'EOF'
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    host: true,
-    port: 5173,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        secure: false,
-        configure: (proxy, _options) => {
-          proxy.on('error', (err, _req, _res) => {
-            console.log('proxy error', err);
-          });
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('Sending Request to the Target:', req.method, req.url);
-          });
-          proxy.on('proxyRes', (proxyRes, req, _res) => {
-            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
-          });
-        },
-      },
-      '/health': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        secure: false,
-      },
-    },
-  },
-})
-EOF
-
-# Create frontend environment file
-cat > .env << EOF
-VITE_API_URL=
-EOF
-
-if [ ! -d "node_modules" ]; then
-    print_info "Installing frontend dependencies..."
-    npm install
-fi
-
-nohup npm run dev > /tmp/lab_manager_frontend.log 2>&1 &
-FRONTEND_PID=$!
-echo $FRONTEND_PID > /tmp/lab_manager_frontend.pid
-cd ../..
+docker-compose up -d frontend-dev
 
 # Wait for services to start
 print_info "Waiting for services to start..."
-sleep 20
+sleep 15
 
-# Check service health with better validation
+# Check service health
 echo
 print_info "Checking service health..."
 
-# Check RAG API
-if wait_for_service "http://localhost:8000/health" "RAG API"; then
-    print_success "✓ RAG API: Running on http://localhost:8000"
+# Check Database
+if docker-compose exec -T db pg_isready -U postgres >/dev/null 2>&1; then
+    print_success "✓ Database: Running on localhost:5433"
 else
-    print_error "✗ RAG API: Failed to start"
+    print_error "✗ Database: Failed to start"
 fi
 
 # Check Backend
-if wait_for_service "http://localhost:8080/health" "Backend API"; then
-    print_success "✓ Backend API: Running on http://localhost:8080"
+if wait_for_service "http://localhost:3000/health" "Backend API"; then
+    print_success "✓ Backend API: Running on http://localhost:3000"
 else
     print_error "✗ Backend API: Failed to start"
+    print_info "Checking backend logs..."
+    docker-compose logs dev | tail -20
 fi
 
 # Check Frontend
@@ -238,76 +156,62 @@ if check_port 5173; then
     print_success "✓ Frontend: Running on http://localhost:5173"
 else
     print_error "✗ Frontend: Failed to start"
-fi
-
-# Check Database
-if check_port $DB_PORT; then
-    print_success "✓ Database: Running on localhost:${DB_PORT}"
-else
-    print_error "✗ Database: Failed to start"
+    print_info "Checking frontend logs..."
+    docker-compose logs frontend-dev | tail -20
 fi
 
 echo
-print_success "🎉 Lab Manager Application with User System is now running!"
-echo
-print_info "🔐 Default Admin Credentials:"
-echo "  • Email: admin@lab.local"
-echo "  • Password: admin123"
-echo "  • Role: Lab Administrator"
-echo
-print_warning "⚠️  Please change the default admin password after first login!"
+print_success "🎉 Lab Manager Application is now running!"
 echo
 print_info "🌐 Access Points:"
 echo "  • Main Application: http://localhost:5173"
-echo "  • Backend API: http://localhost:8080"
-echo "  • RAG API: http://localhost:8000"
-echo "  • Database: localhost:${DB_PORT}"
+echo "  • Backend API: http://localhost:3000"
+echo "  • API Documentation: http://localhost:3000/docs (if available)"
+echo "  • Database: localhost:5433"
 echo
-print_info "🔧 User Management Features:"
-echo "  • Create/Edit/Delete users (Admin only)"
-echo "  • Role-based access control"
-echo "  • Profile management"
-echo "  • Session management"
+print_info "🔐 Default Admin Credentials (if seeded):"
+echo "  • Email: admin@lab.local"
+echo "  • Password: admin123"
 echo
-print_info "📁 Log Files:"
-echo "  • Backend: /tmp/lab_manager_backend.log"
-echo "  • Frontend: /tmp/lab_manager_frontend.log"
-echo "  • RAG API: /tmp/rag_api.log"
+print_warning "⚠️  Note: RAG service is expected to run separately on port 8000"
+echo "   The system will work without it, but AI features will be limited."
 echo
 print_info "🛠️  Useful Commands:"
-echo "  • View logs: tail -f /tmp/*.log"
-echo "  • Stop all: ./stop_full_app.sh"
-echo "  • Check auth endpoints: curl http://localhost:8080/api/auth/login"
+echo "  • View all logs: docker-compose logs -f"
+echo "  • View backend logs: docker-compose logs -f dev"
+echo "  • View frontend logs: docker-compose logs -f frontend-dev"
+echo "  • Stop all services: docker-compose down"
+echo "  • Restart services: docker-compose restart"
 echo
-print_info "📚 User Roles Available:"
-echo "  • Lab Administrator: Full system access"
-echo "  • Principal Investigator: Lab oversight"
-echo "  • Lab Technician: Sample processing"
-echo "  • Research Scientist: Research activities"
-echo "  • Data Analyst: Data analysis and reporting"
-echo "  • Guest: Limited read-only access"
+print_info "🧪 Testing the system:"
+echo "  • Health check: curl http://localhost:3000/health"
+echo "  • API test: curl http://localhost:3000/api/samples"
 echo
 
-# Check if authentication works with correct endpoint
-print_info "🔍 Testing authentication system..."
-sleep 5
-
-if curl -s "http://localhost:8080/api/auth/login" -X POST \
-   -H "Content-Type: application/json" \
-   -d '{"email":"admin@lab.local","password":"admin123"}' | grep -q "success"; then
-    print_success "✓ User authentication system is working!"
+# Optional: Test authentication if available
+print_info "🔍 Testing system health..."
+if curl -s "http://localhost:3000/health" | grep -q "ok\|healthy\|success" 2>/dev/null; then
+    print_success "✓ System health check passed!"
 else
-    print_warning "⚠ User authentication test failed - check logs for details"
-    print_info "You can test manually: curl -X POST http://localhost:8080/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"admin@lab.local\",\"password\":\"admin123\"}'"
+    print_warning "⚠ Health check inconclusive - system may still be starting"
 fi
 
 echo
-print_warning "Keep this terminal open or services will stop!"
-print_info "Press Ctrl+C to view live logs, or close terminal to keep running in background"
+print_info "📚 Next Steps:"
+echo "  1. Open http://localhost:5173 in your browser"
+echo "  2. Try creating a sample or uploading data"
+echo "  3. Check the API at http://localhost:3000/api/"
+echo "  4. View logs if you encounter any issues"
+echo
+print_info "🔧 For development:"
+echo "  • Backend source code changes will auto-reload"
+echo "  • Frontend changes will auto-reload in the browser"
+echo "  • Database data persists between restarts"
+echo
 
 # Option to show logs
 echo
-read -p "Press Enter to view live logs, or Ctrl+C to exit: " -r
+print_warning "Services are running in Docker containers."
+print_info "Use 'docker-compose logs -f' to view live logs"
+print_info "Use 'docker-compose down' to stop all services"
 echo
-print_info "Showing live logs (Ctrl+C to stop)..."
-tail -f /tmp/lab_manager_backend.log /tmp/lab_manager_frontend.log /tmp/rag_api.log 
