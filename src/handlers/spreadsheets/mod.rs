@@ -33,6 +33,9 @@ pub struct UploadResponse {
 pub struct SearchParams {
     pub search_term: Option<String>,
     pub dataset_id: Option<Uuid>,
+    pub pool_filter: Option<String>,
+    pub sample_filter: Option<String>,
+    pub project_filter: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
     // Column filters as query parameters like: ?filter_Sample_ID=LAB001&filter_Department=Oncology
@@ -181,6 +184,9 @@ pub async fn search_data(
     let query = SpreadsheetSearchQuery {
         search_term: params.search_term,
         dataset_id: params.dataset_id,
+        pool_filter: params.pool_filter,
+        sample_filter: params.sample_filter,
+        project_filter: params.project_filter,
         column_filters: if column_filters.is_empty() {
             None
         } else {
@@ -305,4 +311,97 @@ pub async fn supported_types(
         types,
         "Supported file types retrieved",
     )))
+}
+
+/// Get available filters for datasets
+pub async fn get_available_filters(
+    State(components): State<crate::AppComponents>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<Json<ApiResponse<crate::models::spreadsheet::AvailableFilters>>, StatusCode> {
+    let service = &components.spreadsheet_service;
+    info!("Received request to get available filters");
+
+    let dataset_id = params
+        .get("dataset_id")
+        .and_then(|id| Uuid::parse_str(id).ok());
+
+    match service.get_available_filters(dataset_id).await {
+        Ok(filters) => {
+            info!("Successfully retrieved available filters");
+            Ok(Json(ApiResponse::success(
+                filters,
+                "Available filters retrieved successfully",
+            )))
+        }
+        Err(e) => {
+            error!("Failed to get available filters: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// Analyze dataset structure and content
+pub async fn analyze_dataset(
+    State(components): State<crate::AppComponents>,
+    Path(dataset_id): Path<Uuid>,
+) -> Result<Json<ApiResponse<crate::models::spreadsheet::DatasetAnalysis>>, StatusCode> {
+    let service = &components.spreadsheet_service;
+    info!("Received request to analyze dataset: {}", dataset_id);
+
+    match service.analyze_dataset(dataset_id).await {
+        Ok(analysis) => {
+            info!("Successfully analyzed dataset: {}", dataset_id);
+            Ok(Json(ApiResponse::success(
+                analysis,
+                "Dataset analysis completed successfully",
+            )))
+        }
+        Err(sqlx::Error::RowNotFound) => {
+            warn!("Dataset not found for analysis: {}", dataset_id);
+            Err(StatusCode::NOT_FOUND)
+        }
+        Err(e) => {
+            error!("Failed to analyze dataset {}: {}", dataset_id, e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// Analyze individual column
+pub async fn analyze_column(
+    State(components): State<crate::AppComponents>,
+    Path((dataset_id, column_name)): Path<(Uuid, String)>,
+) -> Result<Json<ApiResponse<crate::models::spreadsheet::ColumnAnalysis>>, StatusCode> {
+    let service = &components.spreadsheet_service;
+    info!(
+        "Received request to analyze column '{}' in dataset: {}",
+        column_name, dataset_id
+    );
+
+    match service.analyze_column(dataset_id, &column_name).await {
+        Ok(analysis) => {
+            info!(
+                "Successfully analyzed column '{}' in dataset: {}",
+                column_name, dataset_id
+            );
+            Ok(Json(ApiResponse::success(
+                analysis,
+                "Column analysis completed successfully",
+            )))
+        }
+        Err(sqlx::Error::RowNotFound) => {
+            warn!(
+                "Dataset or column not found: {} / {}",
+                dataset_id, column_name
+            );
+            Err(StatusCode::NOT_FOUND)
+        }
+        Err(e) => {
+            error!(
+                "Failed to analyze column '{}' in dataset {}: {}",
+                column_name, dataset_id, e
+            );
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }

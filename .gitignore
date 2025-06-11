@@ -5,7 +5,7 @@ Cargo.lock
 
 # Environment files
 .env
-.env.*
+.env_old
 !.env.example
 
 # IDE and editor files

@@ -35,13 +35,32 @@ interface SearchFilters {
   [key: string]: string;
 }
 
+interface AvailableFilters {
+  pools: string[];
+  samples: string[];
+  projects: string[];
+  all_columns: string[];
+  column_values: Record<string, string[]>;
+}
+
 export default function SpreadsheetSearchModal({ onClose }: SpreadsheetSearchModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<SearchFilters>({});
+  const [poolFilter, setPoolFilter] = useState('');
+  const [sampleFilter, setSampleFilter] = useState('');
+  const [projectFilter, setProjectFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [limit, setLimit] = useState(25);
   const [offset, setOffset] = useState(0);
 
+  // Fetch available filters
+  const { data: availableFilters } = useQuery<AvailableFilters>({
+    queryKey: ['available-filters'],
+    queryFn: async () => {
+      const response = await axios.get('/api/spreadsheets/filters');
+      return response.data.data;
+    },
+  });
 
   // Debounced search
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -54,12 +73,28 @@ export default function SpreadsheetSearchModal({ onClose }: SpreadsheetSearchMod
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    setOffset(0);
+  }, [poolFilter, sampleFilter, projectFilter]);
+
   // Build search query
   const buildSearchQuery = () => {
     const params = new URLSearchParams();
     
     if (debouncedSearchTerm.trim()) {
       params.append('search_term', debouncedSearchTerm.trim());
+    }
+    
+    // Add pool/sample/project filters
+    if (poolFilter.trim()) {
+      params.append('pool_filter', poolFilter.trim());
+    }
+    if (sampleFilter.trim()) {
+      params.append('sample_filter', sampleFilter.trim());
+    }
+    if (projectFilter.trim()) {
+      params.append('project_filter', projectFilter.trim());
     }
     
     // Add column filters
@@ -83,10 +118,12 @@ export default function SpreadsheetSearchModal({ onClose }: SpreadsheetSearchMod
       const response = await axios.get(`/api/spreadsheets/search?${query}`);
       return response.data.data;
     },
-    enabled: debouncedSearchTerm.trim().length > 0 || Object.values(filters).some(v => v.trim().length > 0),
+    enabled: debouncedSearchTerm.trim().length > 0 || 
+             Object.values(filters).some(v => v.trim().length > 0) ||
+             poolFilter.trim().length > 0 ||
+             sampleFilter.trim().length > 0 ||
+             projectFilter.trim().length > 0,
   });
-
-
 
   const handleFilterChange = (column: string, value: string) => {
     setFilters(prev => ({
@@ -107,10 +144,17 @@ export default function SpreadsheetSearchModal({ onClose }: SpreadsheetSearchMod
   const clearAllFilters = () => {
     setFilters({});
     setSearchTerm('');
+    setPoolFilter('');
+    setSampleFilter('');
+    setProjectFilter('');
     setOffset(0);
   };
 
-  const hasActiveSearch = debouncedSearchTerm.trim().length > 0 || Object.values(filters).some(v => v.trim().length > 0);
+  const hasActiveSearch = debouncedSearchTerm.trim().length > 0 || 
+                         Object.values(filters).some(v => v.trim().length > 0) ||
+                         poolFilter.trim().length > 0 ||
+                         sampleFilter.trim().length > 0 ||
+                         projectFilter.trim().length > 0;
   const totalPages = searchResults ? Math.ceil(searchResults.total_count / limit) : 0;
   const currentPage = Math.floor(offset / limit) + 1;
 
@@ -180,19 +224,77 @@ export default function SpreadsheetSearchModal({ onClose }: SpreadsheetSearchMod
               type="button"
               onClick={() => setShowFilters(!showFilters)}
               className={`inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium ${
-                showFilters || Object.keys(filters).length > 0
+                showFilters || Object.keys(filters).length > 0 || poolFilter || sampleFilter || projectFilter
                   ? 'text-indigo-700 bg-indigo-50 border-indigo-300'
                   : 'text-gray-700 bg-white hover:bg-gray-50'
               } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
             >
               <FunnelIcon className="h-4 w-4 mr-2" />
               Filters
-              {Object.keys(filters).length > 0 && (
+              {(Object.keys(filters).length > 0 || poolFilter || sampleFilter || projectFilter) && (
                 <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                  {Object.keys(filters).length}
+                  {Object.keys(filters).length + (poolFilter ? 1 : 0) + (sampleFilter ? 1 : 0) + (projectFilter ? 1 : 0)}
                 </span>
               )}
             </button>
+          </div>
+
+          {/* Pool/Sample/Project Quick Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label htmlFor="pool-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                Pool
+              </label>
+              <select
+                id="pool-filter"
+                value={poolFilter}
+                onChange={(e) => setPoolFilter(e.target.value)}
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              >
+                <option value="">All pools</option>
+                {availableFilters?.pools.map((pool) => (
+                  <option key={pool} value={pool}>
+                    {pool}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="sample-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                Sample
+              </label>
+              <select
+                id="sample-filter"
+                value={sampleFilter}
+                onChange={(e) => setSampleFilter(e.target.value)}
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              >
+                <option value="">All samples</option>
+                {availableFilters?.samples.map((sample) => (
+                  <option key={sample} value={sample}>
+                    {sample}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="project-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                Project
+              </label>
+              <select
+                id="project-filter"
+                value={projectFilter}
+                onChange={(e) => setProjectFilter(e.target.value)}
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              >
+                <option value="">All projects</option>
+                {availableFilters?.projects.map((project) => (
+                  <option key={project} value={project}>
+                    {project}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Column Filters */}

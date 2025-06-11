@@ -9,6 +9,9 @@ import {
   TableCellsIcon,
   CalendarDaysIcon,
   UserIcon,
+  ChartBarIcon,
+  FunnelIcon,
+  EyeIcon,
 } from '@heroicons/react/24/outline';
 import FileUploadModal from '../components/FileUploadModal';
 import SpreadsheetSearchModal from '../components/SpreadsheetSearchModal';
@@ -32,10 +35,21 @@ interface SpreadsheetDataset {
   metadata: any;
 }
 
+interface AvailableFilters {
+  pools: string[];
+  samples: string[];
+  projects: string[];
+  all_columns: string[];
+}
+
 export default function Spreadsheets() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [viewingDataset, setViewingDataset] = useState<SpreadsheetDataset | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [poolFilter, setPoolFilter] = useState('');
+  const [sampleFilter, setSampleFilter] = useState('');
+  const [projectFilter, setProjectFilter] = useState('');
   const queryClient = useQueryClient();
 
   // Fetch datasets
@@ -46,6 +60,42 @@ export default function Spreadsheets() {
       return response.data.data || [];
     },
   });
+
+  // Fetch available filters
+  const { data: availableFilters } = useQuery<AvailableFilters>({
+    queryKey: ['available-filters'],
+    queryFn: async () => {
+      const response = await axios.get('/api/spreadsheets/filters');
+      return response.data.data || { pools: [], samples: [], projects: [], all_columns: [] };
+    },
+  });
+
+  // Filter datasets based on metadata and content
+  const filteredDatasets = datasets?.filter(dataset => {
+    if (!poolFilter && !sampleFilter && !projectFilter) {
+      return true;
+    }
+    
+    // Check metadata for pool/sample/project information
+    const metadata = dataset.metadata || {};
+    
+    if (poolFilter && !metadata.pool_column && !dataset.column_headers.some(h => 
+      h.toLowerCase().includes('pool'))) {
+      return false;
+    }
+    
+    if (sampleFilter && !metadata.sample_column && !dataset.column_headers.some(h => 
+      h.toLowerCase().includes('sample'))) {
+      return false;
+    }
+    
+    if (projectFilter && !metadata.project_column && !dataset.column_headers.some(h => 
+      h.toLowerCase().includes('project'))) {
+      return false;
+    }
+    
+    return true;
+  }) || [];
 
   // Delete dataset mutation
   const deleteDatasetMutation = useMutation({
@@ -263,7 +313,7 @@ export default function Spreadsheets() {
                       </td>
                     </tr>
                   ) : (
-                    datasets.map((dataset) => (
+                    filteredDatasets.map((dataset) => (
                       <tr key={dataset.id}>
                         <td className="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
                           <div className="flex items-center">

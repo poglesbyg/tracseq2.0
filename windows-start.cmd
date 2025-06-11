@@ -9,7 +9,7 @@ echo.
 
 REM Check if we're in the right directory
 if not exist "run.ps1" (
-    echo [ERROR] Please run this from the TracSeq 2.0 root directory
+    echo [ERROR] Please run this from the lab_manager directory
     pause
     exit /b 1
 )

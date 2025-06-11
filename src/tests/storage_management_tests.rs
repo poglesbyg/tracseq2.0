@@ -61,7 +61,7 @@ mod storage_management_tests {
         ];
 
         for (target, actual, should_be_valid) in readings {
-            let tolerance = if target < -70.0 { 5.0 } else { 2.0 };
+            let tolerance: f64 = if target < -70.0 { 5.0 } else { 2.0 };
             let is_valid = (actual - target).abs() <= tolerance;
             assert_eq!(is_valid, should_be_valid);
         }

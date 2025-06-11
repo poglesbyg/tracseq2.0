@@ -256,6 +256,185 @@ impl SpreadsheetService {
         self.manager.delete_dataset(dataset_id).await
     }
 
+    pub async fn get_available_filters(
+        &self,
+        dataset_id: Option<Uuid>,
+    ) -> Result<crate::models::spreadsheet::AvailableFilters, sqlx::Error> {
+        self.manager.get_available_filters(dataset_id).await
+    }
+
+    pub async fn analyze_dataset(
+        &self,
+        dataset_id: Uuid,
+    ) -> Result<crate::models::spreadsheet::DatasetAnalysis, sqlx::Error> {
+        self.manager.analyze_dataset(dataset_id).await
+    }
+
+    pub async fn analyze_column(
+        &self,
+        dataset_id: Uuid,
+        column_name: &str,
+    ) -> Result<crate::models::spreadsheet::ColumnAnalysis, sqlx::Error> {
+        self.manager.analyze_column(dataset_id, column_name).await
+    }
+
+    /// Enhanced data processing with metadata extraction for pools, samples, and projects
+    pub async fn process_upload_with_metadata(
+        &self,
+        filename: String,
+        original_filename: String,
+        file_data: Vec<u8>,
+        file_type: String,
+        sheet_name: Option<String>,
+        uploaded_by: Option<String>,
+        pool_column: Option<String>,
+        sample_column: Option<String>,
+        project_column: Option<String>,
+    ) -> Result<SpreadsheetDataset, Box<dyn std::error::Error + Send + Sync>> {
+        // Enhanced metadata to include pool/sample/project column mappings
+        let mut metadata = json!({
+            "processing_started_at": chrono::Utc::now(),
+            "file_size_bytes": file_data.len()
+        });
+
+        if let Some(pool_col) = &pool_column {
+            metadata["pool_column"] = json!(pool_col);
+        }
+        if let Some(sample_col) = &sample_column {
+            metadata["sample_column"] = json!(sample_col);
+        }
+        if let Some(project_col) = &project_column {
+            metadata["project_column"] = json!(project_col);
+        }
+
+        // Create initial dataset record
+        let create_dataset = CreateSpreadsheetDataset {
+            filename: filename.clone(),
+            original_filename,
+            file_type: file_type.clone(),
+            file_size: file_data.len() as i64,
+            sheet_name: sheet_name.clone(),
+            column_headers: Vec::new(), // Will be updated after parsing
+            uploaded_by,
+            metadata: Some(metadata),
+        };
+
+        let initial_dataset = self
+            .manager
+            .create_dataset(create_dataset)
+            .await
+            .map_err(|e| format!("Failed to create dataset: {}", e))?;
+
+        // Parse the file data
+        let parsed_data = match file_type.to_lowercase().as_str() {
+            "csv" => self.parse_csv_data(&file_data),
+            "xlsx" | "xls" => self.parse_excel_data(&file_data, sheet_name.as_deref()),
+            _ => return Err(format!("Unsupported file type: {}", file_type).into()),
+        };
+
+        match parsed_data {
+            Ok(data) => {
+                // Create records for each row with enhanced search text
+                let mut records = Vec::new();
+                for (index, row) in data.rows.iter().enumerate() {
+                    // Enhanced search text to include pool/sample/project data
+                    let enhanced_search_text = self.generate_enhanced_search_text(
+                        row,
+                        pool_column.as_deref(),
+                        sample_column.as_deref(),
+                        project_column.as_deref(),
+                    );
+
+                    let mut enhanced_row_data = row.clone();
+                    enhanced_row_data.insert("_search_enhanced".to_string(), enhanced_search_text);
+
+                    records.push(CreateSpreadsheetRecord {
+                        dataset_id: initial_dataset.id,
+                        row_number: (index + 1) as i32, // 1-based indexing
+                        row_data: json!(enhanced_row_data),
+                    });
+                }
+
+                // Bulk insert records
+                let _inserted_count = self
+                    .manager
+                    .bulk_create_records(records)
+                    .await
+                    .map_err(|e| format!("Failed to insert records: {}", e))?;
+
+                // Update dataset with final counts and status
+                let dataset = self
+                    .manager
+                    .update_dataset_status(
+                        initial_dataset.id,
+                        UploadStatus::Completed,
+                        None,
+                        Some(data.total_rows as i32),
+                        Some(data.total_columns as i32),
+                    )
+                    .await
+                    .map_err(|e| format!("Failed to update dataset status: {}", e))?;
+
+                Ok(dataset)
+            }
+            Err(e) => {
+                // Update dataset with error status
+                let error_message = format!("Failed to parse file: {}", e);
+                let _dataset = self
+                    .manager
+                    .update_dataset_status(
+                        initial_dataset.id,
+                        UploadStatus::Failed,
+                        Some(error_message.clone()),
+                        None,
+                        None,
+                    )
+                    .await
+                    .map_err(|e| format!("Failed to update dataset error status: {}", e))?;
+
+                Err(error_message.into())
+            }
+        }
+    }
+
+    fn generate_enhanced_search_text(
+        &self,
+        row_data: &HashMap<String, String>,
+        pool_column: Option<&str>,
+        sample_column: Option<&str>,
+        project_column: Option<&str>,
+    ) -> String {
+        let mut search_parts = Vec::new();
+
+        // Add all values for general search
+        for value in row_data.values() {
+            if !value.is_empty() {
+                search_parts.push(value.clone());
+            }
+        }
+
+        // Add enhanced searchable terms for pools/samples/projects
+        if let Some(pool_col) = pool_column {
+            if let Some(pool_value) = row_data.get(pool_col) {
+                search_parts.push(format!("pool:{}", pool_value));
+            }
+        }
+
+        if let Some(sample_col) = sample_column {
+            if let Some(sample_value) = row_data.get(sample_col) {
+                search_parts.push(format!("sample:{}", sample_value));
+            }
+        }
+
+        if let Some(project_col) = project_column {
+            if let Some(project_value) = row_data.get(project_col) {
+                search_parts.push(format!("project:{}", project_value));
+            }
+        }
+
+        search_parts.join(" ")
+    }
+
     /// Get supported file types
     pub fn supported_file_types(&self) -> Vec<&'static str> {
         vec!["csv", "xlsx", "xls"]

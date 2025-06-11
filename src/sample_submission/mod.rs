@@ -15,7 +15,7 @@ pub struct Sample {
     pub metadata: serde_json::Value,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
 #[sqlx(type_name = "sample_status", rename_all = "snake_case")]
 pub enum SampleStatus {
     Pending,

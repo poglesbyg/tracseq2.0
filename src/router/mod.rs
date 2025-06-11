@@ -132,6 +132,18 @@ pub fn spreadsheet_routes() -> Router<AppComponents> {
             delete(handlers::spreadsheets::delete_dataset),
         )
         .route(
+            "/api/spreadsheets/datasets/:id/analyze",
+            get(handlers::spreadsheets::analyze_dataset),
+        )
+        .route(
+            "/api/spreadsheets/datasets/:id/columns/:column_name/analyze",
+            get(handlers::spreadsheets::analyze_column),
+        )
+        .route(
+            "/api/spreadsheets/filters",
+            get(handlers::spreadsheets::get_available_filters),
+        )
+        .route(
             "/api/spreadsheets/health",
             get(handlers::spreadsheets::health_check),
         )
