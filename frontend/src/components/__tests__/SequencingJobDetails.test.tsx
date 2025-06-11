@@ -7,18 +7,17 @@ import SequencingJobDetails from '../SequencingJobDetails';
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-// Mock data
+// Mock data - Updated to match component interface
 const mockJob = {
-  id: 1,
+  id: '1',
   name: 'Test Job',
-  status: 'pending' as const,
+  status: 'Pending' as const,
   created_at: '2024-03-20T10:00:00Z',
   updated_at: '2024-03-20T10:00:00Z',
-  sample_sheet_url: null,
-  samples: [
-    { id: 1, name: 'Sample 1', barcode: 'BAR001' },
-    { id: 2, name: 'Sample 2', barcode: 'BAR002' }
-  ]
+  sample_sheet_path: null,
+  metadata: {
+    sample_ids: [1, 2]
+  }
 };
 
 describe('SequencingJobDetails', () => {
@@ -40,11 +39,11 @@ describe('SequencingJobDetails', () => {
     
     render(
       <QueryClientProvider client={queryClient}>
-        <SequencingJobDetails jobId={1} onClose={() => {}} />
+        <SequencingJobDetails jobId="1" onClose={() => {}} />
       </QueryClientProvider>
     );
 
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByRole('status', { hidden: true })).toBeInTheDocument();
   });
 
   it('renders job details correctly', async () => {
@@ -52,13 +51,13 @@ describe('SequencingJobDetails', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <SequencingJobDetails jobId={1} onClose={() => {}} />
+        <SequencingJobDetails jobId="1" onClose={() => {}} />
       </QueryClientProvider>
     );
 
     await waitFor(() => {
       expect(screen.getByText('Test Job')).toBeInTheDocument();
-      expect(screen.getByText('pending')).toBeInTheDocument();
+      expect(screen.getByText('Pending')).toBeInTheDocument();
       expect(screen.getByText('Sample 1')).toBeInTheDocument();
       expect(screen.getByText('Sample 2')).toBeInTheDocument();
     });
@@ -66,11 +65,11 @@ describe('SequencingJobDetails', () => {
 
   it('handles sample sheet generation', async () => {
     mockedAxios.get.mockResolvedValueOnce({ data: mockJob });
-    mockedAxios.post.mockResolvedValueOnce({ data: { sample_sheet_url: 'http://example.com/sheet' } });
+    mockedAxios.post.mockResolvedValueOnce({ data: { sample_sheet_path: 'http://example.com/sheet' } });
 
     render(
       <QueryClientProvider client={queryClient}>
-        <SequencingJobDetails jobId={1} onClose={() => {}} />
+        <SequencingJobDetails jobId="1" onClose={() => {}} />
       </QueryClientProvider>
     );
 
@@ -87,11 +86,11 @@ describe('SequencingJobDetails', () => {
 
   it('handles job status updates', async () => {
     mockedAxios.get.mockResolvedValueOnce({ data: mockJob });
-    mockedAxios.patch.mockResolvedValueOnce({ data: { ...mockJob, status: 'running' } });
+    mockedAxios.patch.mockResolvedValueOnce({ data: { ...mockJob, status: 'InProgress' } });
 
     render(
       <QueryClientProvider client={queryClient}>
-        <SequencingJobDetails jobId={1} onClose={() => {}} />
+        <SequencingJobDetails jobId="1" onClose={() => {}} />
       </QueryClientProvider>
     );
 
@@ -102,7 +101,7 @@ describe('SequencingJobDetails', () => {
     fireEvent.click(screen.getByText('Start Job'));
 
     await waitFor(() => {
-      expect(mockedAxios.patch).toHaveBeenCalledWith('/api/sequencing/jobs/1', { status: 'running' });
+      expect(mockedAxios.patch).toHaveBeenCalledWith('/api/sequencing/jobs/1', { status: 'InProgress' });
     });
   });
 
@@ -112,7 +111,7 @@ describe('SequencingJobDetails', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <SequencingJobDetails jobId={1} onClose={onClose} />
+        <SequencingJobDetails jobId="1" onClose={onClose} />
       </QueryClientProvider>
     );
 

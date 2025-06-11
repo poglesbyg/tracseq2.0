@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:spreadsheets": "jest --testPathPattern=Spreadsheet"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",

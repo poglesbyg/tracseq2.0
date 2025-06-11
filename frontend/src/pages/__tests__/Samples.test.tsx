@@ -7,38 +7,32 @@ import Samples from '../Samples';
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-// Mock data
+// Mock data - Updated to match component interface
 const mockSamples = [
   {
-    id: 1,
+    id: '1',
     name: 'Sample 1',
-    template_id: 1,
-    storage_location_id: 1,
     barcode: 'BAR001',
+    location: 'Location 1',
+    status: 'Pending' as const,
     created_at: '2024-03-20T10:00:00Z',
     updated_at: '2024-03-20T10:00:00Z',
-    status: 'active'
+    metadata: {
+      template_name: 'Template 1'
+    }
   },
   {
-    id: 2,
+    id: '2',
     name: 'Sample 2',
-    template_id: 2,
-    storage_location_id: 2,
     barcode: 'BAR002',
+    location: 'Location 2',
+    status: 'Validated' as const,
     created_at: '2024-03-20T11:00:00Z',
     updated_at: '2024-03-20T11:00:00Z',
-    status: 'pending'
+    metadata: {
+      template_name: 'Template 2'
+    }
   }
-];
-
-const mockTemplates = [
-  { id: 1, name: 'Template 1', version: '1.0' },
-  { id: 2, name: 'Template 2', version: '1.0' }
-];
-
-const mockStorageLocations = [
-  { id: 1, name: 'Location 1' },
-  { id: 2, name: 'Location 2' }
 ];
 
 describe('Samples', () => {
@@ -68,10 +62,7 @@ describe('Samples', () => {
   });
 
   it('renders samples list correctly', async () => {
-    mockedAxios.get
-      .mockResolvedValueOnce({ data: mockSamples })
-      .mockResolvedValueOnce({ data: mockTemplates })
-      .mockResolvedValueOnce({ data: mockStorageLocations });
+    mockedAxios.get.mockResolvedValueOnce({ data: mockSamples });
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -83,15 +74,14 @@ describe('Samples', () => {
       expect(screen.getByText('Sample 1')).toBeInTheDocument();
       expect(screen.getByText('Sample 2')).toBeInTheDocument();
       expect(screen.getByText('Template 1')).toBeInTheDocument();
+      expect(screen.getByText('Template 2')).toBeInTheDocument();
       expect(screen.getByText('Location 1')).toBeInTheDocument();
+      expect(screen.getByText('Location 2')).toBeInTheDocument();
     });
   });
 
   it('shows empty state when no samples exist', async () => {
-    mockedAxios.get
-      .mockResolvedValueOnce({ data: [] })
-      .mockResolvedValueOnce({ data: mockTemplates })
-      .mockResolvedValueOnce({ data: mockStorageLocations });
+    mockedAxios.get.mockResolvedValueOnce({ data: [] });
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -105,10 +95,7 @@ describe('Samples', () => {
   });
 
   it('opens sample submission wizard when Add Sample button is clicked', async () => {
-    mockedAxios.get
-      .mockResolvedValueOnce({ data: mockSamples })
-      .mockResolvedValueOnce({ data: mockTemplates })
-      .mockResolvedValueOnce({ data: mockStorageLocations });
+    mockedAxios.get.mockResolvedValueOnce({ data: mockSamples });
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -126,10 +113,7 @@ describe('Samples', () => {
   });
 
   it('displays correct status colors', async () => {
-    mockedAxios.get
-      .mockResolvedValueOnce({ data: mockSamples })
-      .mockResolvedValueOnce({ data: mockTemplates })
-      .mockResolvedValueOnce({ data: mockStorageLocations });
+    mockedAxios.get.mockResolvedValueOnce({ data: mockSamples });
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -138,11 +122,11 @@ describe('Samples', () => {
     );
 
     await waitFor(() => {
-      const activeStatus = screen.getByText('active');
-      const pendingStatus = screen.getByText('pending');
+      const pendingStatus = screen.getByText('Pending');
+      const validatedStatus = screen.getByText('Validated');
       
-      expect(activeStatus).toHaveClass('bg-green-100');
       expect(pendingStatus).toHaveClass('bg-yellow-100');
+      expect(validatedStatus).toHaveClass('bg-blue-100');
     });
   });
 }); 

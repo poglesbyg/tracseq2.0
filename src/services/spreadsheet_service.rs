@@ -460,6 +460,217 @@ impl SpreadsheetService {
             _ => None,
         }
     }
+
+    /// Get available sheet names from Excel data
+    pub fn get_excel_sheet_names(
+        &self,
+        data: &[u8],
+    ) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
+        let cursor = Cursor::new(data);
+        let mut workbook = open_workbook_auto_from_rs(cursor)?;
+        Ok(workbook.sheet_names().to_vec())
+    }
+
+    /// Parse all sheets from Excel data
+    pub fn parse_all_excel_sheets(
+        &self,
+        data: &[u8],
+    ) -> Result<Vec<(String, ParsedSpreadsheetData)>, Box<dyn std::error::Error + Send + Sync>>
+    {
+        let cursor = Cursor::new(data);
+        let mut workbook = open_workbook_auto_from_rs(cursor)?;
+        let sheet_names = workbook.sheet_names().to_vec();
+        let mut results = Vec::new();
+
+        for sheet_name in sheet_names {
+            let sheet = workbook
+                .worksheet_range(&sheet_name)
+                .ok_or(format!("Sheet '{}' not found", sheet_name))?
+                .map_err(|e| format!("Error reading sheet: {}", e))?;
+
+            let mut headers = Vec::new();
+            let mut rows = Vec::new();
+
+            // Get dimensions
+            let (row_count, col_count) = sheet.get_size();
+
+            if row_count == 0 {
+                results.push((
+                    sheet_name,
+                    ParsedSpreadsheetData {
+                        headers: Vec::new(),
+                        rows: Vec::new(),
+                        total_rows: 0,
+                        total_columns: 0,
+                    },
+                ));
+                continue;
+            }
+
+            // Extract headers from first row
+            for col in 0..col_count {
+                let header = sheet
+                    .get_value((0, col as u32))
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| format!("Column_{}", col + 1));
+                headers.push(header);
+            }
+
+            // Extract data rows (skip header row)
+            for row in 1..row_count {
+                let mut row_map = HashMap::new();
+
+                for col in 0..col_count {
+                    let value = sheet
+                        .get_value((row as u32, col as u32))
+                        .map(|v| v.to_string())
+                        .unwrap_or_default();
+
+                    if col < headers.len() {
+                        row_map.insert(headers[col].clone(), value);
+                    }
+                }
+                rows.push(row_map);
+            }
+
+            let parsed_data = ParsedSpreadsheetData {
+                headers,
+                rows: rows.clone(),
+                total_rows: rows.len(),
+                total_columns: col_count,
+            };
+
+            results.push((sheet_name, parsed_data));
+        }
+
+        Ok(results)
+    }
+
+    /// Process and store uploaded spreadsheet data with multiple sheets support
+    pub async fn process_upload_multiple_sheets(
+        &self,
+        filename: String,
+        original_filename: String,
+        file_data: Vec<u8>,
+        file_type: String,
+        selected_sheets: Option<Vec<String>>,
+        uploaded_by: Option<String>,
+    ) -> Result<Vec<SpreadsheetDataset>, Box<dyn std::error::Error + Send + Sync>> {
+        match file_type.to_lowercase().as_str() {
+            "csv" => {
+                // For CSV, process as single sheet
+                let dataset = self
+                    .process_upload(
+                        filename,
+                        original_filename,
+                        file_data,
+                        file_type,
+                        None,
+                        uploaded_by,
+                    )
+                    .await?;
+                Ok(vec![dataset])
+            }
+            "xlsx" | "xls" => {
+                let all_sheets = self.parse_all_excel_sheets(&file_data)?;
+                let mut datasets = Vec::new();
+
+                // Filter sheets based on selection
+                let sheets_to_process: Vec<_> = if let Some(selected) = selected_sheets {
+                    all_sheets
+                        .into_iter()
+                        .filter(|(name, _)| selected.contains(name))
+                        .collect()
+                } else {
+                    all_sheets
+                };
+
+                let process_multiple = sheets_to_process.len() > 1;
+
+                for (sheet_name, parsed_data) in sheets_to_process {
+                    // Create dataset name with sheet suffix if multiple sheets
+                    let dataset_filename = if process_multiple {
+                        format!("{}_{}", filename, sheet_name.replace(" ", "_"))
+                    } else {
+                        filename.clone()
+                    };
+
+                    let create_dataset = CreateSpreadsheetDataset {
+                        filename: dataset_filename,
+                        original_filename: format!("{}_{}", original_filename, sheet_name),
+                        file_type: file_type.clone(),
+                        file_size: file_data.len() as i64,
+                        sheet_name: Some(sheet_name.clone()),
+                        column_headers: parsed_data.headers.clone(),
+                        uploaded_by: uploaded_by.clone(),
+                        metadata: Some(json!({
+                            "processing_started_at": chrono::Utc::now(),
+                            "file_size_bytes": file_data.len(),
+                            "sheet_name": sheet_name,
+                            "total_rows": parsed_data.total_rows,
+                            "total_columns": parsed_data.total_columns,
+                        })),
+                    };
+
+                    let dataset =
+                        self.manager
+                            .create_dataset(create_dataset)
+                            .await
+                            .map_err(|e| {
+                                format!(
+                                    "Failed to create dataset for sheet '{}': {}",
+                                    sheet_name, e
+                                )
+                            })?;
+
+                    // Store the parsed records
+                    let mut records_to_insert = Vec::new();
+                    for (row_index, row_data) in parsed_data.rows.iter().enumerate() {
+                        let record = CreateSpreadsheetRecord {
+                            dataset_id: dataset.id,
+                            row_number: (row_index + 1) as i32, // 1-based indexing
+                            row_data: json!(row_data),
+                        };
+                        records_to_insert.push(record);
+                    }
+
+                    if !records_to_insert.is_empty() {
+                        self.manager
+                            .bulk_create_records(records_to_insert)
+                            .await
+                            .map_err(|e| {
+                                format!(
+                                    "Failed to insert records for sheet '{}': {}",
+                                    sheet_name, e
+                                )
+                            })?;
+                    }
+
+                    // Update dataset status
+                    self.manager
+                        .update_dataset_status(
+                            dataset.id,
+                            crate::models::spreadsheet::UploadStatus::Completed,
+                            None,
+                            Some(parsed_data.total_rows as i32),
+                            Some(parsed_data.total_columns as i32),
+                        )
+                        .await
+                        .map_err(|e| {
+                            format!(
+                                "Failed to update dataset status for sheet '{}': {}",
+                                sheet_name, e
+                            )
+                        })?;
+
+                    datasets.push(dataset);
+                }
+
+                Ok(datasets)
+            }
+            _ => Err(format!("Unsupported file type: {}", file_type).into()),
+        }
+    }
 }
 
 #[async_trait]

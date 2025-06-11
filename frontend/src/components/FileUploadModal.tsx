@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import {
@@ -8,6 +8,7 @@ import {
   XMarkIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 
 interface FileUploadModalProps {
@@ -17,7 +18,13 @@ interface FileUploadModalProps {
 
 interface UploadResponse {
   success: boolean;
-  dataset?: any;
+  data?: any[];
+  message: string;
+}
+
+interface SheetNamesResponse {
+  success: boolean;
+  data?: string[];
   message: string;
 }
 
@@ -25,14 +32,45 @@ export default function FileUploadModal({ onClose, onSuccess }: FileUploadModalP
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadedBy, setUploadedBy] = useState('');
-  const [sheetName, setSheetName] = useState('');
+  const [availableSheets, setAvailableSheets] = useState<string[]>([]);
+  const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
+  const [isLoadingSheets, setIsLoadingSheets] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [uploadMessage, setUploadMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Mutation for getting sheet names
+  const sheetNamesMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await axios.post<SheetNamesResponse>('/api/spreadsheets/preview-sheets', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      if (data.success && data.data) {
+        setAvailableSheets(data.data);
+        setSelectedSheets(data.data); // Select all sheets by default
+        setIsLoadingSheets(false);
+      }
+    },
+    onError: (error: any) => {
+      console.error('Failed to get sheet names:', error);
+      setIsLoadingSheets(false);
+      setUploadMessage(error.response?.data?.message || 'Failed to read file sheets');
+      setUploadStatus('error');
+    },
+  });
+
+  // Mutation for uploading file
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await axios.post<UploadResponse>('/api/spreadsheets/upload', formData, {
+      const response = await axios.post<UploadResponse>('/api/spreadsheets/upload-multiple', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -41,7 +79,8 @@ export default function FileUploadModal({ onClose, onSuccess }: FileUploadModalP
     },
     onSuccess: (data) => {
       setUploadStatus('success');
-      setUploadMessage(data.message);
+      const datasetsCount = data.data?.length || 1;
+      setUploadMessage(`Successfully processed ${datasetsCount} dataset(s): ${data.message}`);
       setTimeout(() => {
         onSuccess();
       }, 2000);
@@ -58,10 +97,18 @@ export default function FileUploadModal({ onClose, onSuccess }: FileUploadModalP
       setSelectedFile(file);
       setUploadStatus('idle');
       setUploadMessage('');
+      setAvailableSheets([]);
+      setSelectedSheets([]);
+      
+      // For Excel files, automatically get sheet names
+      if (isExcelFile(file.name)) {
+        setIsLoadingSheets(true);
+        sheetNamesMutation.mutate(file);
+      }
     } else {
       alert('Please select a CSV, XLSX, or XLS file.');
     }
-  }, []);
+  }, [sheetNamesMutation]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -110,6 +157,27 @@ export default function FileUploadModal({ onClose, onSuccess }: FileUploadModalP
     }
   };
 
+  const isExcelFile = (filename: string) => {
+    const extension = filename.split('.').pop()?.toLowerCase();
+    return extension === 'xlsx' || extension === 'xls';
+  };
+
+  const handleSheetSelection = (sheetName: string) => {
+    setSelectedSheets(prev => 
+      prev.includes(sheetName) 
+        ? prev.filter(s => s !== sheetName)
+        : [...prev, sheetName]
+    );
+  };
+
+  const selectAllSheets = () => {
+    setSelectedSheets(availableSheets);
+  };
+
+  const selectNoSheets = () => {
+    setSelectedSheets([]);
+  };
+
   const handleUpload = async () => {
     if (!selectedFile) return;
 
@@ -120,8 +188,9 @@ export default function FileUploadModal({ onClose, onSuccess }: FileUploadModalP
       formData.append('uploaded_by', uploadedBy.trim());
     }
     
-    if (sheetName.trim()) {
-      formData.append('sheet_name', sheetName.trim());
+    // For Excel files with sheet selection, send selected sheets
+    if (isExcelFile(selectedFile.name) && selectedSheets.length > 0) {
+      formData.append('selected_sheets', JSON.stringify(selectedSheets));
     }
 
     setUploadStatus('uploading');
@@ -136,10 +205,10 @@ export default function FileUploadModal({ onClose, onSuccess }: FileUploadModalP
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
-  const isExcelFile = (filename: string) => {
-    const extension = filename.split('.').pop()?.toLowerCase();
-    return extension === 'xlsx' || extension === 'xls';
-  };
+  const canUpload = selectedFile && (
+    !isExcelFile(selectedFile.name) || 
+    (availableSheets.length > 0 && selectedSheets.length > 0)
+  );
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
@@ -255,25 +324,77 @@ export default function FileUploadModal({ onClose, onSuccess }: FileUploadModalP
                 />
               </div>
 
+              {/* Sheet Selection for Excel files */}
               {isExcelFile(selectedFile.name) && (
                 <div>
-                  <label htmlFor="sheet-name" className="block text-sm font-medium text-gray-700">
-                    Sheet Name (Optional)
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Available Sheets
                   </label>
-                  <input
-                    type="text"
-                    id="sheet-name"
-                    value={sheetName}
-                    onChange={(e) => setSheetName(e.target.value)}
-                    placeholder="Leave blank to use first sheet"
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    disabled={uploadStatus === 'uploading'}
-                  />
-                  <p className="mt-1 text-sm text-gray-500">
-                    Specify which Excel sheet to process. If left blank, the first sheet will be used.
-                  </p>
+                  
+                  {isLoadingSheets ? (
+                    <div className="flex items-center justify-center py-4">
+                      <ArrowPathIcon className="h-5 w-5 animate-spin text-indigo-600 mr-2" />
+                      <span className="text-sm text-gray-600">Loading sheets...</span>
+                    </div>
+                  ) : availableSheets.length > 0 ? (
+                    <div className="border border-gray-200 rounded-md p-3">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm text-gray-600">
+                          Select sheets to process ({selectedSheets.length} of {availableSheets.length} selected)
+                        </span>
+                        <div className="space-x-2">
+                          <button
+                            type="button"
+                            onClick={selectAllSheets}
+                            className="text-xs text-indigo-600 hover:text-indigo-800"
+                            disabled={uploadStatus === 'uploading'}
+                          >
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={selectNoSheets}
+                            className="text-xs text-gray-600 hover:text-gray-800"
+                            disabled={uploadStatus === 'uploading'}
+                          >
+                            Select None
+                          </button>
+                        </div>
+                      </div>
+                      <div className="space-y-2 max-h-32 overflow-y-auto">
+                        {availableSheets.map((sheetName) => (
+                          <label key={sheetName} className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedSheets.includes(sheetName)}
+                              onChange={() => handleSheetSelection(sheetName)}
+                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                              disabled={uploadStatus === 'uploading'}
+                            />
+                            <span className="ml-2 text-sm text-gray-700">{sheetName}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {selectedSheets.length === 0 && (
+                        <p className="text-sm text-red-600 mt-2">
+                          Please select at least one sheet to process.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Upload Status */}
+          {uploadMessage && (
+            <div className={`rounded-md p-4 mb-4 ${
+              uploadStatus === 'success' ? 'bg-green-50 text-green-800' : 
+              uploadStatus === 'error' ? 'bg-red-50 text-red-800' : 
+              'bg-blue-50 text-blue-800'
+            }`}>
+              {uploadMessage}
             </div>
           )}
 
@@ -292,7 +413,7 @@ export default function FileUploadModal({ onClose, onSuccess }: FileUploadModalP
               <button
                 type="button"
                 onClick={handleUpload}
-                disabled={uploadStatus === 'uploading'}
+                disabled={uploadStatus === 'uploading' || !canUpload}
                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
                 {uploadStatus === 'uploading' ? (
@@ -303,7 +424,9 @@ export default function FileUploadModal({ onClose, onSuccess }: FileUploadModalP
                 ) : (
                   <>
                     <CloudArrowUpIcon className="h-4 w-4 mr-2" />
-                    Upload File
+                    Upload {isExcelFile(selectedFile.name) && selectedSheets.length > 1 
+                      ? `${selectedSheets.length} Sheets` 
+                      : 'File'}
                   </>
                 )}
               </button>

@@ -3,13 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { DocumentIcon, ArrowPathIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
-interface Sample {
-  id: number;
-  name: string;
-  barcode: string;
-  status?: string;
-}
-
 interface SequencingJob {
   id: string;
   name: string;

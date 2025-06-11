@@ -406,6 +406,173 @@ pub async fn analyze_column(
     }
 }
 
+/// Get sheet names from uploaded Excel file
+pub async fn get_sheet_names(
+    State(components): State<crate::AppComponents>,
+    mut multipart: Multipart,
+) -> Result<Json<ApiResponse<Vec<String>>>, StatusCode> {
+    let service = &components.spreadsheet_service;
+    info!("Received request to get sheet names");
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        error!("Failed to read multipart field: {}", e);
+        StatusCode::BAD_REQUEST
+    })? {
+        if field.name() == Some("file") {
+            let filename = field.file_name().unwrap_or("unknown").to_string();
+            let file_data = field.bytes().await.map_err(|e| {
+                error!("Failed to read file data: {}", e);
+                StatusCode::BAD_REQUEST
+            })?;
+
+            // Detect file type from filename
+            let file_type = match service.detect_file_type(&filename) {
+                Some(ft) => ft,
+                None => {
+                    warn!("Unsupported file type for file: {}", filename);
+                    return Ok(ApiResponse::error(
+                        "Unsupported file type. Only Excel files (xlsx, xls) are supported for sheet name detection.",
+                    ));
+                }
+            };
+
+            // Only Excel files have multiple sheets
+            if file_type.to_lowercase() == "csv" {
+                return Ok(ApiResponse::success(
+                    vec!["Sheet1".to_string()],
+                    "CSV files have only one sheet",
+                ));
+            }
+
+            match service.get_excel_sheet_names(&file_data) {
+                Ok(sheet_names) => {
+                    info!(
+                        "Successfully retrieved {} sheet names from file: {}",
+                        sheet_names.len(),
+                        filename
+                    );
+                    return Ok(ApiResponse::success(
+                        sheet_names,
+                        "Sheet names retrieved successfully",
+                    ));
+                }
+                Err(e) => {
+                    error!("Failed to get sheet names from file {}: {}", filename, e);
+                    return Ok(ApiResponse::error(&format!(
+                        "Failed to read sheet names: {}",
+                        e
+                    )));
+                }
+            }
+        }
+    }
+
+    warn!("No file field found in sheet names request");
+    Ok(ApiResponse::error("No file provided in request"))
+}
+
+/// Upload spreadsheet file with multiple sheets support
+pub async fn upload_spreadsheet_multiple_sheets(
+    State(components): State<crate::AppComponents>,
+    mut multipart: Multipart,
+) -> Result<Json<ApiResponse<Vec<SpreadsheetDataset>>>, StatusCode> {
+    let service = &components.spreadsheet_service;
+    info!("Received spreadsheet upload request with multiple sheets support");
+
+    let mut filename = String::new();
+    let mut file_data = Vec::new();
+    let mut uploaded_by: Option<String> = None;
+    let mut selected_sheets: Option<Vec<String>> = None;
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        error!("Failed to read multipart field: {}", e);
+        StatusCode::BAD_REQUEST
+    })? {
+        match field.name() {
+            Some("file") => {
+                filename = field.file_name().unwrap_or("unknown").to_string();
+                file_data = field
+                    .bytes()
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to read file data: {}", e);
+                        StatusCode::BAD_REQUEST
+                    })?
+                    .to_vec();
+            }
+            Some("uploaded_by") => {
+                uploaded_by = field.text().await.ok();
+            }
+            Some("selected_sheets") => {
+                if let Ok(sheets_json) = field.text().await {
+                    selected_sheets = serde_json::from_str(&sheets_json).ok();
+                }
+            }
+            _ => {} // Ignore other fields
+        }
+    }
+
+    if filename.is_empty() || file_data.is_empty() {
+        return Ok(ApiResponse::error("No file provided in request"));
+    }
+
+    // Detect file type from filename
+    let file_type = match service.detect_file_type(&filename) {
+        Some(ft) => ft,
+        None => {
+            warn!("Unsupported file type for file: {}", filename);
+            return Ok(ApiResponse::error(&format!(
+                "Unsupported file type. Supported types: {:?}",
+                service.supported_file_types()
+            )));
+        }
+    };
+
+    // Validate file type
+    if !service.is_supported_file_type(&file_type) {
+        warn!("File type not supported: {}", file_type);
+        return Ok(ApiResponse::error(&format!(
+            "File type '{}' not supported",
+            file_type
+        )));
+    }
+
+    // Generate unique filename for storage
+    let stored_filename = format!("{}_{}", Uuid::new_v4(), filename);
+
+    // Process the upload with multiple sheets support
+    match service
+        .process_upload_multiple_sheets(
+            stored_filename,
+            filename.clone(),
+            file_data,
+            file_type,
+            selected_sheets,
+            uploaded_by,
+        )
+        .await
+    {
+        Ok(datasets) => {
+            info!(
+                "Successfully processed upload for file: {} with {} datasets",
+                filename,
+                datasets.len()
+            );
+            Ok(ApiResponse::success(
+                datasets,
+                "File uploaded and processed successfully",
+            ))
+        }
+        Err(e) => {
+            error!("Failed to process upload for file {}: {}", filename, e);
+            Ok(ApiResponse::error(&format!(
+                "Failed to process file: {}",
+                e
+            )))
+        }
+    }
+}
+
 /// Create a router for spreadsheet endpoints (for standalone usage)
 /// Note: Use crate::router::spreadsheet_routes() for full functionality with AppComponents
 pub fn create_router(

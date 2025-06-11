@@ -178,7 +178,7 @@ export default function Sequencing() {
 
       {selectedJobId && (
         <div className="mt-8">
-          <SequencingJobDetails jobId={selectedJobId} onClose={() => setSelectedJobId(null)} />
+          <SequencingJobDetails jobId={selectedJobId.toString()} onClose={() => setSelectedJobId(null)} />
         </div>
       )}
     </div>

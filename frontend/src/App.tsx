@@ -22,13 +22,12 @@ const queryClient = new QueryClient();
 
 export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Router>
-          <ProtectedRoute fallback={<LoginModal isOpen={true} onClose={() => setIsLoginOpen(false)} />}>
+          <ProtectedRoute fallback={<LoginModal isOpen={true} onClose={() => {}} />}>
             <Layout>
               <Routes>
                 <Route path="/" element={<Dashboard />} />

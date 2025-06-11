@@ -9,8 +9,6 @@ import {
   TableCellsIcon,
   CalendarDaysIcon,
   UserIcon,
-  ChartBarIcon,
-  FunnelIcon,
   EyeIcon,
 } from '@heroicons/react/24/outline';
 import FileUploadModal from '../components/FileUploadModal';
@@ -35,21 +33,10 @@ interface SpreadsheetDataset {
   metadata: any;
 }
 
-interface AvailableFilters {
-  pools: string[];
-  samples: string[];
-  projects: string[];
-  all_columns: string[];
-}
-
 export default function Spreadsheets() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [viewingDataset, setViewingDataset] = useState<SpreadsheetDataset | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
-  const [poolFilter, setPoolFilter] = useState('');
-  const [sampleFilter, setSampleFilter] = useState('');
-  const [projectFilter, setProjectFilter] = useState('');
   const queryClient = useQueryClient();
 
   // Fetch datasets
@@ -60,42 +47,6 @@ export default function Spreadsheets() {
       return response.data.data || [];
     },
   });
-
-  // Fetch available filters
-  const { data: availableFilters } = useQuery<AvailableFilters>({
-    queryKey: ['available-filters'],
-    queryFn: async () => {
-      const response = await axios.get('/api/spreadsheets/filters');
-      return response.data.data || { pools: [], samples: [], projects: [], all_columns: [] };
-    },
-  });
-
-  // Filter datasets based on metadata and content
-  const filteredDatasets = datasets?.filter(dataset => {
-    if (!poolFilter && !sampleFilter && !projectFilter) {
-      return true;
-    }
-    
-    // Check metadata for pool/sample/project information
-    const metadata = dataset.metadata || {};
-    
-    if (poolFilter && !metadata.pool_column && !dataset.column_headers.some(h => 
-      h.toLowerCase().includes('pool'))) {
-      return false;
-    }
-    
-    if (sampleFilter && !metadata.sample_column && !dataset.column_headers.some(h => 
-      h.toLowerCase().includes('sample'))) {
-      return false;
-    }
-    
-    if (projectFilter && !metadata.project_column && !dataset.column_headers.some(h => 
-      h.toLowerCase().includes('project'))) {
-      return false;
-    }
-    
-    return true;
-  }) || [];
 
   // Delete dataset mutation
   const deleteDatasetMutation = useMutation({
@@ -119,7 +70,7 @@ export default function Spreadsheets() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case 'completed':
         return 'bg-green-100 text-green-800';
       case 'processing':
@@ -239,7 +190,7 @@ export default function Spreadsheets() {
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Completed Uploads</dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      {datasets.filter(d => d.upload_status === 'completed').length}
+                      {datasets.filter(d => d.upload_status?.toLowerCase() === 'completed').length}
                     </dd>
                   </dl>
                 </div>
@@ -313,8 +264,27 @@ export default function Spreadsheets() {
                       </td>
                     </tr>
                   ) : (
-                    filteredDatasets.map((dataset) => (
-                      <tr key={dataset.id}>
+                    datasets.map((dataset) => (
+                      <tr 
+                        key={dataset.id}
+                        className={`${
+                          dataset.upload_status?.toLowerCase() === 'completed' 
+                            ? 'hover:bg-gray-50 cursor-pointer' 
+                            : ''
+                        }`}
+                        title={
+                          dataset.upload_status?.toLowerCase() === 'completed'
+                            ? 'Click to view spreadsheet data'
+                            : dataset.upload_status?.toLowerCase() === 'failed'
+                            ? 'Upload failed - cannot view data'
+                            : 'Processing - data not yet available'
+                        }
+                        onClick={() => {
+                          if (dataset.upload_status?.toLowerCase() === 'completed') {
+                            setViewingDataset(dataset);
+                          }
+                        }}
+                      >
                         <td className="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
                           <div className="flex items-center">
                             <div className="flex-shrink-0">
@@ -370,18 +340,26 @@ export default function Spreadsheets() {
                         </td>
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                           <div className="flex items-center space-x-2">
-                            {dataset.upload_status === 'completed' && (
+                            {dataset.upload_status?.toLowerCase() === 'completed' && (
                               <button
-                                onClick={() => setViewingDataset(dataset)}
-                                className="text-indigo-600 hover:text-indigo-900"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setViewingDataset(dataset);
+                                }}
+                                className="text-indigo-600 hover:text-indigo-900 flex items-center"
                               >
+                                <EyeIcon className="h-4 w-4 mr-1" />
                                 View Data
                               </button>
                             )}
                             <button
-                              onClick={() => handleDelete(dataset)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(dataset);
+                              }}
                               className="text-red-600 hover:text-red-900"
                               disabled={deleteDatasetMutation.isPending}
+                              title="Delete dataset"
                             >
                               <TrashIcon className="h-4 w-4" />
                             </button>

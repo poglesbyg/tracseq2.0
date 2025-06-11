@@ -116,6 +116,14 @@ pub fn spreadsheet_routes() -> Router<AppComponents> {
             post(handlers::spreadsheets::upload_spreadsheet),
         )
         .route(
+            "/api/spreadsheets/upload-multiple",
+            post(handlers::spreadsheets::upload_spreadsheet_multiple_sheets),
+        )
+        .route(
+            "/api/spreadsheets/preview-sheets",
+            post(handlers::spreadsheets::get_sheet_names),
+        )
+        .route(
             "/api/spreadsheets/search",
             get(handlers::spreadsheets::search_data),
         )
