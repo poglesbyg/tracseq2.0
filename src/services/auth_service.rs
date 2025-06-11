@@ -6,7 +6,7 @@ use argon2::password_hash::{rand_core::OsRng, SaltString};
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 use crate::models::user::{
@@ -274,17 +274,20 @@ impl AuthService {
         let token_hash = self.hash_token(&request.token);
 
         // Find and verify reset token
-        let reset_token = sqlx::query!(
+        let reset_token = sqlx::query(
             r#"
             SELECT user_id, expires_at
             FROM password_reset_tokens
             WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()
             "#,
-            token_hash
         )
+        .bind(&token_hash)
         .fetch_one(&self.pool)
         .await
         .map_err(|_| anyhow!("Invalid or expired reset token"))?;
+
+        let user_id: Uuid = reset_token.get("user_id");
+        let _expires_at: chrono::DateTime<chrono::Utc> = reset_token.get("expires_at");
 
         // Hash new password
         let salt = SaltString::generate(&mut OsRng);
@@ -305,7 +308,7 @@ impl AuthService {
             "#,
         )
         .bind(&new_password_hash)
-        .bind(reset_token.user_id)
+        .bind(user_id)
         .execute(&mut *tx)
         .await?;
 
@@ -316,7 +319,7 @@ impl AuthService {
 
         // Invalidate all existing sessions
         sqlx::query("DELETE FROM user_sessions WHERE user_id = $1")
-            .bind(reset_token.user_id)
+            .bind(user_id)
             .execute(&mut *tx)
             .await?;
 
@@ -324,7 +327,7 @@ impl AuthService {
 
         // Log password reset
         self.log_user_activity(
-            Some(reset_token.user_id),
+            Some(user_id),
             "password_reset_completed",
             None,
             None,
