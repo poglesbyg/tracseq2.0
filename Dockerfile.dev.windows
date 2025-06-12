@@ -16,9 +16,8 @@ RUN cargo install cargo-watch
 # Copy the source code (this avoids Windows volume mount issues)
 COPY . .
 
-# Set environment variables
+# Set default environment variables (can be overridden at runtime)
 ENV RUST_LOG=info
-ENV DATABASE_URL=postgres://postgres:postgres@db:5432/lab_manager
 ENV STORAGE_PATH=/usr/local/bin/storage
 ENV SQLX_OFFLINE=false
 

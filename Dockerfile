@@ -42,9 +42,9 @@ RUN if [ -d "/usr/src/app/migrations" ]; then \
         cp -r /usr/src/app/migrations/* /usr/local/bin/migrations/ 2>/dev/null || true; \
     fi
 
-# Set environment variables
+# Set default environment variables (can be overridden at runtime)
 ENV RUST_LOG=info
-ENV DATABASE_URL=postgres://postgres:postgres@db:5432/lab_manager
+ENV STORAGE_PATH=/usr/local/bin/storage
 
 EXPOSE 3000
 

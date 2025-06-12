@@ -19,9 +19,8 @@ COPY . .
 # This avoids dependency version conflicts during build
 # SQLx will connect to the database at runtime for query validation
 
-# Set environment variables
+# Set default environment variables (can be overridden at runtime)
 ENV RUST_LOG=info
-ENV DATABASE_URL=postgres://postgres:postgres@db:5432/lab_manager
 ENV STORAGE_PATH=/usr/local/bin/storage
 ENV SQLX_OFFLINE=false
 
