@@ -13,6 +13,20 @@ use crate::{
     StorageComponent,
 };
 
+// New modular system imports
+pub mod components;
+pub mod product_lines;
+pub mod traits;
+
+// Re-export key types from the new modular system
+pub use product_lines::{
+    CompactLine, CompactVariant, HybridLine, ProductLine, ProfessionalLine, ProfessionalVariant,
+    StudioLine, StudioVariant,
+};
+pub use traits::{
+    Component, ComponentError, Configurable, ServiceConsumer, ServiceProvider, ServiceRegistry,
+};
+
 /// Repositories component for data access abstraction
 #[derive(Clone)]
 pub struct RepositoriesComponent {
