@@ -19,6 +19,9 @@ interface SearchResult {
   row_data: Record<string, any>;
   search_text?: string;
   created_at: string;
+  original_filename: string;
+  file_type: string;
+  dataset_filename: string;
 }
 
 interface SearchResponse {
@@ -469,10 +472,10 @@ export default function SpreadsheetSearchModal({ onClose }: SpreadsheetSearchMod
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <div className="text-gray-900 font-medium">
-                            {searchResults.dataset_info?.original_filename || 'Unknown file'}
+                            {record.original_filename}
                           </div>
                           <div className="text-xs text-gray-500 uppercase">
-                            {searchResults.dataset_info?.file_type}
+                            {record.file_type}
                           </div>
                         </td>
                       </tr>

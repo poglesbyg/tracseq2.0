@@ -41,6 +41,19 @@ pub struct SpreadsheetRecord {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct SpreadsheetSearchRecord {
+    pub id: Uuid,
+    pub dataset_id: Uuid,
+    pub row_number: i32,
+    pub row_data: serde_json::Value,
+    pub search_text: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub original_filename: String,
+    pub file_type: String,
+    pub dataset_filename: String,
+}
+
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct CreateSpreadsheetDataset {
     pub filename: String,
@@ -74,7 +87,7 @@ pub struct SpreadsheetSearchQuery {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SpreadsheetSearchResult {
-    pub records: Vec<SpreadsheetRecord>,
+    pub records: Vec<SpreadsheetSearchRecord>,
     pub total_count: i64,
     pub dataset_info: Option<SpreadsheetDataset>,
     pub available_filters: Option<AvailableFilters>,
@@ -300,11 +313,13 @@ impl SpreadsheetDataManager {
             format!("WHERE {}", where_conditions.join(" AND "))
         };
 
-        // Build the main query
+        // Build the main query with dataset information joined
         let records_query = format!(
             r#"
-            SELECT sr.id, sr.dataset_id, sr.row_number, sr.row_data, sr.search_text, sr.created_at
+            SELECT sr.id, sr.dataset_id, sr.row_number, sr.row_data, sr.search_text, sr.created_at,
+                   sd.original_filename, sd.file_type, sd.filename as dataset_filename
             FROM spreadsheet_records sr
+            JOIN spreadsheet_datasets sd ON sr.dataset_id = sd.id
             {}
             ORDER BY sr.dataset_id, sr.row_number
             LIMIT ${} OFFSET ${}
@@ -319,6 +334,7 @@ impl SpreadsheetDataManager {
             r#"
             SELECT COUNT(*) as total
             FROM spreadsheet_records sr
+            JOIN spreadsheet_datasets sd ON sr.dataset_id = sd.id
             {}
             "#,
             where_clause
@@ -367,7 +383,8 @@ impl SpreadsheetDataManager {
         let total_count = count_query_builder.fetch_one(&self.pool).await?;
 
         // Execute records query
-        let mut records_query_builder = sqlx::query_as::<_, SpreadsheetRecord>(&records_query);
+        let mut records_query_builder =
+            sqlx::query_as::<_, SpreadsheetSearchRecord>(&records_query);
         param_count = 1;
 
         if let Some(dataset_id) = query.dataset_id {
