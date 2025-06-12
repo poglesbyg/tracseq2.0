@@ -107,7 +107,7 @@ export default function Users() {
       if (statusFilter) params.append('status', statusFilter);
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/users?${params}`,
+        `${import.meta.env.VITE_API_URL || ''}/api/users?${params}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -164,7 +164,7 @@ export default function Users() {
       setError('');
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/users`,
+        `${import.meta.env.VITE_API_URL || ''}/api/users`,
         {
           method: 'POST',
           headers: {
@@ -199,7 +199,7 @@ export default function Users() {
       const { password, ...updateData } = formData;
       
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/users/${selectedUser.id}`,
+        `${import.meta.env.VITE_API_URL || ''}/api/users/${selectedUser.id}`,
         {
           method: 'PUT',
           headers: {
@@ -233,7 +233,7 @@ export default function Users() {
       setError('');
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/users/${userId}`,
+        `${import.meta.env.VITE_API_URL || ''}/api/users/${userId}`,
         {
           method: 'DELETE',
           headers: {

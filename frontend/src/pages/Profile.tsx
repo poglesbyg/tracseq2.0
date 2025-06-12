@@ -77,7 +77,7 @@ export default function Profile() {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/users/me`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/users/me`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -119,7 +119,7 @@ export default function Profile() {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/users/change-password`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/users/change-password`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
