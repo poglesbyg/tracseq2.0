@@ -17,6 +17,11 @@ pub use samples::{
 pub use sequencing::{
     create_sequencing_job, get_sequencing_job, list_sequencing_jobs, update_job_status,
 };
+pub use spreadsheets::{
+    analyze_column, analyze_dataset, delete_dataset, get_available_filters, get_dataset,
+    get_sheet_names, health_check as spreadsheets_health_check, list_datasets, search_data,
+    supported_types, upload_spreadsheet, upload_spreadsheet_multiple_sheets,
+};
 pub use storage::{
     create_storage_location, get_capacity_overview, list_storage_locations, move_sample,
     scan_sample_barcode, store_sample,

@@ -115,51 +115,42 @@ pub fn spreadsheet_routes() -> Router<AppComponents> {
     Router::new()
         .route(
             "/api/spreadsheets/upload",
-            post(handlers::spreadsheets::upload_spreadsheet),
+            post(handlers::upload_spreadsheet),
         )
         .route(
             "/api/spreadsheets/upload-multiple",
-            post(handlers::spreadsheets::upload_spreadsheet_multiple_sheets),
+            post(handlers::upload_spreadsheet_multiple_sheets),
         )
         .route(
             "/api/spreadsheets/preview-sheets",
-            post(handlers::spreadsheets::get_sheet_names),
+            post(handlers::get_sheet_names),
         )
-        .route(
-            "/api/spreadsheets/search",
-            get(handlers::spreadsheets::search_data),
-        )
-        .route(
-            "/api/spreadsheets/datasets",
-            get(handlers::spreadsheets::list_datasets),
-        )
+        .route("/api/spreadsheets/search", get(handlers::search_data))
+        .route("/api/spreadsheets/datasets", get(handlers::list_datasets))
+        .route("/api/spreadsheets/datasets/:id", get(handlers::get_dataset))
         .route(
             "/api/spreadsheets/datasets/:id",
-            get(handlers::spreadsheets::get_dataset),
-        )
-        .route(
-            "/api/spreadsheets/datasets/:id",
-            delete(handlers::spreadsheets::delete_dataset),
+            delete(handlers::delete_dataset),
         )
         .route(
             "/api/spreadsheets/datasets/:id/analyze",
-            get(handlers::spreadsheets::analyze_dataset),
+            get(handlers::analyze_dataset),
         )
         .route(
             "/api/spreadsheets/datasets/:id/columns/:column_name/analyze",
-            get(handlers::spreadsheets::analyze_column),
+            get(handlers::analyze_column),
         )
         .route(
             "/api/spreadsheets/filters",
-            get(handlers::spreadsheets::get_available_filters),
+            get(handlers::get_available_filters),
         )
         .route(
             "/api/spreadsheets/health",
-            get(handlers::spreadsheets::health_check),
+            get(handlers::spreadsheets_health_check),
         )
         .route(
             "/api/spreadsheets/supported-types",
-            get(handlers::spreadsheets::supported_types),
+            get(handlers::supported_types),
         )
 }
 
