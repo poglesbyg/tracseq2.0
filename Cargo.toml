@@ -7,6 +7,7 @@ license = "MIT"
 repository = "https://github.com/poglesbyg/lab_manager"
 keywords = ["laboratory", "sample-management", "sequencing", "storage", "biotech"]
 categories = ["science", "database"]
+default-run = "lab_manager"
 
 [lib]
 name = "lab_manager"

@@ -50,7 +50,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+    command: cargo watch -x "run --bin lab_manager"
     volumes:
+      - .:/usr/src/app
       - app_storage:/usr/local/bin/storage
       - cargo_cache:/usr/local/cargo/registry
     ports:

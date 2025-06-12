@@ -1,7 +1,8 @@
 use axum::{
     routing::{delete, get, post, put},
-    Router,
+    Json, Router,
 };
+use serde_json;
 use tower_http::cors::CorsLayer;
 
 use crate::{handlers, AppComponents};
@@ -110,6 +111,7 @@ pub fn reports_routes() -> Router<AppComponents> {
 
 /// Spreadsheet processing routes
 pub fn spreadsheet_routes() -> Router<AppComponents> {
+    tracing::info!("🔧 Registering spreadsheet routes");
     Router::new()
         .route(
             "/api/spreadsheets/upload",
@@ -198,16 +200,45 @@ pub fn user_routes() -> Router<AppComponents> {
 
 /// Assemble all routes into a complete application router
 pub fn create_app_router() -> Router<AppComponents> {
-    Router::new()
-        .merge(health_routes())
-        .merge(template_routes())
-        .merge(sample_routes())
-        .merge(sequencing_routes())
-        .merge(storage_routes())
-        .merge(reports_routes())
-        .merge(spreadsheet_routes())
-        .merge(user_routes())
-        .layer(CorsLayer::permissive())
+    tracing::info!("🔧 Creating application router");
+
+    let router = Router::new()
+        .merge({
+            tracing::info!("📋 Merging health routes");
+            health_routes()
+        })
+        .merge({
+            tracing::info!("📝 Merging template routes");
+            template_routes()
+        })
+        .merge({
+            tracing::info!("🧪 Merging sample routes");
+            sample_routes()
+        })
+        .merge({
+            tracing::info!("🧬 Merging sequencing routes");
+            sequencing_routes()
+        })
+        .merge({
+            tracing::info!("📦 Merging storage routes");
+            storage_routes()
+        })
+        .merge({
+            tracing::info!("📊 Merging reports routes");
+            reports_routes()
+        })
+        .merge({
+            tracing::info!("📈 About to merge spreadsheet routes");
+            spreadsheet_routes()
+        })
+        .merge({
+            tracing::info!("👤 Merging user routes");
+            user_routes()
+        })
+        .layer(CorsLayer::permissive());
+
+    tracing::info!("✅ Application router created successfully");
+    router
 }
 
 /// Create a minimal router for testing
