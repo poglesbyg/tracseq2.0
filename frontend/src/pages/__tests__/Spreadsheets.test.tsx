@@ -51,7 +51,7 @@ const mockDatasets = [
     total_rows: 500,
     total_columns: 8,
     column_headers: ['Sample ID', 'Concentration'],
-    upload_status: 'Completed',
+    upload_status: 'completed',
     error_message: null,
     uploaded_by: 'user@lab.local',
     created_at: '2025-01-01T00:00:00Z',
@@ -67,7 +67,7 @@ const mockDatasets = [
     total_rows: 1200,
     total_columns: 12,
     column_headers: ['ID', 'Value'],
-    upload_status: 'Processing',
+    upload_status: 'processing',
     error_message: null,
     uploaded_by: 'admin@lab.local',
     created_at: '2025-01-02T00:00:00Z',
@@ -158,8 +158,16 @@ describe('Spreadsheets Page', () => {
       renderComponent();
       
       await waitFor(() => {
-        expect(screen.getByText('CSV')).toBeInTheDocument();
-        expect(screen.getByText('XLSX')).toBeInTheDocument();
+        // Find file type badges specifically by looking for spans with the right classes
+        const csvBadge = screen.getByText('csv').closest('span');
+        const xlsxBadge = screen.getByText('xlsx').closest('span');
+        
+        expect(csvBadge).toBeInTheDocument();
+        expect(xlsxBadge).toBeInTheDocument();
+        
+        // Verify they have the correct styling classes
+        expect(csvBadge).toHaveClass('uppercase', 'font-mono', 'text-xs', 'bg-gray-100');
+        expect(xlsxBadge).toHaveClass('uppercase', 'font-mono', 'text-xs', 'bg-gray-100');
       });
     });
 
@@ -167,8 +175,8 @@ describe('Spreadsheets Page', () => {
       renderComponent();
       
       await waitFor(() => {
-        const completedBadge = screen.getByText('Completed');
-        const processingBadge = screen.getByText('Processing');
+        const completedBadge = screen.getByText('completed');
+        const processingBadge = screen.getByText('processing');
         
         expect(completedBadge).toBeInTheDocument();
         expect(processingBadge).toBeInTheDocument();
