@@ -240,7 +240,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
 
   const totalPages = dataResponse ? Math.ceil(dataResponse.total_count / rowsPerPage) : 0;
   const startRow = currentPage * rowsPerPage + 1;
-  const endRow = Math.min((currentPage + 1) * rowsPerPage, dataResponse?.total_count || 0);
+  const endRow = Math.min(startRow + (dataResponse?.records.length || 0) - 1, dataResponse?.total_count || 0);
 
   const goToNextPage = () => {
     if (currentPage < totalPages - 1) {
@@ -752,7 +752,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {sortedRecords.slice(currentPage * rowsPerPage, (currentPage + 1) * rowsPerPage).map((record, index) => (
+                      {sortedRecords.map((record, index) => (
                         <tr 
                           key={record.id} 
                           className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${
