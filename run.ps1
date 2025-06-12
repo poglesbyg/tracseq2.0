@@ -44,13 +44,20 @@ function Test-Docker {
     return $false
 }
 
-# Function to get the correct docker-compose command
+# Function to get the correct docker-compose command and compose file
 function Get-DockerComposeCommand {
+    # Determine the compose file to use - Windows-specific version for better compatibility
+    $composeFile = if (Test-Path "docker-compose.windows.yml") { 
+        "docker-compose.windows.yml" 
+    } else { 
+        "docker-compose.yml" 
+    }
+    
     # Try docker compose first (newer versions)
     try {
         $null = docker compose version 2>$null
         if ($LASTEXITCODE -eq 0) {
-            return "docker compose"
+            return "docker compose -f $composeFile"
         }
     }
     catch { }
@@ -60,13 +67,13 @@ function Get-DockerComposeCommand {
         $null = Get-Command docker-compose -ErrorAction Stop
         $null = docker-compose version 2>$null
         if ($LASTEXITCODE -eq 0) {
-            return "docker-compose"
+            return "docker-compose -f $composeFile"
         }
     }
     catch { }
     
     # Fallback to docker compose
-    return "docker compose"
+    return "docker compose -f $composeFile"
 }
 
 # Function to check if required files exist
@@ -104,6 +111,29 @@ function New-RequiredDirectories {
     }
     
     Write-Success "Directories created"
+}
+
+# Function to fix Windows Docker Desktop issues
+function Repair-WindowsDockerIssues {
+    Write-Info "Attempting to fix Windows Docker Desktop issues..."
+    
+    # Stop any running containers
+    $composeCmd = Get-DockerComposeCommand
+    try {
+        Invoke-Expression "$composeCmd down --remove-orphans" 2>$null
+    } catch { }
+    
+    # Clean up Docker resources that might be causing mount issues
+    try {
+        docker system prune -f --volumes 2>$null
+        Write-Success "Docker resources cleaned up"
+    } catch {
+        Write-Warning "Could not clean up Docker resources"
+    }
+    
+    # Restart Docker Desktop (requires user confirmation)
+    Write-Info "You may need to restart Docker Desktop if issues persist"
+    Write-Info "Try: Right-click Docker Desktop system tray icon -> Restart Docker Desktop"
 }
 
 # Function to wait for backend to be ready
@@ -381,6 +411,7 @@ function Show-Help {
     Write-Host "  logs [service] Show logs (optional: specify service name)"
     Write-Host "  rebuild        Rebuild all Docker images"
     Write-Host "  clean          Clean up Docker resources"
+    Write-Host "  repair-docker  Fix Windows Docker Desktop issues"
     Write-Host ""
     Write-Host "Test Commands:" -ForegroundColor Yellow
     Write-Host "  test           Run all tests"
@@ -390,6 +421,11 @@ function Show-Help {
     Write-Host "  test-sequencing Run sequencing tests"
     Write-Host "  test-templates Run template tests"
     Write-Host ""
+    Write-Host "Windows-Specific Notes:" -ForegroundColor Yellow
+    Write-Host "  - Uses docker-compose.windows.yml for better Windows compatibility"
+    Write-Host "  - If you get mount path errors, try: .\run.ps1 repair-docker"
+    Write-Host "  - Make sure Docker Desktop is running in Windows containers mode"
+    Write-Host ""
     Write-Host "Services:" -ForegroundColor Yellow
     Write-Host "  - Frontend: http://localhost:8080 (prod) or http://localhost:5173 (dev)"
     Write-Host "  - Backend:  http://localhost:3001 (prod) or http://localhost:3000 (dev)"
@@ -397,6 +433,7 @@ function Show-Help {
     Write-Host ""
     Write-Host "Examples:" -ForegroundColor Cyan
     Write-Host "  .\run.ps1 start-dev"
+    Write-Host "  .\run.ps1 repair-docker   # If you get mount path errors"
     Write-Host "  .\run.ps1 test"
     Write-Host "  .\run.ps1 test-auth"
     Write-Host "  .\run.ps1 logs dev"
@@ -451,6 +488,7 @@ switch ($Command.ToLower()) {
     "logs" { Show-ServiceLogs $Service }
     "rebuild" { Invoke-RebuildServices }
     "clean" { Clear-DockerResources }
+    "repair-docker" { Repair-WindowsDockerIssues }
     "test" { Invoke-Tests }
     "test-auth" { Invoke-SpecificTests "auth" }
     "test-validation" { Invoke-SpecificTests "validation" }

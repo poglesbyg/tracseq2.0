@@ -1,0 +1,98 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - app
+    networks:
+      - lab_network
+
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      - BACKEND_URL=http://dev:3000
+    depends_on:
+      - dev
+    networks:
+      - lab_network
+
+  app:
+    build: .
+    ports:
+      - "3001:3000"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/lab_manager
+      - RUST_LOG=info
+      - STORAGE_PATH=/usr/local/bin/storage
+      - RAG_SERVICE_URL=http://host.docker.internal:8000
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+    volumes:
+      - app_storage:/usr/local/bin/storage
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - db
+    networks:
+      - lab_network
+
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev.windows
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/lab_manager
+      - HOST=0.0.0.0
+      - PORT=3000
+      - RUST_LOG=info
+      - STORAGE_PATH=/usr/local/bin/storage
+      - RAG_SERVICE_URL=http://host.docker.internal:8000
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - db
+    networks:
+      - lab_network
+
+  # Helper service to sync source code to the named volume
+  code-sync:
+    image: alpine:latest
+    volumes:
+      - .:/host:ro
+      - source_code:/target
+    command: sh -c "cp -r /host/* /target/ && echo 'Code synced to volume'"
+    profiles:
+      - sync
+
+  db:
+    image: postgres:15
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=lab_manager
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - lab_network
+
+volumes:
+  postgres_data:
+  app_storage:
+  cargo_cache:
+  source_code:
+
+networks:
+  lab_network:
+    driver: bridge 
