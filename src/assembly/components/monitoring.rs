@@ -93,6 +93,26 @@ pub enum HealthStatus {
     Unknown,
 }
 
+/// Alert severity levels
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AlertSeverity {
+    Info,
+    Warning,
+    Critical,
+    Emergency,
+}
+
+/// Alert type categorization
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AlertType {
+    ComponentFailure,
+    StorageCapacity,
+    SecurityEvent,
+    PerformanceIssue,
+    SystemEvent,
+}
+
+/// System alert representation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Alert {
     pub id: String,
@@ -104,22 +124,26 @@ pub struct Alert {
     pub resolved: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AlertType {
-    HighCpuUsage,
-    HighMemoryUsage,
-    HighResponseTime,
-    HighErrorRate,
-    ComponentFailure,
-    StorageCapacityWarning,
-    TemperatureAlert,
-}
+impl Alert {
+    /// Create a new alert
+    pub fn new(
+        severity: AlertSeverity,
+        message: String,
+        source: String,
+        component: Option<String>,
+    ) -> Self {
+        let id = format!("alert_{}", uuid::Uuid::new_v4());
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub enum AlertSeverity {
-    Info,
-    Warning,
-    Critical,
+        Self {
+            id,
+            alert_type: AlertType::SystemEvent,
+            severity,
+            message,
+            component,
+            timestamp: chrono::Utc::now(),
+            resolved: false,
+        }
+    }
 }
 
 /// Monitoring component that provides system observability
@@ -130,6 +154,7 @@ pub struct MonitoringComponent {
     service_registry: Option<std::sync::Arc<ServiceRegistry>>,
     monitoring_start_time: Option<Instant>,
     is_initialized: bool,
+    component_health: HashMap<String, bool>,
 }
 
 impl MonitoringComponent {
@@ -141,6 +166,7 @@ impl MonitoringComponent {
             service_registry: None,
             monitoring_start_time: None,
             is_initialized: false,
+            component_health: HashMap::new(),
         }
     }
 
@@ -187,13 +213,42 @@ impl MonitoringComponent {
         if let Some(registry) = &self.service_registry {
             let health_check_results = registry.health_check_all().await?;
 
-            for (component_id, is_healthy) in health_check_results {
-                let status = if is_healthy {
+            // Update component health status
+            for health_result in health_check_results {
+                // Parse the health status string (format: "component_id: Healthy")
+                if let Some(idx) = health_result.find(':') {
+                    let component_id = health_result[..idx].trim().to_string();
+                    let is_healthy = health_result[idx + 1..].trim().contains("Healthy");
+
+                    // Update metrics
+                    let component_status = if is_healthy { "healthy" } else { "unhealthy" };
+
+                    self.component_health
+                        .insert(component_id.clone(), is_healthy);
+
+                    // Add to alert if unhealthy
+                    if !is_healthy {
+                        let alert = Alert {
+                            id: format!("component_failure_{}", component_id),
+                            alert_type: AlertType::ComponentFailure,
+                            severity: AlertSeverity::Critical,
+                            message: format!("Component {} is in critical state", component_id),
+                            component: Some(component_id.clone()),
+                            timestamp: chrono::Utc::now(),
+                            resolved: false,
+                        };
+                        self.active_alerts.insert(alert.id.clone(), alert);
+                    }
+                }
+            }
+
+            for (component_id, is_healthy) in self.component_health.iter() {
+                let status = if *is_healthy {
                     HealthStatus::Healthy
                 } else {
                     HealthStatus::Critical
                 };
-                health_results.insert(component_id, status);
+                health_results.insert(component_id.clone(), status);
             }
         }
 
@@ -325,7 +380,7 @@ impl MonitoringComponent {
         if metrics.cpu_usage > self.config.alert_thresholds.cpu_usage_threshold {
             let alert = Alert {
                 id: "high_cpu_usage".to_string(),
-                alert_type: AlertType::HighCpuUsage,
+                alert_type: AlertType::PerformanceIssue,
                 severity: AlertSeverity::Warning,
                 message: format!("High CPU usage: {:.1}%", metrics.cpu_usage),
                 component: None,
@@ -339,7 +394,7 @@ impl MonitoringComponent {
         if metrics.memory_usage > self.config.alert_thresholds.memory_usage_threshold {
             let alert = Alert {
                 id: "high_memory_usage".to_string(),
-                alert_type: AlertType::HighMemoryUsage,
+                alert_type: AlertType::PerformanceIssue,
                 severity: AlertSeverity::Warning,
                 message: format!("High memory usage: {:.1}%", metrics.memory_usage),
                 component: None,
@@ -370,7 +425,7 @@ impl MonitoringComponent {
             {
                 let alert = Alert {
                     id: format!("high_response_time_{}", component_id),
-                    alert_type: AlertType::HighResponseTime,
+                    alert_type: AlertType::PerformanceIssue,
                     severity: AlertSeverity::Warning,
                     message: format!(
                         "High response time for {}: {}ms",
@@ -404,6 +459,183 @@ impl MonitoringComponent {
         let sum: f64 = self.metrics_history.iter().map(|m| m.memory_usage).sum();
 
         sum / self.metrics_history.len() as f64
+    }
+
+    /// Generate health alerts based on registry components
+    async fn generate_health_alerts(&mut self, registry: &ServiceRegistry) -> Vec<Alert> {
+        let mut alerts = Vec::new();
+
+        // Run health checks
+        if let Ok(health_results) = registry.health_check_all().await {
+            // Update component health status
+            for health_result in health_results {
+                // Parse the health status string (format: "component_id: Healthy")
+                if let Some(idx) = health_result.find(':') {
+                    let component_id = health_result[..idx].trim().to_string();
+                    let is_healthy = health_result[idx + 1..].trim().contains("Healthy");
+
+                    // Update component health status
+                    self.component_health
+                        .insert(component_id.clone(), is_healthy);
+
+                    // Add to alert if unhealthy
+                    if !is_healthy {
+                        alerts.push(Alert::new(
+                            AlertSeverity::Critical,
+                            format!("Component {} is unhealthy", component_id),
+                            "monitoring".to_string(),
+                            Some(component_id),
+                        ));
+                    }
+                }
+            }
+        }
+
+        alerts
+    }
+
+    /// Update component health status based on health check results
+    async fn update_component_health(
+        &mut self,
+        registry: &ServiceRegistry,
+    ) -> Result<(), ComponentError> {
+        if let Ok(health_check_results) = registry.health_check_all().await {
+            // Update component health status
+            for health_result in health_check_results {
+                // Parse the health status string (format: "component_id: Healthy")
+                if let Some(idx) = health_result.find(':') {
+                    let component_id = health_result[..idx].trim().to_string();
+                    let is_healthy = health_result[idx + 1..].trim().contains("Healthy");
+
+                    // Update metrics
+                    let component_status = if is_healthy { "healthy" } else { "unhealthy" };
+
+                    self.component_health
+                        .insert(component_id.clone(), is_healthy);
+
+                    // Add to alert if unhealthy
+                    if !is_healthy {
+                        let alert = Alert {
+                            id: format!("component_failure_{}", component_id),
+                            alert_type: AlertType::ComponentFailure,
+                            severity: AlertSeverity::Critical,
+                            message: format!("Component {} is in critical state", component_id),
+                            component: Some(component_id.clone()),
+                            timestamp: chrono::Utc::now(),
+                            resolved: false,
+                        };
+                        self.active_alerts.insert(alert.id.clone(), alert);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Check component health status and return results
+    async fn check_health(&self) -> HashMap<String, HealthStatus> {
+        let mut health_results = HashMap::new();
+
+        // If we have a registry, check component health
+        if let Some(registry) = &self.service_registry {
+            if let Ok(health_check_results) = registry.health_check_all().await {
+                // Parse health check results
+                for health_result in health_check_results {
+                    // Parse the health status string (format: "component_id: Healthy")
+                    if let Some(idx) = health_result.find(':') {
+                        let component_id = health_result[..idx].trim().to_string();
+                        let is_healthy = health_result[idx + 1..].trim().contains("Healthy");
+
+                        let status = if is_healthy {
+                            HealthStatus::Healthy
+                        } else {
+                            HealthStatus::Critical
+                        };
+
+                        health_results.insert(component_id, status);
+                    }
+                }
+            }
+        }
+
+        // Add our own health status
+        health_results.insert("monitoring".to_string(), HealthStatus::Healthy);
+
+        health_results
+    }
+
+    /// Process health check results and update internal state
+    async fn process_health_check(&mut self) -> Result<(), ComponentError> {
+        let mut alerts = Vec::new();
+
+        // Check component health
+        if let Some(registry) = &self.service_registry {
+            if let Ok(health_results) = registry.health_check_all().await {
+                // Process each health result string
+                for health_result in health_results {
+                    // Parse the health status string (format: "component_id: Healthy")
+                    if let Some(idx) = health_result.find(':') {
+                        let component_id = health_result[..idx].trim().to_string();
+                        let is_healthy = health_result[idx + 1..].trim().contains("Healthy");
+
+                        // Update component health status
+                        self.component_health
+                            .insert(component_id.clone(), is_healthy);
+
+                        // Add to alert if unhealthy
+                        if !is_healthy {
+                            alerts.push(Alert::new(
+                                AlertSeverity::Critical,
+                                format!("Component {} is unhealthy", component_id),
+                                "monitoring".to_string(),
+                                Some(component_id),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Process alerts
+        for alert in alerts {
+            self.active_alerts.insert(alert.id.clone(), alert);
+        }
+
+        Ok(())
+    }
+
+    /// Process health check results from the health_results HashMap
+    async fn process_health_results(
+        &mut self,
+        health_results: &HashMap<String, String>,
+    ) -> Result<(), ComponentError> {
+        // Process each health result
+        for (component_id, health_status) in health_results {
+            let is_healthy = health_status.contains("Healthy");
+
+            // Update metrics
+            let status = if is_healthy {
+                HealthStatus::Healthy
+            } else {
+                HealthStatus::Critical
+            };
+
+            self.component_health
+                .insert(component_id.clone(), is_healthy);
+
+            // Add to alert if unhealthy
+            if !is_healthy {
+                let alert = Alert::new(
+                    AlertSeverity::Critical,
+                    format!("Component {} is unhealthy", component_id),
+                    "monitoring".to_string(),
+                    Some(component_id.clone()),
+                );
+                self.active_alerts.insert(alert.id.clone(), alert);
+            }
+        }
+
+        Ok(())
     }
 }
 

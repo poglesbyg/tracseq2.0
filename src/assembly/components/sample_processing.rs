@@ -76,11 +76,11 @@ pub struct SampleProcessingComponent {
 }
 
 #[derive(Debug, Default)]
-struct ProcessingStats {
-    documents_processed: u64,
-    samples_created: u64,
-    average_confidence: f64,
-    processing_errors: u64,
+pub struct ProcessingStats {
+    pub documents_processed: u64,
+    pub samples_created: u64,
+    pub average_confidence: f64,
+    pub processing_errors: u64,
 }
 
 impl SampleProcessingComponent {

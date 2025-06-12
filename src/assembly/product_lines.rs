@@ -138,8 +138,9 @@ impl CompactLine {
 
         // Compact storage with limited cache
         let storage_config = StorageConfig {
-            base_path: std::path::PathBuf::from("/data/storage"),
-            max_file_size: 10 * 1024 * 1024, // 10MB max files
+            base_path: std::path::PathBuf::from("/tmp/tracseq"),
+            max_file_size: 50 * 1024 * 1024, // 50MB
+            allowed_extensions: vec!["xlsx".to_string(), "csv".to_string(), "txt".to_string()],
             temp_dir: std::path::PathBuf::from("/tmp/tracseq"),
         };
 
@@ -293,9 +294,13 @@ impl HybridAssemblyBuilder {
             registry.register_component(storage)?;
         }
 
-        // Register custom configuration as a service
+        // Register custom configuration as a service (simplified for now)
         if !self.custom_config.is_empty() {
-            registry.register_service("custom_config", self.custom_config);
+            tracing::info!(
+                "Custom config available with {} keys",
+                self.custom_config.len()
+            );
+            // TODO: Implement proper config service registration
         }
 
         registry.initialize_all().await?;

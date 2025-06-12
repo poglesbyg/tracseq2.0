@@ -13,7 +13,6 @@ use lab_manager::assembly::{
 };
 
 use std::time::{Duration, Instant};
-use tokio_test;
 
 /// Benchmark component initialization and shutdown performance
 #[tokio::test]
@@ -254,7 +253,7 @@ async fn benchmark_event_system_performance() {
             };
 
             let event_id = event_system
-                .publish_event(event)
+                .publish_event(event, "benchmark_test")
                 .await
                 .expect("Failed to publish event");
             assert!(event_id.starts_with("evt_"));
@@ -582,7 +581,7 @@ async fn benchmark_integrated_workflow_performance() {
             };
 
             let event_id = event_system
-                .publish_event(sample_event)
+                .publish_event(sample_event, "workflow_test")
                 .await
                 .expect("Failed to publish event");
             assert!(event_id.starts_with("evt_"));

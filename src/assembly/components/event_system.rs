@@ -20,6 +20,8 @@ pub struct EventSystemConfig {
     pub batch_size: usize,
     /// Enable event metrics collection
     pub enable_metrics: bool,
+    /// Processing timeout in milliseconds
+    pub processing_timeout_ms: u64,
 }
 
 impl Default for EventSystemConfig {
@@ -29,6 +31,7 @@ impl Default for EventSystemConfig {
             enable_persistence: false,
             batch_size: 100,
             enable_metrics: true,
+            processing_timeout_ms: 5000,
         }
     }
 }
@@ -187,7 +190,7 @@ pub trait EventHandler {
 }
 
 /// Event processing metrics
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct EventMetrics {
     pub total_events_processed: u64,
     pub events_by_type: HashMap<String, u64>,
@@ -619,7 +622,7 @@ impl EventHandler for AuditTrailHandler {
             entity_type: "Event".to_string(),
             entity_id: envelope.event_id.clone(),
             action: format!(
-                "Event processed: {}",
+                "Event processed: {:?}",
                 std::mem::discriminant(&envelope.event)
             ),
             actor: envelope.source_component.clone(),

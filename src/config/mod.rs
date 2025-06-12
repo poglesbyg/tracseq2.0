@@ -17,6 +17,44 @@ pub struct DatabaseConfig {
     pub url: String,
     pub max_connections: u32,
     pub min_connections: u32,
+    pub acquire_timeout: std::time::Duration,
+    pub idle_timeout: Option<std::time::Duration>,
+    pub max_lifetime: Option<std::time::Duration>,
+}
+
+impl DatabaseConfig {
+    /// Create configuration from environment variables
+    pub fn from_env() -> Result<Self, ConfigError> {
+        let database_url = std::env::var("DATABASE_URL")
+            .map_err(|_| ConfigError::MissingEnvVar("DATABASE_URL"))?;
+
+        Ok(Self {
+            url: database_url,
+            max_connections: 10,
+            min_connections: 1,
+            acquire_timeout: std::time::Duration::from_secs(30),
+            idle_timeout: Some(std::time::Duration::from_secs(600)),
+            max_lifetime: Some(std::time::Duration::from_secs(1800)),
+        })
+    }
+
+    /// Create a default configuration for testing
+    pub fn for_testing() -> Self {
+        Self {
+            url: "sqlite::memory:".to_string(),
+            max_connections: 5,
+            min_connections: 1,
+            acquire_timeout: std::time::Duration::from_secs(30),
+            idle_timeout: Some(std::time::Duration::from_secs(300)),
+            max_lifetime: Some(std::time::Duration::from_secs(1800)),
+        }
+    }
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self::for_testing()
+    }
 }
 
 /// Storage configuration
@@ -25,6 +63,38 @@ pub struct StorageConfig {
     pub base_path: PathBuf,
     pub max_file_size: u64,
     pub allowed_extensions: Vec<String>,
+    pub temp_dir: PathBuf,
+}
+
+impl StorageConfig {
+    /// Create configuration from environment variables
+    pub fn from_env() -> Result<Self, ConfigError> {
+        let storage_path = std::env::var("STORAGE_PATH")
+            .map_err(|_| ConfigError::MissingEnvVar("STORAGE_PATH"))?;
+
+        Ok(Self {
+            base_path: PathBuf::from(&storage_path),
+            max_file_size: 100 * 1024 * 1024, // 100MB
+            allowed_extensions: vec!["xlsx".to_string(), "xls".to_string(), "csv".to_string()],
+            temp_dir: PathBuf::from(&storage_path).join("temp"),
+        })
+    }
+
+    /// Create a default configuration for testing
+    pub fn for_testing() -> Self {
+        Self {
+            base_path: PathBuf::from("/tmp/lab_manager_test"),
+            max_file_size: 10 * 1024 * 1024, // 10MB for tests
+            allowed_extensions: vec!["xlsx".to_string(), "csv".to_string()],
+            temp_dir: PathBuf::from("/tmp/lab_manager_test/temp"),
+        }
+    }
+}
+
+impl Default for StorageConfig {
+    fn default() -> Self {
+        Self::for_testing()
+    }
 }
 
 /// Server configuration
@@ -84,11 +154,15 @@ impl AppConfig {
                 url: database_url,
                 max_connections: 10,
                 min_connections: 1,
+                acquire_timeout: std::time::Duration::from_secs(30),
+                idle_timeout: Some(std::time::Duration::from_secs(600)),
+                max_lifetime: Some(std::time::Duration::from_secs(1800)),
             },
             storage: StorageConfig {
-                base_path: PathBuf::from(storage_path),
+                base_path: PathBuf::from(&storage_path),
                 max_file_size: 100 * 1024 * 1024, // 100MB
                 allowed_extensions: vec!["xlsx".to_string(), "xls".to_string(), "csv".to_string()],
+                temp_dir: PathBuf::from(&storage_path).join("temp"),
             },
             server: ServerConfig {
                 host,
@@ -109,11 +183,15 @@ impl AppConfig {
                 url: "postgres://test:test@localhost:5432/test_lab_manager".to_string(),
                 max_connections: 5,
                 min_connections: 1,
+                acquire_timeout: std::time::Duration::from_secs(30),
+                idle_timeout: Some(std::time::Duration::from_secs(300)),
+                max_lifetime: Some(std::time::Duration::from_secs(1800)),
             },
             storage: StorageConfig {
                 base_path: PathBuf::from("/tmp/lab_manager_test"),
                 max_file_size: 10 * 1024 * 1024, // 10MB for tests
                 allowed_extensions: vec!["xlsx".to_string(), "csv".to_string()],
+                temp_dir: PathBuf::from("/tmp/lab_manager_test/temp"),
             },
             server: ServerConfig {
                 host: "127.0.0.1".to_string(),
