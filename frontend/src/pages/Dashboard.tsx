@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { 
   ExclamationTriangleIcon, 
@@ -7,7 +8,10 @@ import {
   DocumentIcon,
   BeakerIcon,
   QueueListIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  SparklesIcon,
+  DocumentArrowUpIcon,
+  EyeIcon
 } from '@heroicons/react/24/outline';
 
 interface DashboardStats {
@@ -289,6 +293,83 @@ export default function Dashboard() {
           <div className="mt-4 flex items-center text-sm text-gray-500">
             <CheckCircleIcon className="h-4 w-4 text-green-500 mr-1" />
             <span>Successfully processed</span>
+          </div>
+        </div>
+      </div>
+
+      {/* AI-Powered Document Submissions Section */}
+      <div className="mb-8">
+        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg border border-indigo-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="h-10 w-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <SparklesIcon className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              <div className="ml-4">
+                <h2 className="text-lg font-semibold text-gray-900">AI-Powered Document Submissions</h2>
+                <p className="text-sm text-gray-600">Upload laboratory documents to automatically extract sample data using AI</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Quick Upload */}
+            <Link
+              to="/rag-submissions"
+              className="group bg-white rounded-lg p-4 border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all duration-200"
+            >
+              <div className="flex items-center">
+                <DocumentArrowUpIcon className="h-8 w-8 text-indigo-600 group-hover:text-indigo-700" />
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-gray-900 group-hover:text-indigo-700">Upload Document</h3>
+                  <p className="text-xs text-gray-500">PDF, DOCX, TXT</p>
+                </div>
+              </div>
+            </Link>
+
+            {/* Preview Mode */}
+            <Link
+              to="/rag-submissions?mode=preview"
+              className="group bg-white rounded-lg p-4 border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all duration-200"
+            >
+              <div className="flex items-center">
+                <EyeIcon className="h-8 w-8 text-purple-600 group-hover:text-purple-700" />
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-gray-900 group-hover:text-purple-700">Preview Extract</h3>
+                  <p className="text-xs text-gray-500">Review before creating</p>
+                </div>
+              </div>
+            </Link>
+
+            {/* Features */}
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <div className="space-y-2">
+                <div className="flex items-center text-xs text-gray-600">
+                  <CheckCircleIcon className="h-4 w-4 text-green-500 mr-2" />
+                  AI-powered extraction
+                </div>
+                <div className="flex items-center text-xs text-gray-600">
+                  <CheckCircleIcon className="h-4 w-4 text-green-500 mr-2" />
+                  Confidence scoring
+                </div>
+                <div className="flex items-center text-xs text-gray-600">
+                  <CheckCircleIcon className="h-4 w-4 text-green-500 mr-2" />
+                  Natural language queries
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-4 text-center">
+            <Link
+              to="/rag-submissions"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
+            >
+              <SparklesIcon className="h-4 w-4 mr-2" />
+              Open AI Document Processor
+            </Link>
           </div>
         </div>
       </div>

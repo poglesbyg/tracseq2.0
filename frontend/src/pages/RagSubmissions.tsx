@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import {
   DocumentArrowUpIcon,
@@ -8,6 +9,7 @@ import {
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
   SparklesIcon,
+  ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 
 interface RagExtractionResult {
@@ -32,6 +34,7 @@ interface RagExtractionResult {
 }
 
 export default function RagSubmissions() {
+  const [searchParams] = useSearchParams();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [extractionResult, setExtractionResult] = useState<RagExtractionResult | null>(null);
@@ -42,6 +45,17 @@ export default function RagSubmissions() {
   const [queryResult, setQueryResult] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
+  
+  // Handle URL parameters for Dashboard integration
+  const mode = searchParams.get('mode');
+  const isPreviewMode = mode === 'preview';
+  
+  useEffect(() => {
+    if (isPreviewMode) {
+      setShowPreview(true);
+      setAutoCreate(false);
+    }
+  }, [isPreviewMode]);
 
   // Process document mutation
   const processDocumentMutation = useMutation({
@@ -153,13 +167,34 @@ export default function RagSubmissions() {
       {/* Header */}
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <Link
+                to="/"
+                className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
+              >
+                <ArrowLeftIcon className="h-4 w-4 mr-1" />
+                Back to Dashboard
+              </Link>
+            </div>
+          </div>
           <div className="flex items-center">
-            <SparklesIcon className="h-8 w-8 text-indigo-600 mr-3" />
+            <div className="h-10 w-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center mr-4">
+              <SparklesIcon className="h-6 w-6 text-white" />
+            </div>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">AI-Powered Document Submissions</h1>
+              <h1 className="text-2xl font-bold text-gray-900">AI-Powered Document Submissions</h1>
               <p className="mt-2 text-sm text-gray-700">
-                Upload laboratory documents (PDF, DOCX, TXT) to automatically extract sample data using AI
+                {isPreviewMode 
+                  ? "Preview mode: Upload a document to see extracted data without creating samples"
+                  : "Upload laboratory documents (PDF, DOCX, TXT) to automatically extract sample data using AI"
+                }
               </p>
+              {isPreviewMode && (
+                <div className="mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  Preview Mode Active
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -249,10 +284,12 @@ export default function RagSubmissions() {
                   type="checkbox"
                   checked={autoCreate}
                   onChange={(e) => setAutoCreate(e.target.checked)}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  disabled={isPreviewMode}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded disabled:opacity-50"
                 />
-                <label htmlFor="auto-create" className="ml-2 text-sm text-gray-700">
+                <label htmlFor="auto-create" className={`ml-2 text-sm ${isPreviewMode ? 'text-gray-500' : 'text-gray-700'}`}>
                   Automatically create samples after extraction
+                  {isPreviewMode && <span className="text-xs text-purple-600 ml-1">(disabled in preview mode)</span>}
                 </label>
               </div>
             </div>
