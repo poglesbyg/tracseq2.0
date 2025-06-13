@@ -85,20 +85,8 @@ impl
         &self,
         data: crate::models::template::CreateTemplate,
     ) -> Result<crate::models::template::Template, Self::Error> {
-        // Extract file_path and file_type from metadata if they exist
+        // Use file_path and file_type directly from the struct
         let metadata = data.metadata.unwrap_or(serde_json::json!({}));
-        let file_path = metadata
-            .get("file_path")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let file_type = metadata
-            .get("file_type")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown");
-        let clean_metadata = metadata
-            .get("original_metadata")
-            .unwrap_or(&metadata)
-            .clone();
 
         sqlx::query_as::<_, crate::models::template::Template>(
             r#"
@@ -109,9 +97,9 @@ impl
         )
         .bind(&data.name)
         .bind(&data.description)
-        .bind(file_path)
-        .bind(file_type)
-        .bind(&clean_metadata)
+        .bind(&data.file_path)
+        .bind(&data.file_type)
+        .bind(&metadata)
         .fetch_one(&self.pool)
         .await
     }

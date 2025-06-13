@@ -84,9 +84,16 @@ pub async fn upload_template(
     // Save template metadata to database using repository
     let template_repo = state.repositories.factory.template_repository();
     let mut create_template = template_data;
+
+    // Set the file path and type directly in the struct
+    create_template.file_path = file_path.to_string_lossy().to_string();
+    create_template.file_type = file_type.to_string();
+
+    // Keep original metadata, removing the file info since it's now in dedicated fields
     create_template.metadata = Some(json!({
-        "file_path": file_path.to_string_lossy(),
-        "file_type": file_type,
+        "fileSize": file_content.len(),
+        "originalFileName": original_filename,
+        "uploadedAt": chrono::Utc::now().to_rfc3339(),
         "original_metadata": create_template.metadata.unwrap_or(json!({}))
     }));
 

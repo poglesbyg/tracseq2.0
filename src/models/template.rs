@@ -18,6 +18,8 @@ pub struct Template {
 pub struct CreateTemplate {
     pub name: String,
     pub description: Option<String>,
+    pub file_path: String,
+    pub file_type: String,
     pub metadata: Option<serde_json::Value>,
 }
 
