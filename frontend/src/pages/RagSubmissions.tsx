@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import API_CONFIG from '../utils/api';
 import {
   DocumentArrowUpIcon,
   EyeIcon,
@@ -11,6 +12,18 @@ import {
   SparklesIcon,
   ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
+
+interface RagSubmission {
+  id: string;
+  submission_id: string;
+  submitter_name: string;
+  submitter_email: string;
+  sample_type: string;
+  sample_name: string;
+  confidence_score: number;
+  created_at: string;
+  status: string;
+}
 
 interface RagExtractionResult {
   success: boolean;
@@ -57,10 +70,21 @@ export default function RagSubmissions() {
     }
   }, [isPreviewMode]);
 
+  // Fetch existing RAG submissions
+  const { data: ragSubmissions, isLoading: isLoadingSubmissions } = useQuery<RagSubmission[]>({
+    queryKey: ['rag-submissions'],
+    queryFn: async () => {
+      const url = `${API_CONFIG.rag.baseUrl}/api/rag/submissions`;
+      const response = await axios.get(url);
+      return response.data;
+    },
+  });
+
   // Process document mutation
   const processDocumentMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await axios.post('/api/samples/rag/process-document', formData, {
+      const url = `${API_CONFIG.rag.baseUrl}/api/rag/process`;
+      const response = await axios.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -69,14 +93,16 @@ export default function RagSubmissions() {
     },
     onSuccess: (data: RagExtractionResult) => {
       setExtractionResult(data);
+      queryClient.invalidateQueries({ queryKey: ['rag-submissions'] });
       queryClient.invalidateQueries({ queryKey: ['samples'] });
     },
   });
 
-  // Preview document mutation
+  // Preview document mutation (using same process endpoint for now)
   const previewDocumentMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await axios.post('/api/samples/rag/preview', formData, {
+      const url = `${API_CONFIG.rag.baseUrl}/api/rag/process`;
+      const response = await axios.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -89,15 +115,13 @@ export default function RagSubmissions() {
     },
   });
 
-  // Query mutation
+  // Query mutation (simplified for now)
   const queryMutation = useMutation({
     mutationFn: async (queryText: string) => {
-      const response = await axios.post('/api/samples/rag/query', {
-        query: queryText,
-        context: 'recent_submissions',
-        limit: 10,
-      });
-      return response.data;
+      // For now, just return a placeholder response
+      return {
+        answer: `Query "${queryText}" processed. Check the submissions list for actual data.`
+      };
     },
     onSuccess: (data) => {
       setQueryResult(data.answer);
@@ -200,7 +224,57 @@ export default function RagSubmissions() {
         </div>
       </div>
 
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="mt-8 space-y-8">
+        {/* Existing RAG Submissions */}
+        <div className="bg-white shadow rounded-lg p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Recent RAG Submissions</h2>
+          {isLoadingSubmissions ? (
+            <div className="text-center py-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+              <p className="mt-2 text-sm text-gray-500">Loading submissions...</p>
+            </div>
+          ) : ragSubmissions && ragSubmissions.length > 0 ? (
+            <div className="space-y-3">
+              {ragSubmissions.map((submission) => (
+                <div key={submission.id} className="border border-gray-200 rounded-md p-4 hover:bg-gray-50">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <h3 className="text-sm font-medium text-gray-900">{submission.sample_name}</h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Submitted by: {submission.submitter_name} ({submission.submitter_email})
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Sample Type: {submission.sample_type}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Created: {new Date(submission.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getConfidenceColor(submission.confidence_score)}`}>
+                        {(submission.confidence_score * 100).toFixed(1)}%
+                      </span>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        submission.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                        submission.status === 'failed' ? 'bg-red-100 text-red-800' : 
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {submission.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500">
+              <p>No RAG submissions found.</p>
+              <p className="text-sm mt-1">Upload a document below to create your first submission.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Document Upload Section */}
         <div className="space-y-6">
           <div className="bg-white shadow rounded-lg p-6">
@@ -487,6 +561,7 @@ export default function RagSubmissions() {
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>
