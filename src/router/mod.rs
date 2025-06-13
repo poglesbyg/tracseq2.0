@@ -112,7 +112,8 @@ pub fn reports_routes() -> Router<AppComponents> {
 /// Spreadsheet processing routes
 pub fn spreadsheet_routes() -> Router<AppComponents> {
     tracing::info!("🔧 Registering spreadsheet routes");
-    Router::new()
+
+    let router = Router::new()
         .route(
             "/api/spreadsheets/upload",
             post(handlers::upload_spreadsheet),
@@ -151,7 +152,10 @@ pub fn spreadsheet_routes() -> Router<AppComponents> {
         .route(
             "/api/spreadsheets/supported-types",
             get(handlers::supported_types),
-        )
+        );
+
+    tracing::info!("✅ Spreadsheet routes registered successfully");
+    router
 }
 
 /// User management and authentication routes
@@ -220,7 +224,9 @@ pub fn create_app_router() -> Router<AppComponents> {
         })
         .merge({
             tracing::info!("📈 About to merge spreadsheet routes");
-            spreadsheet_routes()
+            let spreadsheet_router = spreadsheet_routes();
+            tracing::info!("📈 Spreadsheet routes ready for merge");
+            spreadsheet_router
         })
         .merge({
             tracing::info!("👤 Merging user routes");
