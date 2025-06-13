@@ -28,7 +28,6 @@ import {
   BookmarkIcon,
   PrinterIcon,
   Squares2X2Icon,
-  ListBulletIcon,
   CogIcon,
 } from '@heroicons/react/24/outline';
 
@@ -111,7 +110,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
   const [pinnedColumns, setPinnedColumns] = useState<Set<string>>(new Set());
-  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  // const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
@@ -1729,13 +1728,13 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
                               />
                             </div>
                             <div className="space-y-2">
-                              {visibleColumns.slice(0, 6).map((header, colIndex) => {
+                              {visibleColumns.slice(0, 6).map((header, _index) => {
                                 const value = record.row_data[header];
                                 const stats = columnStats[header];
                                 const formattedValue = formatCellValue(value, stats?.type || 'text');
                                 
                                 return (
-                                  <div key={`card-${header}-${colIndex}`} className="flex items-start justify-between">
+                                  <div key={`card-${header}-${_index}`} className="flex items-start justify-between">
                                     <div className="flex items-center space-x-1 min-w-0">
                                       {stats && getDataTypeIcon(stats.type)}
                                       <span className="text-xs font-medium text-gray-600 truncate">

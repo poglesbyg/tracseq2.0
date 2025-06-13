@@ -30,7 +30,48 @@ frontend/dist/
 # Docker files (don't copy other Dockerfiles into context)
 Dockerfile.deploy
 
-# Documentation
+# Documentation and guides (reduce build context)
 docs/
 README.md
-LICENSE 
+README-Windows.md
+LICENSE
+OPTIMIZATION_GUIDE.md
+
+# Test files and scripts
+test_*.txt
+test_*.ps1
+run_*.ps1
+*.bat
+*.cmd
+*.sh
+
+# Development files
+examples/
+scripts/
+.github/
+.cursor/
+.giga/
+
+# Large data files
+uploads/
+storage/
+*.csv
+*.json
+*.txt
+
+# Windows specific
+Dockerfile.dev.windows
+docker-compose.windows.yml
+windows-*
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+
+# Package lock files (use Cargo.lock instead)
+package-lock.json
+package.json
+
+# Deploy directory
+deploy/ 
