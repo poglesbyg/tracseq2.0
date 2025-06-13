@@ -34,6 +34,8 @@ mod tests {
         let create_template = CreateTemplate {
             name: "New Template".to_string(),
             description: Some("New Description".to_string()),
+            file_path: "/path/to/new_template.xlsx".to_string(),
+            file_type: "xlsx".to_string(),
             metadata: Some(json!({
                 "version": "1.0",
                 "columns": ["sample_id", "concentration", "volume"]
