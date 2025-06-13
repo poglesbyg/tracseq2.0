@@ -1,4 +1,5 @@
 pub mod dashboard;
+pub mod rag_proxy;
 pub mod reports;
 pub mod samples;
 pub mod sequencing;
@@ -8,6 +9,7 @@ pub mod templates;
 pub mod users;
 
 pub use dashboard::{get_dashboard_stats, health_check, DashboardStats, HealthStatus};
+pub use rag_proxy::{get_rag_health, get_rag_stats, get_rag_submissions, process_rag_document};
 pub use reports::{execute_report, get_report_templates, get_schema};
 pub use samples::{
     create_sample, create_samples_batch, create_samples_from_rag_data, get_rag_system_status,

@@ -8,9 +8,9 @@ export default defineConfig({
     host: true,
     port: 5173,
     proxy: {
-      // RAG API - route to RAG API Bridge on port 8000
+      // RAG API - route to RAG API Bridge on port 3002
       '/api/rag': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:3002',
         changeOrigin: true,
         secure: false,
         configure: (proxy, _options) => {

@@ -2,11 +2,11 @@
 const API_CONFIG = {
   // Main Lab Manager API
   labManager: {
-    baseUrl: import.meta.env.PROD ? 'http://localhost:3001' : '',
+    baseUrl: import.meta.env.PROD ? '' : '',
   },
-  // RAG Service API
+  // RAG Service API - Use relative URLs in production, proxy in development
   rag: {
-    baseUrl: import.meta.env.PROD ? 'http://localhost:8000' : '',
+    baseUrl: '',
   },
 };
 

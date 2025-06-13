@@ -24,6 +24,15 @@ pub fn template_routes() -> Router<AppComponents> {
         .route("/api/templates/:id", delete(handlers::delete_template))
 }
 
+/// RAG proxy routes - forward requests to RAG API Bridge on port 3002
+pub fn rag_proxy_routes() -> Router<AppComponents> {
+    Router::new()
+        .route("/api/rag/submissions", get(handlers::get_rag_submissions))
+        .route("/api/rag/process", post(handlers::process_rag_document))
+        .route("/api/rag/stats", get(handlers::get_rag_stats))
+        .route("/api/rag/health", get(handlers::get_rag_health))
+}
+
 /// Sample management routes
 pub fn sample_routes() -> Router<AppComponents> {
     Router::new()
@@ -205,6 +214,10 @@ pub fn create_app_router() -> Router<AppComponents> {
         .merge({
             tracing::info!("📝 Merging template routes");
             template_routes()
+        })
+        .merge({
+            tracing::info!("🤖 Merging RAG proxy routes");
+            rag_proxy_routes()
         })
         .merge({
             tracing::info!("🧪 Merging sample routes");

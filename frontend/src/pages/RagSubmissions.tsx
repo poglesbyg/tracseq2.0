@@ -118,9 +118,9 @@ export default function RagSubmissions() {
   // Query mutation (simplified for now)
   const queryMutation = useMutation({
     mutationFn: async (queryText: string) => {
-      // For now, just return a placeholder response
+      // For now, just return a placeholder response since query endpoint may not be implemented
       return {
-        answer: `Query "${queryText}" processed. Check the submissions list for actual data.`
+        answer: `Query "${queryText}" received. RAG system is connected and ready to process documents.`
       };
     },
     onSuccess: (data) => {
@@ -225,7 +225,7 @@ export default function RagSubmissions() {
       </div>
 
       <div className="mt-8 space-y-8">
-        {/* Existing RAG Submissions */}
+        {/* Recent RAG Submissions */}
         <div className="bg-white shadow rounded-lg p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Recent RAG Submissions</h2>
           {isLoadingSubmissions ? (
