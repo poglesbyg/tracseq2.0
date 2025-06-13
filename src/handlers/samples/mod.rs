@@ -6,6 +6,7 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
+    repositories::storage_repository::StorageRepository,
     sample_submission::{CreateSample, Sample, UpdateSample},
     AppComponents,
 };
@@ -113,6 +114,30 @@ pub async fn get_sample(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct BatchCreateSamplesRequest {
+    pub samples: Vec<CreateSample>,
+    pub storage_location_id: Option<i32>,
+    pub template_name: Option<String>,
+    pub stored_by: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct BatchCreateSamplesResponse {
+    pub created: usize,
+    pub failed: usize,
+    pub stored_in_storage: usize,
+    pub samples: Vec<Sample>,
+    pub storage_errors: Vec<String>,
+    pub errors: Vec<BatchError>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct BatchError {
+    pub index: usize,
+    pub error: String,
+}
+
 /// Create multiple samples in a batch from template data
 pub async fn create_samples_batch(
     State(state): State<AppComponents>,
@@ -122,6 +147,8 @@ pub async fn create_samples_batch(
 
     let mut created_samples = Vec::new();
     let mut errors = Vec::new();
+    let mut storage_errors = Vec::new();
+    let mut stored_in_storage_count = 0;
 
     for (index, sample_data) in batch_request.samples.iter().enumerate() {
         // Validate required fields
@@ -147,6 +174,7 @@ pub async fn create_samples_batch(
             continue;
         }
 
+        // Create the sample first
         match state
             .sample_processing
             .manager
@@ -159,7 +187,66 @@ pub async fn create_samples_batch(
                     sample.name,
                     sample.barcode
                 );
+
+                let sample_id = sample.id;
                 created_samples.push(sample);
+
+                // If storage location is provided, store the sample in the storage system
+                if let Some(location_id) = batch_request.storage_location_id {
+                    match store_sample_in_storage(
+                        &state,
+                        sample_id,
+                        location_id,
+                        &sample_data.name,
+                        batch_request.template_name.as_deref(),
+                        batch_request.stored_by.as_deref().unwrap_or("system"),
+                        None, // position
+                    )
+                    .await
+                    {
+                        Ok(_) => {
+                            // Update the sample status to indicate it's now in storage
+                            let update_sample = crate::sample_submission::UpdateSample {
+                                name: None,
+                                barcode: None,
+                                location: None,
+                                status: Some(crate::sample_submission::SampleStatus::InStorage),
+                                metadata: None,
+                            };
+
+                            if let Err(update_error) = state
+                                .sample_processing
+                                .manager
+                                .update_sample(sample_id, update_sample)
+                                .await
+                            {
+                                tracing::warn!(
+                                    "Failed to update sample {} status to InStorage: {}",
+                                    sample_id,
+                                    update_error
+                                );
+                            }
+
+                            stored_in_storage_count += 1;
+                            tracing::debug!(
+                                "Sample {} stored in storage location {}",
+                                sample_id,
+                                location_id
+                            );
+                        }
+                        Err(storage_error) => {
+                            storage_errors.push(format!(
+                                "Sample {} ({}): {}",
+                                sample_data.name, sample_id, storage_error
+                            ));
+                            tracing::warn!(
+                                "Failed to store sample {} in storage: {}",
+                                sample_id,
+                                storage_error
+                            );
+                        }
+                    }
+                }
             }
             Err(e) => {
                 let error_msg =
@@ -180,33 +267,82 @@ pub async fn create_samples_batch(
     let response = BatchCreateSamplesResponse {
         created: created_samples.len(),
         failed: errors.len(),
+        stored_in_storage: stored_in_storage_count,
         samples: created_samples,
+        storage_errors,
         errors,
     };
 
     tracing::info!(
-        "Batch creation completed: {} created, {} failed",
+        "Batch creation completed: {} created, {} failed, {} stored in storage",
         response.created,
-        response.failed
+        response.failed,
+        response.stored_in_storage
     );
     Ok(Json(response))
 }
 
-#[derive(Debug, serde::Deserialize)]
-pub struct BatchCreateSamplesRequest {
-    pub samples: Vec<CreateSample>,
-}
+/// Helper function to store a sample in the storage system
+async fn store_sample_in_storage(
+    state: &AppComponents,
+    sample_id: uuid::Uuid,
+    location_id: i32,
+    sample_type: &str,
+    template_name: Option<&str>,
+    stored_by: &str,
+    position: Option<String>,
+) -> Result<(), String> {
+    use crate::repositories::storage_repository::{PostgresStorageRepository, StorageRepository};
+    use crate::services::barcode_service::BarcodeService;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
 
-#[derive(Debug, serde::Serialize)]
-pub struct BatchCreateSamplesResponse {
-    pub created: usize,
-    pub failed: usize,
-    pub samples: Vec<Sample>,
-    pub errors: Vec<BatchError>,
-}
+    // Get the sample details to extract the barcode
+    let sample = state
+        .sample_processing
+        .manager
+        .get_sample(sample_id)
+        .await
+        .map_err(|e| format!("Failed to get sample details: {}", e))?;
 
-#[derive(Debug, serde::Serialize)]
-pub struct BatchError {
-    pub index: usize,
-    pub error: String,
+    // Create storage service (this should ideally be injected as a component)
+    let storage_repo = Arc::new(PostgresStorageRepository::new(state.database.pool.clone()));
+    let barcode_service = Arc::new(RwLock::new(BarcodeService::with_default_config()));
+
+    // Create a sample location entry directly using the repository
+    let create_sample_location = crate::repositories::storage_repository::CreateSampleLocation {
+        sample_id: (sample_id.as_u128() % (i32::MAX as u128)) as i32, // Convert UUID to i32 as a workaround
+        location_id,
+        barcode: sample.barcode.clone(),
+        position,
+        storage_state: crate::models::storage::StorageState::InStorage,
+        stored_by: Some(stored_by.to_string()),
+        notes: template_name.map(|t| format!("Created from template: {}", t)),
+    };
+
+    // Store the sample location
+    storage_repo
+        .store_sample(create_sample_location)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Record the movement history
+    let movement = crate::repositories::storage_repository::CreateMovementHistory {
+        sample_id: (sample_id.as_u128() % (i32::MAX as u128)) as i32,
+        barcode: sample.barcode.clone(),
+        from_location_id: None,
+        to_location_id: location_id,
+        from_state: Some(crate::models::storage::StorageState::Validated),
+        to_state: crate::models::storage::StorageState::InStorage,
+        movement_reason: "Initial storage from template".to_string(),
+        moved_by: stored_by.to_string(),
+        notes: template_name.map(|t| format!("Sample created from template: {}", t)),
+    };
+
+    storage_repo
+        .record_movement(movement)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }

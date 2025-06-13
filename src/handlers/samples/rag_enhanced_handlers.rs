@@ -265,7 +265,9 @@ pub async fn create_samples_from_rag_data(
     let response = BatchCreateSamplesResponse {
         created: created_samples.len(),
         failed: errors.len(),
+        stored_in_storage: 0, // RAG samples are not automatically stored in storage
         samples: created_samples,
+        storage_errors: Vec::new(), // No storage operations attempted
         errors,
     };
 

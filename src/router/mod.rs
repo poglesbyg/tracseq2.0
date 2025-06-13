@@ -1,8 +1,7 @@
 use axum::{
     routing::{delete, get, post, put},
-    Json, Router,
+    Router,
 };
-use serde_json;
 use tower_http::cors::CorsLayer;
 
 use crate::{handlers, AppComponents};
