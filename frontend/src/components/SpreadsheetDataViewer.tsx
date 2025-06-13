@@ -500,12 +500,12 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
           <div className="border-b border-gray-200 bg-gray-50 p-4">
             <h3 className="text-sm font-medium text-gray-900 mb-3">Column Statistics</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {columnHeaders.slice(0, 8).map(header => {
+              {columnHeaders.slice(0, 8).map((header, index) => {
                 const stats = columnStats[header];
                 if (!stats) return null;
                 
                 return (
-                  <div key={header} className="bg-white border border-gray-200 rounded-lg p-3">
+                  <div key={`stats-${header}-${index}`} className="bg-white border border-gray-200 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-xs font-medium text-gray-900 truncate" title={header}>
                         {header}
@@ -641,8 +641,8 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
               {columnHeaders.length > 0 ? (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {columnHeaders.slice(0, 8).map((header) => (
-                      <div key={header}>
+                    {columnHeaders.slice(0, 8).map((header, index) => (
+                      <div key={`filter-${header}-${index}`}>
                         <label htmlFor={`filter-${header}`} className="block text-xs font-medium text-gray-700 mb-1">
                           {header}
                         </label>
@@ -721,11 +721,11 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
                           Row #
                         </th>
-                        {columnHeaders.map((header) => {
+                        {columnHeaders.map((header, index) => {
                           const stats = columnStats[header];
                           return (
                             <th
-                              key={header}
+                              key={`header-${header}-${index}`}
                               className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-32 cursor-pointer hover:bg-gray-100"
                               onClick={() => handleSort(header)}
                             >
@@ -770,14 +770,14 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
                           <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 border-r border-gray-200">
                             {record.row_number}
                           </td>
-                          {columnHeaders.map((header) => {
+                          {columnHeaders.map((header, index) => {
                             const value = record.row_data[header];
                             const stats = columnStats[header];
                             const formattedValue = formatCellValue(value, stats?.type || 'text');
                             
                             return (
                               <td
-                                key={header}
+                                key={`cell-${header}-${index}`}
                                 className="px-3 py-2 text-sm border-r border-gray-200 max-w-48"
                               >
                                 <div className="truncate" title={String(value || '')}>
