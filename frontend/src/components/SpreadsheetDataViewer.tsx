@@ -1711,7 +1711,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
                     /* Card View */
                     <div className="p-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {sortedRecords.map((record, index) => (
+                        {sortedRecords.map((record, _recordIndex) => (
                           <div 
                             key={record.id}
                             className={`bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200 ${

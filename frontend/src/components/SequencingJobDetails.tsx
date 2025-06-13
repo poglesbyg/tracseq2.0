@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '../utils/axios';
 import { DocumentIcon, ArrowPathIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
 interface SequencingJob {
@@ -28,7 +28,7 @@ export default function SequencingJobDetails({ jobId, onClose }: JobDetailsProps
   const { data: job, isLoading } = useQuery<SequencingJob>({
     queryKey: ['sequencing-job', jobId],
     queryFn: async () => {
-      const response = await axios.get(`/api/sequencing/jobs/${jobId}`);
+      const response = await api.get(`/api/sequencing/jobs/${jobId}`);
       return response.data;
     },
   });
@@ -36,7 +36,7 @@ export default function SequencingJobDetails({ jobId, onClose }: JobDetailsProps
   // Generate sample sheet mutation
   const generateSampleSheet = useMutation({
     mutationFn: async () => {
-      const response = await axios.post(`/api/sequencing/jobs/${jobId}/sample-sheet`);
+      const response = await api.post(`/api/sequencing/jobs/${jobId}/sample-sheet`);
       return response.data;
     },
     onSuccess: () => {
@@ -48,7 +48,7 @@ export default function SequencingJobDetails({ jobId, onClose }: JobDetailsProps
   // Update job status mutation
   const updateJobStatus = useMutation({
     mutationFn: async (status: SequencingJob['status']) => {
-      const response = await axios.patch(`/api/sequencing/jobs/${jobId}`, { status });
+      const response = await api.patch(`/api/sequencing/jobs/${jobId}`, { status });
       return response.data;
     },
     onSuccess: () => {

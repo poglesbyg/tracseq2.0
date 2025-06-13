@@ -73,7 +73,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       const token = localStorage.getItem('auth_token');
-      if (token) {
+      if (token && token !== 'mock-admin-token') {
         try {
           const response = await fetch(`${API_BASE_URL}/api/users/me`, {
             headers: {
@@ -111,7 +111,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (response.ok) {
           const data = await response.json();
-          const { user: userData, token } = data.data;
+          // Handle both possible response formats
+          const responseData = data.data || data;
+          const { user: userData, token } = responseData;
           setUser(userData);
           localStorage.setItem('auth_token', token);
           console.log('Auto-login successful');

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '../utils/axios';
 import { CheckCircleIcon, BeakerIcon } from '@heroicons/react/24/outline';
 
 interface SheetData {
@@ -55,7 +55,7 @@ export default function BatchSampleCreation({ templateData, onClose, onComplete 
     queryKey: ['storage-locations'],
     queryFn: async () => {
       try {
-        const response = await axios.get('/api/storage/locations');
+        const response = await api.get('/api/storage/locations');
         return response.data;
       } catch (error) {
         // Return default locations if API fails
@@ -72,7 +72,7 @@ export default function BatchSampleCreation({ templateData, onClose, onComplete 
   // Batch create samples mutation
   const createSamplesMutation = useMutation({
     mutationFn: async (samples: any[]) => {
-      const response = await axios.post('/api/samples/batch', { samples });
+      const response = await api.post('/api/samples/batch', { samples });
       return response.data;
     },
     onSuccess: () => {

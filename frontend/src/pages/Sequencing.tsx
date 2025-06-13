@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '../utils/axios';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import SequencingJobDetails from '../components/SequencingJobDetails';
 
@@ -28,7 +28,7 @@ export default function Sequencing() {
   const { data: jobs, isLoading: isLoadingJobs } = useQuery<SequencingJob[]>({
     queryKey: ['sequencing-jobs'],
     queryFn: async () => {
-      const response = await axios.get('/api/sequencing/jobs');
+      const response = await api.get('/api/sequencing/jobs');
       return response.data;
     },
   });
@@ -37,7 +37,7 @@ export default function Sequencing() {
   const { data: samples } = useQuery<Sample[]>({
     queryKey: ['samples'],
     queryFn: async () => {
-      const response = await axios.get('/api/samples');
+      const response = await api.get('/api/samples');
       return response.data;
     },
   });
@@ -45,7 +45,7 @@ export default function Sequencing() {
   // Create job mutation
   const createJob = useMutation({
     mutationFn: async (data: { name: string; sample_ids: number[] }) => {
-      const response = await axios.post('/api/sequencing/jobs', data);
+      const response = await api.post('/api/sequencing/jobs', data);
       return response.data;
     },
     onSuccess: () => {

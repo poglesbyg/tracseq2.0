@@ -1,27 +1,32 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '../utils/axios';
 import { MapPinIcon, QrCodeIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 interface StorageLocation {
   id: number;
   name: string;
+  description: string | null;
+  temperature_zone: string;
   capacity: number;
   available: number;
+  utilization_percentage: number;
+  is_active: boolean;
   samples: StoredSample[];
 }
 
 interface StoredSample {
   id: number;
+  sample_id: number;
   name: string;
   barcode: string;
-  template_id: number;
-  template_name: string;
+  position: string | null;
+  storage_state: string;
   stored_at: string;
+  stored_by: string | null;
 }
 
 export default function StorageManagement() {
-  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const [scanningBarcode, setScanningBarcode] = useState(false);
   const queryClient = useQueryClient();
 
@@ -29,15 +34,20 @@ export default function StorageManagement() {
   const { data: locations, isLoading: isLoadingLocations } = useQuery<StorageLocation[]>({
     queryKey: ['storage-locations'],
     queryFn: async () => {
-      const response = await axios.get('/api/storage/locations');
+      const response = await api.get('/api/storage/locations');
       return response.data;
     },
   });
 
   // Move sample mutation
   const moveSample = useMutation({
-    mutationFn: async ({ sampleId, locationId }: { sampleId: number; locationId: number }) => {
-      const response = await axios.post(`/api/storage/move`, { sample_id: sampleId, location_id: locationId });
+    mutationFn: async ({ barcode, locationId }: { barcode: string; locationId: number }) => {
+      const response = await api.post(`/api/storage/move`, { 
+        barcode, 
+        location_id: locationId,
+        reason: "Sample moved via storage management interface",
+        moved_by: "admin"
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -48,7 +58,7 @@ export default function StorageManagement() {
   // Scan barcode mutation
   const scanBarcode = useMutation({
     mutationFn: async (barcode: string) => {
-      const response = await axios.get(`/api/storage/scan/${barcode}`);
+      const response = await api.get(`/api/storage/scan/${barcode}`);
       return response.data;
     },
     onSuccess: (data) => {
@@ -62,8 +72,8 @@ export default function StorageManagement() {
     scanBarcode.mutate(barcode);
   };
 
-  const handleMoveSample = (sampleId: number, locationId: number) => {
-    moveSample.mutate({ sampleId, locationId });
+  const handleMoveSample = (barcode: string, locationId: number) => {
+    moveSample.mutate({ barcode, locationId });
   };
 
   const getLocationStatus = (location: StorageLocation) => {
@@ -126,9 +136,7 @@ export default function StorageManagement() {
           locations?.map((location) => (
             <div
               key={location.id}
-              className={`bg-white overflow-hidden shadow rounded-lg ${
-                selectedLocation === location.id ? 'ring-2 ring-indigo-500' : ''
-              }`}
+              className="bg-white overflow-hidden shadow rounded-lg"
             >
               <div className="px-4 py-5 sm:p-6">
                 <div className="flex items-center">
@@ -154,13 +162,22 @@ export default function StorageManagement() {
                             <p className="text-sm font-medium text-gray-900">{sample.name}</p>
                             <p className="text-sm text-gray-500">{sample.barcode}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedLocation(location.id)}
-                            className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
+                          <select
+                            className="text-indigo-600 text-sm font-medium bg-transparent border-0 cursor-pointer"
+                            onChange={(e) => {
+                              const newLocationId = Number(e.target.value);
+                              if (newLocationId && newLocationId !== location.id) {
+                                handleMoveSample(sample.barcode, newLocationId);
+                              }
+                            }}
                           >
-                            Move
-                          </button>
+                            <option value="">Move to...</option>
+                            {locations?.filter(loc => loc.id !== location.id).map((loc) => (
+                              <option key={loc.id} value={loc.id}>
+                                {loc.name} ({loc.available} slots)
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </li>
                     ))}
@@ -172,49 +189,7 @@ export default function StorageManagement() {
         )}
       </div>
 
-      {selectedLocation && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Move Sample</h3>
-                <button
-                  type="button"
-                  onClick={() => setSelectedLocation(null)}
-                  className="text-gray-400 hover:text-gray-500"
-                >
-                  <span className="sr-only">Close</span>
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="space-y-4">
-                <p className="text-sm text-gray-500">
-                  Select a new location for the sample:
-                </p>
-                <select
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  onChange={(e) => {
-                    const newLocationId = Number(e.target.value);
-                    if (newLocationId !== selectedLocation) {
-                      handleMoveSample(selectedLocation, newLocationId);
-                      setSelectedLocation(null);
-                    }
-                  }}
-                >
-                  <option value="">Select a location</option>
-                  {locations?.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {location.name} ({location.available} slots available)
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 } 
