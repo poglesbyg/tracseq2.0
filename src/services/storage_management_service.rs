@@ -156,6 +156,72 @@ impl<R: StorageRepository> StorageManagementService<R> {
         Ok(moved_sample)
     }
 
+    /// Move a sample by barcode from one location to another
+    pub async fn move_sample_by_barcode(
+        &self,
+        barcode: &str,
+        new_location_id: i32,
+        moved_by: &str,
+        reason: &str,
+        requirements: Option<StorageRequirement>,
+    ) -> Result<SampleLocation, StorageManagementError> {
+        // First get the sample by barcode
+        let sample_location = self
+            .storage_repo
+            .get_sample_by_barcode(barcode)
+            .await
+            .map_err(StorageManagementError::DatabaseError)?
+            .ok_or(StorageManagementError::BarcodeNotFound(barcode.to_string()))?;
+
+        // Use the existing move_sample method
+        self.move_sample(
+            sample_location.sample_id,
+            new_location_id,
+            moved_by,
+            reason,
+            requirements,
+        )
+        .await
+    }
+
+    /// Remove a sample from storage
+    pub async fn remove_sample(
+        &self,
+        barcode: &str,
+        removed_by: &str,
+        reason: &str,
+    ) -> Result<RemovedSampleResult, StorageManagementError> {
+        // First get the sample by barcode
+        let sample_location = self
+            .storage_repo
+            .get_sample_by_barcode(barcode)
+            .await
+            .map_err(StorageManagementError::DatabaseError)?
+            .ok_or(StorageManagementError::BarcodeNotFound(barcode.to_string()))?;
+
+        // Get the location name for the response
+        let location = self
+            .storage_repo
+            .get_storage_location(sample_location.location_id)
+            .await
+            .map_err(StorageManagementError::DatabaseError)?
+            .ok_or(StorageManagementError::LocationNotFound(
+                sample_location.location_id,
+            ))?;
+
+        // Remove the sample
+        let removed_sample = self
+            .storage_repo
+            .remove_sample(sample_location.sample_id, removed_by, reason)
+            .await
+            .map_err(StorageManagementError::DatabaseError)?;
+
+        Ok(RemovedSampleResult {
+            sample_location: removed_sample,
+            location,
+        })
+    }
+
     /// Update sample storage state
     pub async fn update_sample_state(
         &self,
@@ -438,6 +504,13 @@ pub struct SampleScanResult {
     pub sample_location: SampleLocation,
     pub location: StorageLocation,
     pub barcode_info: crate::services::barcode_service::BarcodeInfo,
+}
+
+/// Result of removing a sample from storage
+#[derive(Debug, Clone)]
+pub struct RemovedSampleResult {
+    pub sample_location: SampleLocation,
+    pub location: StorageLocation,
 }
 
 /// Capacity overview statistics

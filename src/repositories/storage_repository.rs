@@ -62,6 +62,14 @@ pub trait StorageRepository: Send + Sync {
         updated_by: &str,
     ) -> Result<SampleLocation, sqlx::Error>;
 
+    /// Remove a sample from storage
+    async fn remove_sample(
+        &self,
+        sample_id: i32,
+        removed_by: &str,
+        reason: &str,
+    ) -> Result<SampleLocation, sqlx::Error>;
+
     /// Movement History Operations
     async fn record_movement(
         &self,
@@ -434,6 +442,58 @@ impl StorageRepository for PostgresStorageRepository {
         .await?;
 
         Ok(updated_sample)
+    }
+
+    async fn remove_sample(
+        &self,
+        sample_id: i32,
+        removed_by: &str,
+        reason: &str,
+    ) -> Result<SampleLocation, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
+        // Get current sample location before deletion
+        let current_location = sqlx::query_as::<_, SampleLocation>(
+            "SELECT * FROM sample_locations WHERE sample_id = $1 ORDER BY created_at DESC LIMIT 1",
+        )
+        .bind(sample_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)?;
+
+        // Create movement history record indicating removal
+        sqlx::query(
+            r#"
+            INSERT INTO storage_movement_history (sample_id, barcode, from_location_id, to_location_id, from_state, to_state, movement_reason, moved_by)
+            VALUES ($1, $2, $3, NULL, $4, $5, $6, $7)
+            "#
+        )
+        .bind(sample_id)
+        .bind(&current_location.barcode)
+        .bind(current_location.location_id)
+        .bind(&current_location.storage_state)
+        .bind(StorageState::Discarded)
+        .bind(reason)
+        .bind(removed_by)
+        .execute(&mut *tx)
+        .await?;
+
+        // Delete the sample location record
+        sqlx::query("DELETE FROM sample_locations WHERE sample_id = $1")
+            .bind(sample_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // Update location usage count
+        sqlx::query(
+            "UPDATE storage_locations SET current_usage = current_usage - 1, updated_at = NOW() WHERE id = $1"
+        )
+        .bind(current_location.location_id)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(current_location)
     }
 
     async fn record_movement(

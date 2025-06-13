@@ -87,6 +87,7 @@ pub fn storage_routes() -> Router<AppComponents> {
         )
         .route("/api/storage/store", post(handlers::store_sample))
         .route("/api/storage/move", post(handlers::move_sample))
+        .route("/api/storage/remove", post(handlers::remove_sample))
         .route(
             "/api/storage/scan/:barcode",
             get(handlers::scan_sample_barcode),

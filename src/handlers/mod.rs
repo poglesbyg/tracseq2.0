@@ -24,7 +24,7 @@ pub use spreadsheets::{
 };
 pub use storage::{
     create_storage_location, get_capacity_overview, list_storage_locations, move_sample,
-    scan_sample_barcode, store_sample,
+    remove_sample, scan_sample_barcode, store_sample,
 };
 pub use templates::{
     delete_template, get_template, get_template_data, list_templates, update_template,

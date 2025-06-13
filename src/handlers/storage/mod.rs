@@ -4,9 +4,12 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::models::storage::{StorageRequirement, TemperatureZone};
-use crate::repositories::storage_repository::{CreateStorageLocation, PostgresStorageRepository};
+use crate::repositories::storage_repository::{
+    CreateStorageLocation, PostgresStorageRepository, StorageRepository,
+};
 use crate::services::storage_management_service::{
     CapacityOverview, StorageManagementError, StorageManagementService,
 };
@@ -40,7 +43,7 @@ pub struct StoredSampleResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct MoveSampleRequest {
-    pub sample_id: i32,
+    pub barcode: String,
     pub location_id: i32,
     pub reason: Option<String>,
     pub moved_by: String,
@@ -51,6 +54,29 @@ pub struct MoveSampleResponse {
     pub success: bool,
     pub message: String,
     pub new_location: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RemoveSampleRequest {
+    pub barcode: String,
+    pub reason: Option<String>,
+    pub removed_by: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RemoveSampleResponse {
+    pub success: bool,
+    pub message: String,
+    pub removed_sample: RemovedSampleInfo,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RemovedSampleInfo {
+    pub sample_id: i32,
+    pub barcode: String,
+    pub location_name: String,
+    pub removed_at: String,
+    pub removed_by: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -220,8 +246,8 @@ pub async fn move_sample(
     let reason = request.reason.as_deref().unwrap_or("Sample relocation");
 
     match storage_service
-        .move_sample(
-            request.sample_id,
+        .move_sample_by_barcode(
+            &request.barcode,
             request.location_id,
             &request.moved_by,
             reason,
@@ -230,23 +256,21 @@ pub async fn move_sample(
         .await
     {
         Ok(_moved_sample) => {
-            // Get new location name
-            let new_location_name = match storage_service
-                .get_locations_by_temperature(TemperatureZone::UltraLowFreezer)
-                .await
-            {
-                Ok(locations) => locations
-                    .iter()
-                    .find(|loc| loc.id == request.location_id)
-                    .map(|loc| loc.name.clone()),
-                Err(_) => None,
-            };
+            // Get new location name by looking up the location directly
+            let storage_repo = Arc::new(PostgresStorageRepository::new(
+                components.database.pool.clone(),
+            ));
+            let new_location_name =
+                match storage_repo.get_storage_location(request.location_id).await {
+                    Ok(Some(location)) => Some(location.name),
+                    _ => None,
+                };
 
             Ok(Json(MoveSampleResponse {
                 success: true,
                 message: format!(
                     "Sample {} successfully moved to location {}",
-                    request.sample_id, request.location_id
+                    request.barcode, request.location_id
                 ),
                 new_location: new_location_name,
             }))
@@ -356,6 +380,42 @@ pub async fn get_capacity_overview(
 
     match storage_service.get_capacity_overview().await {
         Ok(overview) => Ok(Json(overview)),
+        Err(e) => {
+            let (status, message) = map_storage_error(&e);
+            Err((status, message))
+        }
+    }
+}
+
+/// Remove a sample from storage
+pub async fn remove_sample(
+    State(components): State<AppComponents>,
+    Json(request): Json<RemoveSampleRequest>,
+) -> Result<Json<RemoveSampleResponse>, (StatusCode, String)> {
+    let storage_service = get_storage_service(&components).await?;
+
+    let reason = request.reason.as_deref().unwrap_or("Sample removal");
+
+    match storage_service
+        .remove_sample(&request.barcode, &request.removed_by, reason)
+        .await
+    {
+        Ok(result) => Ok(Json(RemoveSampleResponse {
+            success: true,
+            message: format!(
+                "Sample {} successfully removed from storage",
+                request.barcode
+            ),
+            removed_sample: RemovedSampleInfo {
+                sample_id: result.sample_location.sample_id,
+                barcode: result.sample_location.barcode,
+                location_name: result.location.name,
+                removed_at: chrono::Utc::now()
+                    .format("%Y-%m-%d %H:%M:%S UTC")
+                    .to_string(),
+                removed_by: request.removed_by,
+            },
+        })),
         Err(e) => {
             let (status, message) = map_storage_error(&e);
             Err((status, message))
