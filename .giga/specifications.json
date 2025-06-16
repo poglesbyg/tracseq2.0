@@ -1,0 +1,22 @@
+[
+  {
+    "fileName": "main-overview.mdc",
+    "description": "Complete system overview detailing the Lab Manager architecture, RAG integration, and core components interaction patterns"
+  },
+  {
+    "fileName": "data-models-and-relationships.mdc",
+    "description": "Comprehensive documentation of submission data models, domain entities, and their relationships including AdministrativeInfo, SourceMaterial, PoolingInfo, SequenceGeneration, ContainerInfo, InformaticsInfo, and SampleDetails models"
+  },
+  {
+    "fileName": "rag-algorithms.mdc",
+    "description": "Detailed documentation of the RAG system's core algorithms including document processing, information extraction, vector embedding, and similarity search implementations"
+  },
+  {
+    "fileName": "data-flow-patterns.mdc",
+    "description": "End-to-end documentation of data flow through the system including document processing pipeline, RAG orchestration, and information extraction workflows"
+  },
+  {
+    "fileName": "llm-integration.mdc",
+    "description": "Documentation of LLM integration patterns, prompt engineering, conversation context management, and enhanced response generation algorithms"
+  }
+]

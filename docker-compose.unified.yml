@@ -1,0 +1,244 @@
+# Unified Docker Compose for TracSeq 2.0
+# This file orchestrates both lab_manager and lab_submission_rag services
+# with proper networking and service discovery
+
+services:
+  # PostgreSQL Database (Shared by both systems)
+  postgres:
+    image: postgres:15
+    container_name: tracseq_postgres
+    ports:
+      - "${DB_EXTERNAL_PORT:-5433}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lab_manager}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ollama LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: tracseq_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - tracseq_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # RAG Service
+  rag-service:
+    build:
+      context: ./lab_submission_rag
+      dockerfile: Dockerfile
+    container_name: tracseq_rag
+    ports:
+      - "8000:8000"
+    volumes:
+      - rag_uploads:/app/uploads
+      - rag_exports:/app/exports
+      - rag_logs:/app/logs
+      - rag_data:/app/data
+    # MEMORY OPTIMIZATION
+    mem_limit: 256m
+    memswap_limit: 512m
+    cpus: '1.0'
+    environment:
+      # LLM Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - USE_OLLAMA=${USE_OLLAMA:-true}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.7}
+      - MAX_TOKENS=${MAX_TOKENS:-2048}
+      
+      # Database Configuration (Shared with Lab Manager)
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-lab_manager}
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=${POSTGRES_DB:-lab_manager}
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - TABLE_PREFIX=rag_
+      
+      # Service Configuration
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=${DEBUG:-false}
+      
+      # MEMORY OPTIMIZATION SETTINGS
+      - MEMORY_OPTIMIZED=true
+      - EMBEDDING_MODEL_CACHE=false
+      - VECTOR_STORE_MEMORY_LIMIT=100
+      - EMBEDDING_BATCH_SIZE=8
+      - PYTHONOPTIMIZE=1
+      - PYTHONOPENINTERPRETER=1
+    networks:
+      - tracseq_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Lab Manager Backend (Development)
+  lab-manager-dev:
+    build:
+      context: ./lab_manager
+      dockerfile: Dockerfile.dev
+    container_name: tracseq_lab_manager_dev
+    command: cargo watch -x "run --bin lab_manager"
+    ports:
+      - "${BACKEND_DEV_PORT:-3000}:3000"
+    volumes:
+      - ./lab_manager:/usr/src/app
+      - lab_storage:/usr/local/bin/storage
+      - cargo_cache:/usr/local/cargo/registry
+    environment:
+      # Database Configuration
+      - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-lab_manager}
+      
+      # Service Configuration
+      - HOST=0.0.0.0
+      - PORT=3000
+      - RUST_LOG=${RUST_LOG:-info}
+      - STORAGE_PATH=/usr/local/bin/storage
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-in-production}
+      
+      # RAG Integration
+      - RAG_SERVICE_URL=http://rag-service:8000
+      - RAG_ENABLED=true
+      - RAG_TIMEOUT_SECONDS=300
+      - RAG_MAX_FILE_SIZE_MB=50
+      - RAG_CONFIDENCE_THRESHOLD=0.7
+    networks:
+      - tracseq_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rag-service:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Lab Manager Backend (Production)
+  lab-manager-prod:
+    build:
+      context: ./lab_manager
+      dockerfile: Dockerfile
+    container_name: tracseq_lab_manager_prod
+    ports:
+      - "${BACKEND_PROD_PORT:-3001}:3000"
+    volumes:
+      - lab_storage:/usr/local/bin/storage
+    environment:
+      # Database Configuration
+      - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-lab_manager}
+      
+      # Service Configuration
+      - RUST_LOG=${RUST_LOG:-info}
+      - STORAGE_PATH=/usr/local/bin/storage
+      - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
+      
+      # RAG Integration
+      - RAG_SERVICE_URL=http://rag-service:8000
+      - RAG_ENABLED=true
+      - RAG_TIMEOUT_SECONDS=300
+      - RAG_MAX_FILE_SIZE_MB=50
+      - RAG_CONFIDENCE_THRESHOLD=0.7
+    networks:
+      - tracseq_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rag-service:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # Lab Manager Frontend (Development)
+  lab-manager-frontend-dev:
+    build:
+      context: ./lab_manager/frontend
+      dockerfile: Dockerfile.dev
+    container_name: tracseq_frontend_dev
+    ports:
+      - "${FRONTEND_DEV_PORT:-5173}:5173"
+    volumes:
+      - ./lab_manager/frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - BACKEND_URL=http://lab-manager-dev:3000
+      - RAG_API_URL=http://rag-service:8000
+    networks:
+      - tracseq_network
+    depends_on:
+      - lab-manager-dev
+    restart: unless-stopped
+
+  # Lab Manager Frontend (Production)
+  lab-manager-frontend-prod:
+    build:
+      context: ./lab_manager/frontend
+      dockerfile: Dockerfile
+    container_name: tracseq_frontend_prod
+    ports:
+      - "${FRONTEND_PROD_PORT:-8080}:80"
+    environment:
+      - NODE_ENV=production
+      - BACKEND_URL=http://lab-manager-prod:3000
+      - RAG_API_URL=http://rag-service:8000
+    networks:
+      - tracseq_network
+    depends_on:
+      - lab-manager-prod
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+    driver: local
+  ollama_data:
+    driver: local
+  rag_uploads:
+    driver: local
+  rag_exports:
+    driver: local
+  rag_logs:
+    driver: local
+  rag_data:
+    driver: local
+  lab_storage:
+    driver: local
+  cargo_cache:
+    driver: local
+
+networks:
+  tracseq_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 

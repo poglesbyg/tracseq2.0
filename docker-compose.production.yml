@@ -1,0 +1,68 @@
+# Production-Optimized TracSeq 2.0
+# Docker Compose production configuration
+
+services:
+  # PostgreSQL (Production optimized)
+  postgres:
+    image: postgres:15-alpine  # Smaller alpine image
+    container_name: tracseq_postgres_prod
+    mem_limit: 64m
+    cpus: '0.5'
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lab_manager}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq_network
+
+  # Ollama (Memory optimized)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: tracseq_ollama_prod
+    mem_limit: 128m
+    cpus: '1.0'
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - tracseq_network
+
+  # RAG Service (Production)
+  rag-service:
+    build:
+      context: ./lab_submission_rag
+      dockerfile: Dockerfile
+    container_name: tracseq_rag_prod
+    mem_limit: 200m
+    cpus: '1.0'
+    environment:
+      - MEMORY_OPTIMIZED=true
+      - EMBEDDING_MODEL_CACHE=false
+      - VECTOR_STORE_MEMORY_LIMIT=50
+      - EMBEDDING_BATCH_SIZE=4
+      - PYTHONOPTIMIZE=2
+    networks:
+      - tracseq_network
+
+  # Lab Manager (Production)
+  lab-manager-prod:
+    build:
+      context: ./lab_manager
+      dockerfile: Dockerfile
+    container_name: tracseq_lab_manager_prod
+    mem_limit: 64m
+    cpus: '0.5'
+    environment:
+      - RUST_LOG=warn  # Less logging
+      - RAG_SERVICE_URL=http://rag-service:8000
+    networks:
+      - tracseq_network
+
+volumes:
+  postgres_data:
+  ollama_data:
+
+networks:
+  tracseq_network:
+    driver: bridge 
