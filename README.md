@@ -12,22 +12,86 @@
 
 ### One-Click Windows Start
 ```cmd
-start-tracseq.cmd
+./scripts/start-tracseq.cmd
 ```
 
 ### Cross-Platform Development
 ```bash
-# Clone and start
+# Clone and start the entire system
 git clone https://github.com/poglesbyg/tracseq2.0.git
 cd tracseq2.0
-./run_full_app.sh
+./scripts/run_full_app.sh
+```
+
+### Docker Compose (Recommended)
+```bash
+# Start all services
+docker-compose up -d
+
+# Start only specific services
+docker-compose up -d db rag-service  # Infrastructure only
+docker-compose up -d app frontend    # Application layer
 ```
 
 **Access URLs:**
-- 🌐 **Frontend**: http://localhost:5173
-- 🔧 **API**: http://localhost:3000  
+- 🌐 **Frontend**: http://localhost:5173 (dev) / http://localhost:8080 (prod)
+- 🔧 **Lab Manager API**: http://localhost:3000  
 - 📊 **RAG Service**: http://localhost:8000
-- 🗄️ **Database**: localhost:5432
+- 🗄️ **Database**: localhost:5433
+
+## 🏗️ Repository Structure
+
+This is a **multi-component workspace** with clean separation of concerns:
+
+```
+tracseq2.0/                          # 🏠 Workspace Root
+├── 📋 README.md                     # This file - main documentation
+├── ⚙️ Cargo.toml                     # Rust workspace configuration
+├── 🐳 docker-compose.yml            # Main orchestration
+├── 📄 LICENSE                       # MIT license
+├── 🙈 .gitignore                    # Git ignore patterns
+│
+├── 🧪 lab_manager/                  # Rust Backend + React Frontend
+│   ├── 🦀 src/                     # Rust backend source
+│   ├── ⚛️ frontend/                # React frontend application
+│   ├── 🗃️ migrations/              # Database migrations
+│   ├── 📋 Cargo.toml               # Component configuration
+│   ├── 🐳 Dockerfile               # Production container
+│   └── 📊 examples/                # Usage examples
+│
+├── 🤖 lab_submission_rag/          # Python RAG Processing Service
+│   ├── 🌐 api/                     # FastAPI service
+│   ├── 🧠 rag/                     # Document processing engine
+│   ├── 📦 models/                  # Data models
+│   ├── 🧪 tests/                   # Python tests
+│   ├── 📋 pyproject.toml           # Python configuration
+│   ├── 🐳 Dockerfile               # Service container
+│   └── 📋 requirements.txt         # Dependencies
+│
+├── 📚 docs/                        # 📖 Workspace Documentation
+│   ├── api/                        # API documentation
+│   ├── user-guide/                 # User guides
+│   ├── DOCKER_INTEGRATION_GUIDE.md # Docker setup guide
+│   ├── README-Windows.md           # Windows-specific instructions
+│   └── [other documentation]
+│
+├── 🚀 deploy/                      # 🏭 Deployment Configurations
+│   ├── production/                 # Production configs
+│   │   └── docker-compose.production.yml
+│   ├── development/                # Development configs
+│   │   └── docker-compose.unified.yml
+│   ├── tracseq.env                 # Main environment file
+│   └── tracseq.env.example         # Environment template
+│
+├── 📝 scripts/                     # 🛠️ Workspace Scripts
+│   ├── run_full_app.sh            # Main startup script
+│   ├── start-tracseq.cmd          # Windows startup
+│   ├── run.ps1                    # PowerShell runner
+│   ├── demo-integration.ps1       # Demo scripts
+│   └── [other utility scripts]
+│
+└── 💾 uploads/                     # 📁 Runtime Data Storage
+```
 
 ## ✨ Key Features
 
@@ -61,63 +125,31 @@ cd tracseq2.0
 ```
 Frontend:  React 18 + TypeScript + Vite + TailwindCSS
 Backend:   Rust + Axum + SQLx + PostgreSQL  
-AI/RAG:    Python + FastAPI + Ollama
-Deploy:    Docker + GitHub Actions
+AI/RAG:    Python + FastAPI + Ollama/LLM
+Deploy:    Docker + Compose + GitHub Actions
 ```
 
-### **Monorepo Structure**
+### **Service Architecture**
 ```
-tracseq2.0/
-├── 🏗️ Workspace Root
-│   ├── docker-compose.yml          # Main orchestration
-│   ├── docker-compose.unified.yml  # Unified development
-│   ├── docker-compose.production.yml # Production deployment
-│   └── README.md                   # This file
-├── 🧪 lab_manager/                 # Core Lab Management System
-│   ├── src/                        # Rust backend source
-│   ├── frontend/                   # React frontend
-│   ├── migrations/                 # Database migrations
-│   ├── scripts/                    # Utility scripts
-│   └── Cargo.toml                  # Rust project config
-├── �� lab_submission_rag/          # RAG Document Processing
-│   ├── api/                        # FastAPI service
-│   ├── rag/                        # Document processing
-│   ├── models/                     # Data models
-│   └── requirements.txt            # Python dependencies
-└── 📚 docs/                        # Documentation
-    ├── api/                        # API documentation
-    ├── user-guide/                 # User guides
-    └── development/                # Development docs
-```
-
-### **Core Components**
-```
-lab_manager/
-├── 🌐 Frontend (React + TypeScript)
-│   ├── Sample Management UI
-│   ├── Storage Dashboard  
-│   ├── Data Visualization
-│   └── Authentication
-├── ⚙️ Backend (Rust + Axum)
-│   ├── REST API Handlers
-│   ├── Database Layer (SQLx)
-│   ├── Authentication Service
-│   └── Storage Management
-└── 🗄️ Database (PostgreSQL)
-    ├── Sample Records
-    ├── Storage Locations
-    ├── User Management
-    └── Audit Logs
-
-lab_submission_rag/
-├── 🤖 RAG Service (Python + FastAPI)
-│   ├── Document Processing
-│   ├── AI Model Integration
-│   └── Confidence Scoring
-└── 📄 Document Analysis
-    ├── 7 Laboratory Categories
-    ├── Structured Data Extraction
-    └── Quality Validation
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   React SPA     │    │  Rust Backend   │    │  Python RAG     │
+│  (Frontend)     │◄──►│ (Lab Manager)   │◄──►│   (AI Service)  │
+│                 │    │                 │    │                 │
+│ • Sample UI     │    │ • REST API      │    │ • Doc Analysis  │
+│ • Dashboard     │    │ • Auth Service  │    │ • AI Models     │
+│ • Storage Mgmt  │    │ • Sample Logic  │    │ • Confidence    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 ▼
+                    ┌─────────────────┐
+                    │   PostgreSQL    │
+                    │   (Database)    │
+                    │                 │
+                    │ • Sample Data   │
+                    │ • User Records  │
+                    │ • Storage Info  │
+                    └─────────────────┘
 ```
 
 ## 📋 Prerequisites
@@ -142,86 +174,84 @@ lab_submission_rag/
 
 ### **Production Deployment**
 ```bash
-# Quick production setup
-docker-compose -f docker-compose.production.yml up -d
+# Use production configuration
+docker-compose -f deploy/production/docker-compose.production.yml up -d
 
-# With custom configuration
-cp tracseq.env .env
+# Or copy environment template
+cp deploy/tracseq.env.example .env
 # Edit .env with your settings
 docker-compose up -d
 ```
 
 ### **Development Setup**
 ```bash
-# Full development environment
-./run_full_app.sh
+# Full development environment (all services)
+./scripts/run_full_app.sh
 
-# Individual services
-docker-compose up -d                # All services
-docker-compose up -d postgres       # Database only
-docker-compose up lab-manager       # Lab manager + DB
-docker-compose up rag-service       # RAG service only
+# Unified development (streamlined)
+docker-compose -f deploy/development/docker-compose.unified.yml up -d
+
+# Individual service development
+docker-compose up -d db              # Database only
+docker-compose up dev frontend-dev   # Development servers
+docker-compose up rag-service        # RAG service only
+```
+
+### **Component Development**
+```bash
+# Lab Manager (Rust + React)
+cd lab_manager
+cargo run                           # Backend development
+cd frontend && npm run dev          # Frontend development
+
+# RAG Service (Python)
+cd lab_submission_rag
+python -m uvicorn api.main:app --reload
 ```
 
 ### **Windows-Specific Setup**
-See [📖 Windows Setup Guide](README-Windows.md) for detailed Windows instructions.
+See [📖 Windows Setup Guide](docs/README-Windows.md) for detailed Windows instructions.
 
 ## 🎯 Usage Guide
 
-### **Sample Submission Workflow**
+### **Quick Commands**
+```bash
+# Start everything
+docker-compose up -d
 
-1. **📄 Upload Documents**
-   ```
-   Upload → RAG Processing → Data Extraction → Validation → Sample Creation
-   ```
+# View logs
+docker-compose logs -f [service-name]
 
-2. **🧪 Sample Management**
-   - Create samples via template upload or manual entry
-   - Automatic barcode generation and validation
-   - State transition management with approvals
+# Stop everything
+docker-compose down
 
-3. **🏪 Storage Operations**
-   - Assign samples to temperature-controlled locations
-   - Track capacity utilization and movements
-   - Generate storage reports and alerts
+# Reset everything (⚠️ destroys data)
+docker-compose down -v
+```
 
-4. **🔍 Data Analysis**
-   - Search samples across all metadata
-   - Filter by storage location, temperature, status
-   - Export data in multiple formats
+### **Service Management**
+```bash
+# Scale services
+docker-compose up -d --scale rag-service=2
 
-### **Key User Workflows**
+# Update a single service
+docker-compose up -d --build app
 
-#### **Lab Administrator**
-- Manage users and permissions
-- Configure storage locations and templates
-- Monitor system health and capacity
-
-#### **Principal Investigator**  
-- Oversee project samples and data
-- Approve sample state transitions
-- Generate compliance reports
-
-#### **Lab Technician**
-- Process sample submissions
-- Manage storage operations
-- Perform quality control checks
-
-#### **Research Scientist**
-- Submit samples via document upload
-- Track sample processing status
-- Access research data and results
+# Access service shells
+docker-compose exec app bash
+docker-compose exec rag-service bash
+```
 
 ## 📚 Documentation
 
 ### **Getting Started**
-- 📖 [Windows Setup Guide](README-Windows.md)
+- 📖 [Windows Setup Guide](docs/README-Windows.md)
 - 🛠️ [Development Setup](docs/DEVELOPMENT_SETUP.md)
-- 🐳 [Docker Quick Start](docs/DOCKER_QUICK_START.md)
+- 🐳 [Docker Integration Guide](docs/DOCKER_INTEGRATION_GUIDE.md)
 
 ### **Feature Guides**
 - 🧪 [Sample Management](docs/SAMPLE_EDITING_FEATURE.md)
-- 🏪 [Storage Management](docs/storage-management-flows.md)
+- 🏪 [Storage Management](lab_manager/docs/storage-management-flows.md)
 - 📊 [Spreadsheet Processing](docs/SPREADSHEET_SERVICE.md)
 - 🤖 [RAG Integration](docs/RAG_INTEGRATION.md)
 
@@ -238,60 +268,79 @@ See [📖 Windows Setup Guide](README-Windows.md) for detailed Windows instructi
 
 ## 🔧 Development
 
-### **Quick Development Commands**
+### **Workspace Commands**
 ```bash
+# Run all tests
+./scripts/run_tests.sh
+
 # Start development environment
-./run_full_app.sh
+./scripts/run_full_app.sh
 
-# Individual component development
-cd lab_manager && cargo run         # Backend development
-cd lab_manager/frontend && npm run dev # Frontend development
-cd lab_submission_rag && python -m uvicorn api.main:app --reload # RAG development
+# Windows development
+./scripts/run.ps1
 
-# Run tests
-cd lab_manager && cargo test        # Backend tests
-cd lab_manager/frontend && npm test # Frontend tests
-cd lab_submission_rag && pytest     # RAG tests
+# Demo integration
+./scripts/demo-integration.ps1
+```
 
-# Code quality
-cd lab_manager && cargo clippy      # Rust linting
-cd lab_manager/frontend && npm run lint # Frontend linting
-cd lab_submission_rag && flake8     # Python linting
+### **Component Development**
+```bash
+# Lab Manager (Rust Backend)
+cd lab_manager
+cargo test                        # Run backend tests
+cargo clippy                      # Rust linting
+cargo build --release             # Production build
+
+# Frontend (React)
+cd lab_manager/frontend
+npm test                          # Run frontend tests
+npm run lint                      # Frontend linting
+npm run build                     # Production build
+
+# RAG Service (Python)
+cd lab_submission_rag
+pytest                            # Run Python tests
+flake8                            # Python linting
+python -m build                   # Build package
 ```
 
 ### **Contributing**
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes and add tests
-4. Ensure all tests pass across all components
-5. Commit: `git commit -m 'Add amazing feature'`
-6. Push: `git push origin feature/amazing-feature`
-7. Open a Pull Request
+3. Make your changes in the appropriate component
+4. Add tests for your changes
+5. Ensure all tests pass: `./scripts/run_tests.sh`
+6. Commit: `git commit -m 'Add amazing feature'`
+7. Push: `git push origin feature/amazing-feature`
+8. Open a Pull Request
 
 See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
 
 ## 🚀 Deployment
 
+### **Environment Configuration**
+```bash
+# Copy template and configure
+cp deploy/tracseq.env.example .env
+
+# Required variables
+DATABASE_URL=postgres://user:pass@host:port/db
+RUST_LOG=info
+RAG_SERVICE_URL=http://rag-service:8000
+
+# Optional configurations
+JWT_SECRET=your-secret-key
+STORAGE_PATH=/app/storage
+OLLAMA_HOST=http://localhost:11434
+```
+
 ### **Production Deployment**
 ```bash
-# Using Docker Compose
-docker-compose -f docker-compose.production.yml up -d
+# Using production configuration
+docker-compose -f deploy/production/docker-compose.production.yml up -d
 
 # Using GitHub Actions (automatic)
 git push origin main  # Triggers CI/CD pipeline
-```
-
-### **Environment Configuration**
-```bash
-# Required environment variables
-DATABASE_URL=postgres://user:pass@host:port/db
-RUST_LOG=info
-STORAGE_PATH=/app/storage
-
-# Optional configurations
-RAG_SERVICE_URL=http://localhost:8000
-OLLAMA_HOST=http://localhost:11434
-JWT_SECRET=your-secret-key
 ```
 
 ### **Monitoring & Maintenance**
@@ -315,11 +364,11 @@ docker-compose up -d
 **🗄️ Database Connection**
 ```bash
 # Check database status
-docker-compose ps postgres
-docker-compose logs postgres
+docker-compose ps db
+docker-compose logs db
 
 # Test connection
-docker-compose exec postgres psql -U postgres -d lab_manager -c "SELECT 1;"
+docker-compose exec db psql -U postgres -d lab_manager -c "SELECT 1;"
 ```
 
 **🌐 Port Conflicts**
@@ -327,19 +376,19 @@ docker-compose exec postgres psql -U postgres -d lab_manager -c "SELECT 1;"
 # Find and kill processes using ports
 lsof -i :3000 && kill -9 $(lsof -t -i:3000)
 lsof -i :5173 && kill -9 $(lsof -t -i:5173)
+lsof -i :8000 && kill -9 $(lsof -t -i:8000)
 ```
 
 **🤖 RAG Service Issues**
 ```bash
-# Check Ollama status
-ollama list
-ollama serve
+# Check RAG service status
+docker-compose logs rag-service
 
 # Restart RAG service
 docker-compose restart rag-service
 ```
 
-See [DOCKER_TROUBLESHOOTING.md](docs/DOCKER_TROUBLESHOOTING.md) for more solutions.
+See [Docker Integration Guide](docs/DOCKER_INTEGRATION_GUIDE.md) for more solutions.
 
 ## 📊 Performance & Scaling
 
@@ -376,9 +425,10 @@ See [DOCKER_TROUBLESHOOTING.md](docs/DOCKER_TROUBLESHOOTING.md) for more solutio
 - ✅ Storage tracking system
 - ✅ RAG document processing
 - ✅ User authentication and roles
+- ✅ Clean repository structure
 
 ### **Planned Features**
-- 🔬 Sequencing workflow integration
+- 🔬 Enhanced sequencing workflow integration
 - 📱 Mobile app for barcode scanning
 - 🤖 Advanced AI models for data extraction
 - 📊 Advanced analytics and reporting

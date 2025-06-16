@@ -1,7 +1,7 @@
 services:
   frontend:
     build:
-      context: ./frontend
+      context: ./lab_manager/frontend
       dockerfile: Dockerfile
     ports:
       - "${FRONTEND_PROD_PORT:-8080}:80"
@@ -12,12 +12,12 @@ services:
 
   frontend-dev:
     build:
-      context: ./frontend
+      context: ./lab_manager/frontend
       dockerfile: Dockerfile.dev
     ports:
       - "${FRONTEND_DEV_PORT:-5173}:5173"
     volumes:
-      - ./frontend:/app
+      - ./lab_manager/frontend:/app
       - /app/node_modules
     environment:
       - NODE_ENV=${NODE_ENV:-development}
@@ -28,31 +28,32 @@ services:
       - lab_network
 
   app:
-    build: .
+    build: 
+      context: ./lab_manager
+      dockerfile: Dockerfile
     ports:
       - "${BACKEND_PROD_PORT:-3001}:3000"
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@db:5432/lab_manager}
       - RUST_LOG=${RUST_LOG:-info}
       - STORAGE_PATH=${STORAGE_PATH:-/usr/local/bin/storage}
-      - RAG_SERVICE_URL=${RAG_SERVICE_URL:-http://host.docker.internal:8000}
+      - RAG_SERVICE_URL=${RAG_SERVICE_URL:-http://rag-service:8000}
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
     volumes:
       - app_storage:${STORAGE_PATH:-/usr/local/bin/storage}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       - db
+      - rag-service
     networks:
       - lab_network
 
   dev:
     build:
-      context: .
+      context: ./lab_manager
       dockerfile: Dockerfile.dev
     command: cargo watch -x "run --bin lab_manager"
     volumes:
-      - .:/usr/src/app
+      - ./lab_manager:/usr/src/app
       - app_storage:${STORAGE_PATH:-/usr/local/bin/storage}
       - cargo_cache:/usr/local/cargo/registry
     ports:
@@ -63,14 +64,29 @@ services:
       - PORT=${PORT:-3000}
       - RUST_LOG=${RUST_LOG:-info}
       - STORAGE_PATH=${STORAGE_PATH:-/usr/local/bin/storage}
-      - RAG_SERVICE_URL=${RAG_SERVICE_URL:-http://host.docker.internal:8000}
+      - RAG_SERVICE_URL=${RAG_SERVICE_URL:-http://rag-service:8000}
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      - db
+      - rag-service
+    networks:
+      - lab_network
+
+  rag-service:
+    build:
+      context: ./lab_submission_rag
+      dockerfile: Dockerfile
+    ports:
+      - "${RAG_SERVICE_PORT:-8000}:8000"
+    environment:
+      - POSTGRES_URL=${DATABASE_URL:-postgres://postgres:postgres@db:5432/lab_manager}
+      - RAG_LOG_LEVEL=${RAG_LOG_LEVEL:-INFO}
     depends_on:
       - db
     networks:
       - lab_network
+    volumes:
+      - rag_storage:/app/uploads
 
   db:
     image: postgres:15
@@ -88,6 +104,7 @@ services:
 volumes:
   postgres_data:
   app_storage:
+  rag_storage:
   cargo_cache:
 
 networks:
