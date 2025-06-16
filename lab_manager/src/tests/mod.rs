@@ -19,3 +19,11 @@ pub mod sequencing_workflow_tests;
 pub mod spreadsheet_processing_tests;
 pub mod storage_management_tests;
 pub mod template_processing_tests;
+
+// Additional comprehensive test modules
+pub mod barcode_service_comprehensive_tests;
+pub mod dashboard_tests;
+pub mod integration_workflow_tests;
+pub mod middleware_tests;
+pub mod reports_handler_tests;
+pub mod service_tests;

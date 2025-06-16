@@ -1,9 +1,10 @@
-# 🧬 Lab Manager - Advanced Laboratory Information Management System
+# 🧬 TracSeq 2.0 - Advanced Laboratory Information Management System
 
-[![Build Status](https://github.com/poglesbyg/lab_manager/actions/workflows/ci.yml/badge.svg)](https://github.com/poglesbyg/lab_manager/actions)
+[![Build Status](https://github.com/poglesbyg/tracseq2.0/actions/workflows/ci.yml/badge.svg)](https://github.com/poglesbyg/tracseq2.0/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.75+-blue.svg)](https://www.rust-lang.org)
 [![React](https://img.shields.io/badge/react-18.3+-61dafb.svg)](https://reactjs.org)
+[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org)
 
 > **Modern laboratory information management system with AI-powered document processing, intelligent storage management, and comprehensive sample tracking for biological research workflows.**
 
@@ -17,8 +18,8 @@ start-tracseq.cmd
 ### Cross-Platform Development
 ```bash
 # Clone and start
-git clone https://github.com/poglesbyg/lab_manager.git
-cd lab_manager
+git clone https://github.com/poglesbyg/tracseq2.0.git
+cd tracseq2.0
 ./run_full_app.sh
 ```
 
@@ -64,6 +65,31 @@ AI/RAG:    Python + FastAPI + Ollama
 Deploy:    Docker + GitHub Actions
 ```
 
+### **Monorepo Structure**
+```
+tracseq2.0/
+├── 🏗️ Workspace Root
+│   ├── docker-compose.yml          # Main orchestration
+│   ├── docker-compose.unified.yml  # Unified development
+│   ├── docker-compose.production.yml # Production deployment
+│   └── README.md                   # This file
+├── 🧪 lab_manager/                 # Core Lab Management System
+│   ├── src/                        # Rust backend source
+│   ├── frontend/                   # React frontend
+│   ├── migrations/                 # Database migrations
+│   ├── scripts/                    # Utility scripts
+│   └── Cargo.toml                  # Rust project config
+├── �� lab_submission_rag/          # RAG Document Processing
+│   ├── api/                        # FastAPI service
+│   ├── rag/                        # Document processing
+│   ├── models/                     # Data models
+│   └── requirements.txt            # Python dependencies
+└── 📚 docs/                        # Documentation
+    ├── api/                        # API documentation
+    ├── user-guide/                 # User guides
+    └── development/                # Development docs
+```
+
 ### **Core Components**
 ```
 lab_manager/
@@ -77,15 +103,21 @@ lab_manager/
 │   ├── Database Layer (SQLx)
 │   ├── Authentication Service
 │   └── Storage Management
-├── 🤖 RAG Service (Python + FastAPI)
-│   ├── Document Processing
-│   ├── AI Model Integration
-│   └── Confidence Scoring
 └── 🗄️ Database (PostgreSQL)
     ├── Sample Records
     ├── Storage Locations
     ├── User Management
     └── Audit Logs
+
+lab_submission_rag/
+├── 🤖 RAG Service (Python + FastAPI)
+│   ├── Document Processing
+│   ├── AI Model Integration
+│   └── Confidence Scoring
+└── 📄 Document Analysis
+    ├── 7 Laboratory Categories
+    ├── Structured Data Extraction
+    └── Quality Validation
 ```
 
 ## 📋 Prerequisites
@@ -103,6 +135,7 @@ lab_manager/
 ### **Optional Development Tools**
 - 🦀 **Rust** 1.75+ (for backend development)
 - 📦 **Node.js** 20+ (for frontend development)
+- 🐍 **Python** 3.9+ (for RAG development)
 - 🔧 **Git** (for version control)
 
 ## 🛠️ Installation & Setup
@@ -110,10 +143,10 @@ lab_manager/
 ### **Production Deployment**
 ```bash
 # Quick production setup
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.production.yml up -d
 
 # With custom configuration
-cp .env.example .env
+cp tracseq.env .env
 # Edit .env with your settings
 docker-compose up -d
 ```
@@ -124,9 +157,10 @@ docker-compose up -d
 ./run_full_app.sh
 
 # Individual services
-docker-compose up -d db          # Database only
-docker-compose up -d backend     # Backend + DB
-docker-compose up -d frontend    # Frontend dev server
+docker-compose up -d                # All services
+docker-compose up -d postgres       # Database only
+docker-compose up lab-manager       # Lab manager + DB
+docker-compose up rag-service       # RAG service only
 ```
 
 ### **Windows-Specific Setup**
@@ -209,24 +243,27 @@ See [📖 Windows Setup Guide](README-Windows.md) for detailed Windows instructi
 # Start development environment
 ./run_full_app.sh
 
+# Individual component development
+cd lab_manager && cargo run         # Backend development
+cd lab_manager/frontend && npm run dev # Frontend development
+cd lab_submission_rag && python -m uvicorn api.main:app --reload # RAG development
+
 # Run tests
-cargo test                    # Backend tests
-cd frontend && npm test       # Frontend tests
+cd lab_manager && cargo test        # Backend tests
+cd lab_manager/frontend && npm test # Frontend tests
+cd lab_submission_rag && pytest     # RAG tests
 
 # Code quality
-cargo clippy                  # Rust linting
-cd frontend && npm run lint   # Frontend linting
-
-# Database operations
-./scripts/migrate.sh          # Run migrations
-./scripts/seed.sh            # Seed test data
+cd lab_manager && cargo clippy      # Rust linting
+cd lab_manager/frontend && npm run lint # Frontend linting
+cd lab_submission_rag && flake8     # Python linting
 ```
 
 ### **Contributing**
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
 3. Make your changes and add tests
-4. Ensure all tests pass: `cargo test && cd frontend && npm test`
+4. Ensure all tests pass across all components
 5. Commit: `git commit -m 'Add amazing feature'`
 6. Push: `git push origin feature/amazing-feature`
 7. Open a Pull Request
@@ -238,7 +275,7 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for detailed guidelines.
 ### **Production Deployment**
 ```bash
 # Using Docker Compose
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.production.yml up -d
 
 # Using GitHub Actions (automatic)
 git push origin main  # Triggers CI/CD pipeline
@@ -278,11 +315,11 @@ docker-compose up -d
 **🗄️ Database Connection**
 ```bash
 # Check database status
-docker-compose ps db
-docker-compose logs db
+docker-compose ps postgres
+docker-compose logs postgres
 
 # Test connection
-docker-compose exec db psql -U postgres -d lab_manager -c "SELECT 1;"
+docker-compose exec postgres psql -U postgres -d lab_manager -c "SELECT 1;"
 ```
 
 **🌐 Port Conflicts**
@@ -299,7 +336,7 @@ ollama list
 ollama serve
 
 # Restart RAG service
-docker-compose restart rag
+docker-compose restart rag-service
 ```
 
 See [DOCKER_TROUBLESHOOTING.md](docs/DOCKER_TROUBLESHOOTING.md) for more solutions.
@@ -363,9 +400,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🆘 Support
 
-- 📧 **Email**: support@lab-manager.dev
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/poglesbyg/lab_manager/discussions)
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/poglesbyg/lab_manager/issues)
+- 📧 **Email**: support@tracseq2.dev
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/poglesbyg/tracseq2.0/discussions)
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/poglesbyg/tracseq2.0/issues)
 - 📖 **Documentation**: [docs/](docs/)
 
 ## 🙏 Acknowledgments
@@ -379,4 +416,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Built with ❤️ for the scientific community**
 
-*Context added by Giga data-models-relationships* 
+*Context improved by Giga AI*
