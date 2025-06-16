@@ -11,7 +11,16 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the source code
+# Copy dependency files first for better caching
+COPY Cargo.toml Cargo.lock ./
+
+# Create a dummy main.rs to build dependencies
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+
+# Build dependencies first (this will be cached)
+RUN cargo build --release && rm -rf src/
+
+# Copy the actual source code
 COPY . .
 
 # Skip SQLx offline preparation to avoid dependency conflicts
@@ -19,7 +28,7 @@ COPY . .
 # or building in an environment where database is available
 ENV SQLX_OFFLINE=false
 
-# Build the application
+# Build the application (dependencies already cached)
 RUN cargo build --release
 
 # Runtime stage
