@@ -13,6 +13,7 @@
 !.env.example
 !.env.template
 !tracseq.env
+.env_old
 
 # JWT secrets and API keys
 jwt_secret*
@@ -23,6 +24,7 @@ api_keys*
 # =============================================================================
 # Build artifacts
 target/
+/target/
 Cargo.lock
 # Remove Cargo.lock from the ignore list if creating a binary crate
 # Leave Cargo.lock if creating a library crate
@@ -103,6 +105,10 @@ jspm_packages/
 
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
+
+# Frontend specific
+dist-ssr/
+*.local
 
 # =============================================================================
 # PYTHON
@@ -236,6 +242,10 @@ backup/
 backups/
 *.backup
 
+# SQLx query metadata cache
+migrations/.sqlx/
+.sqlx/
+
 # =============================================================================
 # LOGS
 # =============================================================================
@@ -277,7 +287,7 @@ temp/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
-$RECYCLE.BIN/
+$RECYCLE_BIN/
 *.cab
 *.msi
 *.msix
@@ -328,6 +338,11 @@ Session.vim
 auto-save-list
 tramp
 .\#*
+
+# Cursor AI IDE
+.cursorrules
+/.cursor
+/.giga
 
 # =============================================================================
 # APPLICATION SPECIFIC
@@ -411,6 +426,11 @@ id_ed25519
 # Compiled dynamic libraries
 *.dll
 *.dylib
+
+# Build artifacts
+/dist/
+/build/
+*.o
 
 # Executables
 *.exe

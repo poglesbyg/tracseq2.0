@@ -1,0 +1,95 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_PROD_PORT:-8080}:80"
+    depends_on:
+      - app
+    networks:
+      - lab_network
+
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "${FRONTEND_DEV_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - BACKEND_URL=${BACKEND_URL:-http://dev:3000}
+    depends_on:
+      - dev
+    networks:
+      - lab_network
+
+  app:
+    build: .
+    ports:
+      - "${BACKEND_PROD_PORT:-3001}:3000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@db:5432/lab_manager}
+      - RUST_LOG=${RUST_LOG:-info}
+      - STORAGE_PATH=${STORAGE_PATH:-/usr/local/bin/storage}
+      - RAG_SERVICE_URL=${RAG_SERVICE_URL:-http://host.docker.internal:8000}
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+    volumes:
+      - app_storage:${STORAGE_PATH:-/usr/local/bin/storage}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - db
+    networks:
+      - lab_network
+
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: cargo watch -x "run --bin lab_manager"
+    volumes:
+      - .:/usr/src/app
+      - app_storage:${STORAGE_PATH:-/usr/local/bin/storage}
+      - cargo_cache:/usr/local/cargo/registry
+    ports:
+      - "${BACKEND_DEV_PORT:-3000}:3000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@db:5432/lab_manager}
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-3000}
+      - RUST_LOG=${RUST_LOG:-info}
+      - STORAGE_PATH=${STORAGE_PATH:-/usr/local/bin/storage}
+      - RAG_SERVICE_URL=${RAG_SERVICE_URL:-http://host.docker.internal:8000}
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - db
+    networks:
+      - lab_network
+
+  db:
+    image: postgres:15
+    ports:
+      - "${DB_EXTERNAL_PORT:-5433}:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-lab_manager}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - lab_network
+
+volumes:
+  postgres_data:
+  app_storage:
+  cargo_cache:
+
+networks:
+  lab_network:
+    driver: bridge
