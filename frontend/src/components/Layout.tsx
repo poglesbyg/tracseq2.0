@@ -27,8 +27,8 @@ export default function Layout({ children }: LayoutProps) {
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: HomeIcon },
-    { name: 'Templates', href: '/templates', icon: DocumentIcon },
     { name: 'AI Submissions', href: '/rag-submissions', icon: SparklesIcon },
+    { name: 'Templates', href: '/templates', icon: DocumentIcon },
     { name: 'Samples', href: '/samples', icon: BeakerIcon },
     { name: 'Sequencing', href: '/sequencing', icon: QueueListIcon },
     { name: 'Spreadsheets', href: '/spreadsheets', icon: TableCellsIcon },
