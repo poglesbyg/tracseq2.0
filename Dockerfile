@@ -14,8 +14,13 @@ RUN apt-get update && apt-get install -y \
 # Copy dependency files first for better caching
 COPY Cargo.toml Cargo.lock ./
 
-# Create a dummy main.rs to build dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+# Create dummy source files to build dependencies
+RUN mkdir -p src/bin && \
+    echo "fn main() {}" > src/main.rs && \
+    echo "// lib.rs" > src/lib.rs && \
+    echo "fn main() {}" > src/bin/create_admin.rs && \
+    echo "fn main() {}" > src/bin/test_password.rs && \
+    echo "fn main() {}" > src/bin/test_rag_client.rs
 
 # Build dependencies first (this will be cached)
 RUN cargo build --release && rm -rf src/
