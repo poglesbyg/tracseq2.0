@@ -1,0 +1,59 @@
+Lab Sample Submission Form
+
+Submitter: Dr. Maria Rodriguez
+Email: maria.rodriguez@biotech.com
+Phone: 555-123-4567
+Project: PROJ-2024-RNA-001
+Department: Genomics Lab
+
+Sample Information:
+Sample ID: RNA-SEQ-001
+Sample Name: Liver Tissue RNA
+Source Type: RNA
+Collection Date: 2024-01-20
+Priority: Medium
+Quality Score: 8.5
+
+Sample ID: RNA-SEQ-002  
+Sample Name: Brain Tissue RNA
+Source Type: RNA
+Collection Date: 2024-01-20
+Priority: High
+Quality Score: 9.1
+
+Sample ID: DNA-001
+Sample Name: Control DNA Sample
+Source Type: DNA
+Collection Date: 2024-01-19
+Priority: Low
+Quality Score: 7.8
+
+Container Details:
+Container Type: 96-well plate
+Volume: 25 μL each
+Concentration: 100 ng/μL
+Storage Temperature: -80°C
+Container Barcode: PLATE-2024-001
+
+Sequencing Requirements:
+Platform: Illumina HiSeq 4000
+Read Type: Single-end
+Read Length: 75 bp
+Target Coverage: 20x
+Library Kit: TruSeq Stranded mRNA
+
+Analysis:
+Analysis Type: RNA-Seq differential expression
+Reference Genome: GRCh38
+Pipeline: STAR + DESeq2
+Output Format: FASTQ, BAM, count tables
+
+Special Instructions:
+- Process RNA samples first due to degradation risk
+- Keep samples on dry ice during transport
+- High priority for RNA-SEQ-002 (clinical sample)
+
+Notes:
+All samples extracted using standard protocols.
+RNA integrity verified by Bioanalyzer.
+Ready for immediate processing. 

@@ -1,0 +1,117 @@
+# Target and build artifacts
+target/
+target-install/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs/
+README*.md
+*.md
+!Cargo.toml
+!Cargo.lock
+
+# Frontend files (not needed for backend builds)
+frontend/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test files
+tests/
+test-results/
+coverage/
+
+# Environment and config files
+.env*
+!env.production
+!env.development
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Storage and uploads
+storage/
+uploads/
+logs/
+*.log
+
+# Scripts
+*.sh
+*.ps1
+*.bat
+*.cmd
+
+# Example files
+examples/
+sample_*.csv
+*_example.*
+
+# Rust build artifacts
+.cargo/
+
+# OS files
+.env.local
+
+# Logs
+*.log
+
+# Node modules (for frontend)
+frontend/dist/
+
+# Docker files (don't copy other Dockerfiles into context)
+Dockerfile.deploy
+
+# Documentation and guides (reduce build context)
+README-Windows.md
+LICENSE
+OPTIMIZATION_GUIDE.md
+
+# Test files and scripts
+test_*.txt
+run_*.ps1
+
+# Development files
+scripts/
+.github/
+.cursor/
+.giga/
+
+# Large data files
+*.csv
+*.json
+*.txt
+
+# Windows specific
+Dockerfile.dev.windows
+docker-compose.windows.yml
+windows-*
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+
+# Package lock files (use Cargo.lock instead)
+package-lock.json
+package.json
+
+# Deploy directory
+deploy/ 

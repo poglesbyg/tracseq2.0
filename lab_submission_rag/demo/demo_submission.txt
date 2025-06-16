@@ -1,0 +1,26 @@
+
+Laboratory Submission Form
+
+Submitter Information:
+Name: Dr. Sarah Johnson
+Email: sarah.johnson@university.edu
+Phone: (555) 123-4567
+Institution: University Research Lab
+Project: Genomic Diversity Study 2024
+
+Sample Information:
+Sample ID: DNA_SAMPLE_001
+Sample Type: Genomic DNA
+Concentration: 50 ng/uL
+Volume: 100 uL
+Storage: Frozen at -80C
+
+Sequencing Information:
+Platform: Illumina NovaSeq 6000
+Analysis Type: Whole Genome Sequencing
+Coverage: 30x
+Read Length: 150bp paired-end
+
+Additional Notes:
+High priority sample for genomic diversity analysis.
+Please ensure quality control metrics are included.

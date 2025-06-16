@@ -1,0 +1,71 @@
+services:
+  # Ollama Local LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: simple-rag-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - rag-network
+
+  # Lightweight RAG System
+  simple-rag:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    container_name: simple-rag-app
+    ports:
+      - "8000:8000"  # Web interface (optional)
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+      - ./exports:/app/exports
+      - ./demo:/app/demo
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=llama3.2:3b
+      - USE_OLLAMA=true
+      - DATA_DIRECTORY=/app/data
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+  # Model Downloader (runs once to pull the model)
+  model-downloader:
+    image: ollama/ollama:latest
+    container_name: simple-rag-model-downloader
+    volumes:
+      - ollama_data:/root/.ollama
+    command: >
+      sh -c "
+        echo 'Waiting for Ollama service...' &&
+        sleep 30 &&
+        ollama pull llama3.2:3b &&
+        echo 'Model downloaded successfully!'
+      "
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - rag-network
+    restart: "no"
+
+networks:
+  rag-network:
+    driver: bridge
+
+volumes:
+  ollama_data:
+    driver: local 

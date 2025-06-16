@@ -1,0 +1,118 @@
+# Production deployment configuration
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lab_manager}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    networks:
+      - lab_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Lab Manager Application (Full Stack)
+  app:
+    image: ${LAB_MANAGER_IMAGE:-lab-manager:latest}
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PROD_PORT:-80}:80"
+      - "${BACKEND_PROD_PORT:-3000}:3000"
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-lab_manager}
+      - RUST_LOG=${RUST_LOG:-info}
+      - STORAGE_PATH=${STORAGE_PATH:-/app/storage}
+      - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-production}
+      - JWT_SECRET=${JWT_SECRET}
+      - RAG_SERVICE_URL=${RAG_SERVICE_URL:-http://host.docker.internal:8000}
+    volumes:
+      - app_storage:${STORAGE_PATH:-/app/storage}
+      - app_logs:/var/log/nginx
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - lab_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Redis for caching and session management (optional)
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - lab_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Backup service
+  backup:
+    image: postgres:15-alpine
+    restart: "no"
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data:ro
+      - ./backups:/backups
+    networks:
+      - lab_network
+    command: >
+      sh -c "
+        echo 'Starting backup job...' &&
+        pg_dump -h db -U ${POSTGRES_USER:-postgres} ${POSTGRES_DB:-lab_manager} > /backups/lab_manager_$(date +%Y%m%d_%H%M%S).sql &&
+        echo 'Backup completed successfully'
+      "
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - backup
+
+  # Log aggregation (optional)
+  log-aggregator:
+    image: fluent/fluent-bit:latest
+    restart: unless-stopped
+    volumes:
+      - app_logs:/var/log/nginx:ro
+      - ./deploy/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+    networks:
+      - lab_network
+    profiles:
+      - logging
+
+volumes:
+  postgres_data:
+    driver: local
+  app_storage:
+    driver: local
+  app_logs:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  lab_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 

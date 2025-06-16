@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Submissions API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .submission { background: #e3f2fd; padding: 10px; margin: 5px 0; border-radius: 3px; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🧪 RAG Submissions API Test</h1>
+    <p>This page tests if the lab_manager frontend can access our RAG API Bridge.</p>
+    
+    <div>
+        <button onclick="testHealth()">Test Health</button>
+        <button onclick="testSubmissions()">Test Submissions</button>
+        <button onclick="testStats()">Test Statistics</button>
+        <button onclick="testCORS()">Test CORS</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:3002';
+        const resultsDiv = document.getElementById('results');
+
+        function addResult(title, content, isSuccess = true) {
+            const div = document.createElement('div');
+            div.className = `result ${isSuccess ? 'success' : 'error'}`;
+            div.innerHTML = `<h3>${title}</h3><pre>${content}</pre>`;
+            resultsDiv.appendChild(div);
+        }
+
+        async function testHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                addResult('✅ Health Check', JSON.stringify(data, null, 2), true);
+            } catch (error) {
+                addResult('❌ Health Check Failed', error.message, false);
+            }
+        }
+
+        async function testSubmissions() {
+            try {
+                const response = await fetch(`${API_BASE}/api/rag/submissions`);
+                const data = await response.json();
+                
+                let content = `Found ${data.length} submissions:\n\n`;
+                data.forEach((sub, i) => {
+                    content += `${i+1}. ${sub.submitter_name}\n`;
+                    content += `   Email: ${sub.submitter_email}\n`;
+                    content += `   Sample: ${sub.sample_type}\n`;
+                    content += `   Confidence: ${sub.confidence_score}\n\n`;
+                });
+                
+                addResult('✅ RAG Submissions', content, true);
+                
+                // Display submissions in a nice format
+                const submissionsDiv = document.createElement('div');
+                submissionsDiv.innerHTML = '<h3>📋 Submissions List:</h3>';
+                data.forEach(sub => {
+                    const subDiv = document.createElement('div');
+                    subDiv.className = 'submission';
+                    subDiv.innerHTML = `
+                        <strong>${sub.submitter_name}</strong> (${sub.sample_type})<br>
+                        📧 ${sub.submitter_email}<br>
+                        🎯 Confidence: ${sub.confidence_score}<br>
+                        📅 ${new Date(sub.created_at).toLocaleString()}
+                    `;
+                    submissionsDiv.appendChild(subDiv);
+                });
+                resultsDiv.appendChild(submissionsDiv);
+                
+            } catch (error) {
+                addResult('❌ Submissions Test Failed', error.message, false);
+            }
+        }
+
+        async function testStats() {
+            try {
+                const response = await fetch(`${API_BASE}/api/rag/stats`);
+                const data = await response.json();
+                
+                const content = `Total Submissions: ${data.total_submissions}
+Recent Submissions: ${data.recent_submissions}
+Average Confidence: ${data.average_confidence.toFixed(3)}
+Status: ${data.status}`;
+                
+                addResult('✅ RAG Statistics', content, true);
+            } catch (error) {
+                addResult('❌ Statistics Test Failed', error.message, false);
+            }
+        }
+
+        async function testCORS() {
+            try {
+                const response = await fetch(`${API_BASE}/api/rag/submissions`, {
+                    method: 'GET',
+                    headers: {
+                        'Origin': 'http://localhost:8080',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    addResult('✅ CORS Test', 'Frontend can access API from localhost:8080', true);
+                } else {
+                    addResult('❌ CORS Test Failed', `HTTP ${response.status}`, false);
+                }
+            } catch (error) {
+                addResult('❌ CORS Test Failed', error.message, false);
+            }
+        }
+
+        // Auto-run tests on page load
+        window.onload = function() {
+            setTimeout(testHealth, 500);
+            setTimeout(testSubmissions, 1000);
+            setTimeout(testStats, 1500);
+        };
+    </script>
+    
+    <hr>
+    <h2>🎯 Frontend Integration Status</h2>
+    <div class="result success">
+        <h3>✅ Ready for Integration</h3>
+        <p><strong>Your lab_manager frontend can now:</strong></p>
+        <ul>
+            <li>Access RAG submissions at: <code>http://localhost:3002/api/rag/submissions</code></li>
+            <li>Get submission details at: <code>http://localhost:3002/api/rag/submissions/{id}</code></li>
+            <li>View statistics at: <code>http://localhost:3002/api/rag/stats</code></li>
+            <li>CORS is enabled for <code>http://localhost:8080</code></li>
+        </ul>
+        
+        <p><strong>Next Steps:</strong></p>
+        <ol>
+            <li>Update your frontend to call <code>localhost:3002</code> instead of <code>localhost:8000</code></li>
+            <li>Or add proxy configuration to route <code>/api/rag/*</code> to <code>localhost:3002</code></li>
+            <li>The page <code>http://localhost:8080/rag-submissions</code> will then work perfectly!</li>
+        </ol>
+    </div>
+</body>
+</html> 

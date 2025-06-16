@@ -1,0 +1,20 @@
+Laboratory Sample Submission
+
+Submitter: Dr. Connection Test
+Email: test@connection.edu
+Institution: Connection Test Lab
+Project: Frontend Integration Test
+
+Sample ID: CONN_001
+Sample Name: ConnectionTest_Sample  
+Material: DNA
+Concentration: 50 ng/uL
+Volume: 100 uL
+
+Storage: -80C Freezer
+Platform: Illumina
+Analysis: WGS
+Coverage: 30x
+Priority: High
+
+Instructions: Test document for verifying frontend connection 

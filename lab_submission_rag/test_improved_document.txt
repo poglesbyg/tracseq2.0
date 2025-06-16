@@ -1,0 +1,32 @@
+Laboratory Sample Submission Request
+
+Submitter Information:
+Name: Dr. Sarah Chen
+Email: sarah.chen@research.edu  
+Phone: (555) 123-4567
+Institution: Genomics Research Institute
+Project: Metabolic Disease Study 2024
+
+Sample Details:
+Sample ID: MDS_2024_001
+Sample Name: Patient_001_Plasma
+Barcode: MDS001
+Material Type: Blood Plasma
+Concentration: 45 mg/mL
+Volume: 500 uL
+
+Storage Requirements:
+Location: Freezer B
+Temperature: -80C
+Conditions: Aliquot into 50uL tubes
+
+Sequencing Requirements:
+Platform: Illumina NovaSeq 6000
+Analysis: Whole Exome Sequencing
+Coverage: 100x
+Read Length: 150bp paired-end
+Library Prep: TruSeq Exome
+
+Priority: High
+Quality: A260/A280 = 1.8
+Instructions: Process within 48 hours 

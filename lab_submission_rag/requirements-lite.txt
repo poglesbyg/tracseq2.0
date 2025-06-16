@@ -1,0 +1,27 @@
+# Ultra-Lightweight Laboratory Submission RAG System
+# Minimal dependencies for local-only operation with Ollama
+
+# Core RAG Dependencies (Essential)
+ollama>=0.1.7                     # Local LLM API (replaces OpenAI)
+sentence-transformers>=2.2.0      # Embeddings
+chromadb>=0.4.0                   # Vector database
+numpy>=1.24.0                     # Numerical operations
+
+# Document Processing (Essential)  
+pypdf>=4.0.0                      # PDF processing
+python-docx>=0.8.11              # Word documents
+
+# Data Models (Essential)
+pydantic>=2.5.0                   # Data validation
+
+# Environment Management (Essential)
+python-dotenv>=1.0.0              # Environment variables
+
+# Web Interface (for Docker deployment)
+fastapi>=0.104.0                  # Web framework
+uvicorn>=0.24.0                   # ASGI server
+python-multipart>=0.0.6          # File uploads
+requests>=2.31.0                  # HTTP requests for health checks
+
+# Optional - only if you want to fallback to OpenAI
+# openai>=1.10.0                  # Uncomment if you want OpenAI fallback

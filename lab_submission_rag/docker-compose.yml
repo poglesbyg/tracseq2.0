@@ -1,0 +1,61 @@
+# Laboratory Submission RAG System
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  rag-service:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads:/app/uploads
+      - exports:/app/exports
+      - logs:/app/logs
+      - data:/app/data
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - USE_OLLAMA=${USE_OLLAMA}
+      - OLLAMA_MODEL=${OLLAMA_MODEL}
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE}
+      - MAX_TOKENS=${MAX_TOKENS}
+      # Connect to external lab_manager database
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://user:password@host.docker.internal:5432/lab_manager}
+      - DATABASE_HOST=${DATABASE_HOST:-host.docker.internal}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_NAME=${DATABASE_NAME:-lab_manager}
+      - DATABASE_USER=${DATABASE_USER:-user}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-password}
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # Connect to the same Docker network as lab_manager if it exists
+    networks:
+      - default
+      - lab_manager_lab_network
+    external_links:
+      - lab_manager_postgres:postgres
+
+volumes:
+  uploads:
+  exports:
+  logs:
+  data:
+  ollama_data:
+
+networks:
+  default:
+  lab_manager_lab_network:
+    external: true

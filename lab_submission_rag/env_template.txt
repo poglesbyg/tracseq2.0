@@ -1,0 +1,37 @@
+# Ultra-Lightweight Laboratory Submission RAG System Configuration
+# Copy this content to a file named .env in the same directory
+
+# DEFAULT: Uses Ollama (Local LLM) - No API key needed!
+# Just run: python setup_simple.py --ollama
+
+# OPTIONAL: OpenAI API Configuration (Fallback only)
+# Only needed if you want to use OpenAI instead of Ollama
+# OPENAI_API_KEY=your_openai_api_key_here
+
+# OPTIONAL: Ollama Model Selection (default: llama3.2:3b)
+# OLLAMA_MODEL=llama3.2:3b    # Lightweight, fast
+# OLLAMA_MODEL=llama3.2:1b    # Even lighter
+# OLLAMA_MODEL=llama3.1:8b    # More capable
+
+# OPTIONAL: OpenAI Model Selection (if using fallback)
+# OPENAI_MODEL=gpt-3.5-turbo
+# OPENAI_MODEL=gpt-4
+
+# OPTIONAL: Custom directories (defaults shown)
+# DATA_DIRECTORY=data
+# UPLOAD_DIRECTORY=uploads
+
+# OPTIONAL: Processing settings
+# CHUNK_SIZE=1000
+# MAX_SEARCH_RESULTS=5
+
+# RECOMMENDED SETUP:
+# 1. Run: python setup_simple.py --ollama
+# 2. This installs Ollama and downloads llama3.2:3b model
+# 3. Everything runs locally - no API costs!
+
+# FALLBACK SETUP (if Ollama doesn't work):
+# 1. Get OpenAI API key from: https://platform.openai.com/api-keys
+# 2. Copy this content to a new file named .env
+# 3. Replace "your_openai_api_key_here" with your actual API key
+# 4. Save the file in the same directory as simple_lab_rag.py 

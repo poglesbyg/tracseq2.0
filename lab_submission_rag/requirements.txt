@@ -1,0 +1,50 @@
+# MEMORY-OPTIMIZED RAG Dependencies
+# Core RAG Dependencies (lightweight versions)
+langchain-core>=0.1.0  # Use core only instead of full langchain
+chromadb>=0.4.0
+# sentence-transformers>=2.2.0  # HEAVY! Replace with lighter alternative
+transformers[torch]>=4.30.0  # Lighter than sentence-transformers
+torch>=2.0.0 --index-url https://download.pytorch.org/whl/cpu  # CPU-only torch
+numpy>=1.24.0
+
+# Document Processing
+pypdf>=4.0.0
+python-docx>=0.8.11
+aiofiles>=23.2.0
+
+# Database
+asyncpg>=0.29.0
+sqlalchemy>=2.0.0
+# alembic>=1.13.0  # Remove if not using migrations
+
+# Data Models and Validation
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+email-validator>=2.1.0
+
+# LLM APIs (lightweight)
+openai>=1.10.0
+anthropic>=0.25.0
+httpx>=0.24.0  # For ollama instead of heavy ollama package
+
+# Data Processing (memory optimized)
+# pandas>=2.1.0  # HEAVY! Replace with lighter alternatives when possible
+polars>=0.20.0  # Much lighter than pandas for data processing
+# openpyxl>=3.1.0  # Only include if Excel export is essential
+
+# Web Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# Environment Management  
+python-dotenv>=1.0.0
+
+# Logging (lightweight)
+structlog>=23.2.0
+
+# Development Dependencies (remove in production)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.10.0
+isort>=5.12.0 
