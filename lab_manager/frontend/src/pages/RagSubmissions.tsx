@@ -75,9 +75,13 @@ export default function RagSubmissions() {
     queryKey: ['rag-submissions'],
     queryFn: async () => {
       try {
-        const url = `${API_CONFIG.rag.baseUrl}/api/rag/submissions`;
+        const url = `/api/rag/submissions`;
         const response = await axios.get(url);
-        return response.data;
+        // Handle the response structure from RAG service
+        if (response.data && response.data.results && Array.isArray(response.data.results)) {
+          return response.data.results;
+        }
+        return response.data || [];
       } catch (error) {
         console.error('Failed to fetch RAG submissions:', error);
         // Return empty array on error to prevent crashes
@@ -91,7 +95,7 @@ export default function RagSubmissions() {
   // Process document mutation
   const processDocumentMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const url = `${API_CONFIG.rag.baseUrl}/api/rag/process`;
+      const url = `/api/rag/process`;
       const response = await axios.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -109,7 +113,7 @@ export default function RagSubmissions() {
   // Preview document mutation (using same process endpoint for now)
   const previewDocumentMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const url = `${API_CONFIG.rag.baseUrl}/api/rag/process`;
+      const url = `/api/rag/process`;
       const response = await axios.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',

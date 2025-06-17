@@ -13,7 +13,7 @@ pub async fn get_rag_submissions(
     State(_state): State<AppComponents>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let client = Client::new();
-    let url = "http://localhost:3002/api/rag/submissions";
+    let url = "http://rag-service:8000/api/rag/submissions";
 
     match client.get(url).send().await {
         Ok(response) => {
@@ -46,7 +46,7 @@ pub async fn process_rag_document(
     multipart: Multipart,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let client = Client::new();
-    let url = "http://localhost:3002/api/rag/process";
+    let url = "http://rag-service:8000/api/rag/process";
 
     // Convert axum multipart to reqwest multipart
     let mut form = reqwest::multipart::Form::new();
@@ -108,7 +108,7 @@ pub async fn get_rag_stats(
     State(_state): State<AppComponents>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let client = Client::new();
-    let url = "http://localhost:3002/api/rag/stats";
+    let url = "http://rag-service:8000/api/rag/stats";
 
     match client.get(url).send().await {
         Ok(response) => {
@@ -140,7 +140,7 @@ pub async fn get_rag_health(
     State(_state): State<AppComponents>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let client = Client::new();
-    let url = "http://localhost:3002/health";
+    let url = "http://rag-service:8000/health";
 
     match client.get(url).send().await {
         Ok(response) => {

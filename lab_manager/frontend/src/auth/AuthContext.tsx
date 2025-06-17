@@ -107,7 +107,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ email: 'admin@lab.local', password: 'admin123' }),
+          body: JSON.stringify({ email: 'admin@lab.com', password: 'admin123' }),
         });
 
         if (response.ok) {
@@ -126,7 +126,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // If login fails, create a mock admin user for development
         const mockAdminUser: User = {
           id: 'mock-admin-id',
-          email: 'admin@lab.local',
+          email: 'admin@lab.com',
           first_name: 'Admin',
           last_name: 'User',
           role: 'lab_administrator',
