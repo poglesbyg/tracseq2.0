@@ -72,15 +72,95 @@ jobs:
             echo "✅ No TODO/FIXME comments found"
           fi
 
+  # Matrix testing with multiple environments
+  matrix-tests:
+    name: 🧪 Matrix Tests
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust_version: [stable, beta, nightly]
+        include:
+          - os: ubuntu-latest
+            rust_version: stable
+            coverage: true
+          - os: ubuntu-latest  
+            rust_version: "1.75"  # MSRV
+            msrv: true
+        exclude:
+          - os: windows-latest
+            rust_version: nightly
+          - os: macos-latest
+            rust_version: nightly
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (${{ matrix.rust_version }} on ${{ matrix.os }})
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust_version }}
+          components: rustfmt, clippy
+
+      - name: Setup cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ matrix.os }}-${{ matrix.rust_version }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check formatting (stable only)
+        if: matrix.rust_version == 'stable' && matrix.os == 'ubuntu-latest'
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: |
+          cargo clippy --all-targets --all-features -- \
+            -D warnings \
+            -W clippy::suspicious \
+            -W clippy::complexity \
+            -W clippy::perf
+
+      - name: Run tests
+        run: |
+          if [ "${{ matrix.coverage }}" = "true" ]; then
+            # Install and run with coverage on Ubuntu stable
+            if ! command -v cargo-tarpaulin >/dev/null 2>&1; then
+              cargo install cargo-tarpaulin --version 0.27.3 || echo "Failed to install cargo-tarpaulin"
+            fi
+            if command -v cargo-tarpaulin >/dev/null 2>&1; then
+              cargo tarpaulin --verbose --timeout 120 --out Json --output-dir coverage/ || echo "Coverage failed"
+            else
+              cargo test --verbose
+            fi
+          else
+            cargo test --verbose
+          fi
+
+      - name: Upload coverage (Ubuntu stable only)
+        uses: actions/upload-artifact@v4
+        if: matrix.coverage == 'true' && always()
+        with:
+          name: coverage-matrix-${{ matrix.os }}-${{ matrix.rust_version }}
+          path: coverage/
+
   # Test modular components independently with enhanced coverage
   test-components:
     name: 🧪 Component Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: lint-and-format
     strategy:
+      fail-fast: false
       matrix:
-        component: [config, assembly, router, handlers, storage, reports]
-        rust_version: [stable, beta]
+        component: [config, assembly, router, handlers, storage, reports, validation, services]
+        test_type: [unit, integration]
     
     steps:
       - name: Checkout code
