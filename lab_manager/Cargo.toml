@@ -58,6 +58,7 @@ validator = { version = "0.18", features = ["derive"] }
 axum-extra = { version = "0.9", features = ["typed-header"] }
 tower = { version = "0.4", features = ["util"] }
 headers = "0.4"
+urlencoding = "2.1"
 
 [dev-dependencies]
 axum-test = "15.0"

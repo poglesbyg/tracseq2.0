@@ -4,8 +4,8 @@ use std::net::SocketAddr;
 
 use axum::{
     extract::{ConnectInfo, Path, Query, State},
-    http::{HeaderMap, StatusCode},
-    response::Json,
+    http::{HeaderMap, StatusCode, Uri},
+    response::{Json, Redirect},
     Extension,
 };
 use serde_json::{json, Value};
@@ -68,6 +68,65 @@ pub async fn login(
                 }
             })),
         )),
+    }
+}
+
+/// Shibboleth login redirect endpoint
+/// This endpoint redirects users to Shibboleth authentication
+pub async fn shibboleth_login_redirect(
+    State(components): State<AppComponents>,
+    Query(params): Query<serde_json::Value>,
+) -> Result<Redirect, (StatusCode, Json<Value>)> {
+    // Extract return URL from query parameters
+    let return_url = params
+        .get("return")
+        .and_then(|v| v.as_str())
+        .unwrap_or("/dashboard");
+
+    // In a real deployment with Apache + mod_shib2, this would be handled automatically
+    // For nginx or other setups, you might need to construct the Shibboleth login URL
+    if components.config.shibboleth.enabled {
+        // Construct Shibboleth login URL
+        let login_url = format!(
+            "/Shibboleth.sso/Login?target={}",
+            urlencoding::encode(return_url)
+        );
+        Ok(Redirect::temporary(&login_url))
+    } else {
+        Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({
+                "error": {
+                    "code": "SHIBBOLETH_DISABLED",
+                    "message": "Shibboleth authentication is not enabled"
+                }
+            })),
+        ))
+    }
+}
+
+/// Shibboleth logout redirect endpoint
+/// This endpoint handles Shibboleth logout and redirects appropriately
+pub async fn shibboleth_logout_redirect(
+    State(components): State<AppComponents>,
+    Query(params): Query<serde_json::Value>,
+) -> Result<Redirect, (StatusCode, Json<Value>)> {
+    // Extract return URL from query parameters
+    let return_url = params
+        .get("return")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&components.config.shibboleth.logout_redirect);
+
+    if components.config.shibboleth.enabled {
+        // Construct Shibboleth logout URL
+        let logout_url = format!(
+            "/Shibboleth.sso/Logout?return={}",
+            urlencoding::encode(return_url)
+        );
+        Ok(Redirect::temporary(&logout_url))
+    } else {
+        // If Shibboleth is disabled, just redirect to the return URL
+        Ok(Redirect::temporary(return_url))
     }
 }
 

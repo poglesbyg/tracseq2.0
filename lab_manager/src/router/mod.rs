@@ -4,7 +4,7 @@ use axum::{
 };
 use tower_http::cors::CorsLayer;
 
-use crate::{handlers, AppComponents};
+use crate::{handlers, middleware, AppComponents};
 
 /// Health and system routes
 pub fn health_routes() -> Router<AppComponents> {
@@ -36,11 +36,11 @@ pub fn rag_proxy_routes() -> Router<AppComponents> {
 /// Sample management routes
 pub fn sample_routes() -> Router<AppComponents> {
     Router::new()
-        .route("/api/samples", post(handlers::create_sample))
         .route("/api/samples", get(handlers::list_samples))
+        .route("/api/samples", post(handlers::create_sample))
+        .route("/api/samples/batch", post(handlers::create_samples_batch))
         .route("/api/samples/:id", get(handlers::get_sample))
         .route("/api/samples/:id", put(handlers::update_sample))
-        .route("/api/samples/batch", post(handlers::create_samples_batch))
         .route("/api/samples/:id/validate", post(handlers::validate_sample))
         // RAG-enhanced sample processing routes
         .route(
@@ -180,6 +180,15 @@ pub fn user_routes() -> Router<AppComponents> {
             "/api/auth/confirm-reset",
             post(handlers::confirm_password_reset),
         )
+        // Shibboleth-specific routes
+        .route(
+            "/shibboleth-login",
+            get(handlers::shibboleth_login_redirect),
+        )
+        .route(
+            "/shibboleth-logout",
+            get(handlers::shibboleth_logout_redirect),
+        )
         // Protected user routes (authentication handled in handlers)
         .route("/api/auth/logout", post(handlers::logout))
         .route("/api/users/me", get(handlers::get_current_user))
@@ -202,6 +211,23 @@ pub fn user_routes() -> Router<AppComponents> {
         .route("/api/users/:user_id", delete(handlers::delete_user))
 }
 
+/// Create authenticated routes with hybrid authentication middleware
+pub fn create_authenticated_routes() -> Router<AppComponents> {
+    Router::new()
+        .merge(template_routes())
+        .merge(rag_proxy_routes())
+        .merge(sample_routes())
+        .merge(sequencing_routes())
+        .merge(storage_routes())
+        .merge(reports_routes())
+        .merge(spreadsheet_routes())
+        .merge(user_routes())
+        // Apply hybrid authentication middleware that supports both Shibboleth and JWT
+        .layer(axum::middleware::from_fn(
+            middleware::hybrid_auth_middleware,
+        ))
+}
+
 /// Assemble all routes into a complete application router
 pub fn create_app_router() -> Router<AppComponents> {
     tracing::info!("🔧 Creating application router");
@@ -212,42 +238,12 @@ pub fn create_app_router() -> Router<AppComponents> {
             health_routes()
         })
         .merge({
-            tracing::info!("📝 Merging template routes");
-            template_routes()
-        })
-        .merge({
-            tracing::info!("🤖 Merging RAG proxy routes");
-            rag_proxy_routes()
-        })
-        .merge({
-            tracing::info!("🧪 Merging sample routes");
-            sample_routes()
-        })
-        .merge({
-            tracing::info!("🧬 Merging sequencing routes");
-            sequencing_routes()
-        })
-        .merge({
-            tracing::info!("📦 Merging storage routes");
-            storage_routes()
-        })
-        .merge({
-            tracing::info!("📊 Merging reports routes");
-            reports_routes()
-        })
-        .merge({
-            tracing::info!("📈 About to merge spreadsheet routes");
-            let spreadsheet_router = spreadsheet_routes();
-            tracing::info!("📈 Spreadsheet routes ready for merge");
-            spreadsheet_router
-        })
-        .merge({
-            tracing::info!("👤 Merging user routes");
-            user_routes()
+            tracing::info!("🔐 Merging authenticated routes");
+            create_authenticated_routes()
         })
         .layer(CorsLayer::permissive());
 
-    tracing::info!("✅ Application router created successfully");
+    tracing::info!("✅ Application router created successfully with hybrid authentication support");
     router
 }
 

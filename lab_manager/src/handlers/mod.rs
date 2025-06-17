@@ -35,5 +35,6 @@ pub use templates::{
 pub use users::{
     change_password, confirm_password_reset, create_user, delete_user, get_current_user, get_user,
     get_user_sessions, list_users, login, logout, request_password_reset, revoke_all_sessions,
-    revoke_session, update_current_user, update_user,
+    revoke_session, shibboleth_login_redirect, shibboleth_logout_redirect, update_current_user,
+    update_user,
 };
