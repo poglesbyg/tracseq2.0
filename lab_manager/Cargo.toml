@@ -59,9 +59,6 @@ axum-extra = { version = "0.9", features = ["typed-header"] }
 tower = { version = "0.4", features = ["util"] }
 headers = "0.4"
 
-# Pin base64ct to avoid edition2024 requirement
-base64ct = "1.6"
-
 [dev-dependencies]
 axum-test = "15.0"
 tokio-test = "0.4"

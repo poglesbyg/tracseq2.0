@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM rust:1.82-bookworm as builder
+FROM rustlang/rust:nightly-bookworm as builder
 
 WORKDIR /usr/src/app
 

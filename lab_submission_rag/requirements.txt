@@ -3,8 +3,8 @@
 langchain-core>=0.1.0  # Use core only instead of full langchain
 chromadb>=0.4.0
 # sentence-transformers>=2.2.0  # HEAVY! Replace with lighter alternative
-transformers[torch]>=4.30.0  # Lighter than sentence-transformers
-torch>=2.0.0 --index-url https://download.pytorch.org/whl/cpu  # CPU-only torch
+transformers>=4.30.0  # Lighter than sentence-transformers - removed [torch] extra
+torch>=2.0.0  # CPU-only torch - removed custom index to avoid hash conflicts
 numpy>=1.24.0
 
 # Document Processing

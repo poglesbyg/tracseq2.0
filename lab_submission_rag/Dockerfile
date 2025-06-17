@@ -15,7 +15,10 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install Python dependencies with memory optimizations
-RUN pip install --no-cache-dir --compile \
+# Update pip first to avoid hash verification issues
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir --compile \
+    --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org \
     -r requirements.txt && \
     python -m compileall /usr/local/lib/python3.11/site-packages/ && \
     pip uninstall -y pip setuptools wheel

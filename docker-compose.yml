@@ -94,7 +94,7 @@ services:
   rag-service:
     build:
       context: ./lab_submission_rag
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile  # Use Dockerfile.lite for lightweight builds if dependency issues occur
     ports:
       - "${RAG_SERVICE_PORT:-8000}:8000"
     environment:

@@ -1,0 +1,42 @@
+# Ultra-Lightweight RAG Service Dockerfile
+# Uses minimal dependencies for faster builds and smaller images
+FROM python:3.11-slim
+
+# Install minimal system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    pkg-config \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+WORKDIR /app
+
+# Copy lite requirements for faster builds
+COPY requirements-lite.txt .
+
+# Install minimal Python dependencies
+# Use pip install without hash verification for faster builds
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir \
+    --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org \
+    -r requirements-lite.txt && \
+    python -m compileall /usr/local/lib/python3.11/site-packages/ 
+
+# Copy application code
+COPY . .
+
+# Create necessary directories
+RUN mkdir -p uploads exports logs data
+
+# Set lightweight environment variables
+ENV PYTHONOPTIMIZE=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Use lightweight service
+CMD ["python", "simple_frontend_bridge.py"] 
