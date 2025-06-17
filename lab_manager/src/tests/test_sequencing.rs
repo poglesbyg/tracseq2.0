@@ -3,6 +3,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::config::database::Database;
+use crate::config::database::DatabaseConfig;
+use crate::models::storage::BarcodeConfig;
 use crate::sequencing::{CreateJob, JobStatus, SequencingJob, SequencingManager};
 
 /// Test helper to create database connection

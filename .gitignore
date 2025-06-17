@@ -436,3 +436,7 @@ id_ed25519
 *.exe
 *.out
 *.app 
+
+.giga/
+.cursor/
+.cursorrules

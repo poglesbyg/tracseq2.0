@@ -1,10 +1,10 @@
 [package]
 name = "lab_manager"
-version.workspace = true
-edition.workspace = true
+version = "0.1.0"
+edition = "2021"
 description = "Laboratory Sample Management System for biological sample processing, storage tracking, and sequencing workflows"
-license.workspace = true
-repository.workspace = true
+license = "MIT"
+repository = "https://github.com/poglesbyg/tracseq2.0"
 keywords = ["laboratory", "sample-management", "sequencing", "storage", "biotech"]
 categories = ["science", "database"]
 default-run = "lab_manager"
@@ -28,14 +28,14 @@ opt-level = "z"          # Optimize aggressively for size
 lto = "fat"              # Full LTO for maximum size reduction
 
 [dependencies]
-# Workspace dependencies
-tokio.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-uuid.workspace = true
-chrono.workspace = true
-anyhow.workspace = true
-thiserror.workspace = true
+# Core async runtime and utilities
+tokio = { version = "1.36", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.6.1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1.0"
+thiserror = "1.0"
 
 # Project-specific dependencies
 sqlx = { version = "0.8.1", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "json", "chrono", "macros", "migrate"] }
