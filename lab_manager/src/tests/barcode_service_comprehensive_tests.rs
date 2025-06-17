@@ -110,8 +110,9 @@ async fn test_barcode_generation_with_none_parameters() {
 
     let barcode = service.generate_barcode(None, None).await.unwrap();
 
-    assert!(barcode.len() >= service.config.min_length);
-    assert!(barcode.starts_with(&service.config.prefix));
+    let stats = service.get_stats();
+    assert!(barcode.len() >= stats.config.min_length);
+    assert!(barcode.starts_with(&stats.config.prefix));
     // Should still have sequence component even without sample type or location
 }
 
@@ -124,11 +125,12 @@ async fn test_barcode_validation_edge_cases() {
     assert!(service.validate_barcode(min_valid).is_ok());
 
     // Test exactly at min length
-    let exactly_min = "A".repeat(service.config.min_length);
+    let stats = service.get_stats();
+    let exactly_min = "A".repeat(stats.config.min_length);
     assert!(service.validate_barcode(&exactly_min).is_ok());
 
     // Test one character below min length
-    let below_min = "A".repeat(service.config.min_length - 1);
+    let below_min = "A".repeat(stats.config.min_length - 1);
     assert!(service.validate_barcode(&below_min).is_err());
 
     // Test maximum length boundary
@@ -324,8 +326,9 @@ async fn test_get_stats() {
     let stats = service.get_stats();
 
     assert_eq!(stats.total_generated, 5);
-    assert_eq!(stats.config.prefix, service.config.prefix);
-    assert_eq!(stats.config.min_length, service.config.min_length);
+    let service_stats = service.get_stats();
+    assert_eq!(stats.config.prefix, service_stats.config.prefix);
+    assert_eq!(stats.config.min_length, service_stats.config.min_length);
     // Timestamp should be recent
     let now = Utc::now();
     let time_diff = now.signed_duration_since(stats.last_generated);

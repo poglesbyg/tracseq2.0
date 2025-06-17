@@ -58,6 +58,7 @@ mod tests {
                 cors_enabled: false,
             },
             rag: crate::config::RagIntegrationConfig::default(),
+            shibboleth: crate::config::ShibbolethConfig::default(),
         };
 
         assert_eq!(custom_config.server.port, 8080);

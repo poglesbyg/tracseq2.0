@@ -64,7 +64,7 @@ pub async fn shibboleth_auth_middleware(
 }
 
 /// Extract Shibboleth attributes from HTTP headers
-fn extract_shibboleth_attributes(headers: &HeaderMap) -> HashMap<String, String> {
+pub fn extract_shibboleth_attributes(headers: &HeaderMap) -> HashMap<String, String> {
     let mut attributes = HashMap::new();
 
     // Common Shibboleth attribute headers
@@ -134,8 +134,10 @@ async fn create_user_from_shibboleth(
     attributes: &HashMap<String, String>,
 ) -> Result<User, Box<dyn std::error::Error + Send + Sync>> {
     let email = attributes.get("mail").ok_or("Missing email attribute")?;
-    let given_name = attributes.get("givenName").unwrap_or("Unknown");
-    let surname = attributes.get("surname").unwrap_or("User");
+    let given_name = attributes
+        .get("givenName")
+        .map_or("Unknown", |s| s.as_str());
+    let surname = attributes.get("surname").map_or("User", |s| s.as_str());
     let display_name = attributes
         .get("displayName")
         .cloned()
@@ -146,20 +148,21 @@ async fn create_user_from_shibboleth(
 
     let user_request = crate::models::user::CreateUserRequest {
         email: email.clone(),
-        password: None, // No password needed for Shibboleth users
+        password: format!("shibboleth-{}", uuid::Uuid::new_v4()), // Placeholder password for Shibboleth users
         first_name: given_name.to_string(),
         last_name: surname.to_string(),
         role,
         department: attributes.get("department").cloned(),
-        institution: attributes.get("institution").cloned(),
+        position: None,
         phone: None,
+        office_location: None,
         lab_affiliation: attributes.get("affiliation").cloned(),
     };
 
-    let user = components.user_manager.create_user(user_request).await?;
-
-    // Mark user as verified since they're authenticated via Shibboleth
-    components.user_manager.mark_email_verified(user.id).await?;
+    let user = components
+        .user_manager
+        .create_user(user_request, None)
+        .await?;
 
     Ok(user)
 }
@@ -197,14 +200,16 @@ async fn update_user_from_shibboleth(
 
     if updated {
         let update_request = crate::models::user::UpdateUserRequest {
+            email: None,
             first_name: Some(user.first_name.clone()),
             last_name: Some(user.last_name.clone()),
             role: Some(user.role.clone()),
-            department: user.department.clone(),
-            institution: user.institution.clone(),
-            phone: user.phone.clone(),
-            lab_affiliation: user.lab_affiliation.clone(),
             status: None, // Don't change status
+            lab_affiliation: user.lab_affiliation.clone(),
+            department: user.department.clone(),
+            position: None,
+            phone: user.phone.clone(),
+            office_location: None,
         };
 
         components
@@ -217,7 +222,7 @@ async fn update_user_from_shibboleth(
 }
 
 /// Map Shibboleth entitlements/roles to lab management system roles
-fn map_shibboleth_role_to_lab_role(attributes: &HashMap<String, String>) -> UserRole {
+pub fn map_shibboleth_role_to_lab_role(attributes: &HashMap<String, String>) -> UserRole {
     // Check for explicit lab role attribute first
     if let Some(lab_role) = attributes.get("labRole") {
         match lab_role.to_lowercase().as_str() {

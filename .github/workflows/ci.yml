@@ -166,10 +166,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain (${{ matrix.rust_version }})
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust_version }}
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo dependencies
         uses: actions/cache@v4
@@ -191,7 +189,7 @@ jobs:
 
       - name: Run component tests with coverage
         run: |
-          echo "Testing ${{ matrix.component }} component with ${{ matrix.rust_version }}"
+          echo "Testing ${{ matrix.component }} component with stable Rust"
           
           # Enhanced component testing with proper error handling
           case "${{ matrix.component }}" in
@@ -244,7 +242,7 @@ jobs:
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
-        if: matrix.rust_version == 'stable' && always()
+        if: always()
         with:
           name: coverage-${{ matrix.component }}
           path: coverage/

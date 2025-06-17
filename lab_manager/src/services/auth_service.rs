@@ -440,7 +440,7 @@ impl AuthService {
 
     // Private helper methods
 
-    async fn create_session(
+    pub async fn create_session(
         &self,
         user_id: Uuid,
         ip_address: Option<IpAddr>,

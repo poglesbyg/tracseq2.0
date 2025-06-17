@@ -211,7 +211,7 @@ pub fn user_routes() -> Router<AppComponents> {
         .route("/api/users/:user_id", delete(handlers::delete_user))
 }
 
-/// Create authenticated routes with hybrid authentication middleware
+/// Create authenticated routes (middleware applied at app level)
 pub fn create_authenticated_routes() -> Router<AppComponents> {
     Router::new()
         .merge(template_routes())
@@ -222,10 +222,6 @@ pub fn create_authenticated_routes() -> Router<AppComponents> {
         .merge(reports_routes())
         .merge(spreadsheet_routes())
         .merge(user_routes())
-        // Apply hybrid authentication middleware that supports both Shibboleth and JWT
-        .layer(axum::middleware::from_fn(
-            middleware::hybrid_auth_middleware,
-        ))
 }
 
 /// Assemble all routes into a complete application router
