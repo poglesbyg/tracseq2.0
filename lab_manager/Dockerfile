@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM rustlang/rust:nightly as builder
+FROM rust:1.82-bookworm as builder
 
 WORKDIR /usr/src/app
 
@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency files first for better caching
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
 # Create dummy source files to build dependencies
 RUN mkdir -p src/bin && \
@@ -22,8 +22,8 @@ RUN mkdir -p src/bin && \
     echo "fn main() {}" > src/bin/test_password.rs && \
     echo "fn main() {}" > src/bin/test_rag_client.rs
 
-# Build dependencies first (this will be cached)
-RUN cargo build --release && rm -rf src/
+# Update dependencies to compatible versions and build
+RUN cargo update && cargo build --release && rm -rf src/
 
 # Copy the actual source code
 COPY . .

@@ -1,0 +1,402 @@
+name: Deploy TracSeq 2.0 to Azure Container Apps
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+
+env:
+  REGISTRY_NAME: tracseqregistry
+  RESOURCE_GROUP: tracseq-rg
+  NODE_VERSION: '20'
+  RUST_VERSION: '1.75'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Test and build jobs
+  test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: lab_manager/frontend/package-lock.json
+    
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ env.RUST_VERSION }}
+        profile: minimal
+        override: true
+        components: rustfmt, clippy
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Cache Rust dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          lab_manager/target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Install frontend dependencies
+      working-directory: lab_manager/frontend
+      run: npm ci
+    
+    - name: Install Python dependencies
+      working-directory: lab_submission_rag
+      run: |
+        pip install -r requirements.txt
+        pip install pytest flake8
+    
+    - name: Run frontend tests
+      working-directory: lab_manager/frontend
+      run: |
+        npm run lint
+        npm test -- --coverage --watchAll=false
+    
+    - name: Run Rust tests
+      working-directory: lab_manager
+      run: |
+        cargo fmt -- --check
+        cargo clippy -- -D warnings
+        cargo test
+    
+    - name: Run Python tests
+      working-directory: lab_submission_rag
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        pytest tests/ -v
+
+  # Security scanning
+  security:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Build and push container images
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || 
+        (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+        github.event_name == 'workflow_dispatch'
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Login to Azure Container Registry
+      run: az acr login --name ${{ env.REGISTRY_NAME }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY_NAME }}.azurecr.io/tracseq
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Build and push frontend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./lab_manager/frontend
+        file: ./lab_manager/frontend/Dockerfile
+        push: true
+        tags: ${{ env.REGISTRY_NAME }}.azurecr.io/tracseq-frontend:${{ github.sha }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+    
+    - name: Build and push backend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./lab_manager
+        file: ./lab_manager/Dockerfile
+        push: true
+        tags: ${{ env.REGISTRY_NAME }}.azurecr.io/tracseq-backend:${{ github.sha }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+    
+    - name: Build and push RAG service image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./lab_submission_rag
+        file: ./lab_submission_rag/Dockerfile
+        push: true
+        tags: ${{ env.REGISTRY_NAME }}.azurecr.io/tracseq-rag:${{ github.sha }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+    
+    - name: Pull and push Ollama image
+      run: |
+        docker pull ollama/ollama:latest
+        docker tag ollama/ollama:latest ${{ env.REGISTRY_NAME }}.azurecr.io/tracseq-ollama:${{ github.sha }}
+        docker push ${{ env.REGISTRY_NAME }}.azurecr.io/tracseq-ollama:${{ github.sha }}
+
+  # Deploy to Azure Container Apps
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || 
+        (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+        github.event_name == 'workflow_dispatch'
+    
+    environment: 
+      name: ${{ github.event.inputs.environment || 'production' }}
+      url: ${{ steps.deploy.outputs.frontend-url }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Deploy Ollama service to Container Apps
+      id: deploy-ollama
+      run: |
+        echo "Deploying Ollama service..."
+        az containerapp update \
+          --name tracseq-ollama \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --image ${{ env.REGISTRY_NAME }}.azurecr.io/tracseq-ollama:${{ github.sha }}
+        
+        # Get Ollama service URL
+        OLLAMA_URL=$(az containerapp show \
+          --name tracseq-ollama \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --query properties.configuration.ingress.fqdn \
+          --output tsv)
+        echo "ollama-url=https://${OLLAMA_URL}" >> $GITHUB_OUTPUT
+    
+    - name: Deploy RAG service to Container Apps
+      id: deploy-rag
+      run: |
+        echo "Deploying RAG service..."
+        az containerapp update \
+          --name tracseq-rag \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --image ${{ env.REGISTRY_NAME }}.azurecr.io/tracseq-rag:${{ github.sha }} \
+          --set-env-vars \
+            USE_OLLAMA=true \
+            LLM_PROVIDER=ollama \
+            OLLAMA_BASE_URL=${{ steps.deploy-ollama.outputs.ollama-url }} \
+            OLLAMA_MODEL=llama3.2:3b
+        
+        # Get RAG service URL
+        RAG_URL=$(az containerapp show \
+          --name tracseq-rag \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --query properties.configuration.ingress.fqdn \
+          --output tsv)
+        echo "rag-url=https://${RAG_URL}" >> $GITHUB_OUTPUT
+    
+    - name: Deploy backend service to Container Apps
+      id: deploy-backend
+      run: |
+        echo "Deploying backend service..."
+        az containerapp update \
+          --name tracseq-backend \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --image ${{ env.REGISTRY_NAME }}.azurecr.io/tracseq-backend:${{ github.sha }} \
+          --set-env-vars RAG_SERVICE_URL=${{ steps.deploy-rag.outputs.rag-url }}
+        
+        # Get backend service URL
+        BACKEND_URL=$(az containerapp show \
+          --name tracseq-backend \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --query properties.configuration.ingress.fqdn \
+          --output tsv)
+        echo "backend-url=https://${BACKEND_URL}" >> $GITHUB_OUTPUT
+    
+    - name: Deploy frontend to Container Apps
+      id: deploy-frontend
+      run: |
+        echo "Deploying frontend..."
+        az containerapp update \
+          --name tracseq-frontend \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --image ${{ env.REGISTRY_NAME }}.azurecr.io/tracseq-frontend:${{ github.sha }} \
+          --set-env-vars BACKEND_URL=${{ steps.deploy-backend.outputs.backend-url }}
+        
+        # Get frontend service URL
+        FRONTEND_URL=$(az containerapp show \
+          --name tracseq-frontend \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --query properties.configuration.ingress.fqdn \
+          --output tsv)
+        echo "frontend-url=https://${FRONTEND_URL}" >> $GITHUB_OUTPUT
+    
+    - name: Wait for deployment to stabilize
+      run: |
+        echo "Waiting for services to stabilize..."
+        sleep 60
+    
+    - name: Health check
+      id: health-check
+      run: |
+        echo "Performing health checks..."
+        
+        # Check backend health
+        BACKEND_URL="${{ steps.deploy-backend.outputs.backend-url }}"
+        for i in {1..5}; do
+          if curl -f "${BACKEND_URL}/health" >/dev/null 2>&1; then
+            echo "✅ Backend health check passed"
+            break
+          else
+            echo "⏳ Backend health check attempt $i failed, retrying..."
+            sleep 30
+          fi
+        done
+        
+        # Check RAG service health
+        RAG_URL="${{ steps.deploy-rag.outputs.rag-url }}"
+        for i in {1..5}; do
+          if curl -f "${RAG_URL}/health" >/dev/null 2>&1; then
+            echo "✅ RAG service health check passed"
+            break
+          else
+            echo "⏳ RAG service health check attempt $i failed, retrying..."
+            sleep 30
+          fi
+        done
+        
+        # Check frontend availability
+        FRONTEND_URL="${{ steps.deploy-frontend.outputs.frontend-url }}"
+        for i in {1..3}; do
+          if curl -f "${FRONTEND_URL}" >/dev/null 2>&1; then
+            echo "✅ Frontend health check passed"
+            break
+          else
+            echo "⏳ Frontend health check attempt $i failed, retrying..."
+            sleep 30
+          fi
+        done
+    
+    - name: Update deployment status
+      id: deploy
+      run: |
+        echo "frontend-url=${{ steps.deploy-frontend.outputs.frontend-url }}" >> $GITHUB_OUTPUT
+        echo "backend-url=${{ steps.deploy-backend.outputs.backend-url }}" >> $GITHUB_OUTPUT
+        echo "rag-url=${{ steps.deploy-rag.outputs.rag-url }}" >> $GITHUB_OUTPUT
+        echo "ollama-url=${{ steps.deploy-ollama.outputs.ollama-url }}" >> $GITHUB_OUTPUT
+    
+    - name: Create deployment summary
+      run: |
+        echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Deployment completed successfully!** ✅" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Service URLs:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Frontend**: [${{ steps.deploy.outputs.frontend-url }}](${{ steps.deploy.outputs.frontend-url }})" >> $GITHUB_STEP_SUMMARY
+        echo "- **Backend**: [${{ steps.deploy.outputs.backend-url }}](${{ steps.deploy.outputs.backend-url }})" >> $GITHUB_STEP_SUMMARY
+        echo "- **RAG Service**: [${{ steps.deploy.outputs.rag-url }}](${{ steps.deploy.outputs.rag-url }})" >> $GITHUB_STEP_SUMMARY
+        echo "- **Ollama**: ${{ steps.deploy.outputs.ollama-url }} (internal)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🤖 LLM Configuration:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Provider**: Ollama (local inference)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Model**: llama3.2:3b" >> $GITHUB_STEP_SUMMARY
+        echo "- **Cost**: No per-token charges!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔧 Deployment Details:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment**: ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Triggered by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Resource Group**: ${{ env.RESOURCE_GROUP }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔍 Next Steps:" >> $GITHUB_STEP_SUMMARY
+        echo "1. Wait 5-10 minutes for Ollama to download the model" >> $GITHUB_STEP_SUMMARY
+        echo "2. Visit the frontend URL to access TracSeq 2.0" >> $GITHUB_STEP_SUMMARY
+        echo "3. Test RAG functionality with document upload" >> $GITHUB_STEP_SUMMARY
+        echo "4. Monitor services in Azure Portal" >> $GITHUB_STEP_SUMMARY
+        echo "5. Check application logs if needed" >> $GITHUB_STEP_SUMMARY
+
+  # Cleanup on failure
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: [build, deploy]
+    if: failure() && github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Rollback deployment (if needed)
+      run: |
+        echo "Deployment failed. Consider rolling back if necessary."
+        echo "To rollback manually:"
+        echo "1. Go to Azure Portal"
+        echo "2. Navigate to Container Apps"
+        echo "3. Select the service and rollback to previous revision"
+    
+    - name: Notify team of failure
+      if: always()
+      run: |
+        echo "❌ Deployment failed!" >> $GITHUB_STEP_SUMMARY
+        echo "Please check the logs and consider manual intervention." >> $GITHUB_STEP_SUMMARY 

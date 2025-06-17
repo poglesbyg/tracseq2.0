@@ -37,6 +37,7 @@ docker-compose up -d app frontend    # Application layer
 - 🌐 **Frontend**: http://localhost:5173 (dev) / http://localhost:8080 (prod)
 - 🔧 **Lab Manager API**: http://localhost:3000  
 - 📊 **RAG Service**: http://localhost:8000
+- 🤖 **Ollama LLM**: http://localhost:11434
 - 🗄️ **Database**: localhost:5433
 
 ## 🏗️ Repository Structure
@@ -110,6 +111,7 @@ tracseq2.0/                          # 🏠 Workspace Root
 ### 📊 **Data Processing**
 - **Multi-Format Spreadsheet Support** - CSV, XLS, XLSX with template-based processing
 - **RAG Document Analysis** - Confidence scoring for data extraction quality
+- **Local LLM Inference** - Ollama integration with llama3.2:3b (no API costs!)
 - **Advanced Search & Filtering** - Semantic search across all sample data
 - **Real-time Data Validation** - Laboratory-specific validation rules
 
@@ -131,14 +133,14 @@ Deploy:    Docker + Compose + GitHub Actions
 
 ### **Service Architecture**
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   React SPA     │    │  Rust Backend   │    │  Python RAG     │
-│  (Frontend)     │◄──►│ (Lab Manager)   │◄──►│   (AI Service)  │
-│                 │    │                 │    │                 │
-│ • Sample UI     │    │ • REST API      │    │ • Doc Analysis  │
-│ • Dashboard     │    │ • Auth Service  │    │ • AI Models     │
-│ • Storage Mgmt  │    │ • Sample Logic  │    │ • Confidence    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   React SPA     │    │  Rust Backend   │    │  Python RAG     │    │     Ollama      │
+│  (Frontend)     │◄──►│ (Lab Manager)   │◄──►│   (AI Service)  │◄──►│   (Local LLM)   │
+│                 │    │                 │    │                 │    │                 │
+│ • Sample UI     │    │ • REST API      │    │ • Doc Analysis  │    │ • llama3.2:3b   │
+│ • Dashboard     │    │ • Auth Service  │    │ • AI Models     │    │ • No API costs  │
+│ • Storage Mgmt  │    │ • Sample Logic  │    │ • Confidence    │    │ • Privacy-first │
+└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘
                                  ▼
@@ -207,6 +209,10 @@ cd frontend && npm run dev          # Frontend development
 # RAG Service (Python)
 cd lab_submission_rag
 python -m uvicorn api.main:app --reload
+
+# Ollama Setup (First Time)
+./deploy/azure/ollama-init.sh       # Linux/macOS
+./deploy/azure/ollama-init.ps1      # Windows PowerShell
 ```
 
 ### **Windows-Specific Setup**

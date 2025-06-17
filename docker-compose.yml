@@ -72,6 +72,25 @@ services:
     networks:
       - lab_network
 
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - lab_network
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    # Healthcheck to ensure Ollama is ready
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   rag-service:
     build:
       context: ./lab_submission_rag
@@ -81,12 +100,24 @@ services:
     environment:
       - POSTGRES_URL=${DATABASE_URL:-postgres://postgres:postgres@db:5432/lab_manager}
       - RAG_LOG_LEVEL=${RAG_LOG_LEVEL:-INFO}
+      # Ollama Configuration
+      - USE_OLLAMA=${USE_OLLAMA:-true}
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.7}
+      - MAX_TOKENS=${MAX_TOKENS:-2048}
+      # Optional API keys (fallback if Ollama not available)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     depends_on:
       - db
+      - ollama
     networks:
       - lab_network
     volumes:
       - rag_storage:/app/uploads
+    restart: unless-stopped
 
   db:
     image: postgres:15
@@ -106,6 +137,7 @@ volumes:
   app_storage:
   rag_storage:
   cargo_cache:
+  ollama_data:
 
 networks:
   lab_network:
