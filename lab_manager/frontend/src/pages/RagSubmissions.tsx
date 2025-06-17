@@ -71,13 +71,21 @@ export default function RagSubmissions() {
   }, [isPreviewMode]);
 
   // Fetch existing RAG submissions
-  const { data: ragSubmissions, isLoading: isLoadingSubmissions } = useQuery<RagSubmission[]>({
+  const { data: ragSubmissions, isLoading: isLoadingSubmissions, error: submissionsError } = useQuery<RagSubmission[]>({
     queryKey: ['rag-submissions'],
     queryFn: async () => {
-      const url = `${API_CONFIG.rag.baseUrl}/api/rag/submissions`;
-      const response = await axios.get(url);
-      return response.data;
+      try {
+        const url = `${API_CONFIG.rag.baseUrl}/api/rag/submissions`;
+        const response = await axios.get(url);
+        return response.data;
+      } catch (error) {
+        console.error('Failed to fetch RAG submissions:', error);
+        // Return empty array on error to prevent crashes
+        return [];
+      }
     },
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Process document mutation
@@ -233,7 +241,19 @@ export default function RagSubmissions() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
               <p className="mt-2 text-sm text-gray-500">Loading submissions...</p>
             </div>
-          ) : ragSubmissions && ragSubmissions.length > 0 ? (
+          ) : submissionsError ? (
+            <div className="text-center py-4">
+              <div className="text-yellow-600 mb-2">
+                <ExclamationTriangleIcon className="h-8 w-8 mx-auto" />
+              </div>
+              <p className="text-sm text-gray-600">
+                Unable to load RAG submissions. The RAG service may be unavailable.
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                You can still upload documents for processing.
+              </p>
+            </div>
+          ) : ragSubmissions && Array.isArray(ragSubmissions) && ragSubmissions.length > 0 ? (
             <div className="space-y-3">
               {ragSubmissions.map((submission) => (
                 <div key={submission.id} className="border border-gray-200 rounded-md p-4 hover:bg-gray-50">

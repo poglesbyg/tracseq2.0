@@ -95,6 +95,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (error) {
           console.error('Failed to verify token:', error);
           localStorage.removeItem('auth_token');
+          // Don't immediately fail - try auto-login first
         }
       }
       
@@ -118,10 +119,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           localStorage.setItem('auth_token', token);
           console.log('Auto-login successful');
         } else {
-          throw new Error('Login request failed');
+          throw new Error(`Login request failed with status: ${response.status}`);
         }
       } catch (error) {
-        console.log('Auto-login failed, creating mock admin user for development');
+        console.log('Backend not available, using development mode with mock admin user');
         // If login fails, create a mock admin user for development
         const mockAdminUser: User = {
           id: 'mock-admin-id',
@@ -130,11 +131,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           last_name: 'User',
           role: 'lab_administrator',
           status: 'active',
+          lab_affiliation: 'Development Lab',
+          department: 'IT',
+          position: 'Administrator',
           email_verified: true,
           created_at: new Date().toISOString(),
         };
         setUser(mockAdminUser);
         localStorage.setItem('auth_token', 'mock-admin-token');
+        console.log('Development mode: Mock admin user created');
       }
       
       setIsLoading(false);
