@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard';
 import Templates from './pages/Templates';
 import Samples from './pages/Samples';
 import RagSubmissions from './pages/RagSubmissions';
+import RagSamples from './pages/RagSamples';
 import Sequencing from './pages/Sequencing';
 import Spreadsheets from './pages/Spreadsheets';
 import Storage from './pages/Storage';
@@ -34,6 +35,7 @@ export default function App() {
                 <Route path="/templates" element={<Templates />} />
                 <Route path="/samples" element={<Samples />} />
                 <Route path="/rag-submissions" element={<RagSubmissions />} />
+                <Route path="/rag-samples" element={<RagSamples />} />
                 <Route path="/sequencing" element={<Sequencing />} />
                 <Route path="/spreadsheets" element={<Spreadsheets />} />
                 <Route path="/storage" element={<Storage />} />

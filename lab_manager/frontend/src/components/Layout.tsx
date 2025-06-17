@@ -12,6 +12,7 @@ import {
   TableCellsIcon,
   UsersIcon,
   SparklesIcon,
+  CpuChipIcon,
 } from '@heroicons/react/24/outline';
 import { UserMenu } from './UserMenu';
 import { useAuth } from '../auth/AuthContext';
@@ -28,6 +29,7 @@ export default function Layout({ children }: LayoutProps) {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: HomeIcon },
     { name: 'AI Submissions', href: '/rag-submissions', icon: SparklesIcon },
+    { name: 'AI Samples', href: '/rag-samples', icon: CpuChipIcon },
     { name: 'Templates', href: '/templates', icon: DocumentIcon },
     { name: 'Samples', href: '/samples', icon: BeakerIcon },
     { name: 'Sequencing', href: '/sequencing', icon: QueueListIcon },
