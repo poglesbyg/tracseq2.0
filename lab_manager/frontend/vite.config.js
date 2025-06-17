@@ -26,7 +26,7 @@ export default defineConfig({
             },
             // All other API calls - route to lab manager backend (Docker service name)
             '/api': {
-                target: 'http://lab-manager-dev:3000',
+                target: 'http://dev:3000',
                 changeOrigin: true,
                 secure: false,
                 configure: function (proxy, _options) {
@@ -42,7 +42,7 @@ export default defineConfig({
                 },
             },
             '/health': {
-                target: 'http://lab-manager-dev:3000',
+                target: 'http://dev:3000',
                 changeOrigin: true,
                 secure: false,
             },
