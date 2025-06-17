@@ -16,34 +16,37 @@ catch {
 
 # Copy environment file if needed
 if (-not (Test-Path ".env")) {
-    Copy-Item "tracseq.env" ".env"
-    Write-Host "📋 Created .env file from tracseq.env" -ForegroundColor Yellow
+    Copy-Item "deploy/tracseq.env" ".env"
+    Write-Host "📋 Created .env file from deploy/tracseq.env" -ForegroundColor Yellow
 }
 
 Write-Host "🚀 Starting services in $Mode mode..." -ForegroundColor Blue
 
+# Define the correct docker-compose file path
+$composeFile = "deploy/development/docker-compose.unified.yml"
+
 # Start core services first
 Write-Host "  Starting PostgreSQL..." -ForegroundColor Cyan
-docker-compose -f docker-compose.unified.yml up -d postgres
+docker-compose -f $composeFile up -d postgres
 Start-Sleep -Seconds 5
 
 Write-Host "  Starting Ollama..." -ForegroundColor Cyan  
-docker-compose -f docker-compose.unified.yml up -d ollama
+docker-compose -f $composeFile up -d ollama
 Start-Sleep -Seconds 10
 
 Write-Host "  Starting RAG service..." -ForegroundColor Cyan
-docker-compose -f docker-compose.unified.yml up -d rag-service
+docker-compose -f $composeFile up -d rag-service
 Start-Sleep -Seconds 5
 
 # Start Lab Manager services
 Write-Host "  Starting Lab Manager..." -ForegroundColor Cyan
 if ($Mode -eq "dev") {
-    docker-compose -f docker-compose.unified.yml up -d lab-manager-dev lab-manager-frontend-dev
+    docker-compose -f $composeFile up -d lab-manager-dev lab-manager-frontend-dev
     $frontend = "5173"
     $backend = "3000"
 } else {
     $env:COMPOSE_PROFILES = "production"
-    docker-compose -f docker-compose.unified.yml --profile production up -d lab-manager-prod lab-manager-frontend-prod
+    docker-compose -f $composeFile --profile production up -d lab-manager-prod lab-manager-frontend-prod
     $frontend = "8080"
     $backend = "3001"
 }
@@ -58,8 +61,8 @@ Write-Host "   RAG Service:  http://localhost:8000" -ForegroundColor White
 Write-Host "   Database:     localhost:5433" -ForegroundColor White
 Write-Host ""
 Write-Host "🔧 Useful commands:" -ForegroundColor Yellow
-Write-Host "   docker-compose -f docker-compose.unified.yml ps      # Show status"
-Write-Host "   docker-compose -f docker-compose.unified.yml logs    # Show logs"
-Write-Host "   docker-compose -f docker-compose.unified.yml down    # Stop all"
+Write-Host "   docker-compose -f $composeFile ps      # Show status"
+Write-Host "   docker-compose -f $composeFile logs    # Show logs"
+Write-Host "   docker-compose -f $composeFile down    # Stop all"
 Write-Host ""
 Write-Host "⏳ Note: Ollama model download happens in background (may take 5-10 minutes)" 

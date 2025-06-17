@@ -8,9 +8,9 @@ export default defineConfig({
     host: true,
     port: 5173,
     proxy: {
-      // RAG API - route to RAG service on port 8000 (local development)
+      // RAG API - route to RAG service (containerized development)
       '/api/rag': {
-        target: 'http://localhost:8000',
+        target: process.env.RAG_API_URL || 'http://rag-service:8000',
         changeOrigin: true,
         secure: false,
         configure: (proxy, _options) => {
@@ -25,9 +25,9 @@ export default defineConfig({
           });
         },
       },
-      // All other API calls - route to lab manager backend (local development)
+      // All other API calls - route to lab manager backend (containerized development)
       '/api': {
-        target: 'http://localhost:3001',
+        target: process.env.BACKEND_URL || 'http://lab-manager-dev:3000',
         changeOrigin: true,
         secure: false,
         configure: (proxy, _options) => {
@@ -43,7 +43,7 @@ export default defineConfig({
         },
       },
       '/health': {
-        target: 'http://localhost:3001',
+        target: process.env.BACKEND_URL || 'http://lab-manager-dev:3000',
         changeOrigin: true,
         secure: false,
       },

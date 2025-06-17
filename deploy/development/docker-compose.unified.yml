@@ -43,7 +43,7 @@ services:
   # RAG Service
   rag-service:
     build:
-      context: ./lab_submission_rag
+      context: ../../lab_submission_rag
       dockerfile: Dockerfile
     container_name: tracseq_rag
     ports:
@@ -105,14 +105,13 @@ services:
   # Lab Manager Backend (Development)
   lab-manager-dev:
     build:
-      context: ./lab_manager
+      context: ../../lab_manager
       dockerfile: Dockerfile.dev
     container_name: tracseq_lab_manager_dev
     command: cargo watch -x "run --bin lab_manager"
     ports:
       - "${BACKEND_DEV_PORT:-3000}:3000"
     volumes:
-      - ./lab_manager:/usr/src/app
       - lab_storage:/usr/local/bin/storage
       - cargo_cache:/usr/local/cargo/registry
     environment:
@@ -144,7 +143,7 @@ services:
   # Lab Manager Backend (Production)
   lab-manager-prod:
     build:
-      context: ./lab_manager
+      context: ../../lab_manager
       dockerfile: Dockerfile
     container_name: tracseq_lab_manager_prod
     ports:
@@ -180,13 +179,12 @@ services:
   # Lab Manager Frontend (Development)
   lab-manager-frontend-dev:
     build:
-      context: ./lab_manager/frontend
+      context: ../../lab_manager/frontend
       dockerfile: Dockerfile.dev
     container_name: tracseq_frontend_dev
     ports:
       - "${FRONTEND_DEV_PORT:-5173}:5173"
     volumes:
-      - ./lab_manager/frontend:/app
       - /app/node_modules
     environment:
       - NODE_ENV=development
@@ -201,7 +199,7 @@ services:
   # Lab Manager Frontend (Production)
   lab-manager-frontend-prod:
     build:
-      context: ./lab_manager/frontend
+      context: ../../lab_manager/frontend
       dockerfile: Dockerfile
     container_name: tracseq_frontend_prod
     ports:
