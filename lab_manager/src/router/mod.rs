@@ -1,10 +1,11 @@
 use axum::{
+    middleware,
     routing::{delete, get, post, put},
     Router,
 };
 use tower_http::cors::CorsLayer;
 
-use crate::{handlers, middleware, AppComponents};
+use crate::{handlers, middleware::auth, AppComponents};
 
 /// Health and system routes
 pub fn health_routes() -> Router<AppComponents> {
@@ -169,8 +170,8 @@ pub fn spreadsheet_routes() -> Router<AppComponents> {
 
 /// User management and authentication routes
 pub fn user_routes() -> Router<AppComponents> {
-    Router::new()
-        // Public authentication routes
+    // Public routes (no authentication required)
+    let public_routes = Router::new()
         .route("/api/auth/login", post(handlers::login))
         .route(
             "/api/auth/reset-password",
@@ -188,8 +189,10 @@ pub fn user_routes() -> Router<AppComponents> {
         .route(
             "/shibboleth-logout",
             get(handlers::shibboleth_logout_redirect),
-        )
-        // Protected user routes (authentication handled in handlers)
+        );
+
+    // Protected routes (authentication required)
+    let protected_routes = Router::new()
         .route("/api/auth/logout", post(handlers::logout))
         .route("/api/users/me", get(handlers::get_current_user))
         .route("/api/users/me", put(handlers::update_current_user))
@@ -208,7 +211,10 @@ pub fn user_routes() -> Router<AppComponents> {
         .route("/api/users", get(handlers::list_users))
         .route("/api/users/:user_id", get(handlers::get_user))
         .route("/api/users/:user_id", put(handlers::update_user))
-        .route("/api/users/:user_id", delete(handlers::delete_user))
+        .route("/api/users/:user_id", delete(handlers::delete_user));
+
+    // Combine public and protected routes
+    Router::new().merge(public_routes).merge(protected_routes)
 }
 
 /// Create authenticated routes (middleware applied at app level)
@@ -228,14 +234,68 @@ pub fn create_authenticated_routes() -> Router<AppComponents> {
 pub fn create_app_router() -> Router<AppComponents> {
     tracing::info!("🔧 Creating application router");
 
+    // Public routes (no authentication required)
+    let public_routes = Router::new()
+        .route("/api/auth/login", post(handlers::login))
+        .route(
+            "/api/auth/reset-password",
+            post(handlers::request_password_reset),
+        )
+        .route(
+            "/api/auth/confirm-reset",
+            post(handlers::confirm_password_reset),
+        )
+        .route(
+            "/shibboleth-login",
+            get(handlers::shibboleth_login_redirect),
+        )
+        .route(
+            "/shibboleth-logout",
+            get(handlers::shibboleth_logout_redirect),
+        );
+
+    // Authenticated routes (require valid JWT token)
+    let authenticated_routes = Router::new()
+        .merge(template_routes())
+        .merge(rag_proxy_routes())
+        .merge(sample_routes())
+        .merge(sequencing_routes())
+        .merge(storage_routes())
+        .merge(reports_routes())
+        .merge(spreadsheet_routes())
+        // Protected user routes
+        .route("/api/auth/logout", post(handlers::logout))
+        .route("/api/users/me", get(handlers::get_current_user))
+        .route("/api/users/me", put(handlers::update_current_user))
+        .route("/api/users/me/password", put(handlers::change_password))
+        .route("/api/users/me/sessions", get(handlers::get_user_sessions))
+        .route(
+            "/api/users/me/sessions",
+            delete(handlers::revoke_all_sessions),
+        )
+        .route(
+            "/api/users/me/sessions/:session_id",
+            delete(handlers::revoke_session),
+        )
+        // Admin-only routes
+        .route("/api/users", post(handlers::create_user))
+        .route("/api/users", get(handlers::list_users))
+        .route("/api/users/:user_id", get(handlers::get_user))
+        .route("/api/users/:user_id", put(handlers::update_user))
+        .route("/api/users/:user_id", delete(handlers::delete_user));
+
     let router = Router::new()
         .merge({
             tracing::info!("📋 Merging health routes");
             health_routes()
         })
         .merge({
+            tracing::info!("🔓 Merging public routes");
+            public_routes
+        })
+        .merge({
             tracing::info!("🔐 Merging authenticated routes");
-            create_authenticated_routes()
+            authenticated_routes
         })
         .layer(CorsLayer::permissive());
 
