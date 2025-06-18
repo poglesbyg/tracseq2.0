@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import {
   DocumentTextIcon,
@@ -58,6 +58,16 @@ interface RagSubmissionDetail {
   created_at: string;
   status: string;
   samples_created: number;
+  extracted_data?: {
+    administrative_info?: any;
+    source_material?: any;
+    pooling_info?: any;
+    sequence_generation?: any;
+    container_info?: any;
+    informatics_info?: any;
+    sample_details?: any;
+    [key: string]: any;
+  };
 }
 
 export default function RagSamples() {
@@ -66,7 +76,6 @@ export default function RagSamples() {
   const [confidenceFilter, setConfidenceFilter] = useState<string>('');
   const [selectedSample, setSelectedSample] = useState<RagSample | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const navigate = useNavigate();
 
   // Fetch RAG samples
   const { data: ragSamples, isLoading: isLoadingSamples, error: samplesError, refetch } = useQuery<RagSample[]>({
@@ -98,7 +107,7 @@ export default function RagSamples() {
   });
 
   // Fetch RAG submission details
-  const { data: ragSubmissionDetail } = useQuery<RagSubmissionDetail>({
+  const { data: ragSubmissionDetail, isLoading: isLoadingDetail } = useQuery<RagSubmissionDetail>({
     queryKey: ['rag-submission-detail', selectedSample?.metadata?.rag_submission_id],
     queryFn: async () => {
       if (!selectedSample?.metadata?.rag_submission_id) return null;
@@ -152,6 +161,51 @@ export default function RagSamples() {
     setSearchTerm('');
     setStatusFilter('');
     setConfidenceFilter('');
+  };
+
+  const renderExtractedDataSection = (title: string, data: any) => {
+    if (!data || typeof data !== 'object') return null;
+
+    return (
+      <div className="mb-6">
+        <h5 className="text-sm font-semibold text-gray-900 mb-3 border-b border-gray-200 pb-2">
+          {title}
+        </h5>
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {Object.entries(data).map(([key, value]) => {
+            if (value === null || value === undefined || value === '') return null;
+            
+            const displayValue = Array.isArray(value) 
+              ? value.join(', ') 
+              : typeof value === 'object' 
+                ? JSON.stringify(value, null, 2)
+                : String(value);
+
+            return (
+              <div key={key} className="border-l-2 border-blue-100 pl-3">
+                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  {key.replace(/_/g, ' ')}
+                </dt>
+                <dd className="text-sm text-gray-900 mt-1 break-words">
+                  {displayValue.length > 100 ? (
+                    <details className="cursor-pointer">
+                      <summary className="text-blue-600 hover:text-blue-800">
+                        {displayValue.substring(0, 100)}... (click to expand)
+                      </summary>
+                      <div className="mt-2 p-2 bg-gray-50 rounded text-xs font-mono whitespace-pre-wrap">
+                        {displayValue}
+                      </div>
+                    </details>
+                  ) : (
+                    displayValue
+                  )}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      </div>
+    );
   };
 
   const statusOptions = [
@@ -604,32 +658,75 @@ export default function RagSamples() {
                     </div>
                   )}
 
-                  {/* Additional Metadata */}
-                  {selectedSample.metadata && Object.keys(selectedSample.metadata).length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900 mb-3">Additional Information</h4>
-                      <div className="bg-gray-50 rounded-md p-3">
-                        <dl className="space-y-1">
-                          {Object.entries(selectedSample.metadata)
-                            .filter(([key]) => ![
-                              'confidence_score', 'processing_time', 'source_document', 
-                              'submitter_name', 'submitter_email', 'rag_submission_id',
-                              'extraction_method', 'validation_warnings', 'extraction_warnings'
-                            ].includes(key))
-                            .map(([key, value]) => (
-                              <div key={key} className="flex justify-between">
-                                <dt className="text-xs text-gray-500 capitalize">
-                                  {key.replace(/_/g, ' ')}:
-                                </dt>
-                                <dd className="text-xs font-medium text-gray-900 max-w-xs truncate" title={String(value)}>
-                                  {String(value)}
-                                </dd>
-                              </div>
-                            ))}
-                        </dl>
+                                  {/* Extracted Data from Document */}
+                {selectedSample.metadata?.rag_submission_id && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                      <DocumentTextIcon className="h-4 w-4 mr-2" />
+                      Scraped Document Data
+                    </h4>
+                    {isLoadingDetail ? (
+                      <div className="bg-gray-50 rounded-md p-6 text-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto"></div>
+                        <p className="mt-2 text-xs text-gray-500">Loading extracted data...</p>
                       </div>
+                    ) : ragSubmissionDetail?.extracted_data ? (
+                      <div className="bg-gray-50 rounded-md p-4 max-h-80 overflow-y-auto">
+                        {renderExtractedDataSection('Administrative Information', ragSubmissionDetail.extracted_data.administrative_info)}
+                        {renderExtractedDataSection('Source Material', ragSubmissionDetail.extracted_data.source_material)}
+                        {renderExtractedDataSection('Pooling Information', ragSubmissionDetail.extracted_data.pooling_info)}
+                        {renderExtractedDataSection('Sequence Generation', ragSubmissionDetail.extracted_data.sequence_generation)}
+                        {renderExtractedDataSection('Container Information', ragSubmissionDetail.extracted_data.container_info)}
+                        {renderExtractedDataSection('Informatics Requirements', ragSubmissionDetail.extracted_data.informatics_info)}
+                        {renderExtractedDataSection('Sample Details', ragSubmissionDetail.extracted_data.sample_details)}
+                        
+                        {/* Show any other extracted data sections */}
+                        {Object.entries(ragSubmissionDetail.extracted_data)
+                          .filter(([key]) => ![
+                            'administrative_info', 'source_material', 'pooling_info',
+                            'sequence_generation', 'container_info', 'informatics_info', 'sample_details'
+                          ].includes(key))
+                          .map(([key, value]) => renderExtractedDataSection(
+                            key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), 
+                            value
+                          ))
+                        }
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 rounded-md p-4 text-center">
+                        <ExclamationTriangleIcon className="h-6 w-6 text-gray-400 mx-auto" />
+                        <p className="mt-2 text-xs text-gray-500">No extracted data available</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Additional Sample Metadata */}
+                {selectedSample.metadata && Object.keys(selectedSample.metadata).length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-3">Sample Metadata</h4>
+                    <div className="bg-gray-50 rounded-md p-3">
+                      <dl className="space-y-1">
+                        {Object.entries(selectedSample.metadata)
+                          .filter(([key]) => ![
+                            'confidence_score', 'processing_time', 'source_document', 
+                            'submitter_name', 'submitter_email', 'rag_submission_id',
+                            'extraction_method', 'validation_warnings', 'extraction_warnings'
+                          ].includes(key))
+                          .map(([key, value]) => (
+                            <div key={key} className="flex justify-between">
+                              <dt className="text-xs text-gray-500 capitalize">
+                                {key.replace(/_/g, ' ')}:
+                              </dt>
+                              <dd className="text-xs font-medium text-gray-900 max-w-xs truncate" title={String(value)}>
+                                {String(value)}
+                              </dd>
+                            </div>
+                          ))}
+                      </dl>
                     </div>
-                  )}
+                  </div>
+                )}
 
                   {/* RAG Submission Link */}
                   {selectedSample.metadata?.rag_submission_id && (

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import axios from '../utils/axios';
 import { DocumentTextIcon, EyeIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import SpreadsheetViewer from '../components/SpreadsheetViewer';
 import BatchSampleCreation from '../components/BatchSampleCreation';
@@ -54,10 +54,12 @@ export default function Templates() {
       const formData = new FormData();
       formData.append('file', file);
       
-      // Add template metadata
+      // Add template metadata - backend expects CreateTemplate format
       const templateData = {
         name: file.name.replace(/\.[^/.]+$/, ""), // Remove file extension
         description: `Uploaded spreadsheet: ${file.name}`,
+        file_path: "", // Backend will set this
+        file_type: "", // Backend will set this  
         metadata: {
           originalFileName: file.name,
           fileSize: file.size,
@@ -67,11 +69,7 @@ export default function Templates() {
       
       formData.append('template', JSON.stringify(templateData));
       
-      const response = await axios.post('/api/templates/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await axios.post('/api/templates/upload', formData);
       return response.data;
     },
     onSuccess: () => {

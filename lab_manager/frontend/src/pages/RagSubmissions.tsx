@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import API_CONFIG from '../utils/api';
 import {
   DocumentArrowUpIcon,
   EyeIcon,
@@ -485,7 +484,7 @@ export default function RagSubmissions() {
                 
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-700">Samples Found</span>
-                  <span className="text-sm text-gray-900">{extractionResult.samples.length}</span>
+                  <span className="text-sm text-gray-900">{extractionResult.samples?.length || 0}</span>
                 </div>
                 
                 <div className="flex items-center justify-between">
@@ -521,11 +520,11 @@ export default function RagSubmissions() {
                   </div>
                 )}
 
-                {extractionResult.samples.length > 0 && (
+                {extractionResult.samples && extractionResult.samples.length > 0 && (
                   <div>
                     <span className="text-sm font-medium text-gray-700 block mb-2">Extracted Samples</span>
                     <div className="space-y-2">
-                      {extractionResult.samples.map((sample, index) => (
+                      {extractionResult.samples?.map((sample, index) => (
                         <div key={index} className="p-3 border border-gray-200 rounded-md">
                           <div className="flex justify-between items-start">
                             <div>
