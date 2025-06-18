@@ -110,7 +110,7 @@ pub async fn delete_sequencing_job(
             state
                 .sequencing
                 .manager
-                .update_job_status(job_id, JobStatus::Cancelled)
+                .update_job_status(job_id, JobStatus::Failed)
                 .await
                 .map(|_| StatusCode::NO_CONTENT)
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))

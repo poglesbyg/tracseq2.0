@@ -22,8 +22,8 @@ pub async fn validate_input_middleware(
     mut request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    let path = request.uri().path();
-    let method = request.method().as_str();
+    let path = request.uri().path().to_string();
+    let method = request.method().as_str().to_string();
 
     // Log request for security monitoring
     info!("Processing request: {} {}", method, path);
@@ -56,7 +56,7 @@ pub async fn validate_input_middleware(
     }
 
     // Validate content type for POST/PUT requests
-    if matches!(method, "POST" | "PUT" | "PATCH") {
+    if matches!(method.as_str(), "POST" | "PUT" | "PATCH") {
         if let Err(response) = validate_content_type(&headers).await {
             warn!("Content-Type validation failed for {} {}", method, path);
             return Ok(response);
@@ -64,7 +64,7 @@ pub async fn validate_input_middleware(
     }
 
     // Validate URL path parameters
-    if let Err(response) = validate_path_parameters(path).await {
+    if let Err(response) = validate_path_parameters(&path).await {
         warn!("Path parameter validation failed for {}", path);
         return Ok(response);
     }
@@ -301,8 +301,7 @@ fn create_validation_error_response(error_type: ValidationErrorType, message: St
         timestamp: chrono::Utc::now(),
     };
 
-    let json_response = Json(error_response);
-    let mut response = Response::new(serde_json::to_string(&json_response).unwrap().into());
+    let mut response = Response::new(serde_json::to_string(&error_response).unwrap().into());
     *response.status_mut() = StatusCode::BAD_REQUEST;
     response
         .headers_mut()
@@ -382,21 +381,15 @@ fn validate_sample_type(sample_type: &str) -> Result<(), ValidationError> {
     Ok(())
 }
 
-fn validate_barcode_format(barcode: &Option<String>) -> Result<(), ValidationError> {
-    if let Some(bc) = barcode {
-        InputSanitizer::validate_barcode(bc).map(|_| ())
-    } else {
-        Ok(())
-    }
+fn validate_barcode_format(barcode: &str) -> Result<(), ValidationError> {
+    InputSanitizer::validate_barcode(barcode).map(|_| ())
 }
 
-fn validate_storage_conditions(conditions: &Option<String>) -> Result<(), ValidationError> {
-    if let Some(cond) = conditions {
-        let valid_conditions = ["frozen", "refrigerated", "room_temperature", "cryogenic"];
+fn validate_storage_conditions(conditions: &str) -> Result<(), ValidationError> {
+    let valid_conditions = ["frozen", "refrigerated", "room_temperature", "cryogenic"];
 
-        if !valid_conditions.contains(&cond.as_str()) {
-            return Err(ValidationError::new("invalid_storage_conditions"));
-        }
+    if !valid_conditions.contains(&conditions) {
+        return Err(ValidationError::new("invalid_storage_conditions"));
     }
 
     Ok(())

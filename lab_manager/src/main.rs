@@ -20,42 +20,11 @@ use std::net::SocketAddr;
 use assembly::assemble_production_components;
 use router::create_app_router;
 
-// Re-export the component types from the library for binary usage
-use sqlx::PgPool;
-use std::sync::Arc;
-
-#[derive(Clone)]
-pub struct AppComponents {
-    pub config: config::AppConfig,
-    pub database: DatabaseComponent,
-    pub storage: StorageComponent,
-    pub sample_processing: SampleProcessingComponent,
-    pub sequencing: SequencingComponent,
-    pub repositories: assembly::RepositoriesComponent,
-    pub user_manager: models::user::UserManager,
-    pub auth_service: services::auth_service::AuthService,
-    pub spreadsheet_service: services::spreadsheet_service::SpreadsheetService,
-}
-
-#[derive(Clone)]
-pub struct DatabaseComponent {
-    pub pool: PgPool,
-}
-
-#[derive(Clone)]
-pub struct StorageComponent {
-    pub storage: Arc<storage::Storage>,
-}
-
-#[derive(Clone)]
-pub struct SampleProcessingComponent {
-    pub manager: Arc<sample_submission::SampleSubmissionManager>,
-}
-
-#[derive(Clone)]
-pub struct SequencingComponent {
-    pub manager: Arc<sequencing::SequencingManager>,
-}
+// Use the component types from the library
+use lab_manager::{
+    AppComponents, DatabaseComponent, SampleProcessingComponent, SequencingComponent,
+    StorageComponent,
+};
 
 #[tokio::main]
 async fn main() {

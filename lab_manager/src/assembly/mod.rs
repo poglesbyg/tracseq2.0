@@ -4,13 +4,14 @@ use std::sync::Arc;
 use crate::{
     config::AppConfig,
     models::{spreadsheet::SpreadsheetDataManager, user::UserManager},
+    observability::{HealthChecker, MetricsCollector, TracingService},
     repositories::PostgresRepositoryFactory,
     sample_submission::SampleSubmissionManager,
     sequencing::SequencingManager,
     services::{auth_service::AuthService, spreadsheet_service::SpreadsheetService},
     storage::Storage,
-    AppComponents, DatabaseComponent, SampleProcessingComponent, SequencingComponent,
-    StorageComponent,
+    AppComponents, DatabaseComponent, ObservabilityComponent, SampleProcessingComponent,
+    SequencingComponent, StorageComponent,
 };
 
 /// Repositories component for data access abstraction
@@ -192,10 +193,6 @@ impl ComponentBuilder {
             .ok_or(AssemblyError::MissingComponent("Spreadsheet Service"))?;
 
         // Create observability component
-        use crate::{
-            observability::{HealthChecker, MetricsCollector, TracingService},
-            ObservabilityComponent,
-        };
         let observability = ObservabilityComponent {
             metrics: Arc::new(MetricsCollector::new()),
             tracing: Arc::new(TracingService::new()),

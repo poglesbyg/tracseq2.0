@@ -215,7 +215,15 @@ impl ErrorContextBuilder {
     }
 
     pub fn build(self) -> ApiErrorResponse {
-        let mut error_response = ErrorResponse::from_component_error(*self.error);
+        let mut error_response = ErrorResponse {
+            error_id: Uuid::new_v4(),
+            error_code: self.error.error_code().to_string(),
+            message: self.error.to_string(),
+            severity: self.error.severity(),
+            context: self.error.context(),
+            retryable: self.error.is_retryable(),
+            timestamp: chrono::Utc::now(),
+        };
         error_response.context.extend(self.context);
 
         ApiErrorResponse {

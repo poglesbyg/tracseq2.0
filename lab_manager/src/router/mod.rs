@@ -297,21 +297,19 @@ pub fn create_app_router() -> Router<AppComponents> {
         .route("/users/:id", get(users::get_user))
         .route("/users/:id", put(users::update_user))
         .route("/users/:id", delete(users::delete_user))
-        // Apply security and validation middleware to all routes except health checks
-        .layer(middleware::from_fn_with_state(
-            (), // Placeholder state, you might need to adjust this
-            validate_input_middleware,
-        ))
-        // Apply authentication middleware to protected routes
-        .layer(middleware::from_fn_with_state(
-            (), // Placeholder state, you might need to adjust this
-            hybrid_auth_middleware,
-        ))
         // CORS layer
         .layer(
             CorsLayer::new()
-                .allow_origin("http://localhost:5173".parse().unwrap())
-                .allow_origin("http://localhost:8080".parse().unwrap())
+                .allow_origin(
+                    "http://localhost:5173"
+                        .parse::<axum::http::HeaderValue>()
+                        .unwrap(),
+                )
+                .allow_origin(
+                    "http://localhost:8080"
+                        .parse::<axum::http::HeaderValue>()
+                        .unwrap(),
+                )
                 .allow_methods([
                     axum::http::Method::GET,
                     axum::http::Method::POST,

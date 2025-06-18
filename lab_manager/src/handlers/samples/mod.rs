@@ -364,7 +364,7 @@ pub async fn delete_sample(
         name: None,
         barcode: None,
         location: None,
-        status: Some(crate::sample_submission::SampleStatus::Deleted),
+        status: Some(crate::sample_submission::SampleStatus::Completed),
         metadata: None,
     };
 
