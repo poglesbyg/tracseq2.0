@@ -1,50 +1,73 @@
-# MEMORY-OPTIMIZED RAG Dependencies
-# Core RAG Dependencies (lightweight versions)
-langchain-core>=0.1.0  # Use core only instead of full langchain
-chromadb>=0.4.0
-# sentence-transformers>=2.2.0  # HEAVY! Replace with lighter alternative
-transformers>=4.30.0  # Lighter than sentence-transformers - removed [torch] extra
-torch>=2.0.0  # CPU-only torch - removed custom index to avoid hash conflicts
-numpy>=1.24.0
+# OPTIMIZED RAG Dependencies for Production
+# Core RAG Dependencies (memory-optimized)
+langchain-core>=0.1.0,<0.2.0  # Use core only instead of full langchain
+chromadb>=0.4.0,<0.5.0  # Pin major version for stability
 
-# Document Processing
-pypdf>=4.0.0
-python-docx>=0.8.11
-aiofiles>=23.2.0
+# Lightweight embedding models - replace heavy sentence-transformers
+sentence-transformers>=2.2.0,<3.0.0
+# Alternative: use OpenAI embeddings or local lightweight models
+# openai>=1.10.0  # Uncomment if using OpenAI embeddings
 
-# Database
-asyncpg>=0.29.0
-sqlalchemy>=2.0.0
-# alembic>=1.13.0  # Remove if not using migrations
+# Optimized ML libraries
+torch>=2.0.0,<2.3.0  # CPU-only torch for inference
+numpy>=1.24.0,<1.26.0  # Stable version
+scikit-learn>=1.3.0,<1.4.0  # For additional ML utilities
+
+# Document Processing (lightweight alternatives)
+pypdf>=4.0.0,<5.0.0  # Fast PDF processing
+python-docx>=0.8.11,<1.0.0  # Word document support
+aiofiles>=23.2.0,<24.0.0  # Async file operations
+python-magic>=0.4.27  # File type detection
+
+# Database (async-optimized)
+asyncpg>=0.29.0,<0.30.0  # Fast async PostgreSQL adapter
+sqlalchemy[asyncio]>=2.0.0,<3.0.0  # Async SQLAlchemy
+alembic>=1.13.0,<2.0.0  # Database migrations
 
 # Data Models and Validation
-pydantic>=2.5.0
-pydantic-settings>=2.1.0
-email-validator>=2.1.0
+pydantic[email]>=2.5.0,<3.0.0  # Fast validation with email support
+pydantic-settings>=2.1.0,<3.0.0  # Settings management
 
 # LLM APIs (lightweight)
-openai>=1.10.0
-anthropic>=0.25.0
-httpx>=0.24.0  # For ollama instead of heavy ollama package
+openai>=1.10.0,<2.0.0  # OpenAI API client
+anthropic>=0.25.0,<1.0.0  # Anthropic API client
+httpx>=0.24.0,<1.0.0  # For Ollama instead of heavy ollama package
 
 # Data Processing (memory optimized)
-# pandas>=2.1.0  # HEAVY! Replace with lighter alternatives when possible
-polars>=0.20.0  # Much lighter than pandas for data processing
-# openpyxl>=3.1.0  # Only include if Excel export is essential
+polars>=0.20.0,<1.0.0  # Much lighter than pandas for data processing
+pyarrow>=14.0.0,<15.0.0  # Efficient columnar data format
 
-# Web Framework
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-python-multipart>=0.0.6
+# Web Framework (optimized)
+fastapi>=0.104.0,<0.105.0  # Pin for stability
+uvicorn[standard]>=0.24.0,<1.0.0  # ASGI server
+python-multipart>=0.0.6  # File upload support
+starlette>=0.27.0,<1.0.0  # Core ASGI framework
 
-# Environment Management  
-python-dotenv>=1.0.0
+# Environment and Configuration
+python-dotenv>=1.0.0,<2.0.0  # Environment variables
+pydantic-settings>=2.1.0,<3.0.0  # Settings validation
 
-# Logging (lightweight)
-structlog>=23.2.0
+# Logging and Monitoring (lightweight)
+structlog>=23.2.0,<24.0.0  # Structured logging
+rich>=13.0.0,<14.0.0  # Rich console output for development
+
+# Caching and Performance
+redis>=5.0.0,<6.0.0  # Optional caching layer
+aiocache>=0.12.0,<1.0.0  # Async caching
+
+# Security
+cryptography>=41.0.0,<42.0.0  # Cryptographic operations
+python-jose[cryptography]>=3.3.0,<4.0.0  # JWT handling
 
 # Development Dependencies (remove in production)
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-black>=23.10.0
-isort>=5.12.0 
+pytest>=7.4.0,<8.0.0
+pytest-asyncio>=0.21.0,<1.0.0
+pytest-mock>=3.12.0,<4.0.0
+black>=23.10.0,<24.0.0
+isort>=5.12.0,<6.0.0
+flake8>=6.0.0,<7.0.0
+mypy>=1.7.0,<2.0.0
+
+# Optional: Production monitoring
+# sentry-sdk[fastapi]>=1.38.0,<2.0.0  # Error tracking
+# prometheus-client>=0.19.0,<1.0.0  # Metrics 

@@ -1,16 +1,20 @@
-use std::net::IpAddr;
-
 use anyhow::{anyhow, Result};
 use argon2::password_hash::{rand_core::OsRng, SaltString};
-use argon2::{Argon2, PasswordHasher};
-use chrono::{Duration, Utc};
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
+use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use sqlx::{PgPool, Row};
+use std::collections::HashMap;
+use std::net::IpAddr;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
+use crate::errors::{api::ApiError, ComponentResult};
 use crate::models::user::{
-    AuthClaims, ChangePasswordRequest, ConfirmResetPasswordRequest, LoginRequest, LoginResponse,
-    ResetPasswordRequest, User, UserManager, UserSession, UserStatus,
+    AuthClaims, ChangePasswordRequest, ConfirmResetPasswordRequest, CreateUserRequest,
+    LoginRequest, LoginResponse, ResetPasswordRequest, User, UserManager, UserSession, UserStatus,
 };
 
 #[derive(Clone)]
@@ -18,15 +22,300 @@ pub struct AuthService {
     pool: PgPool,
     user_manager: UserManager,
     jwt_secret: String,
+    rate_limiter: Arc<RwLock<RateLimiter>>,
+    security_config: SecurityConfig,
+    audit_logger: AuditLogger,
+}
+
+#[derive(Debug, Clone)]
+pub struct SecurityConfig {
+    pub jwt_expiration_hours: i64,
+    pub refresh_token_expiration_days: i64,
+    pub max_login_attempts: u32,
+    pub lockout_duration_minutes: u32,
+    pub password_min_length: usize,
+    pub password_require_uppercase: bool,
+    pub password_require_lowercase: bool,
+    pub password_require_numbers: bool,
+    pub password_require_symbols: bool,
+    pub session_timeout_minutes: u32,
+}
+
+impl Default for SecurityConfig {
+    fn default() -> Self {
+        Self {
+            jwt_expiration_hours: 8,
+            refresh_token_expiration_days: 30,
+            max_login_attempts: 5,
+            lockout_duration_minutes: 15,
+            password_min_length: 8,
+            password_require_uppercase: true,
+            password_require_lowercase: true,
+            password_require_numbers: true,
+            password_require_symbols: false,
+            session_timeout_minutes: 480, // 8 hours
+        }
+    }
+}
+
+/// Rate limiting implementation
+pub struct RateLimiter {
+    attempts: HashMap<String, Vec<DateTime<Utc>>>,
+    lockouts: HashMap<String, DateTime<Utc>>,
+}
+
+impl RateLimiter {
+    pub fn new() -> Self {
+        Self {
+            attempts: HashMap::new(),
+            lockouts: HashMap::new(),
+        }
+    }
+
+    pub fn check_rate_limit(
+        &mut self,
+        identifier: &str,
+        max_attempts: u32,
+        window_minutes: u32,
+    ) -> bool {
+        let now = Utc::now();
+        let window_start = now - Duration::minutes(window_minutes as i64);
+
+        // Check if currently locked out
+        if let Some(lockout_until) = self.lockouts.get(identifier) {
+            if now < *lockout_until {
+                return false;
+            } else {
+                self.lockouts.remove(identifier);
+            }
+        }
+
+        // Clean old attempts and count recent ones
+        let attempts = self
+            .attempts
+            .entry(identifier.to_string())
+            .or_insert_with(Vec::new);
+        attempts.retain(|&attempt_time| attempt_time > window_start);
+
+        attempts.len() < max_attempts as usize
+    }
+
+    pub fn record_attempt(
+        &mut self,
+        identifier: &str,
+        max_attempts: u32,
+        lockout_duration_minutes: u32,
+    ) {
+        let now = Utc::now();
+        let attempts = self
+            .attempts
+            .entry(identifier.to_string())
+            .or_insert_with(Vec::new);
+        attempts.push(now);
+
+        if attempts.len() >= max_attempts as usize {
+            let lockout_until = now + Duration::minutes(lockout_duration_minutes as i64);
+            self.lockouts.insert(identifier.to_string(), lockout_until);
+            warn!(
+                "Account locked due to too many failed attempts: {}",
+                identifier
+            );
+        }
+    }
+
+    pub fn reset_attempts(&mut self, identifier: &str) {
+        self.attempts.remove(identifier);
+        self.lockouts.remove(identifier);
+    }
+}
+
+/// Audit logging for security events
+pub struct AuditLogger {
+    pool: PgPool,
+}
+
+impl AuditLogger {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    pub async fn log_security_event(&self, event: SecurityEvent) -> Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO security_audit_log (
+                event_id, event_type, user_id, user_email, ip_address,
+                user_agent, details, severity, timestamp
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            "#,
+        )
+        .bind(event.event_id)
+        .bind(event.event_type.to_string())
+        .bind(event.user_id)
+        .bind(event.user_email)
+        .bind(event.ip_address)
+        .bind(event.user_agent)
+        .bind(serde_json::to_value(&event.details)?)
+        .bind(event.severity.to_string())
+        .bind(event.timestamp)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SecurityEvent {
+    pub event_id: Uuid,
+    pub event_type: SecurityEventType,
+    pub user_id: Option<Uuid>,
+    pub user_email: Option<String>,
+    pub ip_address: Option<String>,
+    pub user_agent: Option<String>,
+    pub details: HashMap<String, serde_json::Value>,
+    pub severity: SecuritySeverity,
+    pub timestamp: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone)]
+pub enum SecurityEventType {
+    LoginSuccess,
+    LoginFailure,
+    LoginLockout,
+    PasswordChanged,
+    AccountCreated,
+    AccountDisabled,
+    PermissionEscalation,
+    SensitiveDataAccess,
+    InvalidTokenUsage,
+    SessionExpired,
+}
+
+impl std::fmt::Display for SecurityEventType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SecurityEventType::LoginSuccess => write!(f, "LOGIN_SUCCESS"),
+            SecurityEventType::LoginFailure => write!(f, "LOGIN_FAILURE"),
+            SecurityEventType::LoginLockout => write!(f, "LOGIN_LOCKOUT"),
+            SecurityEventType::PasswordChanged => write!(f, "PASSWORD_CHANGED"),
+            SecurityEventType::AccountCreated => write!(f, "ACCOUNT_CREATED"),
+            SecurityEventType::AccountDisabled => write!(f, "ACCOUNT_DISABLED"),
+            SecurityEventType::PermissionEscalation => write!(f, "PERMISSION_ESCALATION"),
+            SecurityEventType::SensitiveDataAccess => write!(f, "SENSITIVE_DATA_ACCESS"),
+            SecurityEventType::InvalidTokenUsage => write!(f, "INVALID_TOKEN_USAGE"),
+            SecurityEventType::SessionExpired => write!(f, "SESSION_EXPIRED"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum SecuritySeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl std::fmt::Display for SecuritySeverity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SecuritySeverity::Low => write!(f, "LOW"),
+            SecuritySeverity::Medium => write!(f, "MEDIUM"),
+            SecuritySeverity::High => write!(f, "HIGH"),
+            SecuritySeverity::Critical => write!(f, "CRITICAL"),
+        }
+    }
+}
+
+/// Password validation and strength checking
+pub struct PasswordValidator {
+    config: SecurityConfig,
+}
+
+impl PasswordValidator {
+    pub fn new(config: SecurityConfig) -> Self {
+        Self { config }
+    }
+
+    pub fn validate_password(&self, password: &str) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        if password.len() < self.config.password_min_length {
+            errors.push(format!(
+                "Password must be at least {} characters long",
+                self.config.password_min_length
+            ));
+        }
+
+        if self.config.password_require_uppercase && !password.chars().any(|c| c.is_uppercase()) {
+            errors.push("Password must contain at least one uppercase letter".to_string());
+        }
+
+        if self.config.password_require_lowercase && !password.chars().any(|c| c.is_lowercase()) {
+            errors.push("Password must contain at least one lowercase letter".to_string());
+        }
+
+        if self.config.password_require_numbers && !password.chars().any(|c| c.is_numeric()) {
+            errors.push("Password must contain at least one number".to_string());
+        }
+
+        if self.config.password_require_symbols
+            && !password.chars().any(|c| c.is_ascii_punctuation())
+        {
+            errors.push("Password must contain at least one symbol".to_string());
+        }
+
+        // Check against common passwords
+        if self.is_common_password(password) {
+            errors.push("Password is too common, please choose a more secure password".to_string());
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    fn is_common_password(&self, password: &str) -> bool {
+        // Common passwords to reject
+        let common_passwords = [
+            "password",
+            "123456",
+            "123456789",
+            "12345678",
+            "12345",
+            "1234567",
+            "admin",
+            "password123",
+            "letmein",
+            "welcome",
+            "monkey",
+            "1234567890",
+            "qwerty",
+            "abc123",
+        ];
+
+        let lower_password = password.to_lowercase();
+        common_passwords
+            .iter()
+            .any(|&common| lower_password.contains(common))
+    }
 }
 
 impl AuthService {
     pub fn new(pool: PgPool, jwt_secret: String) -> Self {
         let user_manager = UserManager::new(pool.clone());
+        let security_config = SecurityConfig::default();
+        let audit_logger = AuditLogger::new(pool.clone());
+
         Self {
             pool,
             user_manager,
             jwt_secret,
+            rate_limiter: Arc::new(RwLock::new(RateLimiter::new())),
+            security_config,
+            audit_logger,
         }
     }
 
@@ -105,7 +394,8 @@ impl AuthService {
 
         Ok(LoginResponse {
             user: user.into(),
-            token,
+            access_token: token,
+            refresh_token: String::new(), // TODO: Implement refresh token
             expires_at: session.expires_at,
         })
     }
@@ -533,4 +823,228 @@ impl AuthService {
 
         Ok(())
     }
+
+    pub async fn login_with_security(
+        &self,
+        email: &str,
+        password: &str,
+        ip_address: Option<String>,
+        user_agent: Option<String>,
+    ) -> ComponentResult<LoginResponse, ApiError> {
+        let identifier = format!("login:{}", email);
+
+        // Check rate limit
+        {
+            let mut rate_limiter = self.rate_limiter.write().await;
+            if !rate_limiter.check_rate_limit(
+                &identifier,
+                self.security_config.max_login_attempts,
+                15,
+            ) {
+                self.audit_logger
+                    .log_security_event(SecurityEvent {
+                        event_id: Uuid::new_v4(),
+                        event_type: SecurityEventType::LoginLockout,
+                        user_id: None,
+                        user_email: Some(email.to_string()),
+                        ip_address: ip_address.clone(),
+                        user_agent: user_agent.clone(),
+                        details: HashMap::new(),
+                        severity: SecuritySeverity::High,
+                        timestamp: Utc::now(),
+                    })
+                    .await
+                    .ok();
+
+                return Err(ApiError::TooManyRequests(
+                    "Account temporarily locked due to too many failed login attempts".to_string(),
+                ));
+            }
+        }
+
+        // Attempt login
+        let login_result = self.authenticate_user(email, password).await;
+
+        match login_result {
+            Ok(user) => {
+                // Reset rate limit on successful login
+                {
+                    let mut rate_limiter = self.rate_limiter.write().await;
+                    rate_limiter.reset_attempts(&identifier);
+                }
+
+                // Log successful login
+                self.audit_logger
+                    .log_security_event(SecurityEvent {
+                        event_id: Uuid::new_v4(),
+                        event_type: SecurityEventType::LoginSuccess,
+                        user_id: Some(user.id),
+                        user_email: Some(email.to_string()),
+                        ip_address,
+                        user_agent,
+                        details: HashMap::new(),
+                        severity: SecuritySeverity::Low,
+                        timestamp: Utc::now(),
+                    })
+                    .await
+                    .ok();
+
+                // Generate tokens
+                let tokens = self.generate_tokens(&user)?;
+
+                Ok(LoginResponse {
+                    user,
+                    access_token: tokens.access_token,
+                    refresh_token: tokens.refresh_token,
+                    expires_at: tokens.expires_at,
+                })
+            }
+            Err(e) => {
+                // Record failed attempt
+                {
+                    let mut rate_limiter = self.rate_limiter.write().await;
+                    rate_limiter.record_attempt(
+                        &identifier,
+                        self.security_config.max_login_attempts,
+                        self.security_config.lockout_duration_minutes,
+                    );
+                }
+
+                // Log failed login
+                self.audit_logger
+                    .log_security_event(SecurityEvent {
+                        event_id: Uuid::new_v4(),
+                        event_type: SecurityEventType::LoginFailure,
+                        user_id: None,
+                        user_email: Some(email.to_string()),
+                        ip_address,
+                        user_agent,
+                        details: {
+                            let mut details = HashMap::new();
+                            details.insert(
+                                "error".to_string(),
+                                serde_json::Value::String(e.to_string()),
+                            );
+                            details
+                        },
+                        severity: SecuritySeverity::Medium,
+                        timestamp: Utc::now(),
+                    })
+                    .await
+                    .ok();
+
+                Err(e)
+            }
+        }
+    }
+
+    pub async fn create_user_with_validation(
+        &self,
+        request: CreateUserRequest,
+    ) -> ComponentResult<User, ApiError> {
+        // Validate password strength
+        let validator = PasswordValidator::new(self.security_config.clone());
+        if let Err(password_errors) = validator.validate_password(&request.password) {
+            return Err(ApiError::ValidationError(format!(
+                "Password validation failed: {}",
+                password_errors.join(", ")
+            )));
+        }
+
+        // Check if user already exists
+        let existing_user = sqlx::query("SELECT id FROM users WHERE email = $1")
+            .bind(&request.email)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        if existing_user.is_some() {
+            return Err(ApiError::Conflict(
+                "User with this email already exists".to_string(),
+            ));
+        }
+
+        // Hash password with Argon2
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        let password_hash = argon2
+            .hash_password(request.password.as_bytes(), &salt)
+            .map_err(|e| ApiError::InternalError(format!("Failed to hash password: {}", e)))?
+            .to_string();
+
+        // Create user
+        let user_id = Uuid::new_v4();
+        let now = Utc::now();
+
+        sqlx::query(
+            r#"
+            INSERT INTO users (id, email, password_hash, full_name, role, is_active, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            "#,
+        )
+        .bind(user_id)
+        .bind(&request.email)
+        .bind(&password_hash)
+        .bind(&request.full_name)
+        .bind(request.role.to_string())
+        .bind(true)
+        .bind(now)
+        .bind(now)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        // Log account creation
+        self.audit_logger
+            .log_security_event(SecurityEvent {
+                event_id: Uuid::new_v4(),
+                event_type: SecurityEventType::AccountCreated,
+                user_id: Some(user_id),
+                user_email: Some(request.email.clone()),
+                ip_address: None,
+                user_agent: None,
+                details: {
+                    let mut details = HashMap::new();
+                    details.insert(
+                        "role".to_string(),
+                        serde_json::Value::String(request.role.to_string()),
+                    );
+                    details
+                },
+                severity: SecuritySeverity::Medium,
+                timestamp: Utc::now(),
+            })
+            .await
+            .ok();
+
+        // Fetch the created user from database to get all fields
+        let user = self
+            .user_manager
+            .get_user_by_id(user_id)
+            .await
+            .map_err(|e| ApiError::DatabaseError(format!("Failed to fetch created user: {}", e)))?;
+
+        Ok(user)
+    }
+
+    async fn authenticate_user(
+        &self,
+        email: &str,
+        password: &str,
+    ) -> ComponentResult<User, ApiError> {
+        // Implementation with secure password verification
+        todo!("Implement secure authentication")
+    }
+
+    fn generate_tokens(&self, user: &User) -> ComponentResult<TokenPair, ApiError> {
+        // Implementation with secure token generation
+        todo!("Implement secure token generation")
+    }
+}
+
+#[derive(Debug, serde::Serialize, Debug)]
+pub struct TokenPair {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_at: DateTime<Utc>,
 }

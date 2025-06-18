@@ -7,6 +7,7 @@ pub mod events;
 pub mod handlers;
 pub mod middleware;
 pub mod models;
+pub mod observability;
 pub mod plugins;
 pub mod repositories;
 pub mod router;
@@ -19,6 +20,7 @@ pub mod validation;
 // Re-export main component types for convenience
 pub use assembly::{AssemblyError, ComponentBuilder};
 pub use config::{AppConfig, ServerConfig};
+pub use observability::{HealthChecker, MetricsCollector, TracingService};
 
 // Main application component types
 use sqlx::PgPool;
@@ -35,6 +37,7 @@ pub struct AppComponents {
     pub user_manager: models::user::UserManager,
     pub auth_service: services::auth_service::AuthService,
     pub spreadsheet_service: services::spreadsheet_service::SpreadsheetService,
+    pub observability: ObservabilityComponent,
 }
 
 #[derive(Clone)]
@@ -55,4 +58,11 @@ pub struct SampleProcessingComponent {
 #[derive(Clone)]
 pub struct SequencingComponent {
     pub manager: Arc<sequencing::SequencingManager>,
+}
+
+#[derive(Clone)]
+pub struct ObservabilityComponent {
+    pub metrics: Arc<MetricsCollector>,
+    pub tracing: Arc<TracingService>,
+    pub health_checker: Arc<HealthChecker>,
 }

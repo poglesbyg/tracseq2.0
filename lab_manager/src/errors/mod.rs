@@ -179,3 +179,52 @@ impl ErrorHandler<(axum::http::StatusCode, axum::Json<ErrorResponse>)> for HttpE
         (status, axum::Json(response))
     }
 }
+
+/// Standardized error wrapper for all API responses
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApiErrorResponse {
+    pub error: ErrorResponse,
+    pub request_id: Uuid,
+    pub trace_id: Option<String>,
+}
+
+/// Error context builder for better debugging
+pub struct ErrorContextBuilder {
+    error: Box<dyn ComponentError>,
+    context: HashMap<String, String>,
+    trace_id: Option<String>,
+}
+
+impl ErrorContextBuilder {
+    pub fn new<E: ComponentError + 'static>(error: E) -> Self {
+        Self {
+            error: Box::new(error),
+            context: HashMap::new(),
+            trace_id: None,
+        }
+    }
+
+    pub fn with_context(mut self, key: &str, value: &str) -> Self {
+        self.context.insert(key.to_string(), value.to_string());
+        self
+    }
+
+    pub fn with_trace_id(mut self, trace_id: String) -> Self {
+        self.trace_id = Some(trace_id);
+        self
+    }
+
+    pub fn build(self) -> ApiErrorResponse {
+        let mut error_response = ErrorResponse::from_component_error(*self.error);
+        error_response.context.extend(self.context);
+
+        ApiErrorResponse {
+            error: error_response,
+            request_id: Uuid::new_v4(),
+            trace_id: self.trace_id,
+        }
+    }
+}
+
+/// Result type with enhanced error information
+pub type ApiResult<T> = Result<T, ApiErrorResponse>;

@@ -60,6 +60,92 @@ tower = { version = "0.4", features = ["util"] }
 headers = "0.4"
 urlencoding = "2.1"
 
+# Security and Input Validation
+regex = "1.10"                              # Regular expressions for input validation
+lazy_static = "1.4"                         # Static initialization for security patterns
+base64 = "0.22"                             # Base64 encoding/decoding for tokens
+ring = "0.17"                               # Cryptographic operations
+constant_time_eq = "0.3"                    # Constant-time comparison for security
+secrecy = "0.8"                             # Secure secret handling
+zeroize = "1.7"                             # Memory zeroing for sensitive data
+
+# Input Sanitization and Rate Limiting
+htmlescape = "0.3"                          # HTML escaping for XSS prevention
+url = "2.5"                                 # URL parsing and validation
+ipnet = "2.9"                               # IP address validation and manipulation
+governor = "0.6"                            # Rate limiting middleware
+
+# Observability and Monitoring
+metrics = "0.23"                            # Metrics collection
+metrics-exporter-prometheus = { version = "0.13", optional = true }       # Prometheus metrics export
+opentelemetry = "0.22"                      # Distributed tracing
+opentelemetry-jaeger = { version = "0.21", optional = true }               # Jaeger tracing export
+tracing-opentelemetry = "0.23"              # OpenTelemetry tracing integration
+
+# System Monitoring
+sysinfo = { version = "0.30", optional = true }                            # System information and monitoring
+# psutil = "3.2"                              # Process and system utilities - temporarily disabled due to compatibility issues
+
+# Error Handling and Resilience
+circuit_breaker = "0.1"                     # Circuit breaker pattern
+tokio-retry = "0.3"                         # Retry logic with backoff
+backoff = "0.4"                             # Exponential backoff implementation
+
+# Middleware Enhancements
+tower-request-id = "0.3"                    # Request ID generation
+tower-default-headers = "0.2"               # Default security headers
+
 [dev-dependencies]
 axum-test = "15.0"
 tokio-test = "0.4"
+mockall = "0.12"                            # Mocking framework for tests
+tempfile = "3.8"                            # Temporary files for testing
+proptest = "1.4"                            # Property-based testing
+criterion = "0.5"                           # Benchmarking
+
+# Security-focused test dependencies  
+security-framework = "2.9"                  # Security testing utilities
+wiremock = "0.6"                            # HTTP mocking for integration tests
+
+[features]
+default = ["security", "monitoring"]
+
+# Security feature set
+security = [
+    "validator/derive", 
+    "argon2/std", 
+    "ring/std"
+]
+
+# Monitoring and observability features
+monitoring = [
+    "metrics-exporter-prometheus", 
+    "opentelemetry-jaeger",
+    "sysinfo"
+]
+
+# Development features
+development = []
+
+# Production optimizations
+production = [
+    "security",
+    "monitoring"
+]
+
+# Lightweight build for resource-constrained environments
+lightweight = []
+
+[target.'cfg(unix)'.dependencies]
+# Unix-specific dependencies for better system integration
+nix = "0.27"                                # Unix system calls
+libc = "0.2"                                # C library bindings
+
+[target.'cfg(windows)'.dependencies] 
+# Windows-specific dependencies
+winapi = { version = "0.3", features = ["winuser", "processthreadsapi"] }
+
+# Environment-specific configurations
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

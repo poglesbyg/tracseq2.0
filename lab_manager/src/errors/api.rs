@@ -15,6 +15,14 @@ pub enum ApiError {
     NotFound,
     #[error("Rate limit exceeded")]
     RateLimited,
+    #[error("Too many requests: {0}")]
+    TooManyRequests(String),
+    #[error("Validation error: {0}")]
+    ValidationError(String),
+    #[error("Database error: {0}")]
+    DatabaseError(String),
+    #[error("Conflict: {0}")]
+    Conflict(String),
     #[error("Service unavailable: {0}")]
     ServiceUnavailable(String),
     #[error("Internal server error: {0}")]
@@ -32,6 +40,10 @@ impl ComponentError for ApiError {
             Self::Forbidden => "API_FORBIDDEN",
             Self::NotFound => "API_NOT_FOUND",
             Self::RateLimited => "API_RATE_LIMITED",
+            Self::TooManyRequests(_) => "API_TOO_MANY_REQUESTS",
+            Self::ValidationError(_) => "API_VALIDATION_ERROR",
+            Self::DatabaseError(_) => "API_DATABASE_ERROR",
+            Self::Conflict(_) => "API_CONFLICT",
             Self::ServiceUnavailable(_) => "API_SERVICE_UNAVAILABLE",
             Self::InternalServerError(_) => "API_INTERNAL_SERVER_ERROR",
             Self::InternalError => "API_INTERNAL_ERROR",
@@ -45,6 +57,10 @@ impl ComponentError for ApiError {
             Self::Unauthorized | Self::Forbidden => ErrorSeverity::Medium,
             Self::NotFound => ErrorSeverity::Low,
             Self::RateLimited => ErrorSeverity::Medium,
+            Self::TooManyRequests(_) => ErrorSeverity::Medium,
+            Self::ValidationError(_) => ErrorSeverity::Low,
+            Self::DatabaseError(_) => ErrorSeverity::High,
+            Self::Conflict(_) => ErrorSeverity::Medium,
             Self::ServiceUnavailable(_) => ErrorSeverity::Medium,
             Self::InternalServerError(_) => ErrorSeverity::High,
             Self::InternalError => ErrorSeverity::High,
@@ -52,6 +68,9 @@ impl ComponentError for ApiError {
     }
 
     fn is_retryable(&self) -> bool {
-        matches!(self, Self::RateLimited | Self::InternalError)
+        matches!(
+            self,
+            Self::RateLimited | Self::TooManyRequests(_) | Self::InternalError
+        )
     }
 }
