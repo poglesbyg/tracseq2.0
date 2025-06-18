@@ -38,7 +38,7 @@ pub trait StorageRepository: Send + Sync {
     ) -> Result<SampleLocation, sqlx::Error>;
     async fn get_sample_location(
         &self,
-        sample_id: i32,
+        sample_id: uuid::Uuid,
     ) -> Result<Option<SampleLocation>, sqlx::Error>;
     async fn get_sample_by_barcode(
         &self,
@@ -50,14 +50,14 @@ pub trait StorageRepository: Send + Sync {
     ) -> Result<Vec<SampleLocation>, sqlx::Error>;
     async fn move_sample(
         &self,
-        sample_id: i32,
+        sample_id: uuid::Uuid,
         new_location_id: i32,
         moved_by: &str,
         reason: &str,
     ) -> Result<SampleLocation, sqlx::Error>;
     async fn update_sample_state(
         &self,
-        sample_id: i32,
+        sample_id: uuid::Uuid,
         new_state: StorageState,
         updated_by: &str,
     ) -> Result<SampleLocation, sqlx::Error>;
@@ -65,7 +65,7 @@ pub trait StorageRepository: Send + Sync {
     /// Remove a sample from storage
     async fn remove_sample(
         &self,
-        sample_id: i32,
+        sample_id: uuid::Uuid,
         removed_by: &str,
         reason: &str,
     ) -> Result<SampleLocation, sqlx::Error>;
@@ -77,7 +77,7 @@ pub trait StorageRepository: Send + Sync {
     ) -> Result<StorageMovementHistory, sqlx::Error>;
     async fn get_sample_movement_history(
         &self,
-        sample_id: i32,
+        sample_id: uuid::Uuid,
     ) -> Result<Vec<StorageMovementHistory>, sqlx::Error>;
 
     /// Capacity and Statistics
@@ -89,7 +89,11 @@ pub trait StorageRepository: Send + Sync {
 
     /// Barcode Operations
     async fn is_barcode_unique(&self, barcode: &str) -> Result<bool, sqlx::Error>;
-    async fn reserve_barcode(&self, barcode: &str, _sample_id: i32) -> Result<(), sqlx::Error>;
+    async fn reserve_barcode(
+        &self,
+        barcode: &str,
+        _sample_id: uuid::Uuid,
+    ) -> Result<(), sqlx::Error>;
 }
 
 /// Create storage location data
@@ -116,7 +120,7 @@ pub struct UpdateStorageLocation {
 /// Create sample location data
 #[derive(Debug, Clone)]
 pub struct CreateSampleLocation {
-    pub sample_id: i32,
+    pub sample_id: uuid::Uuid,
     pub location_id: i32,
     pub barcode: String,
     pub position: Option<String>,
@@ -128,7 +132,7 @@ pub struct CreateSampleLocation {
 /// Create movement history data
 #[derive(Debug, Clone)]
 pub struct CreateMovementHistory {
-    pub sample_id: i32,
+    pub sample_id: uuid::Uuid,
     pub barcode: String,
     pub from_location_id: Option<i32>,
     pub to_location_id: i32,
@@ -285,7 +289,9 @@ impl StorageRepository for PostgresStorageRepository {
     ) -> Result<SampleLocation, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
-        // Insert sample location
+        // Insert sample location with explicit UUID type conversion
+        let uuid_param: uuid::Uuid = sample_location.sample_id;
+
         let stored_sample = sqlx::query_as::<_, SampleLocation>(
             r#"
             INSERT INTO sample_locations (sample_id, location_id, barcode, position, storage_state, stored_by, notes)
@@ -293,7 +299,7 @@ impl StorageRepository for PostgresStorageRepository {
             RETURNING *
             "#
         )
-        .bind(sample_location.sample_id)
+        .bind(uuid_param)
         .bind(sample_location.location_id)
         .bind(&sample_location.barcode)
         .bind(&sample_location.position)
@@ -317,12 +323,12 @@ impl StorageRepository for PostgresStorageRepository {
 
     async fn get_sample_location(
         &self,
-        sample_id: i32,
+        sample_id: uuid::Uuid,
     ) -> Result<Option<SampleLocation>, sqlx::Error> {
         sqlx::query_as::<_, SampleLocation>(
             "SELECT * FROM sample_locations WHERE sample_id = $1 ORDER BY created_at DESC LIMIT 1",
         )
-        .bind(sample_id)
+        .bind(&sample_id)
         .fetch_optional(&self.pool)
         .await
     }
@@ -353,7 +359,7 @@ impl StorageRepository for PostgresStorageRepository {
 
     async fn move_sample(
         &self,
-        sample_id: i32,
+        sample_id: uuid::Uuid,
         new_location_id: i32,
         moved_by: &str,
         reason: &str,
@@ -364,19 +370,20 @@ impl StorageRepository for PostgresStorageRepository {
         let current_location = sqlx::query_as::<_, SampleLocation>(
             "SELECT * FROM sample_locations WHERE sample_id = $1 ORDER BY created_at DESC LIMIT 1",
         )
-        .bind(sample_id)
+        .bind(&sample_id)
         .fetch_optional(&mut *tx)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
 
         // Create movement history record
+        let uuid_param: uuid::Uuid = sample_id;
         sqlx::query(
             r#"
             INSERT INTO storage_movement_history (sample_id, barcode, from_location_id, to_location_id, from_state, to_state, movement_reason, moved_by)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             "#
         )
-        .bind(sample_id)
+        .bind(uuid_param)
         .bind(&current_location.barcode)
         .bind(current_location.location_id)
         .bind(new_location_id)
@@ -388,6 +395,7 @@ impl StorageRepository for PostgresStorageRepository {
         .await?;
 
         // Update sample location
+        let uuid_param2: uuid::Uuid = sample_id;
         let updated_sample = sqlx::query_as::<_, SampleLocation>(
             r#"
             UPDATE sample_locations 
@@ -398,7 +406,7 @@ impl StorageRepository for PostgresStorageRepository {
         )
         .bind(new_location_id)
         .bind(moved_by)
-        .bind(sample_id)
+        .bind(uuid_param2)
         .fetch_one(&mut *tx)
         .await?;
 
@@ -423,10 +431,11 @@ impl StorageRepository for PostgresStorageRepository {
 
     async fn update_sample_state(
         &self,
-        sample_id: i32,
+        sample_id: uuid::Uuid,
         new_state: StorageState,
         updated_by: &str,
     ) -> Result<SampleLocation, sqlx::Error> {
+        let uuid_param: uuid::Uuid = sample_id;
         let updated_sample = sqlx::query_as::<_, SampleLocation>(
             r#"
             UPDATE sample_locations 
@@ -437,7 +446,7 @@ impl StorageRepository for PostgresStorageRepository {
         )
         .bind(&new_state)
         .bind(updated_by)
-        .bind(sample_id)
+        .bind(uuid_param)
         .fetch_one(&self.pool)
         .await?;
 
@@ -446,7 +455,7 @@ impl StorageRepository for PostgresStorageRepository {
 
     async fn remove_sample(
         &self,
-        sample_id: i32,
+        sample_id: uuid::Uuid,
         removed_by: &str,
         reason: &str,
     ) -> Result<SampleLocation, sqlx::Error> {
@@ -456,19 +465,20 @@ impl StorageRepository for PostgresStorageRepository {
         let current_location = sqlx::query_as::<_, SampleLocation>(
             "SELECT * FROM sample_locations WHERE sample_id = $1 ORDER BY created_at DESC LIMIT 1",
         )
-        .bind(sample_id)
+        .bind(&sample_id)
         .fetch_optional(&mut *tx)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
 
         // Create movement history record indicating removal
+        let uuid_param: uuid::Uuid = sample_id;
         sqlx::query(
             r#"
             INSERT INTO storage_movement_history (sample_id, barcode, from_location_id, to_location_id, from_state, to_state, movement_reason, moved_by)
             VALUES ($1, $2, $3, NULL, $4, $5, $6, $7)
             "#
         )
-        .bind(sample_id)
+        .bind(uuid_param)
         .bind(&current_location.barcode)
         .bind(current_location.location_id)
         .bind(&current_location.storage_state)
@@ -479,8 +489,9 @@ impl StorageRepository for PostgresStorageRepository {
         .await?;
 
         // Delete the sample location record
+        let uuid_param2: uuid::Uuid = sample_id;
         sqlx::query("DELETE FROM sample_locations WHERE sample_id = $1")
-            .bind(sample_id)
+            .bind(uuid_param2)
             .execute(&mut *tx)
             .await?;
 
@@ -500,6 +511,7 @@ impl StorageRepository for PostgresStorageRepository {
         &self,
         movement: CreateMovementHistory,
     ) -> Result<StorageMovementHistory, sqlx::Error> {
+        let uuid_param: uuid::Uuid = movement.sample_id;
         sqlx::query_as::<_, StorageMovementHistory>(
             r#"
             INSERT INTO storage_movement_history (sample_id, barcode, from_location_id, to_location_id, from_state, to_state, movement_reason, moved_by, notes)
@@ -507,7 +519,7 @@ impl StorageRepository for PostgresStorageRepository {
             RETURNING *
             "#
         )
-        .bind(movement.sample_id)
+        .bind(uuid_param)
         .bind(&movement.barcode)
         .bind(movement.from_location_id)
         .bind(movement.to_location_id)
@@ -522,12 +534,12 @@ impl StorageRepository for PostgresStorageRepository {
 
     async fn get_sample_movement_history(
         &self,
-        sample_id: i32,
+        sample_id: uuid::Uuid,
     ) -> Result<Vec<StorageMovementHistory>, sqlx::Error> {
         sqlx::query_as::<_, StorageMovementHistory>(
             "SELECT * FROM storage_movement_history WHERE sample_id = $1 ORDER BY moved_at DESC",
         )
-        .bind(sample_id)
+        .bind(&sample_id)
         .fetch_all(&self.pool)
         .await
     }
@@ -599,7 +611,11 @@ impl StorageRepository for PostgresStorageRepository {
         Ok(count == 0)
     }
 
-    async fn reserve_barcode(&self, barcode: &str, _sample_id: i32) -> Result<(), sqlx::Error> {
+    async fn reserve_barcode(
+        &self,
+        barcode: &str,
+        _sample_id: uuid::Uuid,
+    ) -> Result<(), sqlx::Error> {
         // This could insert into a barcode reservation table if needed
         // For now, we'll just verify it's unique when storing the sample
         if !self.is_barcode_unique(barcode).await? {

@@ -189,6 +189,7 @@ pub async fn create_samples_batch(
                 );
 
                 let sample_id = sample.id;
+
                 created_samples.push(sample);
 
                 // If storage location is provided, store the sample in the storage system
@@ -311,7 +312,7 @@ async fn store_sample_in_storage(
 
     // Create a sample location entry directly using the repository
     let create_sample_location = crate::repositories::storage_repository::CreateSampleLocation {
-        sample_id: (sample_id.as_u128() % (i32::MAX as u128)) as i32, // Convert UUID to i32 as a workaround
+        sample_id, // Use UUID directly now that we've fixed the schema
         location_id,
         barcode: sample.barcode.clone(),
         position,
@@ -328,7 +329,7 @@ async fn store_sample_in_storage(
 
     // Record the movement history
     let movement = crate::repositories::storage_repository::CreateMovementHistory {
-        sample_id: (sample_id.as_u128() % (i32::MAX as u128)) as i32,
+        sample_id, // Use UUID directly now that we've fixed the schema
         barcode: sample.barcode.clone(),
         from_location_id: None,
         to_location_id: location_id,

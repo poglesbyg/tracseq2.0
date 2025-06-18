@@ -69,11 +69,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize auth state from localStorage or auto-login as admin
+  // Initialize auth state from localStorage
   useEffect(() => {
     const initializeAuth = async () => {
       const token = localStorage.getItem('auth_token');
-      if (token && token !== 'mock-admin-token') {
+      if (token) {
         try {
           const response = await fetch(`${API_BASE_URL}/api/users/me`, {
             headers: {
@@ -87,59 +87,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Handle both possible response formats
             const userData = data.data ? data.data : data;
             setUser(userData);
-            setIsLoading(false);
-            return;
           } else {
+            // Token is invalid, remove it
             localStorage.removeItem('auth_token');
+            console.log('Invalid token removed, user needs to login');
           }
         } catch (error) {
           console.error('Failed to verify token:', error);
           localStorage.removeItem('auth_token');
-          // Don't immediately fail - try auto-login first
         }
-      }
-      
-      // Auto-login as admin if no valid token exists
-      try {
-        console.log('Auto-logging in as admin...');
-        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email: 'admin@lab.com', password: 'admin123' }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          // Handle both possible response formats
-          const responseData = data.data || data;
-          const { user: userData, token } = responseData;
-          setUser(userData);
-          localStorage.setItem('auth_token', token);
-          console.log('Auto-login successful');
-        } else {
-          throw new Error(`Login request failed with status: ${response.status}`);
-        }
-      } catch (error) {
-        console.log('Backend not available, using development mode with mock admin user');
-        // If login fails, create a mock admin user for development
-        const mockAdminUser: User = {
-          id: 'mock-admin-id',
-          email: 'admin@lab.com',
-          first_name: 'Admin',
-          last_name: 'User',
-          role: 'lab_administrator',
-          status: 'active',
-          lab_affiliation: 'Development Lab',
-          department: 'IT',
-          position: 'Administrator',
-          email_verified: true,
-          created_at: new Date().toISOString(),
-        };
-        setUser(mockAdminUser);
-        localStorage.setItem('auth_token', 'mock-admin-token');
-        console.log('Development mode: Mock admin user created');
       }
       
       setIsLoading(false);

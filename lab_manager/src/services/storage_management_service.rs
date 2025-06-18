@@ -29,7 +29,7 @@ impl<R: StorageRepository> StorageManagementService<R> {
     /// Store a sample with automatic barcode generation and validation
     pub async fn store_sample(
         &self,
-        sample_id: i32,
+        sample_id: uuid::Uuid,
         location_id: i32,
         sample_type: &str,
         template_name: Option<&str>,
@@ -118,7 +118,7 @@ impl<R: StorageRepository> StorageManagementService<R> {
     /// Move a sample from one location to another
     pub async fn move_sample(
         &self,
-        sample_id: i32,
+        sample_id: uuid::Uuid,
         new_location_id: i32,
         moved_by: &str,
         reason: &str,
@@ -225,7 +225,7 @@ impl<R: StorageRepository> StorageManagementService<R> {
     /// Update sample storage state
     pub async fn update_sample_state(
         &self,
-        sample_id: i32,
+        sample_id: uuid::Uuid,
         new_state: StorageState,
         updated_by: &str,
     ) -> Result<SampleLocation, StorageManagementError> {
@@ -550,7 +550,7 @@ pub enum StorageManagementError {
     LocationNotFound(i32),
 
     #[error("Sample {0} not found")]
-    SampleNotFound(i32),
+    SampleNotFound(uuid::Uuid),
 
     #[error("Barcode {0} not found")]
     BarcodeNotFound(String),

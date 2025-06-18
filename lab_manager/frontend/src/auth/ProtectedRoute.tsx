@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth, UserRole } from './AuthContext';
+import { LoginModal } from './LoginModal';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -18,6 +19,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   fallback,
 }) => {
   const { isAuthenticated, isLoading, hasRole, hasPermission } = useAuth();
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   if (isLoading) {
     return (
@@ -30,18 +32,37 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (!isAuthenticated) {
     return (
       fallback || (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="max-w-md w-full space-y-8">
-            <div>
-              <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                Authentication Required
-              </h2>
-              <p className="mt-2 text-center text-sm text-gray-600">
-                Please log in to access this page
-              </p>
+        <>
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="max-w-md w-full space-y-8">
+              <div className="text-center">
+                <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+                  Lab Manager
+                </h2>
+                <p className="mt-2 text-sm text-gray-600">
+                  Laboratory Management System
+                </p>
+              </div>
+              <div className="mt-8 space-y-6">
+                <button
+                  onClick={() => setShowLoginModal(true)}
+                  className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Sign In
+                </button>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-500">
+                  Access the laboratory management system to manage samples, templates, and reports.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+          <LoginModal 
+            isOpen={showLoginModal} 
+            onClose={() => setShowLoginModal(false)} 
+          />
+        </>
       )
     );
   }

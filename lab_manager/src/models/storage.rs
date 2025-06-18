@@ -125,7 +125,7 @@ impl StorageLocation {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct SampleLocation {
     pub id: i32,
-    pub sample_id: i32,
+    pub sample_id: uuid::Uuid,
     pub location_id: i32,
     pub barcode: String,
     pub position: Option<String>, // e.g., "A1", "Tube 15", etc.
@@ -144,7 +144,7 @@ pub struct SampleLocation {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct StorageMovementHistory {
     pub id: i32,
-    pub sample_id: i32,
+    pub sample_id: uuid::Uuid,
     pub barcode: String,
     pub from_location_id: Option<i32>,
     pub to_location_id: i32,
