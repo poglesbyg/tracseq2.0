@@ -108,7 +108,7 @@ pub async fn health_check(pool: &PgPool) -> Result<DatabaseHealth, sqlx::Error> 
         is_healthy: true,
         response_time_ms: response_time.as_millis() as u64,
         active_connections,
-        idle_connections,
+        idle_connections: idle_connections as u32,
         max_connections: pool.options().get_max_connections(),
     })
 }

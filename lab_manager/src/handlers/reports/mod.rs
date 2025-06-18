@@ -1,8 +1,13 @@
 use crate::AppComponents;
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
 use serde::{Deserialize, Serialize};
 use sqlx::{Column, Row, TypeInfo};
 use std::collections::HashMap;
+use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
 pub struct ReportQuery {
@@ -45,6 +50,35 @@ pub struct ReportTemplate {
     pub description: String,
     pub sql: String,
     pub category: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateReportRequest {
+    pub name: String,
+    pub description: Option<String>,
+    pub query: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CustomReport {
+    pub id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    pub query: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct QueryRequest {
+    pub query: String,
+    pub parameters: Option<std::collections::HashMap<String, serde_json::Value>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SaveTemplateRequest {
+    pub name: String,
+    pub description: Option<String>,
+    pub template: String,
 }
 
 /// Get database schema information
@@ -283,4 +317,67 @@ fn convert_sql_value_to_json(
             }
         }
     }
+}
+
+/// List all reports (stub implementation)
+pub async fn list_reports(
+    State(_state): State<AppComponents>,
+) -> Result<Json<Vec<CustomReport>>, (StatusCode, String)> {
+    Ok(Json(Vec::new()))
+}
+
+/// Create a custom report (stub implementation)
+pub async fn create_custom_report(
+    State(_state): State<AppComponents>,
+    Json(_request): Json<CreateReportRequest>,
+) -> Result<Json<CustomReport>, (StatusCode, String)> {
+    Err((
+        StatusCode::NOT_IMPLEMENTED,
+        "Create custom report not yet implemented".to_string(),
+    ))
+}
+
+/// Get a report by ID (stub implementation)
+pub async fn get_report(
+    State(_state): State<AppComponents>,
+    Path(_report_id): Path<Uuid>,
+) -> Result<Json<CustomReport>, (StatusCode, String)> {
+    Err((StatusCode::NOT_FOUND, "Report not found".to_string()))
+}
+
+/// Update a report (stub implementation)
+pub async fn update_report(
+    State(_state): State<AppComponents>,
+    Path(_report_id): Path<Uuid>,
+    Json(_request): Json<CreateReportRequest>,
+) -> Result<Json<CustomReport>, (StatusCode, String)> {
+    Err((
+        StatusCode::NOT_IMPLEMENTED,
+        "Update report not yet implemented".to_string(),
+    ))
+}
+
+/// Delete a report (stub implementation)
+pub async fn delete_report(
+    State(_state): State<AppComponents>,
+    Path(_report_id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    Err((
+        StatusCode::NOT_IMPLEMENTED,
+        "Delete report not yet implemented".to_string(),
+    ))
+}
+
+/// Get available templates (alias to existing function)
+pub use get_report_templates as get_available_templates;
+
+/// Save report template (stub implementation)
+pub async fn save_report_template(
+    State(_state): State<AppComponents>,
+    Json(_request): Json<SaveTemplateRequest>,
+) -> Result<Json<ReportTemplate>, (StatusCode, String)> {
+    Err((
+        StatusCode::NOT_IMPLEMENTED,
+        "Save report template not yet implemented".to_string(),
+    ))
 }

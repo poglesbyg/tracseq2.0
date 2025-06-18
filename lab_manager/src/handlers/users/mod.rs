@@ -672,3 +672,6 @@ pub async fn delete_user(
         )),
     }
 }
+
+// Alias for backward compatibility
+pub use request_password_reset as reset_password;

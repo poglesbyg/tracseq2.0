@@ -21,59 +21,59 @@ use crate::{
 /// Health and system routes
 pub fn health_routes() -> Router<AppComponents> {
     Router::new()
-        .route("/health", get(handlers::health_check))
-        .route("/api/dashboard/stats", get(handlers::get_dashboard_stats))
+        .route("/health", get(health::health_check))
+        .route("/api/dashboard/stats", get(dashboard::get_dashboard_stats))
 }
 
 /// Template management routes
 pub fn template_routes() -> Router<AppComponents> {
     Router::new()
-        .route("/api/templates/upload", post(handlers::upload_template))
-        .route("/api/templates", get(handlers::list_templates))
-        .route("/api/templates/:id", get(handlers::get_template))
-        .route("/api/templates/:id", put(handlers::update_template))
-        .route("/api/templates/:id/data", get(handlers::get_template_data))
-        .route("/api/templates/:id", delete(handlers::delete_template))
+        .route("/api/templates/upload", post(templates::upload_template))
+        .route("/api/templates", get(templates::list_templates))
+        .route("/api/templates/:id", get(templates::get_template))
+        .route("/api/templates/:id", put(templates::update_template))
+        .route("/api/templates/:id/data", get(templates::get_template_data))
+        .route("/api/templates/:id", delete(templates::delete_template))
 }
 
 /// RAG proxy routes - forward requests to RAG API Bridge on port 3002
 pub fn rag_proxy_routes() -> Router<AppComponents> {
     Router::new()
-        .route("/api/rag/submissions", get(handlers::get_rag_submissions))
-        .route("/api/rag/process", post(handlers::process_rag_document))
-        .route("/api/rag/stats", get(handlers::get_rag_stats))
-        .route("/api/rag/health", get(handlers::get_rag_health))
+        .route("/api/rag/submissions", get(rag_proxy::get_rag_submissions))
+        .route("/api/rag/process", post(rag_proxy::process_rag_document))
+        .route("/api/rag/stats", get(rag_proxy::get_rag_stats))
+        .route("/api/rag/health", get(rag_proxy::get_rag_health))
 }
 
 /// Sample management routes
 pub fn sample_routes() -> Router<AppComponents> {
     Router::new()
-        .route("/api/samples", get(handlers::list_samples))
-        .route("/api/samples", post(handlers::create_sample))
-        .route("/api/samples/batch", post(handlers::create_samples_batch))
-        .route("/api/samples/:id", get(handlers::get_sample))
-        .route("/api/samples/:id", put(handlers::update_sample))
-        .route("/api/samples/:id/validate", post(handlers::validate_sample))
+        .route("/api/samples", get(samples::list_samples))
+        .route("/api/samples", post(samples::create_sample))
+        .route("/api/samples/batch", post(samples::create_samples_batch))
+        .route("/api/samples/:id", get(samples::get_sample))
+        .route("/api/samples/:id", put(samples::update_sample))
+        .route("/api/samples/:id/validate", post(samples::validate_sample))
         // RAG-enhanced sample processing routes
         .route(
             "/api/samples/rag/process-document",
-            post(handlers::process_document_and_create_samples),
+            post(samples::process_document_and_create_samples),
         )
         .route(
             "/api/samples/rag/preview",
-            post(handlers::preview_document_extraction),
+            post(samples::preview_document_extraction),
         )
         .route(
             "/api/samples/rag/create-from-data",
-            post(handlers::create_samples_from_rag_data),
+            post(samples::create_samples_from_rag_data),
         )
         .route(
             "/api/samples/rag/query",
-            post(handlers::query_submission_information),
+            post(samples::query_submission_information),
         )
         .route(
             "/api/samples/rag/status",
-            get(handlers::get_rag_system_status),
+            get(samples::get_rag_system_status),
         )
 }
 
@@ -82,16 +82,19 @@ pub fn sequencing_routes() -> Router<AppComponents> {
     Router::new()
         .route(
             "/api/sequencing/jobs",
-            post(handlers::create_sequencing_job),
+            post(sequencing::create_sequencing_job),
         )
-        .route("/api/sequencing/jobs", get(handlers::list_sequencing_jobs))
+        .route(
+            "/api/sequencing/jobs",
+            get(sequencing::list_sequencing_jobs),
+        )
         .route(
             "/api/sequencing/jobs/:id",
-            get(handlers::get_sequencing_job),
+            get(sequencing::get_sequencing_job),
         )
         .route(
             "/api/sequencing/jobs/:id/status",
-            post(handlers::update_job_status),
+            post(sequencing::update_job_status),
         )
 }
 
@@ -100,34 +103,28 @@ pub fn storage_routes() -> Router<AppComponents> {
     Router::new()
         .route(
             "/api/storage/locations",
-            get(handlers::list_storage_locations),
+            get(storage::list_storage_locations),
         )
         .route(
             "/api/storage/locations",
-            post(handlers::create_storage_location),
+            post(storage::create_storage_location),
         )
-        .route("/api/storage/store", post(handlers::store_sample))
-        .route("/api/storage/move", post(handlers::move_sample))
-        .route("/api/storage/remove", post(handlers::remove_sample))
+        .route("/api/storage/store", post(storage::store_sample))
+        .route("/api/storage/move", post(storage::move_sample))
+        .route("/api/storage/remove", post(storage::remove_sample))
         .route(
             "/api/storage/scan/:barcode",
-            get(handlers::scan_sample_barcode),
+            get(storage::scan_sample_barcode),
         )
-        .route(
-            "/api/storage/capacity",
-            get(handlers::get_capacity_overview),
-        )
+        .route("/api/storage/capacity", get(storage::get_capacity_overview))
 }
 
 /// Reports and analytics routes
 pub fn reports_routes() -> Router<AppComponents> {
     Router::new()
-        .route("/api/reports/execute", post(handlers::execute_report))
-        .route(
-            "/api/reports/templates",
-            get(handlers::get_report_templates),
-        )
-        .route("/api/reports/schema", get(handlers::get_schema))
+        .route("/api/reports/execute", post(reports::execute_report))
+        .route("/api/reports/templates", get(reports::get_report_templates))
+        .route("/api/reports/schema", get(reports::get_schema))
 }
 
 /// Spreadsheet processing routes
@@ -137,42 +134,45 @@ pub fn spreadsheet_routes() -> Router<AppComponents> {
     let router = Router::new()
         .route(
             "/api/spreadsheets/upload",
-            post(handlers::upload_spreadsheet),
+            post(spreadsheets::upload_spreadsheet),
         )
         .route(
             "/api/spreadsheets/upload-multiple",
-            post(handlers::upload_spreadsheet_multiple_sheets),
+            post(spreadsheets::upload_spreadsheet_multiple_sheets),
         )
         .route(
             "/api/spreadsheets/preview-sheets",
-            post(handlers::get_sheet_names),
+            post(spreadsheets::get_sheet_names),
         )
-        .route("/api/spreadsheets/search", get(handlers::search_data))
-        .route("/api/spreadsheets/datasets", get(handlers::list_datasets))
-        .route("/api/spreadsheets/datasets/:id", get(handlers::get_dataset))
+        .route("/api/spreadsheets/search", get(spreadsheets::search_data))
+        .route(
+            "/api/spreadsheets/datasets",
+            get(spreadsheets::list_datasets),
+        )
         .route(
             "/api/spreadsheets/datasets/:id",
-            delete(handlers::delete_dataset),
+            get(spreadsheets::get_dataset),
+        )
+        .route(
+            "/api/spreadsheets/datasets/:id",
+            delete(spreadsheets::delete_dataset),
         )
         .route(
             "/api/spreadsheets/datasets/:id/analyze",
-            get(handlers::analyze_dataset),
+            get(spreadsheets::analyze_dataset),
         )
         .route(
             "/api/spreadsheets/datasets/:id/columns/:column_name/analyze",
-            get(handlers::analyze_column),
+            get(spreadsheets::analyze_column),
         )
         .route(
             "/api/spreadsheets/filters",
-            get(handlers::get_available_filters),
+            get(spreadsheets::get_available_filters),
         )
-        .route(
-            "/api/spreadsheets/health",
-            get(handlers::spreadsheets_health_check),
-        )
+        .route("/api/spreadsheets/health", get(spreadsheets::health_check))
         .route(
             "/api/spreadsheets/supported-types",
-            get(handlers::supported_types),
+            get(spreadsheets::supported_types),
         );
 
     tracing::info!("✅ Spreadsheet routes registered successfully");
@@ -183,46 +183,37 @@ pub fn spreadsheet_routes() -> Router<AppComponents> {
 pub fn user_routes() -> Router<AppComponents> {
     // Public routes (no authentication required)
     let public_routes = Router::new()
-        .route("/api/auth/login", post(handlers::login))
+        .route("/api/auth/login", post(users::login))
         .route(
             "/api/auth/reset-password",
-            post(handlers::request_password_reset),
+            post(users::request_password_reset),
         )
         .route(
             "/api/auth/confirm-reset",
-            post(handlers::confirm_password_reset),
+            post(users::confirm_password_reset),
         )
         // Shibboleth-specific routes
-        .route(
-            "/shibboleth-login",
-            get(handlers::shibboleth_login_redirect),
-        )
-        .route(
-            "/shibboleth-logout",
-            get(handlers::shibboleth_logout_redirect),
-        );
+        .route("/shibboleth-login", get(users::shibboleth_login_redirect))
+        .route("/shibboleth-logout", get(users::shibboleth_logout_redirect));
 
     // Protected routes (authentication required)
     let protected_routes = Router::new()
-        .route("/api/auth/logout", post(handlers::logout))
-        .route("/api/users/me", get(handlers::get_current_user))
-        .route("/api/users/me", put(handlers::update_current_user))
-        .route("/api/users/me/password", put(handlers::change_password))
-        .route("/api/users/me/sessions", get(handlers::get_user_sessions))
-        .route(
-            "/api/users/me/sessions",
-            delete(handlers::revoke_all_sessions),
-        )
+        .route("/api/auth/logout", post(users::logout))
+        .route("/api/users/me", get(users::get_current_user))
+        .route("/api/users/me", put(users::update_current_user))
+        .route("/api/users/me/password", put(users::change_password))
+        .route("/api/users/me/sessions", get(users::get_user_sessions))
+        .route("/api/users/me/sessions", delete(users::revoke_all_sessions))
         .route(
             "/api/users/me/sessions/:session_id",
-            delete(handlers::revoke_session),
+            delete(users::revoke_session),
         )
         // Admin-only routes (authentication + authorization handled in handlers)
-        .route("/api/users", post(handlers::create_user))
-        .route("/api/users", get(handlers::list_users))
-        .route("/api/users/:user_id", get(handlers::get_user))
-        .route("/api/users/:user_id", put(handlers::update_user))
-        .route("/api/users/:user_id", delete(handlers::delete_user));
+        .route("/api/users", post(users::create_user))
+        .route("/api/users", get(users::list_users))
+        .route("/api/users/:user_id", get(users::get_user))
+        .route("/api/users/:user_id", put(users::update_user))
+        .route("/api/users/:user_id", delete(users::delete_user));
 
     // Combine public and protected routes
     Router::new().merge(public_routes).merge(protected_routes)
@@ -340,15 +331,15 @@ pub fn create_app_router() -> Router<AppComponents> {
 /// Create a minimal router for testing
 pub fn create_test_router() -> Router<AppComponents> {
     Router::new()
-        .route("/health", get(handlers::health_check))
-        .route("/api/templates", get(handlers::list_templates))
+        .route("/health", get(health::health_check))
+        .route("/api/templates", get(templates::list_templates))
 }
 
 /// Create API-only router (no file uploads)
 pub fn create_api_only_router() -> Router<AppComponents> {
     Router::new()
         .merge(health_routes())
-        .route("/api/templates", get(handlers::list_templates))
+        .route("/api/templates", get(templates::list_templates))
         .merge(sample_routes())
         .merge(sequencing_routes())
         .merge(storage_routes())

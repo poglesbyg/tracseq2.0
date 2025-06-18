@@ -104,7 +104,9 @@ proptest = "1.4"                            # Property-based testing
 criterion = "0.5"                           # Benchmarking
 
 # Security-focused test dependencies  
-security-framework = "2.9"                  # Security testing utilities
+# Platform-specific dependencies
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "2.9"                  # Security testing utilities (macOS only)
 wiremock = "0.6"                            # HTTP mocking for integration tests
 
 [features]

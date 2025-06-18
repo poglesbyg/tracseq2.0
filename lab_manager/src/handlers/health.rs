@@ -342,7 +342,11 @@ fn get_hostname() -> String {
 
 /// Get Rust version
 fn get_rust_version() -> String {
-    env!("RUSTC_VERSION").to_string()
+    // Use the standard rustc version environment variable, or provide fallback
+    option_env!("RUSTC_VERSION")
+        .or_else(|| option_env!("RUSTUP_TOOLCHAIN"))
+        .unwrap_or("unknown")
+        .to_string()
 }
 
 /// Get memory usage in MB (placeholder implementation)

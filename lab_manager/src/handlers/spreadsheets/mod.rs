@@ -586,3 +586,51 @@ pub fn create_router(
 
 // Note: For standalone usage, use the main router endpoints directly
 // The create_router function provides a simplified router for the spreadsheet service
+
+// Add missing types and functions for backward compatibility
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateDatasetRequest {
+    pub name: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateDatasetRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchRequest {
+    pub query: String,
+    pub filters: Option<std::collections::HashMap<String, String>>,
+}
+
+pub type DatasetInfo = SpreadsheetDataset;
+
+/// Create a new dataset (stub implementation)
+pub async fn create_dataset(
+    State(_state): State<crate::AppComponents>,
+    Json(_request): Json<CreateDatasetRequest>,
+) -> Result<Json<DatasetInfo>, (StatusCode, String)> {
+    Err((
+        StatusCode::NOT_IMPLEMENTED,
+        "Create dataset not yet implemented".to_string(),
+    ))
+}
+
+/// Update an existing dataset (stub implementation)  
+pub async fn update_dataset(
+    State(_state): State<crate::AppComponents>,
+    Path(_dataset_id): Path<Uuid>,
+    Json(_request): Json<UpdateDatasetRequest>,
+) -> Result<Json<DatasetInfo>, (StatusCode, String)> {
+    Err((
+        StatusCode::NOT_IMPLEMENTED,
+        "Update dataset not yet implemented".to_string(),
+    ))
+}
+
+/// Search spreadsheet data (alias to existing search_data)
+pub use search_data as search_spreadsheet_data;

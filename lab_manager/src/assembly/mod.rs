@@ -191,6 +191,17 @@ impl ComponentBuilder {
             .spreadsheet_service
             .ok_or(AssemblyError::MissingComponent("Spreadsheet Service"))?;
 
+        // Create observability component
+        use crate::{
+            observability::{HealthChecker, MetricsCollector, TracingService},
+            ObservabilityComponent,
+        };
+        let observability = ObservabilityComponent {
+            metrics: Arc::new(MetricsCollector::new()),
+            tracing: Arc::new(TracingService::new()),
+            health_checker: Arc::new(HealthChecker::new()),
+        };
+
         Ok(AppComponents {
             config: self.config,
             database: DatabaseComponent {
@@ -209,6 +220,7 @@ impl ComponentBuilder {
             user_manager,
             auth_service,
             spreadsheet_service,
+            observability,
         })
     }
 }
@@ -279,6 +291,7 @@ impl CustomAssembly {
             user_manager: components.user_manager,
             auth_service: components.auth_service,
             spreadsheet_service: components.spreadsheet_service,
+            observability: components.observability,
         })
     }
 

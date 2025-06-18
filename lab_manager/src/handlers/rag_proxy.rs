@@ -174,3 +174,7 @@ pub async fn get_rag_health(
         )),
     }
 }
+
+// Alias functions for backward compatibility
+pub use get_rag_submissions as query_submissions;
+pub use process_rag_document as process_document;

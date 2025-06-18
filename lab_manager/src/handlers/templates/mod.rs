@@ -7,10 +7,17 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
-    models::template::{CreateTemplate, ParsedTemplateResponse, TemplateResponse, UpdateTemplate},
+    models::template::{
+        CreateTemplate, ParsedTemplateResponse, Template, TemplateResponse, UpdateTemplate,
+    },
     repositories::{Repository, RepositoryFactory},
     services::template_service::TemplateService,
     AppComponents,
+};
+
+// Re-export types for handlers/mod.rs
+pub use crate::models::template::{
+    CreateTemplate as CreateTemplateRequest, UpdateTemplate as UpdateTemplateRequest,
 };
 
 /// Upload a new template file with metadata
@@ -257,4 +264,25 @@ pub async fn delete_template(
     }
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Create a new template (without file upload)
+pub async fn create_template(
+    State(state): State<AppComponents>,
+    Json(create_request): Json<CreateTemplate>,
+) -> Result<Json<TemplateResponse>, (StatusCode, String)> {
+    let template_repo = state.repositories.factory.template_repository();
+
+    let template = template_repo
+        .create(create_request)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(TemplateResponse {
+        id: template.id,
+        name: template.name,
+        description: template.description,
+        created_at: template.created_at,
+        metadata: template.metadata,
+    }))
 }

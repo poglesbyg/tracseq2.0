@@ -130,6 +130,7 @@ impl RateLimiter {
 }
 
 /// Audit logging for security events
+#[derive(Clone)]
 pub struct AuditLogger {
     pool: PgPool,
 }
@@ -394,8 +395,7 @@ impl AuthService {
 
         Ok(LoginResponse {
             user: user.into(),
-            access_token: token,
-            refresh_token: String::new(), // TODO: Implement refresh token
+            token,
             expires_at: session.expires_at,
         })
     }
@@ -893,9 +893,8 @@ impl AuthService {
                 let tokens = self.generate_tokens(&user)?;
 
                 Ok(LoginResponse {
-                    user,
-                    access_token: tokens.access_token,
-                    refresh_token: tokens.refresh_token,
+                    user: user.into(),
+                    token: tokens.access_token,
                     expires_at: tokens.expires_at,
                 })
             }
@@ -969,7 +968,7 @@ impl AuthService {
         let argon2 = Argon2::default();
         let password_hash = argon2
             .hash_password(request.password.as_bytes(), &salt)
-            .map_err(|e| ApiError::InternalError(format!("Failed to hash password: {}", e)))?
+            .map_err(|e| ApiError::InternalServerError(format!("Failed to hash password: {}", e)))?
             .to_string();
 
         // Create user
@@ -978,16 +977,17 @@ impl AuthService {
 
         sqlx::query(
             r#"
-            INSERT INTO users (id, email, password_hash, full_name, role, is_active, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            INSERT INTO users (id, email, password_hash, first_name, last_name, role, status, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             "#,
         )
         .bind(user_id)
         .bind(&request.email)
         .bind(&password_hash)
-        .bind(&request.full_name)
+        .bind(&request.first_name)
+        .bind(&request.last_name)
         .bind(request.role.to_string())
-        .bind(true)
+        .bind("active")
         .bind(now)
         .bind(now)
         .execute(&self.pool)
@@ -1042,7 +1042,7 @@ impl AuthService {
     }
 }
 
-#[derive(Debug, serde::Serialize, Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct TokenPair {
     pub access_token: String,
     pub refresh_token: String,

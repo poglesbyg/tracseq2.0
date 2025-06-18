@@ -11,6 +11,11 @@ use crate::{
     AppComponents,
 };
 
+// Re-export types for handlers/mod.rs
+pub use crate::sample_submission::{
+    CreateSample as CreateSampleRequest, UpdateSample as UpdateSampleRequest,
+};
+
 // Re-export RAG enhanced functionality
 pub mod rag_enhanced_handlers;
 pub use rag_enhanced_handlers::*;
@@ -346,4 +351,39 @@ async fn store_sample_in_storage(
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+/// Delete a sample by its ID
+pub async fn delete_sample(
+    State(state): State<AppComponents>,
+    Path(sample_id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    // For safety in a laboratory environment, we typically don't permanently delete samples
+    // Instead, we mark them as deleted or archived
+    let update_sample = UpdateSample {
+        name: None,
+        barcode: None,
+        location: None,
+        status: Some(crate::sample_submission::SampleStatus::Deleted),
+        metadata: None,
+    };
+
+    match state
+        .sample_processing
+        .manager
+        .update_sample(sample_id, update_sample)
+        .await
+    {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => {
+            if e.to_string().contains("not found") {
+                Err((
+                    StatusCode::NOT_FOUND,
+                    format!("Sample {} not found", sample_id),
+                ))
+            } else {
+                Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+            }
+        }
+    }
 }
