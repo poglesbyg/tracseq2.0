@@ -1,0 +1,291 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "enhanced-rag-service"
+version = "0.1.0"
+description = "Enhanced RAG Service for AI-Powered Laboratory Document Processing"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+keywords = ["rag", "ai", "laboratory", "document-processing", "microservice"]
+authors = [
+  { name = "Lab Management Team", email = "dev@tracseq.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: Implementation :: CPython",
+]
+
+dependencies = [
+  # Web Framework & API
+  "fastapi[standard]>=0.104.0",
+  "uvicorn[standard]>=0.24.0",
+  "pydantic>=2.4.0",
+  "pydantic-settings>=2.0.0",
+  
+  # Database & Storage
+  "asyncpg>=0.29.0",
+  "sqlalchemy[asyncio]>=2.0.0",
+  "alembic>=1.12.0",
+  "redis>=5.0.0",
+  
+  # Document Processing
+  "pypdf>=3.17.0",
+  "python-docx>=1.1.0",
+  "python-pptx>=0.6.23",
+  "openpyxl>=3.1.2",
+  "python-multipart>=0.0.6",
+  "pillow>=10.1.0",
+  "pytesseract>=0.3.10",
+  "pdf2image>=1.17.0",
+  
+  # AI & Machine Learning
+  "transformers>=4.35.0",
+  "torch>=2.1.0",
+  "sentence-transformers>=2.2.2",
+  "langchain>=0.0.340",
+  "langchain-community>=0.0.8",
+  "langchain-openai>=0.0.5",
+  "openai>=1.3.0",
+  "chromadb>=0.4.17",
+  "faiss-cpu>=1.7.4",
+  
+  # Vector Databases
+  "pinecone-client>=2.2.4",
+  "qdrant-client>=1.6.9",
+  "weaviate-client>=3.25.3",
+  
+  # Text Processing & NLP
+  "spacy>=3.7.2",
+  "nltk>=3.8.1",
+  "textstat>=0.7.3",
+  "fuzzywuzzy[speedup]>=0.18.0",
+  "python-levenshtein>=0.23.0",
+  
+  # Data Processing
+  "pandas>=2.1.0",
+  "numpy>=1.24.0",
+  "scikit-learn>=1.3.0",
+  "jsonschema>=4.19.0",
+  
+  # Async & Concurrency
+  "aiofiles>=23.2.1",
+  "aiohttp>=3.9.0",
+  "asyncio-mqtt>=0.16.1",
+  "celery[redis]>=5.3.0",
+  
+  # Monitoring & Observability
+  "prometheus-client>=0.19.0",
+  "structlog>=23.2.0",
+  "sentry-sdk[fastapi]>=1.38.0",
+  
+  # Utilities
+  "httpx>=0.25.0",
+  "tenacity>=8.2.3",
+  "python-jose[cryptography]>=3.3.0",
+  "passlib[bcrypt]>=1.7.4",
+  "python-magic>=0.4.27",
+  "watchfiles>=0.21.0",
+  
+  # Configuration & Environment
+  "python-dotenv>=1.0.0",
+  "pyyaml>=6.0.1",
+  "toml>=0.10.2",
+  
+  # Image Processing
+  "opencv-python>=4.8.1.78",
+  "scikit-image>=0.22.0",
+  
+  # Advanced ML Features
+  "huggingface-hub>=0.19.0",
+  "accelerate>=0.24.0",
+  "optimum>=1.14.0",
+  
+  # Document Intelligence
+  "layoutparser[layoutmodels,tesseract]>=0.3.4",
+  "unstructured[local-inference]>=0.11.0",
+  
+  # MLOps & Experiment Tracking
+  "mlflow>=2.7.1",
+  "wandb>=0.16.0",
+  
+  # Testing Framework
+  "pytest>=7.4.0",
+  "pytest-asyncio>=0.21.0",
+  "pytest-cov>=4.1.0",
+  "httpx>=0.25.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black>=23.10.0",
+  "ruff>=0.1.5",
+  "mypy>=1.7.0",
+  "pre-commit>=3.5.0",
+]
+
+gpu = [
+  "torch>=2.1.0+cu118",
+  "faiss-gpu>=1.7.4",
+]
+
+advanced = [
+  # Enterprise AI Features
+  "anthropic>=0.7.0",
+  "cohere>=4.37",
+  "together>=0.2.7",
+  
+  # Advanced Document Processing
+  "pymupdf>=1.23.0",
+  "camelot-py[cv]>=0.11.0",
+  "tabula-py>=2.8.2",
+  
+  # Advanced OCR
+  "easyocr>=1.7.0",
+  "paddleocr>=2.7.0",
+  
+  # Graph & Knowledge Processing
+  "networkx>=3.2.1",
+  "rdflib>=7.0.0",
+  
+  # Audio Processing
+  "whisper>=1.1.10",
+  "librosa>=0.10.1",
+]
+
+[project.urls]
+Documentation = "https://docs.tracseq.com/rag"
+Issues = "https://github.com/tracseq/enhanced-rag-service/issues"
+Source = "https://github.com/tracseq/enhanced-rag-service"
+
+[tool.hatch.version]
+path = "src/enhanced_rag_service/__about__.py"
+
+[tool.hatch.envs.default]
+dependencies = [
+  "coverage[toml]>=6.5",
+  "pytest",
+]
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "coverage run -m pytest {args:tests}"
+cov-report = [
+  "- coverage combine",
+  "coverage report",
+]
+cov-html = [
+  "- coverage combine", 
+  "coverage html",
+]
+
+[tool.hatch.envs.lint]
+detached = true
+dependencies = [
+  "black>=23.1.0",
+  "mypy>=1.0.0",
+  "ruff>=0.0.243",
+]
+
+[tool.hatch.envs.lint.scripts]
+typing = "mypy --install-types --non-interactive {args:src/enhanced_rag_service tests}"
+style = [
+  "ruff {args:.}",
+  "black --check --diff {args:.}",
+]
+fmt = [
+  "black {args:.}",
+  "ruff --fix {args:.}",
+  "style",
+]
+all = [
+  "style",
+  "typing",
+]
+
+[tool.black]
+target-version = ["py39"]
+line-length = 88
+skip-string-normalization = true
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+  "A",
+  "ARG", 
+  "B",
+  "C",
+  "DTZ",
+  "E",
+  "EM",
+  "F",
+  "FBT",
+  "I",
+  "ICN",
+  "ISC",
+  "N",
+  "PLC",
+  "PLE",
+  "PLR",
+  "PLW",
+  "Q",
+  "RUF",
+  "S",
+  "T",
+  "TID",
+  "UP",
+  "W",
+  "YTT",
+]
+ignore = [
+  # Allow non-abstract empty methods in abstract base classes
+  "B027",
+  # Allow boolean positional values in function calls
+  "FBT003",
+  # Ignore checks for possible passwords
+  "S105", "S106", "S107",
+  # Ignore complexity
+  "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
+]
+unfixable = [
+  # Don't touch unused imports
+  "F401",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["enhanced_rag_service"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can use magic values, assertions, and relative imports
+"tests/**/*" = ["PLR2004", "S101", "TID252"]
+
+[tool.coverage.run]
+source_pkgs = ["enhanced_rag_service", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/enhanced_rag_service/__about__.py",
+]
+
+[tool.coverage.paths]
+enhanced_rag_service = ["src/enhanced_rag_service", "*/enhanced-rag-service/src/enhanced_rag_service"]
+tests = ["tests", "*/enhanced-rag-service/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+] 

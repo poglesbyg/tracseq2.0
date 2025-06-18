@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # Enhanced RAG Service
+  enhanced-rag-service:
+    build: .
+    container_name: enhanced-rag-service
+    ports:
+      - "8086:8086"
+    environment:
+      - DATABASE__URL=postgresql://rag_user:rag_password@rag-postgres:5432/enhanced_rag_db
+      - VECTOR_STORE__PROVIDER=chromadb
+      - VECTOR_STORE__CHROMA_PERSIST_DIRECTORY=/app/chroma_db
+      - LLM__PROVIDER=openai
+      - LLM__OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ENVIRONMENT=production
+    volumes:
+      - rag_uploads:/app/uploads
+      - rag_chroma:/app/chroma_db
+    depends_on:
+      - rag-postgres
+      - rag-redis
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL Database
+  rag-postgres:
+    image: postgres:15-alpine
+    container_name: rag-postgres
+    environment:
+      - POSTGRES_DB=enhanced_rag_db
+      - POSTGRES_USER=rag_user
+      - POSTGRES_PASSWORD=rag_password
+    volumes:
+      - rag_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag_user -d enhanced_rag_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  rag-redis:
+    image: redis:7-alpine
+    container_name: rag-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - rag_redis_data:/data
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Prometheus for monitoring
+  rag-prometheus:
+    image: prom/prometheus:latest
+    container_name: rag-prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - rag_prometheus_data:/prometheus
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Grafana for visualization
+  rag-grafana:
+    image: grafana/grafana:latest
+    container_name: rag-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - rag_grafana_data:/var/lib/grafana
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+volumes:
+  rag_postgres_data:
+  rag_redis_data:
+  rag_uploads:
+  rag_chroma:
+  rag_prometheus_data:
+  rag_grafana_data:
+
+networks:
+  tracseq-network:
+    driver: bridge
+    external: true 

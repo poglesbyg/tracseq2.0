@@ -1,0 +1,111 @@
+[package]
+name = "enhanced_storage_service"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lab Management Team"]
+description = "Enhanced storage management service with IoT integration, predictive analytics, and digital twin technology"
+
+[dependencies]
+# Web framework
+axum = "0.7"
+tokio = { version = "1.0", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "compression"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Validation
+validator = { version = "0.16", features = ["derive"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Configuration
+config = "0.14"
+dotenvy = "0.15"
+
+# HTTP client for service communication
+reqwest = { version = "0.11", features = ["json"] }
+
+# Utilities
+lazy_static = "1.4"
+
+# IoT and sensor integration
+rumqttc = "0.24"  # MQTT client for IoT devices
+tokio-modbus = "0.13"  # Modbus protocol for industrial sensors
+tungstenite = "0.21"  # WebSocket for real-time data
+tokio-tungstenite = "0.21"
+
+# Machine Learning and Predictive Analytics
+candle-core = "0.4"  # Rust ML framework
+candle-nn = "0.4"
+ndarray = "0.15"  # N-dimensional arrays
+linfa = "0.7"  # ML toolkit
+linfa-linear = "0.7"  # Linear regression
+linfa-clustering = "0.7"  # Clustering algorithms
+
+# Time series analysis
+polars = { version = "0.35", features = ["lazy", "temporal", "strings"] }
+
+# Blockchain integration
+sha2 = "0.10"  # SHA-256 hashing
+ed25519-dalek = "2.0"  # Digital signatures
+hex = "0.4"
+
+# Energy optimization
+measurements = "0.11"  # Unit conversion for energy calculations
+
+# Digital twin and simulation
+petgraph = "0.6"  # Graph algorithms for modeling
+nalgebra = "0.32"  # Linear algebra for simulations
+
+# Mobile integration
+jsonwebtoken = "9.0"  # JWT for mobile auth
+
+# Rate limiting and caching
+governor = "0.6"
+dashmap = "5.5"
+
+# Async utilities
+futures = "0.3"
+async-trait = "0.1"
+
+# Metrics and monitoring
+metrics = "0.22"
+metrics-exporter-prometheus = "0.13"
+
+# Background job processing
+tokio-cron-scheduler = "0.10"
+
+# Image processing for barcode scanning
+image = "0.24"
+qrcode = "0.14"
+
+# Geolocation for mobile tracking
+geoutils = "0.5"
+
+# WebRTC for real-time communication
+webrtc = "0.11"
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockito = "1.4"
+tempfile = "3.8"
+
+[[bin]]
+name = "enhanced_storage_service"
+path = "src/main.rs" 
