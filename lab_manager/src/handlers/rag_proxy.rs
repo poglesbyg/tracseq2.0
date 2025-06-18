@@ -13,7 +13,9 @@ pub async fn get_rag_submissions(
     State(_state): State<AppComponents>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let client = Client::new();
-    let url = "http://rag-service:8000/api/rag/submissions";
+    let rag_service_url =
+        std::env::var("RAG_SERVICE_URL").unwrap_or_else(|_| "http://localhost:8000".to_string());
+    let url = format!("{}/api/rag/submissions", rag_service_url);
 
     match client.get(url).send().await {
         Ok(response) => {
@@ -46,7 +48,9 @@ pub async fn process_rag_document(
     multipart: Multipart,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let client = Client::new();
-    let url = "http://rag-service:8000/api/rag/process";
+    let rag_service_url =
+        std::env::var("RAG_SERVICE_URL").unwrap_or_else(|_| "http://localhost:8000".to_string());
+    let url = format!("{}/api/rag/process", rag_service_url);
 
     // Convert axum multipart to reqwest multipart
     let mut form = reqwest::multipart::Form::new();
@@ -108,7 +112,9 @@ pub async fn get_rag_stats(
     State(_state): State<AppComponents>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let client = Client::new();
-    let url = "http://rag-service:8000/api/rag/stats";
+    let rag_service_url =
+        std::env::var("RAG_SERVICE_URL").unwrap_or_else(|_| "http://localhost:8000".to_string());
+    let url = format!("{}/api/rag/stats", rag_service_url);
 
     match client.get(url).send().await {
         Ok(response) => {
@@ -140,7 +146,9 @@ pub async fn get_rag_health(
     State(_state): State<AppComponents>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let client = Client::new();
-    let url = "http://rag-service:8000/health";
+    let rag_service_url =
+        std::env::var("RAG_SERVICE_URL").unwrap_or_else(|_| "http://localhost:8000".to_string());
+    let url = format!("{}/health", rag_service_url);
 
     match client.get(url).send().await {
         Ok(response) => {

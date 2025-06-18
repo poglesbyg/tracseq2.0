@@ -252,12 +252,13 @@ pub fn create_app_router() -> Router<AppComponents> {
         .route(
             "/shibboleth-logout",
             get(handlers::shibboleth_logout_redirect),
-        );
+        )
+        // RAG routes made public for accessibility
+        .merge(rag_proxy_routes());
 
     // Authenticated routes (require valid JWT token)
     let authenticated_routes = Router::new()
         .merge(template_routes())
-        .merge(rag_proxy_routes())
         .merge(sample_routes())
         .merge(sequencing_routes())
         .merge(storage_routes())
