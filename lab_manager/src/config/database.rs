@@ -1,7 +1,7 @@
 use anyhow::Result;
 use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::info;
 
 /// Enhanced database configuration with performance tuning
 #[derive(Debug, Clone)]

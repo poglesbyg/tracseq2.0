@@ -1,73 +1,81 @@
 ---
-description: Analyzing data flow patterns for laboratory sample processing and RAG-based document extraction system
-globs: lab_manager/**/*.rs,lab_submission_rag/**/*.py,lab_submission_rag/rag/**/*
+description: Documents data flows through laboratory information system including document processing, RAG orchestration, and sample workflows
+globs: **/rag/**/*.{py,rs},**/lab_manager/**/*.{rs,py},**/mlops/**/*.{py,rs}
 alwaysApply: false
 ---
 
 
 # data-flow-patterns
 
-### Primary Data Flow Pipelines
+The data flow patterns in this laboratory information system focus on two main paths: document processing and sample management.
 
-1. Document Processing Pipeline (Score: 95)
-- Document ingestion → Chunking → Vector embedding → Storage in ChromaDB
-- Specialized extraction patterns for laboratory submission documents
-- Information categorized into 7 domain categories (Administrative, Source Material, etc.)
-File: `lab_submission_rag/rag/document_processor.py`
+## Document Processing Pipeline
+Importance Score: 95
 
-2. RAG Orchestration Flow (Score: 90) 
-- Document chunks → Relevance search → LLM context assembly → Information extraction
-- Maintains conversation context for follow-up queries
-- Handles batch processing of multiple documents
-File: `lab_submission_rag/rag/rag_orchestrator.py`
+The RAG system implements a multi-stage document processing pipeline:
 
-3. Sample Processing Pipeline (Score: 85)
-- Sample submission → Metadata validation → Barcode generation → Storage assignment
-- Template-based batch uploads with data mapping
-- Automated sample sheet creation for sequencing jobs
-File: `lab_manager/examples/modular_usage.rs`
+1. Initial Document Ingestion
+- Documents uploaded through web interface or file system monitoring
+- Automatic file type detection and validation
+- Assignment to processing queue with priority levels
 
-### Information Extraction Workflows
+2. Document Chunking and Processing 
+- Text extraction based on document type
+- Recursive chunking with configurable overlap
+- Chunk enrichment with metadata
+- Vector embedding generation
 
-1. Laboratory Document Analysis (Score: 88)
-- Multi-stage extraction process targeting specific document sections
-- Confidence scoring system for extracted information
-- Fallback mechanisms for unclear or missing information
-File: `lab_submission_rag/rag/llm_interface.py`
+3. Information Extraction
+- RAG-based extraction using prompt templates
+- Structured data mapping to laboratory schema
+- Confidence scoring and validation
+- Failed extraction retry with different models
 
-2. Data Transformation Chain (Score: 82)
-- Document → Structured data → Sample records → Storage records
-- Template mapping for standardized submissions
-- Validation at each transformation stage
-File: `lab_manager/src/sample_submission/document_conversion.rs`
+## Sample Management Flow 
+Importance Score: 90
 
-### Query Processing Patterns
+The sample workflow orchestrates:
 
-1. Natural Language Query Flow (Score: 85)
-- Query → Vector search → Context assembly → Enhanced response generation
-- Domain-specific knowledge integration
-- Conversation history management
-File: `lab_submission_rag/rag/enhanced_llm_interface.py`
+1. Sample Creation
+- From processed documents or manual entry
+- Automated barcode generation
+- Multi-level validation
+- Storage location assignment
 
-2. Sample Information Retrieval (Score: 80)
-- Barcode-based lookups
-- Storage location tracking
-- Status monitoring across processing stages
-File: `lab_manager/src/storage/barcode_tracking.rs`
+2. Sample State Transitions
+```
+Pending -> Validated -> InStorage -> InSequencing -> Completed
+```
 
-### Data Models Flow
+3. Storage Management
+- Real-time capacity tracking
+- Temperature zone control (-80°C to 37°C)
+- Chain of custody logging
+- Container organization hierarchy
 
-1. Submission Information Model (Score: 92)
-- Comprehensive data structure covering all laboratory submission aspects
-- Validation rules for each information category
-- Transformation logic for different output formats
-File: `lab_submission_rag/models/submission.py`
+## Integration Points
+Importance Score: 85
 
-2. Storage and Tracking Model (Score: 85)
-- Location tracking with state transitions
-- Storage condition validation
-- Sample relationship mapping
-File: `lab_manager/src/storage/storage_validation.rs`
+Key data flow integration points:
+
+1. Database Integration
+- Submission storage with RAG system tables
+- Sample tracking tables
+- Storage management tables
+- Audit logging tables
+
+2. External Systems
+- Sequencing equipment integration
+- Storage system monitoring
+- Laboratory information system (LIMS) sync
+- Authentication system integration
+
+## File Paths
+- `lab_submission_rag/rag/document_processor.py`
+- `lab_submission_rag/rag/llm_interface.py` 
+- `lab_manager/src/workflow.rs`
+- `lab_manager/src/storage/chain_of_custody.rs`
+- `lab_manager/src/integration/lims.rs`
 
 $END$
 

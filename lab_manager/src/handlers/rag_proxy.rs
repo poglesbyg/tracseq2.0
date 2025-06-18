@@ -6,7 +6,7 @@ use axum::{
 use reqwest::Client;
 use serde_json::Value;
 
-use crate::AppComponents;
+use crate::assembly::AppComponents;
 
 /// Get RAG submissions by proxying to the RAG API Bridge
 pub async fn get_rag_submissions(
@@ -64,7 +64,7 @@ pub async fn process_rag_document(
     })? {
         let name = field.name().unwrap_or("file").to_string();
         let filename = field.file_name().map(|s| s.to_string());
-        let content_type = field.content_type().map(|s| s.to_string());
+        let _content_type = field.content_type().map(|s| s.to_string());
         let data = field.bytes().await.map_err(|e| {
             (
                 StatusCode::BAD_REQUEST,

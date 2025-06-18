@@ -6,8 +6,8 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
+    assembly::AppComponents,
     sequencing::{CreateJob, JobStatus, SequencingJob},
-    AppComponents,
 };
 use serde::{Deserialize, Serialize};
 

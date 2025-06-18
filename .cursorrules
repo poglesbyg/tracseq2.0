@@ -10,36 +10,51 @@
 - Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
 
 
-The system implements a laboratory management platform with integrated RAG-based document processing, consisting of three core components:
+The Laboratory Management System integrates traditional sample tracking with AI-powered document processing through a multi-tier architecture:
 
-## Core Lab Management
-- Modular architecture following IKEA-style assembly patterns for lab components
-- Custom error handling and validation system specific to laboratory processes
-- Sample tracking via barcode system with state transitions
-- Template management for lab sample submissions
-- Integration of RAG system for automated document extraction
+## Core Laboratory Management
+- Implements a state-based sample workflow: Pending → Validated → InStorage → InSequencing → Completed
+- Manages temperature-controlled storage zones (-80°C, -20°C, 4°C, RT, 37°C) with capacity monitoring
+- Enforces chain of custody tracking for regulatory compliance
+- Generates standardized barcodes in format {TYPE}-{TIMESTAMP}-{RANDOM}
 
-## RAG Processing Engine
-- Document extraction across 7 laboratory-specific categories:
-  - Administrative Information
-  - Source/Submitting Material
-  - Pooling/Multiplexing 
-  - Sequence Generation
-  - Container/Diluent Specs
-  - Informatics Requirements
-  - Sample Details
-- Domain-specific LLM prompting for lab document analysis
-- Confidence scoring for extracted information
-- Vector storage optimization for laboratory documents
+File paths:
+- lab_manager/src/workflow.rs
+- lab_manager/src/storage/temperature_zones.rs
+- lab_manager/src/storage/chain_of_custody.rs
 
-## Workflow Orchestration
-- Custom validation rules for sample metadata
-- Sequencing job management with protocol validation
-- Storage condition enforcement and tracking
-- Template-to-sample mapping with validation
-- Natural language querying of submission data
+## AI-Powered Document Processing
+- RAG system extracts structured data from laboratory documents (PDF, DOCX, TXT)
+- Implements confidence scoring (0.5-1.0) for extraction quality assessment
+- Supports natural language querying of extracted information
+- Provides vector-based similarity search for related documents
 
-The system provides comprehensive laboratory workflow management with AI-assisted document processing and validation rules specific to laboratory operations.
+File paths:
+- lab_submission_rag/rag/document_processor.py
+- lab_submission_rag/rag/llm_interface.py
+- lab_submission_rag/rag/vector_store.py
+
+## MLOps Integration
+- Tracks model experiments with laboratory-specific metrics
+- Manages A/B testing of extraction model variants
+- Implements continuous learning pipeline for model improvement
+- Monitors extraction quality and performance metrics
+
+File paths:
+- lab_submission_rag/mlops/experiment_tracker.py
+- lab_submission_rag/mlops/ab_testing.py
+- lab_submission_rag/mlops/continuous_learning.py
+
+## Access Control and Security
+- Implements role-based access (Lab Admin, PI, Technician, Scientist, Analyst, Guest)
+- Enforces department and lab-specific access restrictions
+- Maintains comprehensive audit logging for compliance
+- Supports multi-tenant laboratory environments
+
+File paths:
+- lab_manager/src/auth/roles.rs
+- lab_manager/src/multi_tenancy.rs
+- lab_manager/src/audit_logging.rs
 
 $END$
 

@@ -1,4 +1,4 @@
-use crate::AppComponents;
+use crate::assembly::AppComponents;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -277,7 +277,10 @@ fn convert_sql_value_to_json(
 ) -> serde_json::Value {
     use sqlx::ValueRef;
 
-    let value_ref = row.try_get_raw(index).unwrap();
+    let value_ref = match row.try_get_raw(index) {
+        Ok(value) => value,
+        Err(_) => return serde_json::Value::Null,
+    };
 
     if value_ref.is_null() {
         return serde_json::Value::Null;

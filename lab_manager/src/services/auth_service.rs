@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use argon2::password_hash::{rand_core::OsRng, SaltString};
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
+use argon2::{Argon2, PasswordHasher};
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use sqlx::{PgPool, Row};
@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{error, info, warn};
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::errors::{api::ApiError, ComponentResult};
@@ -17,7 +17,7 @@ use crate::models::user::{
     LoginRequest, LoginResponse, ResetPasswordRequest, User, UserManager, UserSession, UserStatus,
 };
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AuthService {
     pool: PgPool,
     user_manager: UserManager,
@@ -59,6 +59,7 @@ impl Default for SecurityConfig {
 }
 
 /// Rate limiting implementation
+#[derive(Debug)]
 pub struct RateLimiter {
     attempts: HashMap<String, Vec<DateTime<Utc>>>,
     lockouts: HashMap<String, DateTime<Utc>>,
@@ -130,7 +131,7 @@ impl RateLimiter {
 }
 
 /// Audit logging for security events
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AuditLogger {
     pool: PgPool,
 }
@@ -229,6 +230,7 @@ impl std::fmt::Display for SecuritySeverity {
 }
 
 /// Password validation and strength checking
+#[derive(Debug)]
 pub struct PasswordValidator {
     config: SecurityConfig,
 }
@@ -1032,13 +1034,65 @@ impl AuthService {
         email: &str,
         password: &str,
     ) -> ComponentResult<User, ApiError> {
-        // Implementation with secure password verification
-        todo!("Implement secure authentication")
+        // Get user by email
+        let user = self
+            .user_manager
+            .get_user_by_email(email)
+            .await
+            .map_err(|_| ApiError::Unauthorized)?;
+
+        // Check if user can login
+        if !user.can_login() {
+            return Err(ApiError::Forbidden);
+        }
+
+        // Verify password
+        if !self
+            .user_manager
+            .verify_password(password, &user.password_hash)
+            .await
+        {
+            // Increment failed login attempts
+            let _ = self.user_manager.increment_failed_login(user.id).await;
+            return Err(ApiError::Unauthorized);
+        }
+
+        // Reset failed login attempts on successful authentication
+        self.user_manager
+            .reset_failed_login(user.id)
+            .await
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        Ok(user)
     }
 
     fn generate_tokens(&self, user: &User) -> ComponentResult<TokenPair, ApiError> {
-        // Implementation with secure token generation
-        todo!("Implement secure token generation")
+        let now = Utc::now();
+        let expiration = now + Duration::hours(self.security_config.jwt_expiration_hours);
+
+        // Create JWT claims
+        let claims = AuthClaims {
+            sub: user.id,
+            email: user.email.clone(),
+            role: user.role.clone(),
+            exp: expiration.timestamp(),
+            iat: now.timestamp(),
+            jti: Uuid::new_v4(), // Session/token ID
+        };
+
+        // Generate access token
+        let access_token = self.generate_jwt_token(&claims).map_err(|e| {
+            ApiError::InternalServerError(format!("Failed to generate token: {}", e))
+        })?;
+
+        // Generate refresh token (simple UUID for now)
+        let refresh_token = Uuid::new_v4().to_string();
+
+        Ok(TokenPair {
+            access_token,
+            refresh_token,
+            expires_at: expiration,
+        })
     }
 }
 

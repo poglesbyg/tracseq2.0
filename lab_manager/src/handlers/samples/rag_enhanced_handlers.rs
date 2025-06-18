@@ -8,11 +8,11 @@ use tokio::fs;
 use uuid::Uuid;
 
 use crate::{
+    assembly::AppComponents,
     handlers::samples::{BatchCreateSamplesResponse, BatchError},
     services::rag_integration_service::{
         RagConfig, RagEnhancedSampleResult, RagIntegrationService,
     },
-    AppComponents,
 };
 
 /// Process a laboratory document using RAG and create samples from extracted data
@@ -468,13 +468,13 @@ pub async fn preview_document_extraction(
     }))
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct QueryRequest {
     pub query: String,
     pub session_id: Option<String>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub struct QueryResponse {
     pub query: String,
     pub answer: String,

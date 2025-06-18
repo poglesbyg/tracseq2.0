@@ -5,8 +5,8 @@ use axum::{
 use serde_json::{json, Value};
 
 use crate::{
+    assembly::AppComponents,
     models::user::{User, UserSession},
-    AppComponents,
 };
 
 /// Extract and verify JWT token from request headers

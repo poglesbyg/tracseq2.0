@@ -1,12 +1,12 @@
 use axum::{extract::State, http::StatusCode, Json};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use tracing::{error, info};
 
 use crate::{
+    assembly::AppComponents,
     config::database::health_check as db_health_check,
-    observability::{HealthChecker, HealthStatus, ServiceStatus},
-    AppComponents,
+    observability::{HealthStatus, MetricValue, ServiceStatus},
 };
 
 /// Basic health check response
@@ -114,7 +114,7 @@ pub async fn system_health_check(
     };
 
     // Return appropriate status code based on health
-    let status_code = match response.overall_status {
+    let _status_code = match response.overall_status {
         ServiceStatus::Healthy => StatusCode::OK,
         ServiceStatus::Degraded => StatusCode::OK, // Still operational
         ServiceStatus::Unhealthy => StatusCode::SERVICE_UNAVAILABLE,
@@ -280,11 +280,8 @@ async fn get_database_version(pool: &sqlx::PgPool) -> Option<String> {
 }
 
 /// Extract counter metric value
-fn extract_counter_metric(
-    metrics: &HashMap<String, crate::observability::MetricValue>,
-    name: &str,
-) -> Option<u64> {
-    if let Some(crate::observability::MetricValue::Counter(value)) = metrics.get(name) {
+fn extract_counter_metric(metrics: &HashMap<String, MetricValue>, name: &str) -> Option<u64> {
+    if let Some(MetricValue::Counter(value)) = metrics.get(name) {
         Some(*value)
     } else {
         None
@@ -292,11 +289,8 @@ fn extract_counter_metric(
 }
 
 /// Extract gauge metric value
-fn extract_gauge_metric(
-    metrics: &HashMap<String, crate::observability::MetricValue>,
-    name: &str,
-) -> Option<f64> {
-    if let Some(crate::observability::MetricValue::Gauge(value)) = metrics.get(name) {
+fn extract_gauge_metric(metrics: &HashMap<String, MetricValue>, name: &str) -> Option<f64> {
+    if let Some(MetricValue::Gauge(value)) = metrics.get(name) {
         Some(*value)
     } else {
         None
@@ -304,7 +298,7 @@ fn extract_gauge_metric(
 }
 
 /// Calculate error rate from metrics
-fn calculate_error_rate(metrics: &HashMap<String, crate::observability::MetricValue>) -> f64 {
+fn calculate_error_rate(metrics: &HashMap<String, MetricValue>) -> f64 {
     let total_requests = extract_counter_metric(metrics, "http_requests_total").unwrap_or(0) as f64;
     let error_requests =
         extract_counter_metric(metrics, "http_requests_errors").unwrap_or(0) as f64;
@@ -317,11 +311,8 @@ fn calculate_error_rate(metrics: &HashMap<String, crate::observability::MetricVa
 }
 
 /// Extract histogram average
-fn extract_histogram_average(
-    metrics: &HashMap<String, crate::observability::MetricValue>,
-    name: &str,
-) -> Option<f64> {
-    if let Some(crate::observability::MetricValue::Histogram(values)) = metrics.get(name) {
+fn extract_histogram_average(metrics: &HashMap<String, MetricValue>, name: &str) -> Option<f64> {
+    if let Some(MetricValue::Histogram(values)) = metrics.get(name) {
         if !values.is_empty() {
             let sum: f64 = values.iter().sum();
             Some(sum / values.len() as f64)

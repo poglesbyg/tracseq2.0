@@ -8,9 +8,8 @@ use serde_json::json;
 use std::collections::HashMap;
 
 use crate::{
+    assembly::AppComponents,
     models::user::{User, UserRole},
-    services::auth_service::AuthService,
-    AppComponents,
 };
 
 /// Shibboleth authentication middleware that processes headers from Shibboleth SP
@@ -98,7 +97,7 @@ pub fn extract_shibboleth_attributes(headers: &HeaderMap) -> HashMap<String, Str
 /// Authenticate user based on Shibboleth attributes
 async fn authenticate_shibboleth_user(
     components: &AppComponents,
-    user_id: &str,
+    _user_id: &str,
     attributes: &HashMap<String, String>,
 ) -> Result<(User, uuid::Uuid), Box<dyn std::error::Error + Send + Sync>> {
     // Try to find existing user by email or create new one
@@ -138,7 +137,7 @@ async fn create_user_from_shibboleth(
         .get("givenName")
         .map_or("Unknown", |s| s.as_str());
     let surname = attributes.get("surname").map_or("User", |s| s.as_str());
-    let display_name = attributes
+    let _display_name = attributes
         .get("displayName")
         .cloned()
         .unwrap_or_else(|| format!("{} {}", given_name, surname));

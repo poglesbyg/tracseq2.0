@@ -14,7 +14,7 @@ use crate::{
     services::{HealthCheck, HealthStatus, Service, ServiceConfig, ServiceHealth},
 };
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SpreadsheetService {
     manager: SpreadsheetDataManager,
 }
@@ -467,7 +467,7 @@ impl SpreadsheetService {
         data: &[u8],
     ) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
         let cursor = Cursor::new(data);
-        let mut workbook = open_workbook_auto_from_rs(cursor)?;
+        let workbook = open_workbook_auto_from_rs(cursor)?;
         Ok(workbook.sheet_names().to_vec())
     }
 

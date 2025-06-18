@@ -1,21 +1,15 @@
 use axum::{
-    middleware,
     routing::{delete, get, post, put},
     Router,
 };
 use tower_http::cors::CorsLayer;
 
 use crate::{
+    assembly::AppComponents,
     handlers::{
         dashboard, health, rag_proxy, reports, samples, sequencing, spreadsheets, storage,
         templates, users,
     },
-    middleware::{
-        auth::{auth_middleware, optional_auth_middleware},
-        shibboleth_auth::hybrid_auth_middleware,
-        validation::validate_input_middleware,
-    },
-    AppComponents,
 };
 
 /// Health and system routes
@@ -303,12 +297,24 @@ pub fn create_app_router() -> Router<AppComponents> {
                 .allow_origin(
                     "http://localhost:5173"
                         .parse::<axum::http::HeaderValue>()
-                        .unwrap(),
+                        .map_err(|e| {
+                            tracing::error!("Failed to parse CORS origin: {}", e);
+                            e
+                        })
+                        .unwrap_or_else(|_| {
+                            axum::http::HeaderValue::from_static("http://localhost:5173")
+                        }),
                 )
                 .allow_origin(
                     "http://localhost:8080"
                         .parse::<axum::http::HeaderValue>()
-                        .unwrap(),
+                        .map_err(|e| {
+                            tracing::error!("Failed to parse CORS origin: {}", e);
+                            e
+                        })
+                        .unwrap_or_else(|_| {
+                            axum::http::HeaderValue::from_static("http://localhost:8080")
+                        }),
                 )
                 .allow_methods([
                     axum::http::Method::GET,

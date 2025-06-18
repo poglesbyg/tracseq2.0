@@ -1,6 +1,6 @@
 ---
-description: Documents core data models and relationships for lab sample submissions, including administrative, material, sequencing and container details.
-globs: **/models/*,**/entities/*,**/types/*,**/schemas/*
+description: Documents the core data models, entities and their relationships for a laboratory sample submission and management system
+globs: **/models/**,**/entities/**,**/schemas/**,**/*model*.{ts,js,py,rs},**/*entity*.{ts,js,py,rs}
 alwaysApply: false
 ---
 
@@ -9,61 +9,73 @@ alwaysApply: false
 
 ## Core Domain Models
 
-### Sample Submission Models
-- `AdministrativeInfo`: Captures administrative metadata including submitter info, project details, contact info
-- `SourceMaterial`: Records material properties like type, collection info, storage conditions
-- `PoolingInfo`: Handles multiplexing configuration including barcodes, pooling ratios
-- `SequenceGeneration`: Stores sequencing parameters, platform details, read requirements
-- `ContainerInfo`: Defines container specs, volumes, concentrations
-- `InformaticsInfo`: Manages analysis requirements, reference genomes, pipeline configs
-- `SampleDetails`: Contains core sample data including IDs, quality metrics, priority levels
+### Laboratory Submission Model (Importance: 95)
+Core model representing a laboratory sample submission with comprehensive metadata:
 
-### Business Logic in Model Relationships
+- **AdministrativeInfo**:
+  - Submitter details (name, email, department)
+  - Project information and priority level
+  - Submission timestamps and status
 
-- **Administrative Linkage**
+- **SourceMaterial**: 
+  - Sample origin and type
+  - Collection date and conditions
+  - Material properties (concentration, volume)
+
+- **PoolingInfo**:
+  - Multiplexing strategy
+  - Sample combinations
+  - Pooling ratios and conditions
+
+- **SequenceGeneration**:
+  - Platform configuration
+  - Chemistry version
+  - Run parameters
+  - Quality thresholds
+
+- **ContainerInfo**:
+  - Storage requirements
+  - Container type and dimensions
+  - Temperature conditions
+  - Location tracking
+
+- **InformaticsInfo**:
+  - Analysis requirements
+  - Data delivery format
+  - Custom pipeline parameters
+
+- **SampleDetails**:
+  - Sample identifiers and metadata
+  - Quality scores
+  - Processing history
+  - Current status
+
+### Model Relationships
+
+```mermaid
+graph TD
+    LabSubmission --> AdministrativeInfo
+    LabSubmission --> SourceMaterial
+    LabSubmission --> PoolingInfo
+    LabSubmission --> SequenceGeneration
+    LabSubmission --> ContainerInfo
+    LabSubmission --> InformaticsInfo
+    LabSubmission --> SampleDetails
 ```
-AdministrativeInfo 1:1 LabSubmission
-SampleDetails N:1 LabSubmission 
+
+### Validation Rules (Importance: 85)
+- Administrative data requires submitter contact information
+- Source material must specify type and collection details
+- Container information must include storage requirements
+- Sample details require unique identifiers
+- Sequencing data requires platform specification
+
+### File Paths
 ```
-
-- **Material Flow**
+lab_submission_rag/models/submission.py
+lab_submission_rag/models/rag_models.py
+lab_submission_rag/models/database.py
 ```
-SourceMaterial 1:N PoolingInfo
-PoolingInfo 1:1 SequenceGeneration
-```
-
-- **Container Management** 
-```
-ContainerInfo 1:1 SampleDetails
-ContainerInfo 1:N StorageLocation
-```
-
-### Model Validation Rules
-
-- `SampleValidator`: Enforces domain rules for sample data validation:
-  - Empty names not allowed
-  - Barcode length requirements
-  - Valid storage conditions
-  - Required metadata fields
-
-- `SubmissionPolicies`: Defines business policies for submissions:
-  - Required metadata per submission type
-  - Storage condition requirements
-  - Sequencing job creation rules
-
-### Export Transformations
-
-- Document to Sample Data conversion rules
-- Template to Sample record mapping
-- Structured formats (JSON, CSV) for interoperability
-- Maintains relationships during export
-
-### Notable Relationships
-
-- Container tracking via barcode references
-- Sample to storage location mapping
-- Project to submission linkage
-- Sequential workflow state transitions
 
 $END$
 

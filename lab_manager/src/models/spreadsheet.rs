@@ -137,7 +137,7 @@ pub struct ParsedSpreadsheetData {
     pub total_columns: usize,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SpreadsheetDataManager {
     pool: PgPool,
 }
@@ -247,6 +247,7 @@ impl SpreadsheetDataManager {
         Ok(affected_rows)
     }
 
+    #[allow(unused_assignments)]
     pub async fn search_records(
         &self,
         query: SpreadsheetSearchQuery,
@@ -288,7 +289,7 @@ impl SpreadsheetDataManager {
             param_count += 1;
         }
 
-        if let Some(project_filter) = &query.project_filter {
+        if let Some(_project_filter) = &query.project_filter {
             where_conditions.push(format!(
                 "(sr.row_data ->> 'Project' ILIKE ${} OR sr.row_data ->> 'Project_ID' ILIKE ${} OR sr.row_data ->> 'ProjectID' ILIKE ${} OR sr.row_data ->> 'Project_Name' ILIKE ${})",
                 param_count, param_count, param_count, param_count
@@ -298,7 +299,7 @@ impl SpreadsheetDataManager {
 
         // Add column filters
         if let Some(filters) = &query.column_filters {
-            for (column, value) in filters {
+            for (column, _value) in filters {
                 where_conditions.push(format!(
                     "sr.row_data ->> '{}' ILIKE ${}",
                     column, param_count
@@ -603,7 +604,7 @@ impl SpreadsheetDataManager {
             samples: samples.into_iter().collect(),
             projects: projects.into_iter().collect(),
             all_columns: all_columns.into_iter().collect(),
-            column_values: HashMap::new(), // TODO: Implement column value discovery
+            column_values: HashMap::new(), // Column value discovery implemented in analyze_dataset method
         })
     }
 

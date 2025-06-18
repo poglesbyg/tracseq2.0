@@ -32,6 +32,7 @@ pub struct CreateJob {
     pub metadata: Option<serde_json::Value>,
 }
 
+#[derive(Debug)]
 pub struct SequencingManager {
     pool: PgPool,
 }

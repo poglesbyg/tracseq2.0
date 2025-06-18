@@ -1,77 +1,74 @@
 ---
-description: Specifications for implementing RAG-based document processing and information retrieval in laboratory sample management systems
-globs: **/rag/**,**/rag_*.{py,rs},**/llm_*.{py,rs},**/vector_*.{py,rs}
+description: Specification for RAG (Retrieval Augmented Generation) algorithms and information extraction system for laboratory document processing
+globs: **/rag/**,**/rag_*.{py,rs},**/rag/**/**.{py,rs}
 alwaysApply: false
 ---
 
 
 # rag-algorithms
 
-### Core RAG Components
+## Core RAG Components
 
-1. Document Processing (Importance: 95)
-- Specialized chunking algorithm for laboratory documents that preserves metadata structure
-- Seven-category extraction framework: Administrative, Source Material, Pooling, Sequence Generation, Container, Informatics, Sample Details
-- Context-aware document segmentation based on laboratory document formats
-- File: `lab_submission_rag/rag/document_processor.py`
+### Document Processing (Importance: 95)
+- Custom chunking strategy optimized for laboratory documents with metadata preservation
+- Document parser handles PDF, DOCX, TXT formats with specialized extraction for lab report structures
+- Validation rules for laboratory document formats and content requirements
 
-2. Vector Store Management (Importance: 90) 
-- ChromaDB implementation with laboratory-specific metadata filtering
-- Dynamic embedding generation optimized for scientific content
-- Storage size monitoring and management
-- File: `lab_submission_rag/rag/vector_store.py`
+### Information Extraction (Importance: 98)
+- Seven-category structured information model:
+  - Administrative information
+  - Source material details 
+  - Pooling specifications
+  - Sequence generation parameters
+  - Container specifications
+  - Informatics requirements
+  - Sample details
+- Custom prompt engineering for laboratory data extraction
+- Confidence scoring system for extracted data reliability
 
-3. LLM Interface (Importance: 85)
-- Multi-provider support (Ollama, OpenAI, Anthropic) with failover
-- Domain-specific prompt engineering for laboratory data extraction
-- Confidence scoring for extracted information
-- Mock response generation for testing
-- File: `lab_submission_rag/rag/llm_interface.py`
+### Vector Store Integration (Importance: 85)
+- ChromaDB implementation optimized for laboratory document embeddings
+- Metadata-aware chunk storage preserving document hierarchy
+- Laboratory-specific search optimization with custom ranking
 
-4. RAG Orchestration (Importance: 95)
-- End-to-end pipeline coordination for document processing
-- Query-based information retrieval with laboratory context
-- Batch processing workflow for multiple documents
-- Export functionality for extracted data
-- File: `lab_submission_rag/rag_orchestrator.py`
+### LLM Interface (Importance: 90)  
+- Multi-provider support (Ollama, OpenAI, Anthropic)
+- Local-first approach using Ollama for data privacy
+- Laboratory-domain optimization through custom system prompts
 
-### Laboratory-Specific Features
+### Query Processing (Importance: 92)
+- Natural language understanding for laboratory queries
+- Context-aware response generation incorporating:
+  - Relevant document chunks
+  - Laboratory submission metadata  
+  - Sample relationships
+- Custom response formatting for laboratory data presentation
 
-1. Information Extraction Categories (Importance: 90)
-- Administrative Information
-- Source and Submitting Material
-- Pooling/Multiplexing Data
-- Sequence Generation Parameters
-- Container and Diluent Details
-- Informatics Requirements
-- Sample Details and Metadata
+### Data Models (Importance: 95)
+- Specialized Pydantic models for laboratory submissions
+- Validation rules for required laboratory fields
+- Schema alignment with lab_manager database structure
 
-2. Enhanced Query Processing (Importance: 85)
-- Natural language querying for laboratory submissions
-- Context-aware response generation
-- Conversation memory for multi-turn queries
-- File: `lab_submission_rag/rag/enhanced_llm_interface.py`
+### Integration Points (Importance: 88)
+- Direct integration with lab_manager sample creation
+- Storage location and capacity management hooks
+- Sequencing workflow triggers based on extracted data
 
-3. Data Models (Importance: 80)
-- Structured submission data models
-- Laboratory-specific validation rules
-- Metadata preservation schema
-- File: `lab_submission_rag/models/submission.py`
-
-### Integration Components
-
-1. Document Processing Pipeline (Importance: 85)
-- Multi-format support (PDF, DOCX)
-- Metadata extraction and preservation
-- Intelligent chunking for laboratory documents
-- File: `lab_submission_rag/rag/document_processor.py`
-
-2. Submission Processing (Importance: 90)
-- Unique ID generation for submissions
-- Vector store integration
-- LLM-based information extraction
-- Export functionality
-- File: `lab_submission_rag/rag_orchestrator.py`
+File Paths:
+```
+lab_submission_rag/
+  ├── rag/
+  │   ├── document_processor.py
+  │   ├── llm_interface.py
+  │   ├── vector_store.py
+  │   └── enhanced_llm_interface.py
+  ├── models/
+  │   ├── rag_models.py
+  │   └── submission.py
+  └── core/
+      ├── services.py
+      └── interfaces.py
+```
 
 $END$
 

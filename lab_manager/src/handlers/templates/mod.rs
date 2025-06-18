@@ -7,12 +7,10 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
-    models::template::{
-        CreateTemplate, ParsedTemplateResponse, Template, TemplateResponse, UpdateTemplate,
-    },
+    assembly::AppComponents,
+    models::template::{CreateTemplate, ParsedTemplateResponse, TemplateResponse, UpdateTemplate},
     repositories::{Repository, RepositoryFactory},
     services::template_service::TemplateService,
-    AppComponents,
 };
 
 // Re-export types for handlers/mod.rs

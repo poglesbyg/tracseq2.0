@@ -3,23 +3,105 @@ use axum::{
     http::{HeaderMap, StatusCode},
     middleware::Next,
     response::Response,
-    Json,
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{error, info, warn};
+use std::sync::OnceLock;
+use tracing::{info, warn};
 use uuid::Uuid;
 use validator::{Validate, ValidationError, ValidationErrors};
 
+use crate::assembly::AppComponents;
 use crate::errors::{ErrorResponse, ErrorSeverity};
-use crate::AppComponents;
+
+// Compiled regexes using OnceLock for thread-safe lazy initialization
+static EMAIL_REGEX: OnceLock<Regex> = OnceLock::new();
+static BARCODE_REGEX: OnceLock<Regex> = OnceLock::new();
+static SAFE_PATH_REGEX: OnceLock<Regex> = OnceLock::new();
+static IPV4_REGEX: OnceLock<Regex> = OnceLock::new();
+static IPV6_REGEX: OnceLock<Regex> = OnceLock::new();
+
+/// Initialize all validation regexes at startup
+pub fn initialize_validation_regexes() -> Result<(), String> {
+    EMAIL_REGEX
+        .set(
+            Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+                .map_err(|e| format!("Failed to compile email regex: {}", e))?,
+        )
+        .map_err(|_| "Failed to set email regex")?;
+
+    BARCODE_REGEX
+        .set(
+            Regex::new(r"^[A-Z]{3,5}-\d{14}-\d{3}$")
+                .map_err(|e| format!("Failed to compile barcode regex: {}", e))?,
+        )
+        .map_err(|_| "Failed to set barcode regex")?;
+
+    SAFE_PATH_REGEX
+        .set(
+            Regex::new(r"^[a-zA-Z0-9._/-]+$")
+                .map_err(|e| format!("Failed to compile safe path regex: {}", e))?,
+        )
+        .map_err(|_| "Failed to set safe path regex")?;
+
+    IPV4_REGEX
+        .set(
+            Regex::new(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
+                .map_err(|e| format!("Failed to compile IPv4 regex: {}", e))?,
+        )
+        .map_err(|_| "Failed to set IPv4 regex")?;
+
+    IPV6_REGEX
+        .set(
+            Regex::new(r"^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$")
+                .map_err(|e| format!("Failed to compile IPv6 regex: {}", e))?,
+        )
+        .map_err(|_| "Failed to set IPv6 regex")?;
+
+    Ok(())
+}
+
+/// Get email regex, initializing if necessary
+fn get_email_regex() -> Result<&'static Regex, String> {
+    EMAIL_REGEX.get().ok_or_else(|| {
+        "Email regex not initialized. Call initialize_validation_regexes() first.".to_string()
+    })
+}
+
+/// Get barcode regex, initializing if necessary
+fn get_barcode_regex() -> Result<&'static Regex, String> {
+    BARCODE_REGEX.get().ok_or_else(|| {
+        "Barcode regex not initialized. Call initialize_validation_regexes() first.".to_string()
+    })
+}
+
+/// Get safe path regex, initializing if necessary
+fn get_safe_path_regex() -> Result<&'static Regex, String> {
+    SAFE_PATH_REGEX.get().ok_or_else(|| {
+        "Safe path regex not initialized. Call initialize_validation_regexes() first.".to_string()
+    })
+}
+
+/// Get IPv4 regex, initializing if necessary
+fn get_ipv4_regex() -> Result<&'static Regex, String> {
+    IPV4_REGEX.get().ok_or_else(|| {
+        "IPv4 regex not initialized. Call initialize_validation_regexes() first.".to_string()
+    })
+}
+
+/// Get IPv6 regex, initializing if necessary
+fn get_ipv6_regex() -> Result<&'static Regex, String> {
+    IPV6_REGEX.get().ok_or_else(|| {
+        "IPv6 regex not initialized. Call initialize_validation_regexes() first.".to_string()
+    })
+}
 
 /// Input validation middleware for API endpoints
 pub async fn validate_input_middleware(
-    State(app): State<AppComponents>,
+    State(_app): State<AppComponents>,
     headers: HeaderMap,
-    mut request: Request,
+    request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
     let path = request.uri().path().to_string();
@@ -130,7 +212,10 @@ impl InputSanitizer {
 
     /// Validate and sanitize email addresses
     pub fn validate_email(email: &str) -> Result<String, ValidationError> {
-        let email_regex = Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap();
+        let email_regex = match get_email_regex() {
+            Ok(regex) => regex,
+            Err(_) => return Err(ValidationError::new("regex_compilation_error")),
+        };
 
         if !email_regex.is_match(email) {
             return Err(ValidationError::new("invalid_email"));
@@ -150,8 +235,10 @@ impl InputSanitizer {
 
     /// Validate barcode format (laboratory-specific)
     pub fn validate_barcode(barcode: &str) -> Result<String, ValidationError> {
-        // Laboratory barcode format: TYPE-YYYYMMDDHHMMSS-XXX
-        let barcode_regex = Regex::new(r"^[A-Z]{3,5}-\d{14}-\d{3}$").unwrap();
+        let barcode_regex = match get_barcode_regex() {
+            Ok(regex) => regex,
+            Err(_) => return Err(ValidationError::new("regex_compilation_error")),
+        };
 
         if !barcode_regex.is_match(barcode) {
             return Err(ValidationError::new("invalid_barcode_format"));
@@ -162,13 +249,16 @@ impl InputSanitizer {
 
     /// Validate file paths to prevent directory traversal
     pub fn validate_file_path(path: &str) -> Result<String, ValidationError> {
+        let safe_path_regex = match get_safe_path_regex() {
+            Ok(regex) => regex,
+            Err(_) => return Err(ValidationError::new("regex_compilation_error")),
+        };
+
         // Check for directory traversal attempts
         if path.contains("..") || path.contains("//") || path.starts_with('/') {
             return Err(ValidationError::new("invalid_file_path"));
         }
 
-        // Only allow alphanumeric characters, hyphens, underscores, and dots
-        let safe_path_regex = Regex::new(r"^[a-zA-Z0-9._/-]+$").unwrap();
         if !safe_path_regex.is_match(path) {
             return Err(ValidationError::new("unsafe_file_path"));
         }
@@ -312,13 +402,13 @@ fn create_validation_error_response(error_type: ValidationErrorType, message: St
 
 /// Basic IP format validation
 fn is_valid_ip_format(ip: &str) -> bool {
-    // Basic regex for IPv4
-    let ipv4_regex = Regex::new(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$").unwrap();
-
-    // Basic regex for IPv6 (simplified)
-    let ipv6_regex = Regex::new(r"^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$").unwrap();
-
-    ipv4_regex.is_match(ip) || ipv6_regex.is_match(ip)
+    match (get_ipv4_regex(), get_ipv6_regex()) {
+        (Ok(ipv4_regex), Ok(ipv6_regex)) => ipv4_regex.is_match(ip) || ipv6_regex.is_match(ip),
+        _ => {
+            warn!("Failed to get IP validation regexes");
+            false
+        }
+    }
 }
 
 /// Validation traits for request models

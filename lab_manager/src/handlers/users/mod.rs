@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 
 use axum::{
     extract::{ConnectInfo, Path, Query, State},
-    http::{HeaderMap, StatusCode, Uri},
+    http::{HeaderMap, StatusCode},
     response::{Json, Redirect},
     Extension,
 };
@@ -13,11 +13,11 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
+    assembly::AppComponents,
     models::user::{
         ChangePasswordRequest, ConfirmResetPasswordRequest, CreateUserRequest, LoginRequest,
         ResetPasswordRequest, UpdateUserRequest, User, UserListQuery, UserSafeProfile,
     },
-    AppComponents,
 };
 
 use auth_helpers::{require_admin, require_auth, verify_auth_token};

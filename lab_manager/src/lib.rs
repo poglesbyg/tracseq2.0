@@ -26,7 +26,7 @@ pub use observability::{HealthChecker, MetricsCollector, TracingService};
 use sqlx::PgPool;
 use std::sync::Arc;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AppComponents {
     pub config: config::AppConfig,
     pub database: DatabaseComponent,
@@ -40,27 +40,27 @@ pub struct AppComponents {
     pub observability: ObservabilityComponent,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct DatabaseComponent {
     pub pool: PgPool,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct StorageComponent {
     pub storage: Arc<storage::Storage>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SampleProcessingComponent {
     pub manager: Arc<sample_submission::SampleSubmissionManager>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SequencingComponent {
     pub manager: Arc<sequencing::SequencingManager>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ObservabilityComponent {
     pub metrics: Arc<MetricsCollector>,
     pub tracing: Arc<TracingService>,

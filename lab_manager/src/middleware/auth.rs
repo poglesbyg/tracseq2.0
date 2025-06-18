@@ -7,8 +7,8 @@ use axum::{
 use serde_json::json;
 
 use crate::{
+    assembly::AppComponents,
     models::user::{User, UserRole},
-    AppComponents,
 };
 
 /// Authentication middleware that verifies JWT tokens and injects user info

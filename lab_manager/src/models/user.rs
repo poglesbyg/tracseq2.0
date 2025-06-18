@@ -328,7 +328,7 @@ pub struct UserListResponse {
     pub total_pages: u32,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct UserManager {
     pool: PgPool,
 }
@@ -412,6 +412,7 @@ impl UserManager {
         .await
     }
 
+    #[allow(unused_assignments)]
     pub async fn update_user(
         &self,
         user_id: Uuid,
@@ -517,6 +518,7 @@ impl UserManager {
         query_builder.fetch_one(&self.pool).await
     }
 
+    #[allow(unused_assignments)]
     pub async fn list_users(&self, query: UserListQuery) -> Result<UserListResponse, sqlx::Error> {
         let page = query.page.unwrap_or(1).max(1);
         let per_page = query.per_page.unwrap_or(20).min(100);

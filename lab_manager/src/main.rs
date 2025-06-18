@@ -12,19 +12,14 @@ pub mod sample_submission;
 pub mod sequencing;
 pub mod services;
 pub mod storage;
-pub mod tests;
 pub mod validation;
 
 use std::net::SocketAddr;
+use std::process;
 
 use assembly::assemble_production_components;
+use middleware::validation::initialize_validation_regexes;
 use router::create_app_router;
-
-// Use the component types from the library
-use lab_manager::{
-    AppComponents, DatabaseComponent, SampleProcessingComponent, SequencingComponent,
-    StorageComponent,
-};
 
 #[tokio::main]
 async fn main() {
@@ -34,27 +29,85 @@ async fn main() {
     // Load environment variables
     dotenvy::dotenv().ok();
 
+    // Initialize validation regexes
+    if let Err(e) = initialize_validation_regexes() {
+        tracing::error!("Failed to initialize validation regexes: {}", e);
+        eprintln!("❌ Error: Failed to initialize validation regexes");
+        eprintln!("   Details: {}", e);
+        process::exit(1);
+    }
+
     // Assemble all components using the new modular system
-    let components = assemble_production_components()
-        .await
-        .expect("Failed to assemble application components");
+    let components = match assemble_production_components().await {
+        Ok(components) => components,
+        Err(e) => {
+            tracing::error!("Failed to assemble application components: {}", e);
+            eprintln!("❌ Error: Failed to initialize application components");
+            eprintln!("   Details: {}", e);
+            eprintln!("   Please check your configuration and database connectivity.");
+            process::exit(1);
+        }
+    };
 
     // Create the application router
     let app = create_app_router().with_state(components);
 
     // Get server configuration
-    let config = config::AppConfig::from_env().expect("Failed to load configuration");
+    let config = match config::AppConfig::from_env() {
+        Ok(config) => config,
+        Err(e) => {
+            tracing::error!("Failed to load configuration: {}", e);
+            eprintln!("❌ Error: Failed to load configuration");
+            eprintln!("   Details: {}", e);
+            eprintln!("   Please check your environment variables.");
+            process::exit(1);
+        }
+    };
 
-    // Run the application
-    let addr = format!("{}:{}", config.server.host, config.server.port)
-        .parse::<SocketAddr>()
-        .expect("Invalid host:port combination");
+    // Parse the address
+    let addr = match format!("{}:{}", config.server.host, config.server.port).parse::<SocketAddr>()
+    {
+        Ok(addr) => addr,
+        Err(e) => {
+            tracing::error!(
+                "Invalid host:port combination: {}:{}",
+                config.server.host,
+                config.server.port
+            );
+            eprintln!(
+                "❌ Error: Invalid host:port combination: {}:{}",
+                config.server.host, config.server.port
+            );
+            eprintln!("   Details: {}", e);
+            process::exit(1);
+        }
+    };
+
     tracing::info!("Starting server on {}", addr);
+    println!("🚀 TracSeq 2.0 Laboratory Management System starting...");
+    println!("📡 Server listening on: http://{}", addr);
 
-    axum::serve(
-        tokio::net::TcpListener::bind(addr).await.unwrap(),
+    // Bind the TCP listener
+    let listener = match tokio::net::TcpListener::bind(addr).await {
+        Ok(listener) => listener,
+        Err(e) => {
+            tracing::error!("Failed to bind to address {}: {}", addr, e);
+            eprintln!("❌ Error: Failed to bind to address {}", addr);
+            eprintln!("   Details: {}", e);
+            eprintln!("   Please check if the port is already in use or if you have permission to bind to it.");
+            process::exit(1);
+        }
+    };
+
+    // Start the server
+    if let Err(e) = axum::serve(
+        listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
     .await
-    .unwrap();
+    {
+        tracing::error!("Server error: {}", e);
+        eprintln!("❌ Server error: {}", e);
+        process::exit(1);
+    }
 }

@@ -37,6 +37,7 @@ pub trait RepositoryFactory {
 }
 
 /// PostgreSQL repository factory
+#[derive(Debug)]
 pub struct PostgresRepositoryFactory {
     pool: sqlx::PgPool,
 }

@@ -6,9 +6,8 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    repositories::storage_repository::StorageRepository,
+    assembly::AppComponents,
     sample_submission::{CreateSample, Sample, UpdateSample},
-    AppComponents,
 };
 
 // Re-export types for handlers/mod.rs
@@ -293,7 +292,7 @@ async fn store_sample_in_storage(
     state: &AppComponents,
     sample_id: uuid::Uuid,
     location_id: i32,
-    sample_type: &str,
+    _sample_type: &str,
     template_name: Option<&str>,
     stored_by: &str,
     position: Option<String>,
@@ -313,7 +312,7 @@ async fn store_sample_in_storage(
 
     // Create storage service (this should ideally be injected as a component)
     let storage_repo = Arc::new(PostgresStorageRepository::new(state.database.pool.clone()));
-    let barcode_service = Arc::new(RwLock::new(BarcodeService::with_default_config()));
+    let _barcode_service = Arc::new(RwLock::new(BarcodeService::with_default_config()));
 
     // Create a sample location entry directly using the repository
     let create_sample_location = crate::repositories::storage_repository::CreateSampleLocation {

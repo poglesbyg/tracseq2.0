@@ -10,17 +10,22 @@ use crate::{
     sequencing::SequencingManager,
     services::{auth_service::AuthService, spreadsheet_service::SpreadsheetService},
     storage::Storage,
+};
+
+// Re-export component types from lib.rs
+pub use crate::{
     AppComponents, DatabaseComponent, ObservabilityComponent, SampleProcessingComponent,
     SequencingComponent, StorageComponent,
 };
 
 /// Repositories component for data access abstraction
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct RepositoriesComponent {
     pub factory: Arc<PostgresRepositoryFactory>,
 }
 
 /// Builder for assembling application components
+#[derive(Debug)]
 pub struct ComponentBuilder {
     pub config: AppConfig,
     database_pool: Option<PgPool>,

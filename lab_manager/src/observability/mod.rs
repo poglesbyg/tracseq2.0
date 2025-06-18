@@ -1,13 +1,14 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 /// Metrics collector for application performance monitoring
+#[derive(Debug)]
 pub struct MetricsCollector {
     metrics: Arc<RwLock<HashMap<String, MetricValue>>>,
     counters: Arc<RwLock<HashMap<String, u64>>>,
@@ -74,6 +75,7 @@ impl MetricsCollector {
 }
 
 /// Distributed tracing service
+#[derive(Debug)]
 pub struct TracingService {
     active_spans: Arc<RwLock<HashMap<String, TraceSpan>>>,
 }
@@ -201,6 +203,17 @@ impl TracingService {
 /// Health checking service
 pub struct HealthChecker {
     checks: Arc<RwLock<HashMap<String, Box<dyn HealthCheck + Send + Sync>>>>,
+}
+
+impl std::fmt::Debug for HealthChecker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HealthChecker")
+            .field(
+                "check_count",
+                &self.checks.try_read().map(|c| c.len()).unwrap_or(0),
+            )
+            .finish()
+    }
 }
 
 #[async_trait::async_trait]

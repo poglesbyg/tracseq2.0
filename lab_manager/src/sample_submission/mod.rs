@@ -42,6 +42,7 @@ pub struct UpdateSample {
     pub metadata: Option<serde_json::Value>,
 }
 
+#[derive(Debug)]
 pub struct SampleSubmissionManager {
     pool: PgPool,
 }

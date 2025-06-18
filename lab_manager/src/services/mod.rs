@@ -63,6 +63,15 @@ pub struct ServiceRegistry {
     services: HashMap<String, Box<dyn Service>>,
 }
 
+impl std::fmt::Debug for ServiceRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ServiceRegistry")
+            .field("service_count", &self.services.len())
+            .field("service_names", &self.services.keys().collect::<Vec<_>>())
+            .finish()
+    }
+}
+
 impl ServiceRegistry {
     pub fn new() -> Self {
         Self {

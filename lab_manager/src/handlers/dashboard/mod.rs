@@ -1,9 +1,9 @@
 use axum::{extract::State, http::StatusCode, Json};
 use serde::Serialize;
 
-use crate::AppComponents;
+use crate::assembly::AppComponents;
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardStats {
     total_templates: i64,
@@ -12,7 +12,7 @@ pub struct DashboardStats {
     completed_sequencing: i64,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct HealthStatus {
     status: String,
     database_connected: bool,
