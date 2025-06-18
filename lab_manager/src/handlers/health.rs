@@ -3,11 +3,33 @@ use serde::Serialize;
 use std::collections::HashMap;
 use tracing::{error, info};
 
-use crate::{
-    assembly::AppComponents,
-    config::database::health_check as db_health_check,
-    observability::{HealthStatus, MetricValue, ServiceStatus},
-};
+use crate::{assembly::AppComponents, config::database::health_check as db_health_check};
+
+// Local type definitions as workaround for import issues
+#[derive(Debug, Clone, Serialize)]
+pub enum ServiceStatus {
+    Healthy,
+    Degraded,
+    Unhealthy,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub enum MetricValue {
+    Counter(u64),
+    Gauge(f64),
+    Histogram(Vec<f64>),
+    Timer(std::time::Duration),
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct HealthStatus {
+    pub is_healthy: bool,
+    pub status: ServiceStatus,
+    pub message: Option<String>,
+    pub response_time_ms: u64,
+    pub last_checked: chrono::DateTime<chrono::Utc>,
+}
 
 /// Basic health check response
 #[derive(Debug, Serialize)]
@@ -92,8 +114,14 @@ pub async fn system_health_check(
     // Check all registered health checks
     let service_results = app.observability.health_checker.check_all().await;
 
+    // Convert types for compatibility
+    let converted_results: HashMap<String, HealthStatus> = service_results
+        .into_iter()
+        .map(|(k, v)| (k, convert_health_status(v)))
+        .collect();
+
     // Determine overall system health
-    let overall_status = determine_overall_status(&service_results);
+    let overall_status = determine_overall_status(&converted_results);
 
     // Gather system information
     let system_info = SystemInfo {
@@ -109,7 +137,7 @@ pub async fn system_health_check(
         timestamp: chrono::Utc::now(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         uptime_seconds: uptime.as_secs(),
-        services: service_results,
+        services: converted_results,
         system_info,
     };
 
@@ -158,7 +186,10 @@ pub async fn application_metrics(
 ) -> Result<Json<ApplicationMetrics>, StatusCode> {
     info!("Application metrics requested");
 
-    let metrics = app.observability.metrics.get_all_metrics().await;
+    let obs_metrics = app.observability.metrics.get_all_metrics().await;
+
+    // Convert metrics types for compatibility
+    let metrics = convert_metrics_map(obs_metrics);
 
     // Extract specific metrics (these would be collected by the metrics system)
     let total_requests = extract_counter_metric(&metrics, "http_requests_total").unwrap_or(0);
@@ -352,6 +383,40 @@ fn get_cpu_usage_percent() -> f64 {
     // This would require a system monitoring library like `sysinfo`
     // For now, return a placeholder value
     0.0
+}
+
+// Type conversion functions to bridge observability and local types
+fn convert_health_status(obs_status: crate::assembly::HealthStatus) -> HealthStatus {
+    HealthStatus {
+        is_healthy: obs_status.is_healthy,
+        status: match obs_status.status {
+            crate::assembly::ServiceStatus::Healthy => ServiceStatus::Healthy,
+            crate::assembly::ServiceStatus::Degraded => ServiceStatus::Degraded,
+            crate::assembly::ServiceStatus::Unhealthy => ServiceStatus::Unhealthy,
+            crate::assembly::ServiceStatus::Unknown => ServiceStatus::Unknown,
+        },
+        message: obs_status.message,
+        response_time_ms: obs_status.response_time_ms,
+        last_checked: obs_status.last_checked,
+    }
+}
+
+fn convert_metric_value(obs_metric: crate::assembly::MetricValue) -> MetricValue {
+    match obs_metric {
+        crate::assembly::MetricValue::Counter(v) => MetricValue::Counter(v),
+        crate::assembly::MetricValue::Gauge(v) => MetricValue::Gauge(v),
+        crate::assembly::MetricValue::Histogram(v) => MetricValue::Histogram(v),
+        crate::assembly::MetricValue::Timer(v) => MetricValue::Timer(v),
+    }
+}
+
+fn convert_metrics_map(
+    obs_metrics: HashMap<String, crate::assembly::MetricValue>,
+) -> HashMap<String, MetricValue> {
+    obs_metrics
+        .into_iter()
+        .map(|(k, v)| (k, convert_metric_value(v)))
+        .collect()
 }
 
 #[cfg(test)]

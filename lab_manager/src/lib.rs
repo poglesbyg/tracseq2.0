@@ -18,51 +18,11 @@ pub mod storage;
 pub mod validation;
 
 // Re-export main component types for convenience
-pub use assembly::{AssemblyError, ComponentBuilder};
+pub use assembly::{
+    AppComponents, AssemblyError, ComponentBuilder, DatabaseComponent, ObservabilityComponent,
+    SampleProcessingComponent, SequencingComponent, StorageComponent,
+};
 pub use config::{AppConfig, ServerConfig};
-pub use observability::{HealthChecker, MetricsCollector, TracingService};
-
-// Main application component types
-use sqlx::PgPool;
-use std::sync::Arc;
-
-#[derive(Debug, Clone)]
-pub struct AppComponents {
-    pub config: config::AppConfig,
-    pub database: DatabaseComponent,
-    pub storage: StorageComponent,
-    pub sample_processing: SampleProcessingComponent,
-    pub sequencing: SequencingComponent,
-    pub repositories: assembly::RepositoriesComponent,
-    pub user_manager: models::user::UserManager,
-    pub auth_service: services::auth_service::AuthService,
-    pub spreadsheet_service: services::spreadsheet_service::SpreadsheetService,
-    pub observability: ObservabilityComponent,
-}
-
-#[derive(Debug, Clone)]
-pub struct DatabaseComponent {
-    pub pool: PgPool,
-}
-
-#[derive(Debug, Clone)]
-pub struct StorageComponent {
-    pub storage: Arc<storage::Storage>,
-}
-
-#[derive(Debug, Clone)]
-pub struct SampleProcessingComponent {
-    pub manager: Arc<sample_submission::SampleSubmissionManager>,
-}
-
-#[derive(Debug, Clone)]
-pub struct SequencingComponent {
-    pub manager: Arc<sequencing::SequencingManager>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ObservabilityComponent {
-    pub metrics: Arc<MetricsCollector>,
-    pub tracing: Arc<TracingService>,
-    pub health_checker: Arc<HealthChecker>,
-}
+pub use observability::{
+    HealthChecker, HealthStatus, MetricValue, MetricsCollector, ServiceStatus, TracingService,
+};
