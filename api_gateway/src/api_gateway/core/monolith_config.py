@@ -22,7 +22,7 @@ from .config import (
 class MonolithEndpoint(BaseModel):
     """Monolith endpoint configuration."""
     name: str = "Lab Manager Monolith"
-    host: str = "host.docker.internal"  # Routes to host machine
+    host: str = "host.docker.internal"  # Routes to host for backend access
     port: int = 3000
     health_check_path: str = "/health"
     timeout: int = 30
@@ -90,7 +90,7 @@ class MonolithRouterConfig(BaseSettings):
             ),
             "templates": ServiceEndpoint(
                 name="Template Service",
-                host="host.docker.internal",
+                host="template-service",
                 port=8083,
                 path_prefix="/api/templates",
                 health_check_path="/health"

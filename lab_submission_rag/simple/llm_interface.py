@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional
 # Core dependencies
 try:
     import ollama
+    OLLAMA_AVAILABLE = True
     # Optional OpenAI fallback
     try:
         import openai
@@ -20,7 +21,16 @@ try:
         OPENAI_AVAILABLE = False
 except ImportError as e:
     print(f"Missing dependency: {e}")
-    raise
+    print("⚠️ Ollama not available, will use fallback or demo mode")
+    OLLAMA_AVAILABLE = False
+    # Still try to import OpenAI as fallback
+    try:
+        import openai
+        OPENAI_AVAILABLE = True
+        print("✅ OpenAI available as fallback")
+    except ImportError:
+        OPENAI_AVAILABLE = False
+        print("⚠️ Neither Ollama nor OpenAI available, using demo mode")
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +46,14 @@ class SimpleLLMInterface:
         self.model = model
         self.use_openai_fallback = use_openai_fallback
         
-        logger.info("Checking Ollama availability...")
-        self.ollama_available = self._check_ollama()
-        logger.info(f"Ollama available: {self.ollama_available}")
+        # Check if ollama module is available
+        if not OLLAMA_AVAILABLE:
+            logger.warning("Ollama module not available, skipping Ollama checks")
+            self.ollama_available = False
+        else:
+            logger.info("Checking Ollama availability...")
+            self.ollama_available = self._check_ollama()
+            logger.info(f"Ollama available: {self.ollama_available}")
         
         # Initialize OpenAI client if available and requested
         self.openai_client = None
@@ -55,17 +70,20 @@ class SimpleLLMInterface:
             else:
                 logger.info("OpenAI API key appears to be placeholder or invalid")
         
-        # Check if we have any working LLM
+        # Check if we have any working LLM - if not, use demo mode
         if not self.ollama_available and not self.openai_client:
-            logger.error("No working LLM found!")
-            logger.error(f"Ollama available: {self.ollama_available}")
-            logger.error(f"OpenAI client: {self.openai_client}")
-            raise RuntimeError(
-                "No LLM available. Please install Ollama or configure OpenAI API key."
-            )
+            logger.warning("No working LLM found! Using demo mode.")
+            logger.warning(f"Ollama available: {self.ollama_available}")
+            logger.warning(f"OpenAI client: {self.openai_client}")
+            logger.warning("Will return demo responses for extraction and queries")
+            self.demo_mode = True
+        else:
+            self.demo_mode = False
         
         # Log which LLM will be used
-        if self.ollama_available:
+        if self.demo_mode:
+            logger.warning("⚠️ Using DEMO mode - no actual LLM processing")
+        elif self.ollama_available:
             logger.info("✅ Using Ollama (local LLM)")
         elif self.openai_client:
             logger.info("✅ Using OpenAI (cloud LLM) - Ollama not available")
@@ -111,6 +129,10 @@ Text to analyze:
     
     def _check_ollama(self) -> bool:
         """Check if Ollama is available and running"""
+        if not OLLAMA_AVAILABLE:
+            logger.info("Ollama module not available")
+            return False
+            
         try:
             # Try to list models to check if Ollama is running
             response = ollama.list()
@@ -130,6 +152,10 @@ Text to analyze:
     
     def _ensure_model_available(self) -> bool:
         """Ensure the specified model is available in Ollama"""
+        if not OLLAMA_AVAILABLE:
+            logger.warning("Ollama module not available, cannot check model")
+            return False
+            
         try:
             models_response = ollama.list()
             models = models_response.models if hasattr(models_response, 'models') else []
@@ -167,8 +193,34 @@ Text to analyze:
     def extract_submission_info(self, text: str) -> Dict[str, Any]:
         """Extract structured information from text"""
         
+        # Use demo mode if no LLM is available
+        if self.demo_mode:
+            logger.info("Using demo mode for extraction")
+            return {
+                "administrative": {
+                    "submitter_name": "Demo User",
+                    "submitter_email": "demo@lab.local",
+                    "submitter_phone": "(555) 123-4567",
+                    "project_name": "Demo Project",
+                    "institution": "Demo Laboratory"
+                },
+                "sample": {
+                    "sample_id": "DEMO_001",
+                    "sample_type": "DNA",
+                    "concentration": "50 ng/uL",
+                    "volume": "100 uL",
+                    "storage_conditions": "-80C"
+                },
+                "sequencing": {
+                    "platform": "Illumina",
+                    "analysis_type": "WGS",
+                    "coverage": "30x",
+                    "read_length": "150bp"
+                }
+            }
+        
         # Try Ollama first if available
-        if self.ollama_available:
+        if self.ollama_available and OLLAMA_AVAILABLE:
             try:
                 if self._ensure_model_available():
                     logger.info(f"Generating response with Ollama model: {self.model}")

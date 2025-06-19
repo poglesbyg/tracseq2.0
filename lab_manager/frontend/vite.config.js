@@ -24,25 +24,30 @@ export default defineConfig({
                     });
                 },
             },
-            // All other API calls - route to lab manager backend (containerized development)
+            // All other API calls - route through API Gateway for microservices
             '/api': {
-                target: process.env.BACKEND_URL || 'http://dev:3000',
+                target: process.env.API_GATEWAY_URL || 'http://host.docker.internal:8000',
                 changeOrigin: true,
                 secure: false,
                 configure: function (proxy, _options) {
                     proxy.on('error', function (err, _req, _res) {
-                        console.log('proxy error', err);
+                        console.log('API Gateway proxy error', err);
                     });
                     proxy.on('proxyReq', function (proxyReq, req, _res) {
-                        console.log('Sending Request to the Target:', req.method, req.url);
+                        console.log('Sending Request to API Gateway:', req.method, req.url);
                     });
                     proxy.on('proxyRes', function (proxyRes, req, _res) {
-                        console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+                        console.log('Received Response from API Gateway:', proxyRes.statusCode, req.url);
                     });
                 },
             },
             '/health': {
-                target: process.env.BACKEND_URL || 'http://dev:3000',
+                target: process.env.API_GATEWAY_URL || 'http://host.docker.internal:8000',
+                changeOrigin: true,
+                secure: false,
+            },
+            '/routing-status': {
+                target: process.env.API_GATEWAY_URL || 'http://host.docker.internal:8000',
                 changeOrigin: true,
                 secure: false,
             },

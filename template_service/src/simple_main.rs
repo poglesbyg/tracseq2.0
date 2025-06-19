@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, State, Multipart},
     http::StatusCode,
     routing::{get, post, put, delete},
     Json, Router,
@@ -91,7 +91,9 @@ async fn main() {
         .route("/health", get(health_check))
         .route("/api/templates", get(list_templates))
         .route("/api/templates", post(create_template))
+        .route("/api/templates/upload", post(upload_template))
         .route("/api/templates/:id", get(get_template))
+        .route("/api/templates/:id/data", get(get_template_data))
         .route("/api/templates/:id", put(update_template))
         .route("/api/templates/:id", delete(delete_template))
         .layer(CorsLayer::permissive())
@@ -131,6 +133,36 @@ async fn get_template(
         .cloned()
         .map(Json)
         .ok_or(StatusCode::NOT_FOUND)
+}
+
+async fn get_template_data(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let templates = state.templates.lock().unwrap();
+    
+    if let Some(template) = templates.get(&id) {
+        // Extract content from metadata if it exists
+        let content = if let Some(metadata) = &template.metadata {
+            metadata.get("content")
+                .and_then(|c| c.as_str())
+                .unwrap_or("No content available")
+                .to_string()
+        } else {
+            "No content available".to_string()
+        };
+        
+        Ok(Json(json!({
+            "id": template.id,
+            "name": template.name,
+            "description": template.description,
+            "content": content,
+            "created_at": template.created_at,
+            "metadata": template.metadata
+        })))
+    } else {
+        Err(StatusCode::NOT_FOUND)
+    }
 }
 
 async fn create_template(
@@ -187,4 +219,57 @@ async fn delete_template(
     } else {
         Err(StatusCode::NOT_FOUND)
     }
+}
+
+async fn upload_template(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let mut template_name = String::new();
+    let mut template_content = String::new();
+    
+    while let Some(field) = multipart.next_field().await.map_err(|_| StatusCode::BAD_REQUEST)? {
+        let name = field.name().unwrap_or("").to_string();
+        let data = field.bytes().await.map_err(|_| StatusCode::BAD_REQUEST)?;
+        
+        match name.as_str() {
+            "name" => {
+                template_name = String::from_utf8(data.to_vec()).map_err(|_| StatusCode::BAD_REQUEST)?;
+            }
+            "file" => {
+                template_content = String::from_utf8(data.to_vec()).map_err(|_| StatusCode::BAD_REQUEST)?;
+            }
+            _ => {
+                // Ignore unknown fields
+            }
+        }
+    }
+    
+    if template_name.is_empty() {
+        template_name = format!("Uploaded Template {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S"));
+    }
+    
+    // Create new template from uploaded content
+    let new_template = Template {
+        id: Uuid::new_v4(),
+        name: template_name.clone(),
+        description: Some("Template uploaded via file upload".to_string()),
+        created_at: chrono::Utc::now(),
+        metadata: Some(json!({
+            "content": template_content,
+            "upload_method": "file_upload",
+            "upload_timestamp": chrono::Utc::now()
+        })),
+    };
+    
+    let mut templates = state.templates.lock().unwrap();
+    templates.insert(new_template.id, new_template.clone());
+    
+    info!("✅ Uploaded new template: {}", template_name);
+    
+    Ok(Json(json!({
+        "status": "success",
+        "message": "Template uploaded successfully",
+        "template": new_template
+    })))
 } 

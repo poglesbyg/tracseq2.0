@@ -34,6 +34,30 @@ export default function SpreadsheetViewer({ template, data, onClose, onCreateSam
   const [currentPage, setCurrentPage] = useState(0);
   const rowsPerPage = 50;
 
+  // Add null/undefined checks for data and sheets
+  if (!data || !data.sheets || !Array.isArray(data.sheets) || data.sheets.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="relative top-20 mx-auto p-5 border w-11/12 shadow-lg rounded-md bg-white">
+          <div className="text-center">
+            <h3 className="text-lg font-medium text-gray-900">No Data Available</h3>
+            <p className="mt-2 text-sm text-gray-500">
+              Unable to parse data from this spreadsheet or no data provided.
+            </p>
+            <div className="mt-4">
+              <button
+                onClick={onClose}
+                className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const activeSheet = data.sheets[activeSheetIndex];
   const totalPages = Math.ceil(activeSheet?.rows.length / rowsPerPage) || 1;
   const startRow = currentPage * rowsPerPage;

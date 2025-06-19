@@ -33,8 +33,8 @@ app.add_middleware(
 
 # Database connection
 DB_CONFIG = {
-    'host': 'postgres',
-    'port': 5432,
+    'host': 'localhost',
+    'port': 5433,
     'database': 'lab_manager',
     'user': 'postgres',
     'password': 'postgres'
