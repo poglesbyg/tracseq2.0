@@ -1,0 +1,394 @@
+# Migration Docker Compose - Hybrid Architecture
+# Allows running monolith alongside microservices for gradual migration
+
+services:
+  # === API GATEWAY (Entry Point) ===
+  api-gateway:
+    build: ../../api_gateway
+    container_name: tracseq-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=migration
+      - HOST=0.0.0.0
+      - PORT=8000
+      
+      # Hybrid routing - some to monolith, some to microservices
+      - SERVICES__AUTH__HOST=auth-service
+      - SERVICES__SAMPLES__HOST=lab-manager  # Still route to monolith initially
+      - SERVICES__STORAGE__HOST=enhanced-storage-service
+      - SERVICES__TEMPLATES__HOST=lab-manager  # Still route to monolith initially
+      - SERVICES__SEQUENCING__HOST=lab-manager  # Still route to monolith initially
+      - SERVICES__NOTIFICATIONS__HOST=notification-service
+      - SERVICES__RAG__HOST=enhanced-rag-service
+      
+      # Migration settings
+      - MIGRATION_MODE=true
+      - LEGACY_FALLBACK_HOST=lab-manager
+      - LEGACY_FALLBACK_PORT=3000
+      
+    networks:
+      - tracseq-network
+    depends_on:
+      - lab-manager
+      - auth-service
+      - enhanced-storage-service
+      - notification-service
+      - enhanced-rag-service
+
+  # === LEGACY MONOLITH (Temporary) ===
+  lab-manager:
+    build: ../../lab_manager
+    container_name: lab-manager-legacy
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@legacy-postgres:5432/lab_manager
+      - RAG_SERVICE_URL=http://enhanced-rag-service:8086
+      - MIGRATION_MODE=true
+      - API_GATEWAY_URL=http://api-gateway:8000
+    networks:
+      - tracseq-network
+    depends_on:
+      - legacy-postgres
+      - enhanced-rag-service
+
+  # === NEW MICROSERVICES ===
+  
+  # Auth Service
+  auth-service:
+    build: ../../auth_service
+    container_name: auth-service
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://auth_user:auth_password@auth-postgres:5432/auth_db
+      - MIGRATION_SYNC_ENABLED=true
+      - LEGACY_DB_URL=postgres://postgres:postgres@legacy-postgres:5432/lab_manager
+    networks:
+      - tracseq-network
+    depends_on:
+      - auth-postgres
+      - legacy-postgres
+
+  # Sample Service
+  sample-service:
+    build: ../../sample_service
+    container_name: sample-service
+    ports:
+      - "8081:8081"
+    environment:
+      - DATABASE_URL=postgresql://sample_user:sample_password@sample-postgres:5432/sample_db
+      - MIGRATION_SYNC_ENABLED=true
+      - LEGACY_DB_URL=postgres://postgres:postgres@legacy-postgres:5432/lab_manager
+    networks:
+      - tracseq-network
+    depends_on:
+      - sample-postgres
+      - legacy-postgres
+
+  # Enhanced Storage Service
+  enhanced-storage-service:
+    build: ../../enhanced_storage_service
+    container_name: enhanced-storage-service
+    ports:
+      - "8082:8082"
+    environment:
+      - DATABASE_URL=postgresql://storage_user:storage_password@storage-postgres:5432/storage_db
+      - MIGRATION_SYNC_ENABLED=true
+      - LEGACY_DB_URL=postgres://postgres:postgres@legacy-postgres:5432/lab_manager
+    networks:
+      - tracseq-network
+    depends_on:
+      - storage-postgres
+      - legacy-postgres
+
+  # Template Service
+  template-service:
+    build: ../../template_service
+    container_name: template-service
+    ports:
+      - "8083:8083"
+    environment:
+      - DATABASE_URL=postgresql://template_user:template_password@template-postgres:5432/template_db
+      - MIGRATION_SYNC_ENABLED=true
+      - LEGACY_DB_URL=postgres://postgres:postgres@legacy-postgres:5432/lab_manager
+    networks:
+      - tracseq-network
+    depends_on:
+      - template-postgres
+      - legacy-postgres
+
+  # Sequencing Service
+  sequencing-service:
+    build: ../../sequencing_service
+    container_name: sequencing-service
+    ports:
+      - "8084:8084"
+    environment:
+      - DATABASE_URL=postgresql://sequencing_user:sequencing_password@sequencing-postgres:5432/sequencing_db
+      - MIGRATION_SYNC_ENABLED=true
+      - LEGACY_DB_URL=postgres://postgres:postgres@legacy-postgres:5432/lab_manager
+    networks:
+      - tracseq-network
+    depends_on:
+      - sequencing-postgres
+      - legacy-postgres
+
+  # Notification Service
+  notification-service:
+    build: ../../notification_service
+    container_name: notification-service
+    ports:
+      - "8085:8085"
+    environment:
+      - DATABASE_URL=postgresql://notification_user:notification_password@notification-postgres:5432/notification_db
+      - MIGRATION_SYNC_ENABLED=true
+      - LEGACY_DB_URL=postgres://postgres:postgres@legacy-postgres:5432/lab_manager
+    networks:
+      - tracseq-network
+    depends_on:
+      - notification-postgres
+      - legacy-postgres
+
+  # Enhanced RAG Service
+  enhanced-rag-service:
+    build: ../../enhanced_rag_service
+    container_name: enhanced-rag-service
+    ports:
+      - "8086:8086"
+    environment:
+      - DATABASE__URL=postgresql://rag_user:rag_password@rag-postgres:5432/enhanced_rag_db
+      - VECTOR_STORE__PROVIDER=chromadb
+      - LLM__PROVIDER=ollama
+      - LLM__OLLAMA_BASE_URL=http://ollama-migration:11434
+      - MIGRATION_SYNC_ENABLED=true
+      - LEGACY_RAG_URL=http://lab-manager:3000
+    networks:
+      - tracseq-network
+    depends_on:
+      - rag-postgres
+      - ollama
+
+  # Event Service
+  event-service:
+    build: ../../event_service
+    container_name: event-service
+    ports:
+      - "8087:8087"
+    environment:
+      - REDIS_URL=redis://event-redis:6379/0
+      - DATABASE_URL=postgresql://event_user:event_password@event-postgres:5432/event_db
+    networks:
+      - tracseq-network
+    depends_on:
+      - event-postgres
+      - event-redis
+
+  # Transaction Service
+  transaction-service:
+    build: ../../transaction_service
+    container_name: transaction-service
+    ports:
+      - "8088:8088"
+    environment:
+      - DATABASE_URL=postgresql://transaction_user:transaction_password@transaction-postgres:5432/transaction_db
+      - EVENT_SERVICE_URL=http://event-service:8087
+    networks:
+      - tracseq-network
+    depends_on:
+      - transaction-postgres
+      - event-service
+
+  # === DATABASES ===
+  
+  # Legacy Database (Temporary)
+  legacy-postgres:
+    image: postgres:15-alpine
+    container_name: legacy-postgres
+    environment:
+      - POSTGRES_DB=lab_manager
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - legacy_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+
+  # Individual Service Databases
+  auth-postgres:
+    image: postgres:15-alpine
+    container_name: auth-postgres
+    environment:
+      - POSTGRES_DB=auth_db
+      - POSTGRES_USER=auth_user
+      - POSTGRES_PASSWORD=auth_password
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+
+  sample-postgres:
+    image: postgres:15-alpine
+    container_name: sample-postgres
+    environment:
+      - POSTGRES_DB=sample_db
+      - POSTGRES_USER=sample_user
+      - POSTGRES_PASSWORD=sample_password
+    volumes:
+      - sample_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+
+  storage-postgres:
+    image: postgres:15-alpine
+    container_name: storage-postgres
+    environment:
+      - POSTGRES_DB=storage_db
+      - POSTGRES_USER=storage_user
+      - POSTGRES_PASSWORD=storage_password
+    volumes:
+      - storage_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+
+  template-postgres:
+    image: postgres:15-alpine
+    container_name: template-postgres
+    environment:
+      - POSTGRES_DB=template_db
+      - POSTGRES_USER=template_user
+      - POSTGRES_PASSWORD=template_password
+    volumes:
+      - template_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+
+  sequencing-postgres:
+    image: postgres:15-alpine
+    container_name: sequencing-postgres
+    environment:
+      - POSTGRES_DB=sequencing_db
+      - POSTGRES_USER=sequencing_user
+      - POSTGRES_PASSWORD=sequencing_password
+    volumes:
+      - sequencing_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+
+  notification-postgres:
+    image: postgres:15-alpine
+    container_name: notification-postgres
+    environment:
+      - POSTGRES_DB=notification_db
+      - POSTGRES_USER=notification_user
+      - POSTGRES_PASSWORD=notification_password
+    volumes:
+      - notification_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+
+  rag-postgres:
+    image: postgres:15-alpine
+    container_name: rag-postgres
+    environment:
+      - POSTGRES_DB=enhanced_rag_db
+      - POSTGRES_USER=rag_user
+      - POSTGRES_PASSWORD=rag_password
+    volumes:
+      - rag_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+
+  event-postgres:
+    image: postgres:15-alpine
+    container_name: event-postgres
+    environment:
+      - POSTGRES_DB=event_db
+      - POSTGRES_USER=event_user
+      - POSTGRES_PASSWORD=event_password
+    volumes:
+      - event_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+
+  transaction-postgres:
+    image: postgres:15-alpine
+    container_name: transaction-postgres
+    environment:
+      - POSTGRES_DB=transaction_db
+      - POSTGRES_USER=transaction_user
+      - POSTGRES_PASSWORD=transaction_password
+    volumes:
+      - transaction_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+
+  # === SUPPORTING SERVICES ===
+  
+  # Ollama for LLM
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-migration
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - tracseq-network
+
+  # Redis for Events
+  event-redis:
+    image: redis:7-alpine
+    container_name: event-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - event_redis_data:/data
+    networks:
+      - tracseq-network
+
+  # Gateway Redis
+  gateway-redis:
+    image: redis:7-alpine
+    container_name: gateway-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - gateway_redis_data:/data
+    networks:
+      - tracseq-network
+
+  # === FRONTEND ===
+  frontend:
+    build: ../../lab_manager/frontend
+    container_name: tracseq-frontend
+    ports:
+      - "8080:80"
+    environment:
+      - NODE_ENV=production
+      - BACKEND_URL=http://api-gateway:8000  # Point to API Gateway
+      - RAG_API_URL=http://api-gateway:8000/api/v1/rag
+    networks:
+      - tracseq-network
+    depends_on:
+      - api-gateway
+
+volumes:
+  legacy_postgres_data:
+  auth_postgres_data:
+  sample_postgres_data:
+  storage_postgres_data:
+  template_postgres_data:
+  sequencing_postgres_data:
+  notification_postgres_data:
+  rag_postgres_data:
+  event_postgres_data:
+  transaction_postgres_data:
+  ollama_data:
+  event_redis_data:
+  gateway_redis_data:
+
+networks:
+  tracseq-network:
+    driver: bridge 

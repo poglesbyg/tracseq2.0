@@ -1,0 +1,65 @@
+Laboratory Sample Submission Form
+====================================
+
+Date: June 18, 2025
+Lab: Genomics Research Laboratory
+Institution: University of Science and Technology
+
+SUBMITTER INFORMATION:
+-----------------------
+Name: Dr. Emily Chen
+Email: emily.chen@university.edu  
+Phone: (555) 987-6543
+Department: Molecular Biology
+Project: Cancer Genomics Initiative 2025
+
+SAMPLE DETAILS:
+---------------
+Sample ID: CGI-2025-001
+Sample Name: Tumor DNA Extract
+Sample Type: Genomic DNA
+Source: Human tumor tissue
+Patient ID: PT-12345
+
+PREPARATION DETAILS:
+--------------------
+Extraction Method: Qiagen DNeasy Kit
+Concentration: 150 ng/μL
+Volume: 50 μL
+A260/A280 Ratio: 1.89
+Storage Buffer: TE Buffer (pH 8.0)
+Storage Temperature: -20°C
+
+SEQUENCING REQUIREMENTS:
+------------------------
+Platform: Illumina NovaSeq 6000
+Analysis Type: Whole Exome Sequencing
+Target Coverage: 100x
+Read Length: 150bp paired-end
+Library Type: Illumina TruSeq Exome
+Expected Yield: 12 Gb
+
+QUALITY CONTROL:
+----------------
+DNA Integrity: High (DIN > 8.0)
+Purity: Excellent
+RIN Score: N/A (DNA sample)
+Fragment Size: >20kb
+
+SPECIAL INSTRUCTIONS:
+---------------------
+- Handle with extreme care - limited sample
+- Priority processing required
+- Notify submitter immediately upon completion
+- Store all data securely (PHI protected)
+- Generate comprehensive QC report
+
+SHIPPING INFORMATION:
+---------------------
+Shipped on: June 17, 2025
+Tracking Number: 1Z12345E0205271688
+Temperature during shipping: 4°C
+Expected delivery: June 18, 2025
+
+Contact Dr. Chen for any questions or clarifications.
+This sample is part of an IRB-approved study (IRB-2025-001). 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple Frontend API Bridge for RAG Submissions
+Simple Frontend API Bridge for RAG Submissions - Working File Upload Version
 Provides basic API endpoints that the lab_manager frontend needs
 """
 
@@ -13,13 +13,8 @@ import asyncpg
 import uuid
 import time
 import json
+import re
 from datetime import datetime
-
-# Import the LLM interface for document processing
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'simple'))
-from llm_interface import SimpleLLMInterface
 
 app = FastAPI(
     title="Simple RAG Submissions API Bridge",
@@ -45,14 +40,6 @@ DB_CONFIG = {
     'password': 'postgres'
 }
 
-# Initialize LLM interface for document processing
-try:
-    llm_interface = SimpleLLMInterface(model="llama3.2:3b", use_openai_fallback=True)
-    print("✅ LLM interface initialized successfully")
-except Exception as e:
-    print(f"⚠️ LLM interface initialization failed: {e}")
-    llm_interface = None
-
 class RagSubmissionResponse(BaseModel):
     """Response model for RAG submissions"""
     id: str
@@ -64,11 +51,6 @@ class RagSubmissionResponse(BaseModel):
     confidence_score: float
     created_at: str
     status: str = "completed"
-
-class DocumentProcessRequest(BaseModel):
-    """Request model for document processing"""
-    text: str
-    filename: Optional[str] = "document.txt"
 
 class SampleInfo(BaseModel):
     """Sample information extracted from document"""
@@ -109,6 +91,113 @@ class DocumentProcessResponse(BaseModel):
 async def get_db_connection():
     """Get database connection"""
     return await asyncpg.connect(**DB_CONFIG)
+
+def extract_sample_info_basic(text: str) -> Dict[str, Any]:
+    """Basic text extraction without LLM dependency"""
+    
+    # Initialize result structure
+    result = {
+        "administrative": {},
+        "sample": {},
+        "sequencing": {}
+    }
+    
+    # Extract submitter information
+    name_match = re.search(r"Name:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if name_match:
+        result["administrative"]["submitter_name"] = name_match.group(1).strip()
+    
+    email_match = re.search(r"Email:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if email_match:
+        result["administrative"]["submitter_email"] = email_match.group(1).strip()
+    
+    phone_match = re.search(r"Phone:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if phone_match:
+        result["administrative"]["submitter_phone"] = phone_match.group(1).strip()
+    
+    institution_match = re.search(r"Institution:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if institution_match:
+        result["administrative"]["institution"] = institution_match.group(1).strip()
+    
+    project_match = re.search(r"Project:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if project_match:
+        result["administrative"]["project_name"] = project_match.group(1).strip()
+    
+    # Extract sample information
+    sample_id_match = re.search(r"Sample ID:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if sample_id_match:
+        result["sample"]["sample_id"] = sample_id_match.group(1).strip()
+    
+    sample_type_match = re.search(r"Sample Type:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if sample_type_match:
+        result["sample"]["sample_type"] = sample_type_match.group(1).strip()
+    
+    concentration_match = re.search(r"Concentration:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if concentration_match:
+        result["sample"]["concentration"] = concentration_match.group(1).strip()
+    
+    volume_match = re.search(r"Volume:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if volume_match:
+        result["sample"]["volume"] = volume_match.group(1).strip()
+    
+    storage_match = re.search(r"Storage Temperature:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if storage_match:
+        result["sample"]["storage_conditions"] = storage_match.group(1).strip()
+    
+    # Extract sequencing information
+    platform_match = re.search(r"Platform:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if platform_match:
+        result["sequencing"]["platform"] = platform_match.group(1).strip()
+    
+    analysis_match = re.search(r"Analysis Type:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if analysis_match:
+        result["sequencing"]["analysis_type"] = analysis_match.group(1).strip()
+    
+    coverage_match = re.search(r"Target Coverage:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if coverage_match:
+        result["sequencing"]["coverage"] = coverage_match.group(1).strip()
+    
+    read_length_match = re.search(r"Read Length:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
+    if read_length_match:
+        result["sequencing"]["read_length"] = read_length_match.group(1).strip()
+    
+    return result
+
+def calculate_confidence_score_basic(extraction_result: Dict[str, Any]) -> float:
+    """Calculate confidence score based on extracted information completeness"""
+    total_fields = 0
+    filled_fields = 0
+    
+    # Check administrative fields
+    admin = extraction_result.get('administrative', {}) or {}
+    admin_fields = ['submitter_name', 'submitter_email', 'project_name', 'institution']
+    for field in admin_fields:
+        total_fields += 1
+        if admin.get(field):
+            filled_fields += 1
+    
+    # Check sample fields  
+    sample = extraction_result.get('sample', {}) or {}
+    sample_fields = ['sample_id', 'sample_type', 'concentration', 'volume']
+    for field in sample_fields:
+        total_fields += 1
+        if sample.get(field):
+            filled_fields += 1
+    
+    # Check sequencing fields
+    sequencing = extraction_result.get('sequencing', {}) or {}
+    seq_fields = ['platform', 'analysis_type', 'coverage']
+    for field in seq_fields:
+        total_fields += 1
+        if sequencing.get(field):
+            filled_fields += 1
+    
+    if total_fields == 0:
+        return 0.0
+    
+    # Convert to percentage
+    confidence = (filled_fields / total_fields) * 100
+    return min(90.0, confidence)  # Cap at 90% for regex-based extraction
 
 @app.get("/")
 async def root():
@@ -201,30 +290,41 @@ async def get_rag_statistics():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get statistics: {e}")
 
+# FIXED: Handle file uploads properly (what frontend sends)
 @app.post("/api/rag/process", response_model=DocumentProcessResponse)
-async def process_document(request: DocumentProcessRequest):
-    """Process document and extract laboratory information using AI"""
+async def process_document_upload(file: UploadFile = File(...)):
+    """Process uploaded document and extract laboratory information using regex-based extraction"""
     start_time = time.time()
     
     try:
-        if not llm_interface:
-            return DocumentProcessResponse(
-                success=False,
-                confidence_score=0.0,
-                samples_found=0,
-                processing_time=time.time() - start_time,
-                extracted_data={},
-                submitter_info=SubmitterInfo(),
-                sample_info=SampleInfo(),
-                sequencing_info=SequencingInfo(),
-                message="LLM interface not available"
-            )
+        # Read file content
+        content = await file.read()
         
-        # Extract information using LLM
-        extraction_result = llm_interface.extract_submission_info(request.text)
+        # Convert to text (basic text extraction)
+        if file.content_type == "text/plain":
+            text = content.decode('utf-8')
+        else:
+            # For non-text files, try to decode as UTF-8
+            try:
+                text = content.decode('utf-8')
+            except UnicodeDecodeError:
+                return DocumentProcessResponse(
+                    success=False,
+                    confidence_score=0.0,
+                    samples_found=0,
+                    processing_time=time.time() - start_time,
+                    extracted_data={"error": "Unable to process file. Please upload a text file."},
+                    submitter_info=SubmitterInfo(),
+                    sample_info=SampleInfo(),
+                    sequencing_info=SequencingInfo(),
+                    message="Unable to process file. Please upload a text file."
+                )
+        
+        # Extract information using basic regex patterns
+        extraction_result = extract_sample_info_basic(text)
         
         # Calculate confidence score based on how much information was extracted
-        confidence_score = calculate_confidence_score(extraction_result)
+        confidence_score = calculate_confidence_score_basic(extraction_result)
         
         # Count samples found
         samples_found = 1 if extraction_result.get('sample', {}).get('sample_id') else 0
@@ -265,12 +365,12 @@ async def process_document(request: DocumentProcessRequest):
             try:
                 await store_extraction_result(
                     submission_id=str(uuid.uuid4()),
-                    filename=request.filename,
+                    filename=file.filename or "uploaded_document.txt",
                     extracted_data=extraction_result,
                     confidence_score=confidence_score
                 )
             except Exception as db_error:
-                print(f"⚠️ Failed to store extraction result: {db_error}")
+                print(f"Failed to store extraction result: {db_error}")
         
         return DocumentProcessResponse(
             success=True,
@@ -281,12 +381,12 @@ async def process_document(request: DocumentProcessRequest):
             submitter_info=submitter_info,
             sample_info=sample_info,
             sequencing_info=sequencing_info,
-            message="Document processed successfully" if samples_found > 0 else "Document processed but no complete sample information found"
+            message="Document processed successfully using regex extraction" if samples_found > 0 else "Document processed but no complete sample information found"
         )
         
     except Exception as e:
         processing_time = time.time() - start_time
-        print(f"❌ Document processing failed: {e}")
+        print(f"Document processing failed: {e}")
         
         return DocumentProcessResponse(
             success=False,
@@ -299,69 +399,6 @@ async def process_document(request: DocumentProcessRequest):
             sequencing_info=SequencingInfo(),
             message=f"Processing failed: {str(e)}"
         )
-
-@app.post("/api/rag/process-file")
-async def process_file_upload(file: UploadFile = File(...)):
-    """Process uploaded file and extract laboratory information"""
-    try:
-        # Read file content
-        content = await file.read()
-        
-        # Convert to text (basic text extraction)
-        if file.content_type == "text/plain":
-            text = content.decode('utf-8')
-        else:
-            # For non-text files, try to decode as UTF-8
-            try:
-                text = content.decode('utf-8')
-            except UnicodeDecodeError:
-                raise HTTPException(status_code=400, detail="Unable to process file. Please upload a text file.")
-        
-        # Process the document
-        request = DocumentProcessRequest(text=text, filename=file.filename)
-        return await process_document(request)
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"File processing failed: {str(e)}")
-
-def calculate_confidence_score(extraction_result: Dict[str, Any]) -> float:
-    """Calculate confidence score based on extracted information completeness"""
-    if "error" in extraction_result:
-        return 0.0
-    
-    total_fields = 0
-    filled_fields = 0
-    
-    # Check administrative fields
-    admin = extraction_result.get('administrative', {}) or {}
-    admin_fields = ['submitter_name', 'submitter_email', 'project_name', 'institution']
-    for field in admin_fields:
-        total_fields += 1
-        if admin.get(field) and admin[field] != "null":
-            filled_fields += 1
-    
-    # Check sample fields  
-    sample = extraction_result.get('sample', {}) or {}
-    sample_fields = ['sample_id', 'sample_type', 'concentration', 'volume']
-    for field in sample_fields:
-        total_fields += 1
-        if sample.get(field) and sample[field] != "null":
-            filled_fields += 1
-    
-    # Check sequencing fields
-    sequencing = extraction_result.get('sequencing', {}) or {}
-    seq_fields = ['platform', 'analysis_type', 'coverage']
-    for field in seq_fields:
-        total_fields += 1
-        if sequencing.get(field) and sequencing[field] != "null":
-            filled_fields += 1
-    
-    if total_fields == 0:
-        return 0.0
-    
-    # Convert to percentage
-    confidence = (filled_fields / total_fields) * 100
-    return min(95.0, confidence)  # Cap at 95% to indicate AI uncertainty
 
 async def store_extraction_result(submission_id: str, filename: str, extracted_data: Dict[str, Any], confidence_score: float):
     """Store extraction result in database"""
@@ -388,10 +425,10 @@ async def store_extraction_result(submission_id: str, filename: str, extracted_d
         )
         
         await conn.close()
-        print(f"✅ Stored extraction result: {submission_id}")
+        print(f"Stored extraction result: {submission_id}")
         
     except Exception as e:
-        print(f"❌ Failed to store extraction: {e}")
+        print(f"Failed to store extraction: {e}")
         # Don't raise - this is not critical for the user experience
 
 class QueryRequest(BaseModel):
@@ -409,7 +446,7 @@ def get_intelligent_response(query: str) -> str:
     
     # Greeting responses
     if any(word in query_lower for word in ['hello', 'hi', 'hey', 'greetings']):
-        return f"""Hello! I'm your lab management assistant. I can help you with sample processing, storage management, sequencing workflows, and more.
+        return """Hello! I'm your lab management assistant. I can help you with sample processing, storage management, sequencing workflows, and more.
 
 What can I help you with today? You can ask me about:
 • Submitting new samples
@@ -422,233 +459,35 @@ What can I help you with today? You can ask me about:
     elif any(phrase in query_lower for phrase in ['submit', 'upload', 'create sample', 'new sample', 'add sample', 'submit a sample', 'submit sample', 'submission']):
         return """To submit new samples, you have several options:
 
-1. 📄 AI DOCUMENT PROCESSING (Recommended)
+1. AI DOCUMENT PROCESSING (Recommended)
    • Upload lab submission forms (PDF, Word, or text)
    • I'll automatically extract sample information
    • Review and confirm the extracted data
    
-2. ✏️ MANUAL SAMPLE ENTRY
+2. MANUAL SAMPLE ENTRY
    • Use the "Create Sample" form
    • Fill in all required fields manually
    • Generate barcodes automatically
 
-3. 📊 BULK UPLOAD VIA TEMPLATES
+3. BULK UPLOAD VIA TEMPLATES
    • Download Excel templates
    • Fill in multiple samples at once
    • Upload for batch processing
 
 Which method would you prefer to use?"""
 
-    # Storage and temperature questions
-    elif any(word in query_lower for word in ['storage', 'store', 'temperature', 'freezer', 'refrigerator', 'location']):
-        return """For sample storage management:
-
-🌡️ TEMPERATURE REQUIREMENTS:
-• DNA samples: -20°C or -80°C for long-term storage
-• RNA samples: -80°C (temperature critical!)
-• Proteins: -80°C with appropriate buffers
-• Cell cultures: Liquid nitrogen (-196°C) or -80°C
-
-📍 STORAGE LOCATIONS:
-• Create freezer/refrigerator locations
-• Assign storage positions with barcodes
-• Track capacity and utilization
-• Log all sample movements
-
-🔍 FINDING SAMPLES:
-• Scan barcodes to locate samples
-• Search by sample ID or name
-• View storage history and movements
-
-Would you like help setting up storage locations or finding a specific sample?"""
-
-    # Sequencing and molecular biology
-    elif any(word in query_lower for word in ['sequencing', 'sequence', 'dna', 'rna', 'library', 'prep', 'qc', 'quality']):
-        return """For sequencing workflows and quality control:
-
-🧬 SEQUENCING PLATFORMS SUPPORTED:
-• Illumina: MiSeq, NextSeq, NovaSeq
-• Oxford Nanopore: MinION, GridION  
-• PacBio: Sequel, Revio
-
-📋 SAMPLE SHEET GENERATION:
-• Automatically create sample sheets
-• Include barcodes and metadata
-• Export in platform-specific formats
-
-🔬 QUALITY REQUIREMENTS:
-• DNA: A260/A280 ratio 1.8-2.0, >10 ng/μL
-• RNA: RIN score >7, >100 ng/μL
-• Library QC: Fragment size, molarity
-
-📊 TRACKING & ANALYSIS:
-• Monitor job progress and status
-• Track quality metrics over time
-• Configure analysis pipelines
-
-What type of sequencing are you planning?"""
-
-    # Reports and data analysis  
-    elif any(word in query_lower for word in ['report', 'export', 'data', 'analysis', 'statistics', 'analytics', 'generate report', 'create report']):
-        return """For reports and data analysis:
-
-📊 AVAILABLE REPORTS:
-• Sample inventory and status reports
-• Storage utilization summaries
-• Sequencing job progress tracking
-• Quality metrics analysis
-• Custom SQL queries
-
-📤 EXPORT OPTIONS:
-• Excel spreadsheets (.xlsx)
-• CSV files for further analysis
-• PDF reports for sharing
-• JSON data for API integration
-
-🔍 SEARCH & FILTER:
-• Advanced search across all samples
-• Filter by date ranges, sample types
-• Sort by various criteria
-• Save commonly used filters
-
-📈 ANALYTICS:
-• Track lab productivity over time
-• Monitor storage usage trends
-• Quality control statistics
-• Sample submission patterns
-
-What kind of report would you like to generate?"""
-
-    # Barcode and tracking
-    elif any(phrase in query_lower for phrase in ['barcode', 'track', 'find sample', 'locate sample', 'scan', 'find a sample', 'locate a sample', 'where is sample']):
-        return """For barcode tracking and sample location:
-
-🏷️ BARCODE SYSTEM:
-• Automatic barcode generation for new samples
-• Customizable barcode formats
-• Support for 1D and 2D codes
-• Print barcode labels directly
-
-📍 SAMPLE TRACKING:
-• Scan barcodes to find samples instantly
-• Track movements between locations
-• Maintain complete audit trails
-• Real-time location updates
-
-🔍 SEARCH CAPABILITIES:
-• Search by barcode, sample name, or ID
-• Filter by storage location or date
-• View complete sample history
-• Export tracking reports
-
-📱 MOBILE SCANNING:
-• Use smartphone cameras for scanning
-• Update locations on-the-go
-• Quick status updates
-
-Need help finding a specific sample or setting up barcode printing?"""
-
-    # Templates and batch processing
-    elif any(word in query_lower for word in ['template', 'excel', 'batch', 'bulk', 'multiple']):
-        return """For template-based batch processing:
-
-📊 EXCEL TEMPLATES:
-• Download pre-formatted templates
-• Include all required sample fields
-• Built-in validation rules
-• Example data provided
-
-📤 BATCH UPLOAD PROCESS:
-1. Download the Excel template
-2. Fill in your sample information
-3. Upload the completed file
-4. Review and validate data
-5. Confirm batch creation
-
-✅ VALIDATION FEATURES:
-• Automatic data validation
-• Duplicate detection
-• Format checking
-• Error highlighting with suggestions
-
-🔄 SUPPORTED FORMATS:
-• Excel (.xlsx, .xls)
-• CSV files
-• Tab-delimited text
-• Custom formats on request
-
-How many samples are you looking to upload at once?"""
-
-    # Help and general queries (check after specific ones)
-    elif any(phrase in query_lower for phrase in ['help', 'what can you do', 'what do you do', 'how can you help', 'what are your capabilities']):
-        return """I'm here to help with your laboratory management needs! Here's what I can assist with:
-
-🧪 SAMPLE MANAGEMENT
-• Submit samples using AI document processing
-• Create and edit sample records with barcodes
-• Track sample status and locations
-
-🏠 STORAGE SYSTEMS  
-• Manage storage locations and conditions
-• Track temperature requirements
-• Monitor capacity and sample movements
-
-🧬 SEQUENCING WORKFLOWS
-• Set up sequencing jobs and protocols
-• Generate sample sheets for instruments
-• Track quality metrics and analysis
-
-📊 DATA & REPORTS
-• Generate custom reports and analytics
-• Export data in various formats
-• Search and filter sample information
-
-Just ask me a specific question about any of these areas!"""
-
-    # Login, access, and system issues
-    elif any(word in query_lower for word in ['login', 'access', 'permission', 'error', 'problem', 'issue']):
-        return """For system access and troubleshooting:
-
-🔐 ACCESS ISSUES:
-• Default admin login: admin@lab.local / admin123
-• Contact your lab administrator for new accounts
-• Different roles have different permissions
-• Password reset available through admin
-
-❗ COMMON ISSUES:
-• Clear browser cache if pages aren't loading
-• Check internet connection for API calls
-• Refresh page if data seems outdated
-• Try logging out and back in
-
-🛠️ TROUBLESHOOTING:
-• Browser compatibility: Chrome, Firefox, Safari
-• Enable JavaScript and cookies
-• Disable ad blockers if needed
-• Check for system maintenance announcements
-
-👥 USER ROLES:
-• Lab Administrator: Full access
-• Principal Investigator: Sample and project management
-• Lab Technician: Sample processing and QC
-• Data Analyst: Reports and analytics only
-
-What specific issue are you experiencing?"""
-
     # Default response for unmatched queries
     else:
-        return f"""I understand you're asking about: "{query}"
+        return """I'm your lab management assistant and I can help with many laboratory tasks. Here are some things you might want to know about:
 
-I'm your lab management assistant and I can help with many laboratory tasks. Here are some things you might want to know about:
-
-🧪 COMMON TASKS:
+COMMON TASKS:
 • "How do I submit a new sample?"
 • "What are the storage requirements for DNA?"
 • "How do I create a sequencing job?"
 • "Can you help me generate a report?"
 • "Where is sample XYZ located?"
 
-🔍 TRY ASKING ABOUT:
+TRY ASKING ABOUT:
 • Sample submission and processing
 • Storage locations and temperatures  
 • Sequencing workflows and QC
@@ -668,7 +507,7 @@ async def query_submission_information(request: QueryRequest):
     except Exception as e:
         # Return a helpful error message
         return QueryResponse(
-            answer=f"I apologize, but I'm having trouble processing your question right now. This could be due to a temporary system issue. Please try again in a moment, or contact your lab administrator if the problem persists."
+            answer="I apologize, but I'm having trouble processing your question right now. This could be due to a temporary system issue. Please try again in a moment, or contact your lab administrator if the problem persists."
         )
 
 # Startup event to test database connection
@@ -678,14 +517,18 @@ async def startup_event():
     try:
         conn = await get_db_connection()
         await conn.close()
-        print("✅ Database connection successful")
+        print("Database connection successful")
+        print("Using regex-based document extraction (LLM integration available in future versions)")
+        print("API now handles file uploads correctly for frontend integration")
     except Exception as e:
-        print(f"❌ Database connection failed: {e}")
+        print(f"Database connection failed: {e}")
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Starting Simple RAG Submissions API Bridge")
-    print("📡 Providing basic RAG data access for frontend")
-    print("🌐 CORS enabled for all origins")
+    print("Starting Simple RAG Submissions API Bridge")
+    print("Providing basic RAG data access for frontend")
+    print("CORS enabled for all origins")
+    print("Using regex-based document extraction")
+    print("File upload handling enabled for frontend integration")
     
     uvicorn.run(app, host="0.0.0.0", port=8000) 
