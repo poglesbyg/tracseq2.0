@@ -20,6 +20,9 @@ tokio-stream = "0.1"
 futures = "0.3"
 async-trait = "0.1"
 
+# Random number generation for simulations
+rand = "0.8"
+
 # Database
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json", "migrate"] }
 uuid = { version = "1.6", features = ["v4", "serde"] }

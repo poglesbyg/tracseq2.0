@@ -26,6 +26,13 @@ services:
       - SAMPLE_SERVICE_URL=http://sample-service:8081
       - STORAGE_SERVICE_URL=http://enhanced-storage-service:8082
       - NOTIFICATION_SERVICE_URL=http://notification-service:8085
+      # Enhanced workflow configuration
+      - RAG_SERVICE_URL=http://enhanced-rag-service:8086
+      - ENABLE_AI_DECISIONS=true
+      - MAX_WORKFLOW_STEPS=50
+      - AI_TIMEOUT_SECONDS=30
+      - LAB_MANAGER_URL=http://lab-manager:3000
+      - AI_CONFIDENCE_THRESHOLD=0.8
     depends_on:
       - postgres
       - redis

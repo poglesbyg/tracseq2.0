@@ -5,6 +5,7 @@ mod coordinator;
 mod models;
 mod services;
 mod persistence;
+mod workflows;
 
 use axum::{
     extract::{Path, State},
@@ -17,6 +18,10 @@ use coordinator::{TransactionCoordinator, CoordinatorConfig, TransactionRequest}
 use models::TransactionServiceHealth;
 use services::{HealthService, WorkflowService, MetricsService};
 use saga::step::{SampleCreationData, StorageRequirements};
+use workflows::{
+    WorkflowConfig,
+    orchestrator::{EnhancedWorkflowService, EnhancedWorkflowRequest},
+};
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, trace::TraceLayer, compression::CompressionLayer};
@@ -29,6 +34,7 @@ pub struct AppState {
     coordinator: Arc<TransactionCoordinator>,
     health_service: HealthService,
     workflow_service: WorkflowService,
+    enhanced_workflow_service: Option<EnhancedWorkflowService>,
     metrics_service: MetricsService,
 }
 
@@ -54,12 +60,30 @@ async fn main() -> anyhow::Result<()> {
     };
     let health_service = HealthService::new(coordinator.clone());
     let workflow_service = WorkflowService::new(coordinator.clone());
+    
+    // Initialize enhanced workflow service with RAG integration
+    let enhanced_workflow_service = match EnhancedWorkflowService::new(
+        coordinator.clone(),
+        load_workflow_config(),
+    ).await {
+        Ok(service) => {
+            info!("Enhanced workflow service with RAG integration initialized successfully");
+            Some(service)
+        }
+        Err(e) => {
+            error!("Failed to initialize enhanced workflow service: {}", e);
+            info!("Continuing without enhanced workflow capabilities");
+            None
+        }
+    };
+    
     let metrics_service = MetricsService::new(coordinator.clone());
 
     let app_state = AppState {
         coordinator,
         health_service,
         workflow_service,
+        enhanced_workflow_service,
         metrics_service,
     };
 
@@ -122,6 +146,31 @@ fn load_config() -> CoordinatorConfig {
     }
 }
 
+fn load_workflow_config() -> WorkflowConfig {
+    WorkflowConfig {
+        rag_service_url: std::env::var("RAG_SERVICE_URL")
+            .unwrap_or_else(|_| "http://localhost:8086".to_string()),
+        enable_ai_decisions: std::env::var("ENABLE_AI_DECISIONS")
+            .unwrap_or_else(|_| "true".to_string())
+            .parse()
+            .unwrap_or(true),
+        max_workflow_steps: std::env::var("MAX_WORKFLOW_STEPS")
+            .unwrap_or_else(|_| "50".to_string())
+            .parse()
+            .unwrap_or(50),
+        ai_timeout_seconds: std::env::var("AI_TIMEOUT_SECONDS")
+            .unwrap_or_else(|_| "30".to_string())
+            .parse()
+            .unwrap_or(30),
+        lab_manager_url: std::env::var("LAB_MANAGER_URL")
+            .unwrap_or_else(|_| "http://localhost:3000".to_string()),
+        ai_confidence_threshold: std::env::var("AI_CONFIDENCE_THRESHOLD")
+            .unwrap_or_else(|_| "0.8".to_string())
+            .parse()
+            .unwrap_or(0.8),
+    }
+}
+
 fn create_router(app_state: AppState) -> Router {
     Router::new()
         .route("/health", get(health_check))
@@ -131,6 +180,9 @@ fn create_router(app_state: AppState) -> Router {
         .route("/api/v1/transactions/:saga_id", get(get_transaction_status))
         .route("/api/v1/transactions/:saga_id", delete(cancel_transaction))
         .route("/api/v1/workflows/sample-submission", post(execute_sample_submission))
+        .route("/api/v1/workflows/enhanced", post(execute_enhanced_workflow))
+        .route("/api/v1/workflows/enhanced/templates", get(list_workflow_templates))
+        .route("/api/v1/workflows/enhanced/ai-analyze", post(ai_analyze_workflow))
         .route("/api/v1/metrics/coordinator", get(get_coordinator_metrics))
         .layer(
             ServiceBuilder::new()
@@ -257,4 +309,124 @@ async fn get_coordinator_metrics(
 ) -> Json<coordinator::CoordinatorStatistics> {
     let stats = app_state.metrics_service.get_coordinator_statistics().await;
     Json(stats)
+}
+
+async fn execute_enhanced_workflow(
+    State(app_state): State<AppState>,
+    Json(request): Json<EnhancedWorkflowRequest>,
+) -> Result<Json<workflows::orchestrator::EnhancedWorkflowResult>, StatusCode> {
+    if let Some(enhanced_service) = &app_state.enhanced_workflow_service {
+        match enhanced_service.execute_enhanced_workflow(request).await {
+            Ok(result) => Ok(Json(result)),
+            Err(e) => {
+                error!("Enhanced workflow execution failed: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    } else {
+        error!("Enhanced workflow service not available");
+        Err(StatusCode::SERVICE_UNAVAILABLE)
+    }
+}
+
+async fn list_workflow_templates(
+    State(app_state): State<AppState>,
+) -> Result<Json<Vec<workflows::templates::LaboratoryWorkflowTemplate>>, StatusCode> {
+    // Return available workflow templates
+    let templates = vec![
+        workflows::templates::LaboratoryWorkflowTemplate {
+            template_id: "standard_processing".to_string(),
+            name: "Standard Sample Processing".to_string(),
+            description: "General purpose sample processing workflow".to_string(),
+            steps: vec![],
+            estimated_duration_minutes: 120,
+            required_equipment: vec!["centrifuge".to_string(), "pipettes".to_string()],
+            quality_checkpoints: vec!["initial_qc".to_string(), "final_qc".to_string()],
+            ai_generated: false,
+            confidence_score: 1.0,
+        },
+        workflows::templates::LaboratoryWorkflowTemplate {
+            template_id: "dna_extraction".to_string(),
+            name: "DNA Extraction".to_string(),
+            description: "Standardized DNA extraction workflow".to_string(),
+            steps: vec![],
+            estimated_duration_minutes: 180,
+            required_equipment: vec!["extraction_kit".to_string(), "centrifuge".to_string()],
+            quality_checkpoints: vec!["purity_check".to_string(), "yield_check".to_string()],
+            ai_generated: false,
+            confidence_score: 1.0,
+        },
+    ];
+    
+    Ok(Json(templates))
+}
+
+#[derive(serde::Deserialize)]
+struct AiAnalysisRequest {
+    workflow_type: String,
+    sample_data: workflows::orchestrator::SampleWorkflowData,
+    lab_context: workflows::orchestrator::LaboratoryContext,
+}
+
+#[derive(serde::Serialize)]
+struct AiAnalysisResponse {
+    analysis: workflows::orchestrator::AiInsights,
+    recommendations: Vec<String>,
+    confidence: f64,
+}
+
+async fn ai_analyze_workflow(
+    State(app_state): State<AppState>,
+    Json(request): Json<AiAnalysisRequest>,
+) -> Result<Json<AiAnalysisResponse>, StatusCode> {
+    if let Some(_enhanced_service) = &app_state.enhanced_workflow_service {
+        // Simulate AI analysis
+        let analysis = workflows::orchestrator::AiInsights {
+            optimizations: vec![
+                workflows::orchestrator::WorkflowOptimization {
+                    optimization_type: "efficiency".to_string(),
+                    description: "Reduce processing time by 15%".to_string(),
+                    potential_improvement: 0.15,
+                    confidence: 0.85,
+                    implementation_effort: workflows::orchestrator::ImplementationEffort::Medium,
+                }
+            ],
+            predictions: vec![
+                workflows::orchestrator::AiPrediction {
+                    prediction_type: "success_rate".to_string(),
+                    predicted_value: serde_json::json!(0.95),
+                    confidence: 0.88,
+                    basis: "Historical data analysis".to_string(),
+                }
+            ],
+            risk_assessments: vec![
+                workflows::orchestrator::RiskAssessment {
+                    risk_type: "contamination".to_string(),
+                    risk_level: workflows::RiskLevel::Low,
+                    probability: 0.05,
+                    impact: 0.3,
+                    mitigation_strategies: vec!["Use sterile techniques".to_string()],
+                }
+            ],
+            learning_insights: vec![
+                "Sample type is well-suited for standard processing".to_string(),
+                "Consider automated quality control".to_string(),
+            ],
+        };
+
+        let response = AiAnalysisResponse {
+            analysis,
+            recommendations: vec![
+                "Proceed with standard processing protocol".to_string(),
+                "Monitor temperature closely during incubation".to_string(),
+                "Consider parallel processing for efficiency".to_string(),
+            ],
+            confidence: 0.87,
+        };
+
+        Ok(Json(response))
+    } else {
+        error!("Enhanced workflow service not available for AI analysis");
+        Err(StatusCode::SERVICE_UNAVAILABLE)
+    }
 }
