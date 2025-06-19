@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "tracseq-api-gateway"
 version = "0.1.0"
 description = "TracSeq 2.0 API Gateway - Intelligent routing and management for microservices"
-readme = "README.md"
+readme = "README-gateway.md"
 requires-python = ">=3.9"
 license = "MIT"
 keywords = ["api-gateway", "microservices", "routing", "tracseq", "laboratory"]

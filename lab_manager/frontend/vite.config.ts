@@ -8,60 +8,33 @@ export default defineConfig({
     host: true,
     port: 5173,
     proxy: {
-      // RAG API - route to RAG service (containerized development)
-      '/api/rag': {
-        target: process.env.RAG_API_URL || 'http://localhost:8000',
-        changeOrigin: true,
-        secure: false,
-        configure: (proxy, _options) => {
-          proxy.on('error', (err, _req, _res) => {
-            console.log('RAG API proxy error', err);
-          });
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('Sending RAG Request to the Target:', req.method, req.url);
-          });
-          proxy.on('proxyRes', (proxyRes, req, _res) => {
-            console.log('Received RAG Response from the Target:', proxyRes.statusCode, req.url);
-          });
-        },
-      },
-      // Auth routes - route to lab manager backend (using /auth instead of /api/auth)
-      '/api/auth': {
-        target: process.env.BACKEND_URL || 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/api\/auth/, '/auth'),
-        configure: (proxy, _options) => {
-          proxy.on('error', (err, _req, _res) => {
-            console.log('Auth proxy error', err);
-          });
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('Sending Auth Request to the Target:', req.method, req.url);
-          });
-          proxy.on('proxyRes', (proxyRes, req, _res) => {
-            console.log('Received Auth Response from the Target:', proxyRes.statusCode, req.url);
-          });
-        },
-      },
-      // All other API calls - route to lab manager backend (containerized development)
+      // Route ALL API requests through the API Gateway
+      // This enables gradual microservices migration with feature flags
       '/api': {
-        target: process.env.BACKEND_URL || 'http://localhost:3000',
+        target: process.env.API_GATEWAY_URL || 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, _res) => {
-            console.log('proxy error', err);
+            console.log('API Gateway proxy error', err);
           });
           proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('Sending Request to the Target:', req.method, req.url);
+            console.log('Sending Request to API Gateway:', req.method, req.url);
           });
           proxy.on('proxyRes', (proxyRes, req, _res) => {
-            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+            console.log('Received Response from API Gateway:', proxyRes.statusCode, req.url);
           });
         },
       },
+      // Health check through API Gateway
       '/health': {
-        target: process.env.BACKEND_URL || 'http://localhost:3000',
+        target: process.env.API_GATEWAY_URL || 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      // Routing status for API Gateway
+      '/routing-status': {
+        target: process.env.API_GATEWAY_URL || 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
       },
