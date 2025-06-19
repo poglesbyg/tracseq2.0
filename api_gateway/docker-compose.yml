@@ -1,0 +1,319 @@
+version: '3.8'
+
+services:
+  # API Gateway
+  api-gateway:
+    build: .
+    container_name: tracseq-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - HOST=0.0.0.0
+      - PORT=8000
+      
+      # Service endpoints (container names)
+      - SERVICES__AUTH__HOST=auth-service
+      - SERVICES__SAMPLES__HOST=sample-service
+      - SERVICES__STORAGE__HOST=enhanced-storage-service
+      - SERVICES__TEMPLATES__HOST=template-service
+      - SERVICES__SEQUENCING__HOST=sequencing-service
+      - SERVICES__NOTIFICATIONS__HOST=notification-service
+      - SERVICES__RAG__HOST=enhanced-rag-service
+      
+      # Gateway configuration
+      - REQUEST_TIMEOUT=30
+      - MAX_CONCURRENT_REQUESTS=1000
+      - LOAD_BALANCER__ENABLED=true
+      - LOAD_BALANCER__ALGORITHM=round_robin
+      
+      # CORS configuration
+      - CORS__ENABLED=true
+      - CORS__ALLOW_ORIGINS=["http://localhost:3000","http://localhost:8080","http://localhost:8000"]
+      
+      # Rate limiting
+      - RATE_LIMITING__ENABLED=true
+      - RATE_LIMITING__DEFAULT_REQUESTS_PER_MINUTE=100
+      - RATE_LIMITING__REDIS_URL=redis://gateway-redis:6379/1
+      
+      # Monitoring
+      - MONITORING__METRICS_ENABLED=true
+      - MONITORING__LOG_REQUESTS=true
+      - MONITORING__LOG_RESPONSES=true
+    
+    volumes:
+      - gateway_logs:/app/logs
+    
+    depends_on:
+      - gateway-redis
+      - auth-service
+      - sample-service
+      - enhanced-storage-service
+      - template-service
+      - sequencing-service
+      - notification-service
+      - enhanced-rag-service
+    
+    networks:
+      - tracseq-network
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for gateway caching and rate limiting
+  gateway-redis:
+    image: redis:7-alpine
+    container_name: tracseq-gateway-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - gateway_redis_data:/data
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Auth Service
+  auth-service:
+    build: ../auth_service
+    container_name: auth-service
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://auth_user:auth_password@auth-postgres:5432/auth_db
+    depends_on:
+      - auth-postgres
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Sample Service
+  sample-service:
+    build: ../sample_service
+    container_name: sample-service
+    ports:
+      - "8081:8081"
+    environment:
+      - DATABASE_URL=postgresql://sample_user:sample_password@sample-postgres:5432/sample_db
+    depends_on:
+      - sample-postgres
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Enhanced Storage Service
+  enhanced-storage-service:
+    build: ../enhanced_storage_service
+    container_name: enhanced-storage-service
+    ports:
+      - "8082:8082"
+    environment:
+      - DATABASE_URL=postgresql://storage_user:storage_password@storage-postgres:5432/storage_db
+    depends_on:
+      - storage-postgres
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Template Service
+  template-service:
+    build: ../template_service
+    container_name: template-service
+    ports:
+      - "8083:8083"
+    environment:
+      - DATABASE_URL=postgresql://template_user:template_password@template-postgres:5432/template_db
+    depends_on:
+      - template-postgres
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Sequencing Service
+  sequencing-service:
+    build: ../sequencing_service
+    container_name: sequencing-service
+    ports:
+      - "8084:8084"
+    environment:
+      - DATABASE_URL=postgresql://sequencing_user:sequencing_password@sequencing-postgres:5432/sequencing_db
+    depends_on:
+      - sequencing-postgres
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Notification Service
+  notification-service:
+    build: ../notification_service
+    container_name: notification-service
+    ports:
+      - "8085:8085"
+    environment:
+      - DATABASE_URL=postgresql://notification_user:notification_password@notification-postgres:5432/notification_db
+    depends_on:
+      - notification-postgres
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Enhanced RAG Service
+  enhanced-rag-service:
+    build: ../enhanced_rag_service
+    container_name: enhanced-rag-service
+    ports:
+      - "8086:8086"
+    environment:
+      - DATABASE__URL=postgresql://rag_user:rag_password@rag-postgres:5432/enhanced_rag_db
+      - VECTOR_STORE__PROVIDER=chromadb
+      - LLM__PROVIDER=openai
+      - LLM__OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - rag-postgres
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Database services
+  auth-postgres:
+    image: postgres:15-alpine
+    container_name: auth-postgres
+    environment:
+      - POSTGRES_DB=auth_db
+      - POSTGRES_USER=auth_user
+      - POSTGRES_PASSWORD=auth_password
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  sample-postgres:
+    image: postgres:15-alpine
+    container_name: sample-postgres
+    environment:
+      - POSTGRES_DB=sample_db
+      - POSTGRES_USER=sample_user
+      - POSTGRES_PASSWORD=sample_password
+    volumes:
+      - sample_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  storage-postgres:
+    image: postgres:15-alpine
+    container_name: storage-postgres
+    environment:
+      - POSTGRES_DB=storage_db
+      - POSTGRES_USER=storage_user
+      - POSTGRES_PASSWORD=storage_password
+    volumes:
+      - storage_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  template-postgres:
+    image: postgres:15-alpine
+    container_name: template-postgres
+    environment:
+      - POSTGRES_DB=template_db
+      - POSTGRES_USER=template_user
+      - POSTGRES_PASSWORD=template_password
+    volumes:
+      - template_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  sequencing-postgres:
+    image: postgres:15-alpine
+    container_name: sequencing-postgres
+    environment:
+      - POSTGRES_DB=sequencing_db
+      - POSTGRES_USER=sequencing_user
+      - POSTGRES_PASSWORD=sequencing_password
+    volumes:
+      - sequencing_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  notification-postgres:
+    image: postgres:15-alpine
+    container_name: notification-postgres
+    environment:
+      - POSTGRES_DB=notification_db
+      - POSTGRES_USER=notification_user
+      - POSTGRES_PASSWORD=notification_password
+    volumes:
+      - notification_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  rag-postgres:
+    image: postgres:15-alpine
+    container_name: rag-postgres
+    environment:
+      - POSTGRES_DB=enhanced_rag_db
+      - POSTGRES_USER=rag_user
+      - POSTGRES_PASSWORD=rag_password
+    volumes:
+      - rag_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Monitoring and observability
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: tracseq-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: tracseq-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+volumes:
+  gateway_logs:
+  gateway_redis_data:
+  auth_postgres_data:
+  sample_postgres_data:
+  storage_postgres_data:
+  template_postgres_data:
+  sequencing_postgres_data:
+  notification_postgres_data:
+  rag_postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  tracseq-network:
+    driver: bridge 

@@ -1,0 +1,240 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tracseq-api-gateway"
+version = "0.1.0"
+description = "TracSeq 2.0 API Gateway - Intelligent routing and management for microservices"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+keywords = ["api-gateway", "microservices", "routing", "tracseq", "laboratory"]
+authors = [
+  { name = "TracSeq Team", email = "dev@tracseq.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: Implementation :: CPython",
+]
+
+dependencies = [
+  # Web Framework & API
+  "fastapi[standard]>=0.104.0",
+  "uvicorn[standard]>=0.24.0",
+  "pydantic>=2.4.0",
+  "pydantic-settings>=2.0.0",
+  
+  # HTTP Client & Proxy
+  "httpx>=0.25.0",
+  "aiohttp>=3.9.0",
+  "aiofiles>=23.2.1",
+  
+  # Authentication & Security
+  "python-jose[cryptography]>=3.3.0",
+  "passlib[bcrypt]>=1.7.4",
+  "python-multipart>=0.0.6",
+  
+  # Rate Limiting & Caching
+  "slowapi>=0.1.9",
+  "redis>=5.0.0",
+  "python-redis-rate-limit>=0.1.3",
+  
+  # Configuration & Environment
+  "python-dotenv>=1.0.0",
+  "pyyaml>=6.0.1",
+  "toml>=0.10.2",
+  
+  # Monitoring & Observability
+  "prometheus-client>=0.19.0",
+  "structlog>=23.2.0",
+  "opentelemetry-api>=1.20.0",
+  "opentelemetry-sdk>=1.20.0",
+  "opentelemetry-exporter-prometheus>=1.12.0",
+  
+  # Load Balancing & Service Discovery
+  "consul>=1.1.0",
+  "python-consul2>=0.1.5",
+  
+  # Database & Storage
+  "asyncpg>=0.29.0",
+  "sqlalchemy[asyncio]>=2.0.0",
+  
+  # Utilities
+  "tenacity>=8.2.3",
+  "click>=8.1.0",
+  "rich>=13.6.0",
+  "typer>=0.9.0",
+  
+  # Async & Concurrency
+  "asyncio-mqtt>=0.16.1",
+  
+  # Validation & Schema
+  "jsonschema>=4.19.0",
+  "cerberus>=1.3.4",
+  
+  # Circuit Breaker
+  "pybreaker>=1.0.1",
+  
+  # Metrics & Health Checks
+  "psutil>=5.9.0",
+  "ping3>=4.0.4",
+  
+  # Testing Framework
+  "pytest>=7.4.0",
+  "pytest-asyncio>=0.21.0",
+  "pytest-cov>=4.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black>=23.10.0",
+  "ruff>=0.1.5",
+  "mypy>=1.7.0",
+  "pre-commit>=3.5.0",
+  "ipython>=8.16.0",
+]
+
+monitoring = [
+  # Advanced monitoring
+  "grafana-api>=1.0.3",
+  "elasticsearch>=8.10.0",
+  "kibana-api>=0.1.0",
+]
+
+enterprise = [
+  # Enterprise features
+  "cryptography>=41.0.7",
+  "boto3>=1.29.0",
+  "azure-identity>=1.15.0",
+  "google-cloud-storage>=2.10.0",
+]
+
+[project.urls]
+Documentation = "https://docs.tracseq.com/api-gateway"
+Issues = "https://github.com/tracseq/api-gateway/issues"
+Source = "https://github.com/tracseq/api-gateway"
+
+[project.scripts]
+tracseq-gateway = "api_gateway.cli:main"
+
+[tool.hatch.version]
+path = "src/api_gateway/__about__.py"
+
+[tool.hatch.envs.default]
+dependencies = [
+  "coverage[toml]>=6.5",
+  "pytest",
+]
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "coverage run -m pytest {args:tests}"
+cov-report = [
+  "- coverage combine",
+  "coverage report",
+]
+cov-html = [
+  "- coverage combine", 
+  "coverage html",
+]
+
+[tool.hatch.envs.lint]
+detached = true
+dependencies = [
+  "black>=23.1.0",
+  "mypy>=1.0.0",
+  "ruff>=0.0.243",
+]
+
+[tool.hatch.envs.lint.scripts]
+typing = "mypy --install-types --non-interactive {args:src/api_gateway tests}"
+style = [
+  "ruff {args:.}",
+  "black --check --diff {args:.}",
+]
+fmt = [
+  "black {args:.}",
+  "ruff --fix {args:.}",
+  "style",
+]
+all = [
+  "style",
+  "typing",
+]
+
+[tool.black]
+target-version = ["py39"]
+line-length = 88
+skip-string-normalization = true
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+  "A",
+  "ARG", 
+  "B",
+  "C",
+  "DTZ",
+  "E",
+  "EM",
+  "F",
+  "FBT",
+  "I",
+  "ICN",
+  "ISC",
+  "N",
+  "PLC",
+  "PLE",
+  "PLR",
+  "PLW",
+  "Q",
+  "RUF",
+  "S",
+  "T",
+  "TID",
+  "UP",
+  "W",
+  "YTT",
+]
+ignore = [
+  "B027",
+  "FBT003",
+  "S105", "S106", "S107",
+  "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
+]
+unfixable = [
+  "F401",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["api_gateway"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*" = ["PLR2004", "S101", "TID252"]
+
+[tool.coverage.run]
+source_pkgs = ["api_gateway", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/api_gateway/__about__.py",
+]
+
+[tool.coverage.paths]
+api_gateway = ["src/api_gateway", "*/tracseq-api-gateway/src/api_gateway"]
+tests = ["tests", "*/tracseq-api-gateway/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+] 

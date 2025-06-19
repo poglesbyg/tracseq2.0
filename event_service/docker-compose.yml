@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  event-service:
+    build: .
+    container_name: tracseq-event-service
+    ports:
+      - "8087:8087"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - HOST=0.0.0.0
+      - PORT=8087
+      - RUST_LOG=info
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    container_name: tracseq-redis-events
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: tracseq-redis-ui
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - tracseq-network
+
+networks:
+  tracseq-network:
+    driver: bridge
+    name: tracseq-network
+
+volumes:
+  redis_data:
+    driver: local 
