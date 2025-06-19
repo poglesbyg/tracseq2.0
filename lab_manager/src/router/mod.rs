@@ -236,12 +236,81 @@ pub fn create_app_router() -> Router<AppComponents> {
         .route("/health/metrics", get(health::application_metrics))
         .route("/health/ready", get(health::readiness_check))
         .route("/health/live", get(health::liveness_check))
-        // Public authentication routes
+        // Public authentication routes (both /auth and /api/auth for compatibility)
         .route("/auth/login", post(users::login))
         .route("/auth/logout", post(users::logout))
         .route("/auth/reset-password", post(users::reset_password))
+        .route("/api/auth/login", post(users::login))
+        .route("/api/auth/logout", post(users::logout))
+        .route("/api/auth/reset-password", post(users::reset_password))
         // Dashboard routes (require authentication)
         .route("/dashboard/stats", get(dashboard::get_dashboard_stats))
+        .route("/api/dashboard/stats", get(dashboard::get_dashboard_stats))
+        // API routes for frontend compatibility
+        .route("/api/samples", get(samples::list_samples))
+        .route("/api/samples", post(samples::create_sample))
+        .route("/api/samples/:id", get(samples::get_sample))
+        .route("/api/samples/:id", put(samples::update_sample))
+        .route("/api/templates", get(templates::list_templates))
+        .route("/api/templates", post(templates::create_template))
+        .route("/api/templates/:id", get(templates::get_template))
+        .route("/api/templates/:id", put(templates::update_template))
+        .route(
+            "/api/sequencing/jobs",
+            get(sequencing::list_sequencing_jobs),
+        )
+        .route(
+            "/api/sequencing/jobs",
+            post(sequencing::create_sequencing_job),
+        )
+        .route(
+            "/api/sequencing/jobs/:id",
+            get(sequencing::get_sequencing_job),
+        )
+        // User management API routes
+        .route("/api/users/me", get(users::get_current_user))
+        .route("/api/users/me", put(users::update_current_user))
+        .route("/api/users", get(users::list_users))
+        .route("/api/users", post(users::create_user))
+        .route("/api/users/:user_id", get(users::get_user))
+        .route("/api/users/:user_id", put(users::update_user))
+        .route("/api/users/:user_id", delete(users::delete_user))
+        // RAG API routes
+        .route("/api/rag/submissions", get(rag_proxy::get_rag_submissions))
+        .route("/api/rag/process", post(rag_proxy::process_rag_document))
+        .route("/api/rag/stats", get(rag_proxy::get_rag_stats))
+        .route("/api/rag/health", get(rag_proxy::get_rag_health))
+        // Spreadsheet API routes
+        .route(
+            "/api/spreadsheets/datasets",
+            get(spreadsheets::list_datasets),
+        )
+        .route(
+            "/api/spreadsheets/datasets/:id",
+            get(spreadsheets::get_dataset),
+        )
+        .route(
+            "/api/spreadsheets/datasets/:id",
+            delete(spreadsheets::delete_dataset),
+        )
+        .route(
+            "/api/spreadsheets/upload",
+            post(spreadsheets::upload_spreadsheet),
+        )
+        // Storage API routes
+        .route(
+            "/api/storage/locations",
+            get(storage::list_storage_locations),
+        )
+        .route(
+            "/api/storage/locations",
+            post(storage::create_storage_location),
+        )
+        .route("/api/storage/capacity", get(storage::get_capacity_overview))
+        // Reports API routes
+        .route("/api/reports/templates", get(reports::get_report_templates))
+        .route("/api/reports/schema", get(reports::get_schema))
+        .route("/api/reports/execute", post(reports::execute_report))
         // Sample management routes
         .route("/samples", get(samples::list_samples))
         .route("/samples", post(samples::create_sample))

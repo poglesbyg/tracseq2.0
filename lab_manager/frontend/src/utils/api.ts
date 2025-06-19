@@ -51,10 +51,10 @@ class ApiClient {
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
-        
+
         // Add request ID for tracing
         config.headers['X-Request-ID'] = crypto.randomUUID();
-        
+
         return config;
       },
       (error) => Promise.reject(error)
@@ -65,7 +65,7 @@ class ApiClient {
       (response: AxiosResponse) => response,
       async (error) => {
         const originalRequest = error.config;
-        
+
         // Handle 401 unauthorized
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;

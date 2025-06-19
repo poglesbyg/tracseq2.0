@@ -25,6 +25,24 @@ export default defineConfig({
           });
         },
       },
+      // Auth routes - route to lab manager backend (using /auth instead of /api/auth)
+      '/api/auth': {
+        target: process.env.BACKEND_URL || 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api\/auth/, '/auth'),
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('Auth proxy error', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('Sending Auth Request to the Target:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log('Received Auth Response from the Target:', proxyRes.statusCode, req.url);
+          });
+        },
+      },
       // All other API calls - route to lab manager backend (containerized development)
       '/api': {
         target: process.env.BACKEND_URL || 'http://localhost:3000',

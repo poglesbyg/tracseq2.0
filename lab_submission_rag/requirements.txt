@@ -31,7 +31,8 @@ pydantic-settings>=2.1.0,<3.0.0  # Settings management
 # LLM APIs (lightweight)
 openai>=1.10.0,<2.0.0  # OpenAI API client
 anthropic>=0.25.0,<1.0.0  # Anthropic API client
-httpx>=0.24.0,<1.0.0  # For Ollama instead of heavy ollama package
+ollama>=0.3.0,<1.0.0  # Ollama Python client
+httpx>=0.24.0,<1.0.0  # HTTP client for API calls
 
 # Data Processing (memory optimized)
 polars>=0.20.0,<1.0.0  # Much lighter than pandas for data processing

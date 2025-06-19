@@ -33,31 +33,7 @@ CREATE TABLE IF NOT EXISTS security_audit_log (
 -- =============================================================================
 -- USER SESSIONS TABLE (for session management)
 -- =============================================================================
-
-CREATE TABLE IF NOT EXISTS user_sessions (
-    -- Session identifier
-    session_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    
-    -- User reference
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    
-    -- Session token (hashed)
-    session_token VARCHAR(255) UNIQUE NOT NULL,
-    
-    -- Session metadata
-    ip_address INET,
-    user_agent TEXT,
-    
-    -- Session lifecycle
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    last_accessed TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    expires_at TIMESTAMPTZ NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    
-    -- Logout tracking
-    logout_reason VARCHAR(50),
-    logged_out_at TIMESTAMPTZ
-);
+-- Note: user_sessions table is already created in the user system migration (20240320000005)
 
 -- =============================================================================
 -- QUERY LOG TABLE (for RAG system queries)
@@ -216,13 +192,13 @@ CREATE INDEX IF NOT EXISTS idx_extraction_results_created_at ON extraction_resul
 -- =============================================================================
 
 COMMENT ON TABLE security_audit_log IS 'Comprehensive audit trail for security events and user actions';
-COMMENT ON TABLE user_sessions IS 'Active user sessions for authentication and session management';
+-- COMMENT ON TABLE user_sessions IS 'Active user sessions for authentication and session management'; -- Table created in user system migration
 COMMENT ON TABLE query_log IS 'RAG system query history for analytics and debugging';
 COMMENT ON TABLE extraction_results IS 'Document processing results from RAG system';
 COMMENT ON TABLE document_chunks IS 'Processed document chunks for vector search';
 COMMENT ON TABLE documents IS 'Document metadata and processing status';
 
 COMMENT ON COLUMN security_audit_log.severity IS 'Security event severity: LOW, MEDIUM, HIGH, CRITICAL';
-COMMENT ON COLUMN user_sessions.session_token IS 'Hashed session token for security';
+-- COMMENT ON COLUMN user_sessions.token_hash IS 'Hashed session token for security'; -- Column name is token_hash in actual schema
 COMMENT ON COLUMN document_chunks.embedding IS 'Vector embedding for semantic search';
 COMMENT ON COLUMN extraction_results.confidence_score IS 'Confidence score between 0.00 and 1.00'; 
