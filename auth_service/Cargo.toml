@@ -7,17 +7,17 @@ description = "Standalone authentication service for laboratory management syste
 
 [dependencies]
 # Web framework
-axum = "0.7"
-tokio = { version = "1.0", features = ["full"] }
+axum = "0.7.9"
+tokio = { version = "1.36", features = ["full"] }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace", "compression"] }
+tower-http = { version = "0.5", features = ["cors"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # Database
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+sqlx = { version = "0.8.1", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"] }
 
 # Authentication & Security
 jsonwebtoken = "9.2"
@@ -45,16 +45,9 @@ dotenvy = "0.15"
 # HTTP client (for health checks, etc.)
 reqwest = { version = "0.11", features = ["json"] }
 
-# Rate limiting
-redis = { version = "0.24", features = ["tokio-comp"], optional = true }
-
 # Metrics and observability
-metrics = "0.21"
-metrics-exporter-prometheus = "0.12"
-
-[features]
-default = ["redis"]
-redis = ["dep:redis"]
+metrics = "0.23"
+metrics-exporter-prometheus = "0.13"
 
 [dev-dependencies]
 tokio-test = "0.4"
