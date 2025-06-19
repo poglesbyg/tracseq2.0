@@ -21,7 +21,7 @@ services:
       # Feature flags for gradual service extraction
       - USE_AUTH_SERVICE=false
       - USE_SAMPLE_SERVICE=false
-      - USE_TEMPLATE_SERVICE=false
+      - USE_TEMPLATE_SERVICE=true
       - USE_STORAGE_SERVICE=false
       - USE_SEQUENCING_SERVICE=false
       - USE_NOTIFICATION_SERVICE=false

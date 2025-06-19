@@ -1,0 +1,26 @@
+[package]
+name = "template_service"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "template_service"
+path = "src/simple_main.rs"
+
+[dependencies]
+# Web framework
+axum = "0.7.5"
+tokio = { version = "1.35", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# UUID and time
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3" 

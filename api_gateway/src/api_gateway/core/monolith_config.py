@@ -38,15 +38,21 @@ class MonolithEndpoint(BaseModel):
         return f"{self.base_url}{self.health_check_path}"
 
 
-class ServiceFeatureFlags(BaseModel):
+class ServiceFeatureFlags(BaseSettings):
     """Feature flags for gradual service extraction."""
-    use_auth_service: bool = Field(default=False, env="USE_AUTH_SERVICE")
-    use_sample_service: bool = Field(default=False, env="USE_SAMPLE_SERVICE")
-    use_template_service: bool = Field(default=False, env="USE_TEMPLATE_SERVICE")
-    use_storage_service: bool = Field(default=False, env="USE_STORAGE_SERVICE")
-    use_sequencing_service: bool = Field(default=False, env="USE_SEQUENCING_SERVICE")
-    use_notification_service: bool = Field(default=False, env="USE_NOTIFICATION_SERVICE")
-    use_rag_service: bool = Field(default=False, env="USE_RAG_SERVICE")
+    use_auth_service: bool = Field(default=False)
+    use_sample_service: bool = Field(default=False)
+    use_template_service: bool = Field(default=False)
+    use_storage_service: bool = Field(default=False)
+    use_sequencing_service: bool = Field(default=False)
+    use_notification_service: bool = Field(default=False)
+    use_rag_service: bool = Field(default=False)
+    
+    class Config:
+        """Pydantic configuration for reading environment variables."""
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = False
 
 
 class MonolithRouterConfig(BaseSettings):
@@ -84,7 +90,7 @@ class MonolithRouterConfig(BaseSettings):
             ),
             "templates": ServiceEndpoint(
                 name="Template Service",
-                host="template-service",
+                host="host.docker.internal",
                 port=8083,
                 path_prefix="/api/templates",
                 health_check_path="/health"
