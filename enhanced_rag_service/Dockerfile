@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements first for better caching
 COPY pyproject.toml .
-COPY requirements.txt ./requirements.txt 2>/dev/null || echo "fastapi[standard]>=0.104.0" > requirements.txt
+COPY requirements.txt ./requirements.txt
 
 # Install Python dependencies
 RUN pip install --upgrade pip

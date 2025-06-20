@@ -386,3 +386,10 @@ impl From<validator::ValidationErrors> for ValidationErrors {
         validation_errors
     }
 }
+
+/// Convert validator errors directly to AuthError
+impl From<validator::ValidationErrors> for AuthError {
+    fn from(errors: validator::ValidationErrors) -> Self {
+        ValidationErrors::from(errors).into_auth_error()
+    }
+}

@@ -20,7 +20,7 @@ mod error;
 mod handlers;
 mod models;
 mod services;
-mod middleware as auth_middleware;
+mod middleware;
 
 use config::Config;
 use database::DatabasePool;
@@ -109,7 +109,7 @@ fn create_app(state: AppState) -> Router {
         .route("/auth/change-password", post(handlers::auth::change_password))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            auth_middleware::auth_middleware,
+            middleware::auth_middleware,
         ));
 
     // Token validation routes (for other services)
@@ -118,7 +118,7 @@ fn create_app(state: AppState) -> Router {
         .route("/validate/permissions", post(handlers::validation::validate_permissions))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            auth_middleware::service_auth_middleware,
+            middleware::service_auth_middleware,
         ));
 
     // Admin routes (require admin privileges)
@@ -132,7 +132,7 @@ fn create_app(state: AppState) -> Router {
         .route("/admin/audit-log", get(handlers::admin::get_audit_log))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            auth_middleware::admin_middleware,
+            middleware::admin_middleware,
         ));
 
     // Combine all routes

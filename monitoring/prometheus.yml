@@ -1,0 +1,85 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # TracSeq Microservices
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'sample-service'
+    static_configs:
+      - targets: ['sample-service:8081']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'enhanced-storage-service'
+    static_configs:
+      - targets: ['enhanced-storage-service:8082']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'template-service'
+    static_configs:
+      - targets: ['template-service:8083']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'sequencing-service'
+    static_configs:
+      - targets: ['sequencing-service:8084']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['notification-service:8085']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'enhanced-rag-service'
+    static_configs:
+      - targets: ['enhanced-rag-service:8086']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'event-service'
+    static_configs:
+      - targets: ['event-service:8087']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'transaction-service'
+    static_configs:
+      - targets: ['transaction-service:8088']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8089']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Infrastructure
+  - job_name: 'postgres-main'
+    static_configs:
+      - targets: ['postgres-main:5432']
+    scrape_interval: 60s
+
+  - job_name: 'redis-main'
+    static_configs:
+      - targets: ['redis-main:6379']
+    scrape_interval: 60s 

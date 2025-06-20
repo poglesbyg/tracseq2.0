@@ -1,7 +1,7 @@
 # Multi-stage build for TracSeq Authentication Service
 
 # Build stage
-FROM rust:1.80-slim as builder
+FROM rustlang/rust:nightly-slim as builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \

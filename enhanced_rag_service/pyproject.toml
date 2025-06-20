@@ -6,7 +6,6 @@ build-backend = "hatchling.build"
 name = "enhanced-rag-service"
 version = "0.1.0"
 description = "Enhanced RAG Service for AI-Powered Laboratory Document Processing"
-readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 keywords = ["rag", "ai", "laboratory", "document-processing", "microservice"]
@@ -131,7 +130,7 @@ dev = [
 ]
 
 gpu = [
-  "torch>=2.1.0+cu118",
+  "torch>=2.1.0",
   "faiss-gpu>=1.7.4",
 ]
 
@@ -166,6 +165,9 @@ Source = "https://github.com/tracseq/enhanced-rag-service"
 
 [tool.hatch.version]
 path = "src/enhanced_rag_service/__about__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/enhanced_rag_service"]
 
 [tool.hatch.envs.default]
 dependencies = [

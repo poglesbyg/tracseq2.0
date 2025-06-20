@@ -77,7 +77,7 @@ impl DatabasePool {
                 token_hash VARCHAR(255) NOT NULL,
                 refresh_token_hash VARCHAR(255),
                 device_info TEXT,
-                ip_address INET,
+                ip_address VARCHAR(45),
                 user_agent TEXT,
                 expires_at TIMESTAMPTZ NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -174,7 +174,7 @@ impl DatabasePool {
                 action VARCHAR(100) NOT NULL,
                 resource_type VARCHAR(50),
                 resource_id UUID,
-                ip_address INET,
+                ip_address VARCHAR(45),
                 user_agent TEXT,
                 details JSONB,
                 timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -257,7 +257,7 @@ impl DatabasePool {
         .await?;
 
         // Create triggers for updated_at
-        sqlx::query(
+        if let Err(e) = sqlx::query(
             r#"
             CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
             FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
@@ -265,16 +265,14 @@ impl DatabasePool {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| {
-            if e.to_string().contains("already exists") {
-                // Trigger already exists, that's fine
-                warn!("Trigger update_users_updated_at already exists");
-                return Ok(sqlx::postgres::PgQueryResult::default());
+        {
+            if !e.to_string().contains("already exists") {
+                return Err(e.into());
             }
-            Err(e)
-        })??;
+            warn!("Trigger update_users_updated_at already exists");
+        }
 
-        sqlx::query(
+        if let Err(e) = sqlx::query(
             r#"
             CREATE TRIGGER update_rate_limits_updated_at BEFORE UPDATE ON rate_limits
             FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
@@ -282,13 +280,12 @@ impl DatabasePool {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| {
-            if e.to_string().contains("already exists") {
-                warn!("Trigger update_rate_limits_updated_at already exists");
-                return Ok(sqlx::postgres::PgQueryResult::default());
+        {
+            if !e.to_string().contains("already exists") {
+                return Err(e.into());
             }
-            Err(e)
-        })??;
+            warn!("Trigger update_rate_limits_updated_at already exists");
+        }
 
         info!("Database migrations completed successfully");
         Ok(())
@@ -307,7 +304,7 @@ impl DatabasePool {
                     is_connected: true,
                     response_time_ms: response_time.as_millis() as u64,
                     active_connections: pool_status,
-                    idle_connections: self.pool.num_idle(),
+                    idle_connections: self.pool.num_idle() as u32,
                     max_connections: self.pool.options().get_max_connections(),
                 })
             }

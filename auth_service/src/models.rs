@@ -1,3 +1,9 @@
+use crate::error::AuthError;
+use axum::{
+    async_trait,
+    extract::{FromRequestParts, Request},
+    http::{request::Parts, StatusCode},
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -151,7 +157,7 @@ pub struct UserSession {
 
     // Session metadata
     pub device_info: Option<serde_json::Value>,
-    pub ip_address: Option<std::net::IpAddr>,
+    pub ip_address: Option<String>,
     pub user_agent: Option<String>,
 
     // Session lifecycle
@@ -268,7 +274,7 @@ pub struct SecurityAuditLog {
     pub event_id: Uuid,
     pub event_type: String,
     pub user_id: Option<Uuid>,
-    pub ip_address: Option<std::net::IpAddr>,
+    pub ip_address: Option<String>,
     pub user_agent: Option<String>,
     pub resource: Option<String>,
     pub action: Option<String>,
@@ -303,3 +309,20 @@ pub fn has_role_or_higher(user_role: &UserRole, required_role: &UserRole) -> boo
 
 /// Result type for authentication operations
 pub type AuthResult<T> = Result<T, crate::error::AuthError>;
+
+/// Axum extractor for authenticated users
+#[async_trait]
+impl<S> FromRequestParts<S> for User
+where
+    S: Send + Sync,
+{
+    type Rejection = AuthError;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        parts
+            .extensions
+            .get::<User>()
+            .cloned()
+            .ok_or_else(|| AuthError::authentication("User not authenticated"))
+    }
+}

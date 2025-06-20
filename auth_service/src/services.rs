@@ -19,12 +19,23 @@ use crate::{
 };
 
 /// Core authentication service implementation
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AuthServiceImpl {
     db: DatabasePool,
     config: Config,
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
+}
+
+impl std::fmt::Debug for AuthServiceImpl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AuthServiceImpl")
+            .field("db", &self.db)
+            .field("config", &self.config)
+            .field("encoding_key", &"[REDACTED]")
+            .field("decoding_key", &"[REDACTED]")
+            .finish()
+    }
 }
 
 impl AuthServiceImpl {
