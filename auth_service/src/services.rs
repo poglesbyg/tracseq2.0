@@ -113,6 +113,298 @@ impl AuthServiceImpl {
         })
     }
 
+    /// Create a new user account
+    pub async fn create_user(
+        &self,
+        first_name: String,
+        last_name: String,
+        email: String,
+        password: String,
+        role: UserRole,
+    ) -> AuthResult<User> {
+        // Check if user already exists
+        if let Ok(_) = self.get_user_by_email(&email).await {
+            return Err(AuthError::UserAlreadyExists);
+        }
+
+        // Validate password strength
+        self.validate_password_strength(&password)?;
+
+        // Hash password
+        let password_hash = self.hash_password(&password)?;
+
+        // Create user
+        let user_id = Uuid::new_v4();
+        let email_verified = !self.config.features.email_verification_required;
+
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            INSERT INTO users (
+                id, email, password_hash, first_name, last_name, role, status, 
+                email_verified, failed_login_attempts, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, NOW(), NOW())
+            RETURNING *
+            "#,
+        )
+        .bind(user_id)
+        .bind(&email)
+        .bind(&password_hash)
+        .bind(&first_name)
+        .bind(&last_name)
+        .bind(&role)
+        .bind(UserStatus::Active)
+        .bind(email_verified)
+        .fetch_one(&self.db.pool)
+        .await?;
+
+        // Send email verification if required
+        if self.config.features.email_verification_required {
+            self.send_email_verification(&user).await?;
+        }
+
+        // Log user creation
+        self.log_security_event("USER_CREATED", Some(user.id), None, None).await?;
+
+        Ok(user)
+    }
+
+    /// Refresh access token using refresh token
+    pub async fn refresh_token(&self, refresh_token: &str) -> AuthResult<LoginResponse> {
+        // Find session by refresh token hash
+        let refresh_token_hash = self.hash_token(refresh_token);
+        
+        let session = sqlx::query_as::<_, UserSession>(
+            r#"
+            SELECT * FROM user_sessions 
+            WHERE refresh_token_hash = $1 
+            AND expires_at > NOW() 
+            AND revoked = FALSE
+            "#,
+        )
+        .bind(&refresh_token_hash)
+        .fetch_optional(&self.db.pool)
+        .await?
+        .ok_or(AuthError::TokenInvalid)?;
+
+        // Get user information
+        let user = self.get_user_by_id(session.user_id).await?;
+
+        // Check if user can still login
+        if !user.can_login() {
+            return Err(AuthError::AccountDisabled);
+        }
+
+        // Create new session and tokens
+        let new_session_id = Uuid::new_v4();
+        let expires_at = Utc::now() + Duration::hours(self.config.jwt.access_token_expiry_hours);
+
+        // Create new JWT claims
+        let claims = AuthClaims {
+            sub: user.id,
+            email: user.email.clone(),
+            role: user.role.clone(),
+            exp: expires_at.timestamp(),
+            iat: Utc::now().timestamp(),
+            iss: self.config.jwt.issuer.clone(),
+            aud: self.config.jwt.audience.clone(),
+            jti: new_session_id,
+        };
+
+        // Generate new tokens
+        let access_token = self.generate_jwt_token(&claims)?;
+        let new_refresh_token = self.generate_refresh_token();
+
+        // Revoke old session
+        self.revoke_session(session.id).await?;
+
+        // Create new session
+        self.create_session(
+            new_session_id,
+            user.id,
+            &access_token,
+            Some(&new_refresh_token),
+            expires_at,
+        ).await?;
+
+        // Log token refresh
+        self.log_security_event("TOKEN_REFRESHED", Some(user.id), None, None).await?;
+
+        Ok(LoginResponse {
+            user_id: user.id,
+            email: user.email,
+            role: user.role,
+            access_token,
+            refresh_token: Some(new_refresh_token),
+            expires_at,
+            session_id: new_session_id,
+        })
+    }
+
+    /// Initiate password reset process
+    pub async fn forgot_password(&self, email: &str) -> AuthResult<()> {
+        // Try to get user (but don't reveal if user exists)
+        if let Ok(user) = self.get_user_by_email(email).await {
+            // Generate reset token
+            let reset_token = self.generate_reset_token();
+            let token_hash = self.hash_token(&reset_token);
+            let expires_at = Utc::now() + Duration::hours(1); // 1 hour expiry
+
+            // Store reset token
+            sqlx::query(
+                r#"
+                INSERT INTO password_reset_tokens (
+                    id, user_id, token_hash, expires_at, created_at, used
+                ) VALUES ($1, $2, $3, $4, NOW(), FALSE)
+                "#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(user.id)
+            .bind(&token_hash)
+            .bind(expires_at)
+            .execute(&self.db.pool)
+            .await?;
+
+            // Send password reset email
+            self.send_password_reset_email(&user, &reset_token).await?;
+
+            // Log password reset request
+            self.log_security_event("PASSWORD_RESET_REQUESTED", Some(user.id), None, None).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Reset password using reset token
+    pub async fn reset_password(&self, token: &str, new_password: &str) -> AuthResult<()> {
+        // Validate password strength
+        self.validate_password_strength(new_password)?;
+
+        // Find and validate reset token
+        let token_hash = self.hash_token(token);
+        
+        let reset_token = sqlx::query!(
+            r#"
+            SELECT id, user_id FROM password_reset_tokens 
+            WHERE token_hash = $1 
+            AND expires_at > NOW() 
+            AND used = FALSE
+            "#,
+            token_hash
+        )
+        .fetch_optional(&self.db.pool)
+        .await?
+        .ok_or(AuthError::TokenInvalid)?;
+
+        // Hash new password
+        let password_hash = self.hash_password(new_password)?;
+
+        // Update user password
+        sqlx::query(
+            "UPDATE users SET password_hash = $1, password_changed_at = NOW() WHERE id = $2"
+        )
+        .bind(&password_hash)
+        .bind(reset_token.user_id)
+        .execute(&self.db.pool)
+        .await?;
+
+        // Mark reset token as used
+        sqlx::query("UPDATE password_reset_tokens SET used = TRUE WHERE id = $1")
+            .bind(reset_token.id)
+            .execute(&self.db.pool)
+            .await?;
+
+        // Revoke all existing sessions for security
+        sqlx::query("UPDATE user_sessions SET revoked = TRUE, revoked_at = NOW() WHERE user_id = $1")
+            .bind(reset_token.user_id)
+            .execute(&self.db.pool)
+            .await?;
+
+        // Log password reset
+        self.log_security_event("PASSWORD_RESET_COMPLETED", Some(reset_token.user_id), None, None).await?;
+
+        Ok(())
+    }
+
+    /// Verify email address using verification token
+    pub async fn verify_email(&self, token: &str) -> AuthResult<()> {
+        // Find and validate verification token
+        let token_hash = self.hash_token(token);
+        
+        let verification_token = sqlx::query!(
+            r#"
+            SELECT id, user_id FROM email_verification_tokens 
+            WHERE token_hash = $1 
+            AND expires_at > NOW() 
+            AND used = FALSE
+            "#,
+            token_hash
+        )
+        .fetch_optional(&self.db.pool)
+        .await?
+        .ok_or(AuthError::TokenInvalid)?;
+
+        // Update user email_verified status
+        sqlx::query("UPDATE users SET email_verified = TRUE WHERE id = $1")
+            .bind(verification_token.user_id)
+            .execute(&self.db.pool)
+            .await?;
+
+        // Mark verification token as used
+        sqlx::query("UPDATE email_verification_tokens SET used = TRUE WHERE id = $1")
+            .bind(verification_token.id)
+            .execute(&self.db.pool)
+            .await?;
+
+        // Log email verification
+        self.log_security_event("EMAIL_VERIFIED", Some(verification_token.user_id), None, None).await?;
+
+        Ok(())
+    }
+
+    /// Send email verification
+    async fn send_email_verification(&self, user: &User) -> AuthResult<()> {
+        if !self.config.email.enabled {
+            return Ok(());
+        }
+
+        // Generate verification token
+        let verification_token = self.generate_verification_token();
+        let token_hash = self.hash_token(&verification_token);
+        let expires_at = Utc::now() + Duration::hours(24); // 24 hour expiry
+
+        // Store verification token
+        sqlx::query(
+            r#"
+            INSERT INTO email_verification_tokens (
+                id, user_id, token_hash, expires_at, created_at, used
+            ) VALUES ($1, $2, $3, $4, NOW(), FALSE)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(user.id)
+        .bind(&token_hash)
+        .bind(expires_at)
+        .execute(&self.db.pool)
+        .await?;
+
+        // Send verification email (implementation would depend on email service)
+        info!("Email verification token for {}: {}", user.email, verification_token);
+
+        Ok(())
+    }
+
+    /// Send password reset email
+    async fn send_password_reset_email(&self, user: &User, token: &str) -> AuthResult<()> {
+        if !self.config.email.enabled {
+            return Ok(());
+        }
+
+        // Send password reset email (implementation would depend on email service)
+        info!("Password reset token for {}: {}", user.email, token);
+
+        Ok(())
+    }
+
     /// Validate a JWT token
     pub async fn validate_token(&self, token: &str) -> AuthResult<ValidateTokenResponse> {
         // Decode and validate JWT
@@ -143,6 +435,85 @@ impl AuthServiceImpl {
         })
     }
 
+    /// Get user by ID
+    pub async fn get_user_by_id(&self, user_id: Uuid) -> AuthResult<User> {
+        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_optional(&self.db.pool)
+            .await?
+            .ok_or(AuthError::UserNotFound)?;
+
+        Ok(user)
+    }
+
+    /// Get user by email
+    pub async fn get_user_by_email(&self, email: &str) -> AuthResult<User> {
+        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
+            .bind(email)
+            .fetch_optional(&self.db.pool)
+            .await?
+            .ok_or(AuthError::UserNotFound)?;
+
+        Ok(user)
+    }
+
+    /// Hash password using Argon2 (public method)
+    pub fn hash_password(&self, password: &str) -> AuthResult<String> {
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        
+        argon2
+            .hash_password(password.as_bytes(), &salt)
+            .map(|hash| hash.to_string())
+            .map_err(|e| AuthError::PasswordHash(e))
+    }
+
+    /// Verify password using Argon2 (public method)
+    pub fn verify_password(&self, password: &str, hash: &str) -> AuthResult<bool> {
+        let parsed_hash = argon2::PasswordHash::new(hash)
+            .map_err(|e| AuthError::PasswordHash(e))?;
+        
+        let argon2 = Argon2::default();
+        Ok(argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok())
+    }
+
+    /// Validate password strength
+    fn validate_password_strength(&self, password: &str) -> AuthResult<()> {
+        if password.len() < self.config.security.password_min_length {
+            return Err(AuthError::validation(format!(
+                "Password must be at least {} characters long",
+                self.config.security.password_min_length
+            )));
+        }
+
+        if self.config.security.password_require_uppercase && !password.chars().any(|c| c.is_uppercase()) {
+            return Err(AuthError::validation("Password must contain at least one uppercase letter"));
+        }
+
+        if self.config.security.password_require_lowercase && !password.chars().any(|c| c.is_lowercase()) {
+            return Err(AuthError::validation("Password must contain at least one lowercase letter"));
+        }
+
+        if self.config.security.password_require_numbers && !password.chars().any(|c| c.is_numeric()) {
+            return Err(AuthError::validation("Password must contain at least one number"));
+        }
+
+        if self.config.security.password_require_symbols && !password.chars().any(|c| !c.is_alphanumeric()) {
+            return Err(AuthError::validation("Password must contain at least one symbol"));
+        }
+
+        Ok(())
+    }
+
+    /// Revoke session
+    async fn revoke_session(&self, session_id: Uuid) -> AuthResult<()> {
+        sqlx::query("UPDATE user_sessions SET revoked = TRUE, revoked_at = NOW() WHERE id = $1")
+            .bind(session_id)
+            .execute(&self.db.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Generate JWT token
     fn generate_jwt_token(&self, claims: &AuthClaims) -> AuthResult<String> {
         let header = Header::new(Algorithm::HS256);
@@ -162,26 +533,6 @@ impl AuthServiceImpl {
         Ok(token_data.claims)
     }
 
-    /// Hash password using Argon2
-    fn hash_password(&self, password: &str) -> AuthResult<String> {
-        let salt = SaltString::generate(&mut OsRng);
-        let argon2 = Argon2::default();
-        
-        argon2
-            .hash_password(password.as_bytes(), &salt)
-            .map(|hash| hash.to_string())
-            .map_err(|e| AuthError::PasswordHash(e))
-    }
-
-    /// Verify password using Argon2
-    fn verify_password(&self, password: &str, hash: &str) -> AuthResult<bool> {
-        let parsed_hash = argon2::PasswordHash::new(hash)
-            .map_err(|e| AuthError::PasswordHash(e))?;
-        
-        let argon2 = Argon2::default();
-        Ok(argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok())
-    }
-
     /// Hash token for storage
     fn hash_token(&self, token: &str) -> String {
         let mut hasher = Sha256::new();
@@ -194,15 +545,14 @@ impl AuthServiceImpl {
         Uuid::new_v4().to_string()
     }
 
-    /// Get user by email
-    pub async fn get_user_by_email(&self, email: &str) -> AuthResult<User> {
-        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
-            .bind(email)
-            .fetch_optional(&self.db.pool)
-            .await?
-            .ok_or(AuthError::UserNotFound)?;
+    /// Generate password reset token
+    fn generate_reset_token(&self) -> String {
+        Uuid::new_v4().to_string()
+    }
 
-        Ok(user)
+    /// Generate email verification token
+    fn generate_verification_token(&self) -> String {
+        Uuid::new_v4().to_string()
     }
 
     /// Get session by ID

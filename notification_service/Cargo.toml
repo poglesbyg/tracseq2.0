@@ -7,10 +7,10 @@ description = "Multi-channel notification service for laboratory management syst
 
 [dependencies]
 # Web framework
-axum = "0.7"
-tokio = { version = "1.0", features = ["full"] }
-tower = "0.4"
+axum = { version = "0.7", features = ["macros"] }
+tower = { version = "0.4", features = ["full"] }
 tower-http = { version = "0.5", features = ["cors", "trace", "compression"] }
+tokio = { version = "1.0", features = ["full"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -19,27 +19,28 @@ serde_json = "1.0"
 # Database
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
 
-# Time handling
+# Time and dates
 chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# UUID
+uuid = { version = "1.0", features = ["v4", "serde"] }
 
 # Error handling
 anyhow = "1.0"
 thiserror = "1.0"
 
-# Validation
-validator = { version = "0.16", features = ["derive"] }
-
-# Logging
+# Logging and tracing
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # Configuration
-config = "0.14"
 dotenvy = "0.15"
 
-# HTTP client for service communication
-reqwest = { version = "0.11", features = ["json"] }
+# Async
+futures = "0.3"
+
+# Validation
+validator = { version = "0.16", features = ["derive"] }
 
 # Email notifications
 lettre = "0.11"
@@ -62,7 +63,6 @@ tera = "1.19"
 
 # Job scheduling
 async-cron = "0.1"
-futures = "0.3"
 
 # Rate limiting
 governor = "0.6"

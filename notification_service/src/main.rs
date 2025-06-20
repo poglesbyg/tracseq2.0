@@ -22,9 +22,6 @@ mod models;
 mod services;
 mod middleware as notification_middleware;
 mod clients;
-mod channels;
-mod templates;
-mod scheduling;
 
 use config::Config;
 use database::DatabasePool;
@@ -72,7 +69,7 @@ async fn main() -> Result<()> {
         teams_client,
         email_client,
         sms_client,
-    )?;
+    ).await?;
     info!("Notification service initialized");
 
     // Setup application state
@@ -129,7 +126,10 @@ fn create_app(state: AppState) -> Router {
     // Channel management routes
     let channel_routes = Router::new()
         .route("/channels", get(handlers::channels::list_channels))
-        .route("/channels/:channel_type/test", post(handlers::channels::test_channel))
+        .route("/channels/email/test", post(handlers::channels::test_email_channel))
+        .route("/channels/sms/test", post(handlers::channels::test_sms_channel))
+        .route("/channels/slack/test", post(handlers::channels::test_slack_channel))
+        .route("/channels/teams/test", post(handlers::channels::test_teams_channel))
         .route("/channels/:channel_type/config", get(handlers::channels::get_channel_config))
         .route("/channels/:channel_type/config", put(handlers::channels::update_channel_config))
         .route("/channels/email/templates", get(handlers::channels::list_email_templates))

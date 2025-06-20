@@ -71,6 +71,24 @@ pub enum NotificationError {
 
     #[error("Internal server error: {0}")]
     Internal(String),
+
+    #[error("Channel disabled: {0}")]
+    ChannelDisabled(String),
+
+    #[error("Channel not supported: {0}")]
+    ChannelNotSupported(String),
+
+    #[error("Invalid channel: {0}")]
+    InvalidChannel(String),
+
+    #[error("Invalid operation: {0}")]
+    InvalidOperation(String),
+
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
+
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
 }
 
 impl NotificationError {
@@ -98,6 +116,12 @@ impl NotificationError {
             NotificationError::HttpClient(_) => StatusCode::BAD_GATEWAY,
             NotificationError::Io(_) => StatusCode::INTERNAL_SERVER_ERROR,
             NotificationError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            NotificationError::ChannelDisabled(_) => StatusCode::SERVICE_UNAVAILABLE,
+            NotificationError::ChannelNotSupported(_) => StatusCode::NOT_IMPLEMENTED,
+            NotificationError::InvalidChannel(_) => StatusCode::BAD_REQUEST,
+            NotificationError::InvalidOperation(_) => StatusCode::BAD_REQUEST,
+            NotificationError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            NotificationError::NotImplemented(_) => StatusCode::NOT_IMPLEMENTED,
         }
     }
 
@@ -125,6 +149,12 @@ impl NotificationError {
             NotificationError::HttpClient(_) => "HTTP_CLIENT_ERROR",
             NotificationError::Io(_) => "IO_ERROR",
             NotificationError::Internal(_) => "INTERNAL_ERROR",
+            NotificationError::ChannelDisabled(_) => "CHANNEL_DISABLED",
+            NotificationError::ChannelNotSupported(_) => "CHANNEL_NOT_SUPPORTED",
+            NotificationError::InvalidChannel(_) => "INVALID_CHANNEL",
+            NotificationError::InvalidOperation(_) => "INVALID_OPERATION",
+            NotificationError::ServiceUnavailable(_) => "SERVICE_UNAVAILABLE",
+            NotificationError::NotImplemented(_) => "NOT_IMPLEMENTED",
         }
     }
 
@@ -152,6 +182,12 @@ impl NotificationError {
             NotificationError::HttpClient(_) => true,
             NotificationError::Io(_) => true,
             NotificationError::Internal(_) => false,
+            NotificationError::ChannelDisabled(_) => false,
+            NotificationError::ChannelNotSupported(_) => false,
+            NotificationError::InvalidChannel(_) => false,
+            NotificationError::InvalidOperation(_) => false,
+            NotificationError::ServiceUnavailable(_) => true,
+            NotificationError::NotImplemented(_) => false,
         }
     }
 }

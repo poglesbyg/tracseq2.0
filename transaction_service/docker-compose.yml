@@ -6,37 +6,47 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: tracseq-transaction-service
     ports:
       - "8088:8088"
     environment:
-      - RUST_LOG=info
-      - PORT=8088
-      - MAX_CONCURRENT_SAGAS=100
-      - DEFAULT_TIMEOUT_MS=300000
-      - ENABLE_EVENTS=true
-      - EVENT_SERVICE_URL=http://event-service:8087
-      - ENABLE_PERSISTENCE=true
-      - CLEANUP_AFTER_HOURS=24
-      # Database configuration
-      - DATABASE_URL=postgresql://tracseq:tracseq_password@postgres:5432/tracseq_transactions
-      - DB_MAX_CONNECTIONS=20
-      - DB_MIN_CONNECTIONS=5
-      - DB_CONNECTION_TIMEOUT_SECONDS=30
-      # Service URLs for health checks
-      - SAMPLE_SERVICE_URL=http://sample-service:8081
-      - STORAGE_SERVICE_URL=http://enhanced-storage-service:8082
-      - NOTIFICATION_SERVICE_URL=http://notification-service:8085
-      # Enhanced workflow configuration
-      - RAG_SERVICE_URL=http://enhanced-rag-service:8086
-      - ENABLE_AI_DECISIONS=true
-      - MAX_WORKFLOW_STEPS=50
-      - AI_TIMEOUT_SECONDS=30
-      - LAB_MANAGER_URL=http://lab-manager:3000
-      - AI_CONFIDENCE_THRESHOLD=0.8
+      # Service Configuration
+      PORT: 8088
+      RUST_LOG: info
+      RUST_BACKTRACE: 1
+      
+      # Database Configuration
+      DATABASE_URL: postgresql://tracseq_transaction:tracseq_password@transaction-db:5432/tracseq_transactions
+      DB_MAX_CONNECTIONS: 20
+      DB_MIN_CONNECTIONS: 5
+      DB_CONNECTION_TIMEOUT_SECONDS: 30
+      
+      # Transaction Configuration
+      MAX_CONCURRENT_SAGAS: 100
+      DEFAULT_TIMEOUT_MS: 300000
+      CLEANUP_AFTER_HOURS: 24
+      
+      # Service URLs
+      EVENT_SERVICE_URL: http://event-service:8087
+      RAG_SERVICE_URL: http://rag-service:8086
+      LAB_MANAGER_URL: http://lab-manager:3000
+      
+      # Features
+      ENABLE_EVENTS: true
+      ENABLE_PERSISTENCE: true
+      ENABLE_AI_DECISIONS: true
+      AI_TIMEOUT_SECONDS: 30
+      AI_CONFIDENCE_THRESHOLD: 0.8
+      
+      # Redis Configuration (optional)
+      REDIS_URL: redis://transaction-redis:6379
+      
     depends_on:
-      - postgres
-      - redis
+      - transaction-db
+      - transaction-redis
       - event-service
+    volumes:
+      - ./logs:/app/logs
     networks:
       - tracseq-network
     restart: unless-stopped
@@ -45,183 +55,142 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 10s
 
-  # Event Service for transaction coordination
-  event-service:
-    build:
-      context: ../event_service
-      dockerfile: Dockerfile
-    ports:
-      - "8087:8087"
-    environment:
-      - RUST_LOG=info
-      - PORT=8087
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      - redis
-    networks:
-      - tracseq-network
-    restart: unless-stopped
-
-  # PostgreSQL for saga persistence
-  postgres:
+  # PostgreSQL Database for Transaction Service
+  transaction-db:
     image: postgres:15-alpine
-    ports:
-      - "5432:5432"
+    container_name: tracseq-transaction-db
     environment:
-      - POSTGRES_DB=tracseq_transactions
-      - POSTGRES_USER=tracseq
-      - POSTGRES_PASSWORD=tracseq_password
-      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+      POSTGRES_DB: tracseq_transactions
+      POSTGRES_USER: tracseq_transaction
+      POSTGRES_PASSWORD: tracseq_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5435:5432"  # Different port to avoid conflicts
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - transaction_db_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d/
     networks:
       - tracseq-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tracseq -d tracseq_transactions"]
+      test: ["CMD-SHELL", "pg_isready -U tracseq_transaction -d tracseq_transactions"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Redis for event streaming and state management
-  redis:
+  # Redis for State Management (optional)
+  transaction-redis:
     image: redis:7-alpine
+    container_name: tracseq-transaction-redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
+      - "6381:6379"  # Different port to avoid conflicts
     volumes:
-      - redis_data:/data
+      - transaction_redis_data:/data
     networks:
       - tracseq-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 3s
+      retries: 3
 
-  # Redis Commander for Redis management (development only)
-  redis-commander:
-    image: rediscommander/redis-commander:latest
+  # Event Service (dependency)
+  event-service:
+    image: tracseq/event-service:latest
+    container_name: tracseq-event-service
     ports:
-      - "8081:8081"
+      - "8087:8087"
     environment:
-      - REDIS_HOSTS=local:redis:6379
-    depends_on:
-      - redis
+      PORT: 8087
+      REDIS_URL: redis://event-redis:6379
+      RUST_LOG: info
     networks:
       - tracseq-network
-    profiles:
-      - dev
+    restart: unless-stopped
 
-  # Mock services for testing (development only)
-  mock-sample-service:
-    image: mockserver/mockserver:latest
+  # Event Redis
+  event-redis:
+    image: redis:7-alpine
+    container_name: tracseq-event-redis
+    command: redis-server --appendonly yes
     ports:
-      - "8091:1080"
-    environment:
-      - MOCKSERVER_PROPERTY_FILE=/config/mockserver.properties
-      - MOCKSERVER_INITIALIZATION_JSON_PATH=/config/sample-service-mocks.json
+      - "6380:6379"
     volumes:
-      - ./mocks/sample-service-mocks.json:/config/sample-service-mocks.json:ro
-      - ./mocks/mockserver.properties:/config/mockserver.properties:ro
+      - event_redis_data:/data
     networks:
       - tracseq-network
-    profiles:
-      - dev
+    restart: unless-stopped
 
-  mock-storage-service:
-    image: mockserver/mockserver:latest
+  # RAG Service (dependency - optional)
+  rag-service:
+    image: tracseq/rag-service:latest
+    container_name: tracseq-rag-service
     ports:
-      - "8092:1080"
+      - "8086:8086"
     environment:
-      - MOCKSERVER_PROPERTY_FILE=/config/mockserver.properties
-      - MOCKSERVER_INITIALIZATION_JSON_PATH=/config/storage-service-mocks.json
-    volumes:
-      - ./mocks/storage-service-mocks.json:/config/storage-service-mocks.json:ro
-      - ./mocks/mockserver.properties:/config/mockserver.properties:ro
+      PORT: 8086
+      PYTHON_ENV: production
     networks:
       - tracseq-network
-    profiles:
-      - dev
+    restart: unless-stopped
 
-  mock-notification-service:
-    image: mockserver/mockserver:latest
-    ports:
-      - "8095:1080"
-    environment:
-      - MOCKSERVER_PROPERTY_FILE=/config/mockserver.properties
-      - MOCKSERVER_INITIALIZATION_JSON_PATH=/config/notification-service-mocks.json
-    volumes:
-      - ./mocks/notification-service-mocks.json:/config/notification-service-mocks.json:ro
-      - ./mocks/mockserver.properties:/config/mockserver.properties:ro
-    networks:
-      - tracseq-network
-    profiles:
-      - dev
-
-  # Prometheus for metrics collection (monitoring)
+  # Monitoring & Observability
   prometheus:
     image: prom/prometheus:latest
+    container_name: tracseq-transaction-prometheus
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
     networks:
       - tracseq-network
-    profiles:
-      - monitoring
+    restart: unless-stopped
 
-  # Grafana for metrics visualization (monitoring)
   grafana:
     image: grafana/grafana:latest
+    container_name: tracseq-transaction-grafana
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: false
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-    depends_on:
-      - prometheus
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
     networks:
       - tracseq-network
-    profiles:
-      - monitoring
+    restart: unless-stopped
 
-  # Jaeger for distributed tracing (monitoring)
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    ports:
-      - "16686:16686"
-      - "14268:14268"
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-    networks:
-      - tracseq-network
-    profiles:
-      - monitoring
+# Networks
+networks:
+  tracseq-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
 
+# Volumes
 volumes:
-  postgres_data:
+  transaction_db_data:
     driver: local
-  redis_data:
+  transaction_redis_data:
+    driver: local
+  event_redis_data:
     driver: local
   prometheus_data:
     driver: local
   grafana_data:
-    driver: local
-
-networks:
-  tracseq-network:
-    driver: bridge
-    name: tracseq-network 
+    driver: local 

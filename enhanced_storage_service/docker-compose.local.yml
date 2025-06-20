@@ -1,0 +1,323 @@
+version: '3.8'
+
+services:
+  # Enhanced Storage Service - Main Application
+  enhanced-storage-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      # Database Configuration
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/enhanced_storage
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      
+      # Server Configuration
+      - PORT=8082
+      - HOST=0.0.0.0
+      
+      # AI/ML Configuration (Phase 2)
+      - AI_MODEL_PATH=/app/models
+      - AI_TRAINING_DATA_PATH=/app/training_data
+      - AI_INFERENCE_TIMEOUT=30
+      - AI_CONFIDENCE_THRESHOLD=0.85
+      
+      # Integration Configuration (Phase 3)
+      - LIMS_BASE_URL=http://mock-lims:8090
+      - ERP_BASE_URL=http://mock-erp:8091
+      - AWS_REGION=us-west-2
+      - AWS_ACCESS_KEY_ID=localstack
+      - AWS_SECRET_ACCESS_KEY=localstack
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      
+      # Storage Configuration
+      - STORAGE_PATH=/app/storage
+      - BACKUP_PATH=/app/backups
+      
+      # Security Configuration
+      - JWT_SECRET=enhanced-storage-local-jwt-secret-key-2024
+      - ENCRYPTION_KEY=enhanced-storage-encryption-key-32bit
+      
+      # IoT Configuration
+      - MQTT_BROKER_URL=mqtt://mosquitto:1883
+      - MODBUS_SERVER_HOST=modbus-simulator
+      - MODBUS_SERVER_PORT=502
+      
+      # Blockchain Configuration
+      - BLOCKCHAIN_NETWORK=local
+      - BLOCKCHAIN_NODE_URL=http://ganache:8545
+      
+      # Energy Management
+      - ENERGY_MONITORING_ENABLED=true
+      - CARBON_TRACKING_ENABLED=true
+      
+      # Mobile Configuration
+      - MOBILE_PUSH_ENABLED=false
+      - MOBILE_OFFLINE_SYNC=true
+      
+    volumes:
+      - storage_data:/app/storage
+      - ai_models:/app/models
+      - training_data:/app/training_data
+      - backup_data:/app/backups
+    depends_on:
+      - postgres
+      - redis
+      - mosquitto
+      - localstack
+      - mock-lims
+      - mock-erp
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=enhanced_storage
+      - POSTGRES_INITDB_ARGS=--auth-host=md5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d enhanced_storage"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Caching and Session Management
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass redis_password
+    volumes:
+      - redis_data:/data
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # MQTT Broker for IoT Communication
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+
+  # LocalStack for AWS Services Simulation
+  localstack:
+    image: localstack/localstack:2.3
+    ports:
+      - "4566:4566"
+      - "4510-4559:4510-4559"
+    environment:
+      - SERVICES=s3,dynamodb,sns,cloudwatch,sqs
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - HOST_TMP_FOLDER=/tmp/localstack
+    volumes:
+      - localstack_data:/tmp/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+
+  # Mock LIMS Service for Testing
+  mock-lims:
+    image: wiremock/wiremock:2.35.0
+    ports:
+      - "8090:8080"
+    command: --global-response-templating --verbose
+    volumes:
+      - ./mocks/lims:/home/wiremock
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+
+  # Mock ERP Service for Testing
+  mock-erp:
+    image: wiremock/wiremock:2.35.0
+    ports:
+      - "8091:8080"
+    command: --global-response-templating --verbose
+    volumes:
+      - ./mocks/erp:/home/wiremock
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+
+  # Prometheus for Metrics Collection
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+
+  # Grafana for Monitoring Dashboard
+  grafana:
+    image: grafana/grafana:10.1.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - ./config/grafana/dashboards:/etc/grafana/dashboards
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+
+  # Jaeger for Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.49
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+
+  # MinIO for S3-Compatible Storage (Alternative to LocalStack S3)
+  minio:
+    image: quay.io/minio/minio:RELEASE.2023-10-07T15-07-38Z
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+
+  # Modbus Simulator for IoT Testing
+  modbus-simulator:
+    image: oitc/modbus-server:latest
+    ports:
+      - "502:502"
+    environment:
+      - MODBUS_PORT=502
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+
+  # Ganache for Blockchain Testing
+  ganache:
+    image: trufflesuite/ganache:v7.9.1
+    ports:
+      - "8545:8545"
+    command: 
+      - --deterministic
+      - --accounts=10
+      - --host=0.0.0.0
+      - --port=8545
+      - --networkId=1337
+      - --chainId=1337
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+
+  # Nginx for Load Balancing and Reverse Proxy
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./config/nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - enhanced-storage-service
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+
+  # Frontend Application (React Dashboard)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8082
+      - REACT_APP_WS_URL=ws://localhost:8082
+      - REACT_APP_VERSION=1.0.0
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    depends_on:
+      - enhanced-storage-service
+    networks:
+      - enhanced_storage_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  storage_data:
+  ai_models:
+  training_data:
+  backup_data:
+  mosquitto_data:
+  mosquitto_logs:
+  localstack_data:
+  prometheus_data:
+  grafana_data:
+  minio_data:
+
+networks:
+  enhanced_storage_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 

@@ -6,19 +6,25 @@ use validator::Validate;
 
 /// User role enumeration
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "text")]
+#[sqlx(type_name = "user_role")]
 pub enum UserRole {
     #[serde(rename = "guest")]
+    #[sqlx(rename = "guest")]
     Guest,
     #[serde(rename = "data_analyst")]
+    #[sqlx(rename = "data_analyst")]
     DataAnalyst,
     #[serde(rename = "research_scientist")]
+    #[sqlx(rename = "research_scientist")]
     ResearchScientist,
     #[serde(rename = "lab_technician")]
+    #[sqlx(rename = "lab_technician")]
     LabTechnician,
     #[serde(rename = "principal_investigator")]
+    #[sqlx(rename = "principal_investigator")]
     PrincipalInvestigator,
     #[serde(rename = "lab_administrator")]
+    #[sqlx(rename = "lab_administrator")]
     LabAdministrator,
 }
 
@@ -30,21 +36,25 @@ impl Default for UserRole {
 
 /// User status enumeration
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "text")]
+#[sqlx(type_name = "user_status")]
 pub enum UserStatus {
     #[serde(rename = "active")]
+    #[sqlx(rename = "active")]
     Active,
     #[serde(rename = "inactive")]
+    #[sqlx(rename = "inactive")]
     Inactive,
     #[serde(rename = "suspended")]
+    #[sqlx(rename = "suspended")]
     Suspended,
-    #[serde(rename = "pending")]
-    Pending,
+    #[serde(rename = "deleted")]
+    #[sqlx(rename = "deleted")]
+    Deleted,
 }
 
 impl Default for UserStatus {
     fn default() -> Self {
-        Self::Pending
+        Self::Active
     }
 }
 
@@ -59,26 +69,23 @@ pub struct User {
     pub last_name: String,
     pub role: UserRole,
     pub status: UserStatus,
+
+    // Profile information
+    pub department: Option<String>,
+    pub position: Option<String>,
+    pub lab_affiliation: Option<String>,
+    pub phone: Option<String>,
+
+    // Authentication fields
     pub email_verified: bool,
-    #[serde(skip_serializing)]
-    pub verification_token: Option<String>,
     pub failed_login_attempts: i32,
     pub locked_until: Option<DateTime<Utc>>,
     pub last_login_at: Option<DateTime<Utc>>,
     pub password_changed_at: Option<DateTime<Utc>>,
+
+    // Timestamps
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-
-    // Lab-specific fields
-    pub department: Option<String>,
-    pub position: Option<String>,
-    pub phone: Option<String>,
-    pub office_location: Option<String>,
-    pub lab_affiliation: Option<String>,
-
-    // External integration fields
-    pub shibboleth_id: Option<String>,
-    pub external_id: Option<String>,
 }
 
 impl User {
@@ -130,6 +137,31 @@ impl User {
     }
 }
 
+/// User session model
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct UserSession {
+    pub id: Uuid,
+    pub user_id: Uuid,
+
+    // Token information (hashed)
+    #[serde(skip_serializing)]
+    pub token_hash: String,
+    #[serde(skip_serializing)]
+    pub refresh_token_hash: Option<String>,
+
+    // Session metadata
+    pub device_info: Option<serde_json::Value>,
+    pub ip_address: Option<std::net::IpAddr>,
+    pub user_agent: Option<String>,
+
+    // Session lifecycle
+    pub created_at: DateTime<Utc>,
+    pub last_used_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub revoked: bool,
+    pub revoked_at: Option<DateTime<Utc>>,
+}
+
 /// JWT Claims
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthClaims {
@@ -165,6 +197,13 @@ pub struct LoginResponse {
     pub session_id: Uuid,
 }
 
+/// Token validation request
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct ValidateTokenRequest {
+    #[validate(length(min = 1, message = "Token is required"))]
+    pub token: String,
+}
+
 /// Token validation response
 #[derive(Debug, Clone, Serialize)]
 pub struct ValidateTokenResponse {
@@ -175,3 +214,92 @@ pub struct ValidateTokenResponse {
     pub session_id: Option<Uuid>,
     pub expires_at: Option<DateTime<Utc>>,
 }
+
+/// Permission validation request
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct ValidatePermissionsRequest {
+    #[validate(length(min = 1, message = "Token is required"))]
+    pub token: String,
+    pub required_role: UserRole,
+}
+
+/// Permission validation response
+#[derive(Debug, Clone, Serialize)]
+pub struct ValidatePermissionsResponse {
+    pub authorized: bool,
+    pub user: Option<serde_json::Value>,
+    pub reason: Option<String>,
+}
+
+/// User creation request (admin only)
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct CreateUserRequest {
+    #[validate(email(message = "Invalid email format"))]
+    pub email: String,
+    #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
+    pub password: String,
+    #[validate(length(min = 1, message = "First name is required"))]
+    pub first_name: String,
+    #[validate(length(min = 1, message = "Last name is required"))]
+    pub last_name: String,
+    pub role: UserRole,
+    pub department: Option<String>,
+    pub position: Option<String>,
+    pub lab_affiliation: Option<String>,
+    pub phone: Option<String>,
+}
+
+/// User update request
+#[derive(Debug, Clone, Deserialize, Validate)]
+pub struct UpdateUserRequest {
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub department: Option<String>,
+    pub position: Option<String>,
+    pub lab_affiliation: Option<String>,
+    pub phone: Option<String>,
+    pub role: Option<UserRole>,
+    pub status: Option<UserStatus>,
+}
+
+/// Security audit log entry
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct SecurityAuditLog {
+    pub event_id: Uuid,
+    pub event_type: String,
+    pub user_id: Option<Uuid>,
+    pub ip_address: Option<std::net::IpAddr>,
+    pub user_agent: Option<String>,
+    pub resource: Option<String>,
+    pub action: Option<String>,
+    pub outcome: Option<String>,
+    pub severity: String,
+    pub details: Option<serde_json::Value>,
+    pub timestamp: DateTime<Utc>,
+}
+
+/// Helper function to check role hierarchy
+pub fn has_role_or_higher(user_role: &UserRole, required_role: &UserRole) -> bool {
+    let role_hierarchy = [
+        UserRole::Guest,
+        UserRole::DataAnalyst,
+        UserRole::ResearchScientist,
+        UserRole::LabTechnician,
+        UserRole::PrincipalInvestigator,
+        UserRole::LabAdministrator,
+    ];
+
+    let user_level = role_hierarchy
+        .iter()
+        .position(|r| r == user_role)
+        .unwrap_or(0);
+    let required_level = role_hierarchy
+        .iter()
+        .position(|r| r == required_role)
+        .unwrap_or(usize::MAX);
+
+    user_level >= required_level
+}
+
+/// Result type for authentication operations
+pub type AuthResult<T> = Result<T, crate::error::AuthError>;

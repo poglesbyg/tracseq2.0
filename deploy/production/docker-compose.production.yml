@@ -1,68 +1,791 @@
 # Production-Optimized TracSeq 2.0
 # Docker Compose production configuration
 
+version: '3.8'
+
+# TracSeq 2.0 Production Deployment
+# Complete microservices ecosystem with monitoring, security, and high availability
+
 services:
-  # PostgreSQL (Production optimized)
-  postgres:
-    image: postgres:15-alpine  # Smaller alpine image
-    container_name: tracseq_postgres_prod
-    mem_limit: 64m
-    cpus: '0.5'
+  # ================================
+  # INFRASTRUCTURE SERVICES
+  # ================================
+  
+  # PostgreSQL Primary Database
+  postgres-primary:
+    image: postgres:15-alpine
+    container_name: tracseq-postgres-primary
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-lab_manager}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: tracseq_prod
+      POSTGRES_USER: tracseq_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./backups:/backups
+      - ./init-scripts:/docker-entrypoint-initdb.d/
+    ports:
+      - "5432:5432"
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
     networks:
-      - tracseq_network
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracseq_admin -d tracseq_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # Ollama (Memory optimized)
-  ollama:
-    image: ollama/ollama:latest
-    container_name: tracseq_ollama_prod
-    mem_limit: 128m
-    cpus: '1.0'
+  # Redis Cluster for Caching and Events
+  redis-primary:
+    image: redis:7-alpine
+    container_name: tracseq-redis-primary
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
     volumes:
-      - ollama_data:/root/.ollama
+      - redis_primary_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
     networks:
-      - tracseq_network
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
-  # RAG Service (Production)
+  # ================================
+  # CORE MICROSERVICES (PHASE 1)
+  # ================================
+
+  # API Gateway - Intelligent Routing
+  api-gateway:
+    build:
+      context: ../../api_gateway
+      dockerfile: Dockerfile
+    container_name: tracseq-api-gateway
+    ports:
+      - "8089:8089"
+    environment:
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: 8089
+      GATEWAY_DEBUG: false
+      
+      # Service Discovery
+      AUTH_SERVICE_URL: http://auth-service:8080
+      SAMPLE_SERVICE_URL: http://sample-service:8081
+      TEMPLATE_SERVICE_URL: http://template-service:8083
+      STORAGE_SERVICE_URL: http://storage-service:8082
+      SEQUENCING_SERVICE_URL: http://sequencing-service:8084
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
+      RAG_SERVICE_URL: http://rag-service:8086
+      TRANSACTION_SERVICE_URL: http://transaction-service:8088
+      EVENT_SERVICE_URL: http://event-service:8087
+      
+      # Security
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRATION_HOURS: 24
+      
+      # Performance
+      RATE_LIMITING_ENABLED: true
+      DEFAULT_RATE_LIMIT: 1000
+      CIRCUIT_BREAKER_ENABLED: true
+      
+      # Monitoring
+      METRICS_ENABLED: true
+      TRACING_ENABLED: true
+      
+    depends_on:
+      - postgres-primary
+      - redis-primary
+    volumes:
+      - ./logs/gateway:/app/logs
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+
+  # Authentication Service
+  auth-service:
+    build:
+      context: ../../auth_service
+      dockerfile: Dockerfile
+    container_name: tracseq-auth-service
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      RUST_LOG: info
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_admin:${POSTGRES_PASSWORD}@postgres-primary:5432/tracseq_prod
+      DB_MAX_CONNECTIONS: 20
+      DB_MIN_CONNECTIONS: 5
+      
+      # JWT Configuration
+      JWT_SECRET: ${JWT_SECRET_KEY}
+      JWT_EXPIRATION_HOURS: 24
+      
+      # Security
+      BCRYPT_COST: 12
+      SESSION_TIMEOUT_HOURS: 8
+      MAX_LOGIN_ATTEMPTS: 5
+      
+      # Multi-tenancy
+      ENABLE_MULTI_TENANCY: true
+      DEFAULT_TENANT: tracseq
+      
+    depends_on:
+      - postgres-primary
+      - redis-primary
+    volumes:
+      - ./logs/auth:/app/logs
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Sample Management Service
+  sample-service:
+    build:
+      context: ../../sample_service
+      dockerfile: Dockerfile
+    container_name: tracseq-sample-service
+    ports:
+      - "8081:8081"
+    environment:
+      PORT: 8081
+      RUST_LOG: info
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_admin:${POSTGRES_PASSWORD}@postgres-primary:5432/tracseq_prod
+      DB_MAX_CONNECTIONS: 25
+      DB_MIN_CONNECTIONS: 5
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://auth-service:8080
+      STORAGE_SERVICE_URL: http://storage-service:8082
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
+      EVENT_SERVICE_URL: http://event-service:8087
+      
+      # Business Logic
+      BARCODE_PREFIX: SMPL
+      AUTO_GENERATE_BARCODES: true
+      ENABLE_BATCH_OPERATIONS: true
+      MAX_BATCH_SIZE: 1000
+      
+      # Quality Control
+      ENABLE_QC_VALIDATION: true
+      AUTO_QC_THRESHOLD: 0.95
+      
+    depends_on:
+      - postgres-primary
+      - auth-service
+      - event-service
+    volumes:
+      - ./logs/sample:/app/logs
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Template Management Service
+  template-service:
+    build:
+      context: ../../template_service
+      dockerfile: Dockerfile
+    container_name: tracseq-template-service
+    ports:
+      - "8083:8083"
+    environment:
+      PORT: 8083
+      RUST_LOG: info
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_admin:${POSTGRES_PASSWORD}@postgres-primary:5432/tracseq_prod
+      DB_MAX_CONNECTIONS: 20
+      DB_MIN_CONNECTIONS: 5
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://auth-service:8080
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
+      EVENT_SERVICE_URL: http://event-service:8087
+      
+      # File Processing
+      MAX_UPLOAD_SIZE_MB: 50
+      ALLOWED_EXTENSIONS: xlsx,xls,csv,json
+      ENABLE_VALIDATION: true
+      
+      # Template Features
+      ENABLE_VERSIONING: true
+      ENABLE_APPROVAL_WORKFLOW: true
+      AUTO_BACKUP: true
+      
+    depends_on:
+      - postgres-primary
+      - auth-service
+      - event-service
+    volumes:
+      - ./logs/template:/app/logs
+      - template_uploads:/app/uploads
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ../../notification_service
+      dockerfile: Dockerfile
+    container_name: tracseq-notification-service
+    ports:
+      - "8085:8085"
+    environment:
+      PORT: 8085
+      RUST_LOG: info
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_admin:${POSTGRES_PASSWORD}@postgres-primary:5432/tracseq_prod
+      DB_MAX_CONNECTIONS: 20
+      DB_MIN_CONNECTIONS: 5
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://auth-service:8080
+      EVENT_SERVICE_URL: http://event-service:8087
+      
+      # Email Configuration
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_TLS: true
+      EMAIL_FROM: ${EMAIL_FROM}
+      
+      # SMS Configuration
+      SMS_PROVIDER: ${SMS_PROVIDER}
+      SMS_API_KEY: ${SMS_API_KEY}
+      SMS_FROM: ${SMS_FROM}
+      
+      # Slack Integration
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+      
+      # Teams Integration
+      TEAMS_WEBHOOK_URL: ${TEAMS_WEBHOOK_URL}
+      
+      # Performance
+      MAX_BULK_SIZE: 1000
+      RETRY_ATTEMPTS: 3
+      RATE_LIMIT_PER_MINUTE: 100
+      
+    depends_on:
+      - postgres-primary
+      - auth-service
+      - event-service
+    volumes:
+      - ./logs/notification:/app/logs
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Sequencing Service
+  sequencing-service:
+    build:
+      context: ../../sequencing_service
+      dockerfile: Dockerfile
+    container_name: tracseq-sequencing-service
+    ports:
+      - "8084:8084"
+    environment:
+      PORT: 8084
+      RUST_LOG: info
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_admin:${POSTGRES_PASSWORD}@postgres-primary:5432/tracseq_prod
+      DB_MAX_CONNECTIONS: 25
+      DB_MIN_CONNECTIONS: 5
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://auth-service:8080
+      SAMPLE_SERVICE_URL: http://sample-service:8081
+      TEMPLATE_SERVICE_URL: http://template-service:8083
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
+      EVENT_SERVICE_URL: http://event-service:8087
+      
+      # Sequencing Platforms
+      ENABLE_ILLUMINA: true
+      ENABLE_NANOPORE: true
+      ENABLE_PACBIO: false
+      
+      # Job Management
+      MAX_CONCURRENT_JOBS: 10
+      JOB_TIMEOUT_HOURS: 48
+      AUTO_CLEANUP_DAYS: 30
+      
+      # Quality Control
+      ENABLE_QC_METRICS: true
+      QC_THRESHOLD_Q30: 85
+      QC_THRESHOLD_YIELD: 80
+      
+    depends_on:
+      - postgres-primary
+      - auth-service
+      - sample-service
+      - event-service
+    volumes:
+      - ./logs/sequencing:/app/logs
+      - sequencing_data:/app/data
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Transaction Service (Saga Pattern)
+  transaction-service:
+    build:
+      context: ../../transaction_service
+      dockerfile: Dockerfile
+    container_name: tracseq-transaction-service
+    ports:
+      - "8088:8088"
+    environment:
+      PORT: 8088
+      RUST_LOG: info
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_admin:${POSTGRES_PASSWORD}@postgres-primary:5432/tracseq_transactions
+      DB_MAX_CONNECTIONS: 30
+      DB_MIN_CONNECTIONS: 10
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://auth-service:8080
+      SAMPLE_SERVICE_URL: http://sample-service:8081
+      TEMPLATE_SERVICE_URL: http://template-service:8083
+      STORAGE_SERVICE_URL: http://storage-service:8082
+      SEQUENCING_SERVICE_URL: http://sequencing-service:8084
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
+      RAG_SERVICE_URL: http://rag-service:8086
+      EVENT_SERVICE_URL: http://event-service:8087
+      
+      # Transaction Configuration
+      MAX_CONCURRENT_SAGAS: 100
+      DEFAULT_TIMEOUT_MS: 300000
+      CLEANUP_AFTER_HOURS: 24
+      ENABLE_PERSISTENCE: true
+      
+      # AI Configuration
+      ENABLE_AI_DECISIONS: true
+      AI_CONFIDENCE_THRESHOLD: 0.8
+      AI_TIMEOUT_SECONDS: 30
+      
+      # Redis for State Management
+      REDIS_URL: redis://redis-primary:6379
+      
+    depends_on:
+      - postgres-primary
+      - redis-primary
+      - auth-service
+      - event-service
+    volumes:
+      - ./logs/transaction:/app/logs
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ================================
+  # PHASE 2 SERVICES (After Fixes)
+  # ================================
+
+  # Enhanced Storage Service
+  storage-service:
+    build:
+      context: ../../enhanced_storage_service
+      dockerfile: Dockerfile
+    container_name: tracseq-storage-service
+    ports:
+      - "8082:8082"
+    environment:
+      PORT: 8082
+      RUST_LOG: info
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_admin:${POSTGRES_PASSWORD}@postgres-primary:5432/tracseq_prod
+      DB_MAX_CONNECTIONS: 20
+      DB_MIN_CONNECTIONS: 5
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://auth-service:8080
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
+      EVENT_SERVICE_URL: http://event-service:8087
+      
+      # Storage Configuration
+      ENABLE_IOT_INTEGRATION: true
+      ENABLE_BLOCKCHAIN_AUDIT: false
+      ENABLE_ANALYTICS: true
+      
+      # Temperature Monitoring
+      TEMP_CHECK_INTERVAL_MINUTES: 5
+      ALERT_THRESHOLD_CELSIUS: 2.0
+      
+    depends_on:
+      - postgres-primary
+      - auth-service
+      - event-service
+    volumes:
+      - ./logs/storage:/app/logs
+      - storage_data:/app/data
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - phase2
+
+  # Event Service
+  event-service:
+    build:
+      context: ../../event_service
+      dockerfile: Dockerfile
+    container_name: tracseq-event-service
+    ports:
+      - "8087:8087"
+    environment:
+      PORT: 8087
+      RUST_LOG: info
+      RUST_BACKTRACE: 1
+      
+      # Redis Configuration
+      REDIS_URL: redis://redis-primary:6379
+      REDIS_STREAM_NAME: tracseq_events
+      REDIS_CONSUMER_GROUP: tracseq_processors
+      
+      # Event Configuration
+      MAX_EVENTS_PER_BATCH: 100
+      EVENT_RETENTION_DAYS: 30
+      ENABLE_EVENT_REPLAY: true
+      
+      # Performance
+      WORKER_THREADS: 4
+      BUFFER_SIZE: 1000
+      
+    depends_on:
+      - redis-primary
+    volumes:
+      - ./logs/event:/app/logs
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Enhanced RAG Service
   rag-service:
     build:
-      context: ./lab_submission_rag
+      context: ../../enhanced_rag_service
       dockerfile: Dockerfile
-    container_name: tracseq_rag_prod
-    mem_limit: 200m
-    cpus: '1.0'
+    container_name: tracseq-rag-service
+    ports:
+      - "8086:8086"
     environment:
-      - MEMORY_OPTIMIZED=true
-      - EMBEDDING_MODEL_CACHE=false
-      - VECTOR_STORE_MEMORY_LIMIT=50
-      - EMBEDDING_BATCH_SIZE=4
-      - PYTHONOPTIMIZE=2
+      PORT: 8086
+      PYTHON_ENV: production
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_admin:${POSTGRES_PASSWORD}@postgres-primary:5432/tracseq_prod
+      
+      # AI Configuration
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      
+      # Vector Database
+      CHROMA_HOST: chroma
+      CHROMA_PORT: 8000
+      
+      # Processing
+      MAX_DOCUMENT_SIZE_MB: 100
+      CHUNK_SIZE: 1000
+      CHUNK_OVERLAP: 200
+      
+      # Performance
+      WORKER_PROCESSES: 4
+      MAX_REQUESTS: 1000
+      
+    depends_on:
+      - postgres-primary
+      - chroma
+    volumes:
+      - ./logs/rag:/app/logs
+      - rag_uploads:/app/uploads
+      - rag_models:/app/models
     networks:
-      - tracseq_network
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - phase2
 
-  # Lab Manager (Production)
-  lab-manager-prod:
-    build:
-      context: ./lab_manager
-      dockerfile: Dockerfile
-    container_name: tracseq_lab_manager_prod
-    mem_limit: 64m
-    cpus: '0.5'
+  # Vector Database (Chroma)
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: tracseq-chroma
+    ports:
+      - "8000:8000"
     environment:
-      - RUST_LOG=warn  # Less logging
-      - RAG_SERVICE_URL=http://rag-service:8000
+      CHROMA_SERVER_HOST: 0.0.0.0
+      CHROMA_SERVER_PORT: 8000
+      ANONYMIZED_TELEMETRY: false
+    volumes:
+      - chroma_data:/chroma/chroma
     networks:
-      - tracseq_network
+      - tracseq-prod-network
+    restart: unless-stopped
+    profiles:
+      - phase2
 
-volumes:
-  postgres_data:
-  ollama_data:
+  # ================================
+  # MONITORING & OBSERVABILITY
+  # ================================
 
+  # Prometheus Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: tracseq-prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+
+  # Grafana Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: tracseq-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: false
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+
+  # Jaeger Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: tracseq-jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+      - "6831:6831/udp"
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+      JAEGER_DISABLED: false
+    volumes:
+      - jaeger_data:/badger
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+
+  # Log Aggregation (Loki)
+  loki:
+    image: grafana/loki:latest
+    container_name: tracseq-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/tmp/loki
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+
+  # ================================
+  # SECURITY & BACKUP
+  # ================================
+
+  # PostgreSQL Backup Service
+  postgres-backup:
+    image: postgres:15-alpine
+    container_name: tracseq-postgres-backup
+    environment:
+      PGUSER: tracseq_admin
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGHOST: postgres-primary
+      PGPORT: 5432
+      PGDATABASE: tracseq_prod
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh
+    command: >
+      sh -c "
+        chmod +x /backup.sh &&
+        crond -f -d 8
+      "
+    depends_on:
+      - postgres-primary
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+
+  # Redis Backup Service
+  redis-backup:
+    image: redis:7-alpine
+    container_name: tracseq-redis-backup
+    volumes:
+      - ./backups:/backups
+      - ./scripts/redis-backup.sh:/backup.sh
+    command: >
+      sh -c "
+        chmod +x /backup.sh &&
+        crond -f -d 8
+      "
+    depends_on:
+      - redis-primary
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+
+# ================================
+# NETWORKS
+# ================================
 networks:
-  tracseq_network:
-    driver: bridge 
+  tracseq-prod-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+
+# ================================
+# VOLUMES
+# ================================
+volumes:
+  # Database Volumes
+  postgres_primary_data:
+    driver: local
+  redis_primary_data:
+    driver: local
+  chroma_data:
+    driver: local
+
+  # Application Volumes
+  template_uploads:
+    driver: local
+  rag_uploads:
+    driver: local
+  rag_models:
+    driver: local
+  sequencing_data:
+    driver: local
+  storage_data:
+    driver: local
+
+  # Monitoring Volumes
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  jaeger_data:
+    driver: local
+  loki_data:
+    driver: local

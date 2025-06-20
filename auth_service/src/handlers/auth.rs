@@ -159,11 +159,8 @@ pub async fn change_password(
     // Validate request
     request.validate()?;
 
-    // Change password (this will be implemented in the service)
-    // For now, we'll do a basic implementation
-    
     // Verify current password
-    if !state.auth_service.verify_password(&request.current_password, &user.password_hash).unwrap_or(false) {
+    if !state.auth_service.verify_password(&request.current_password, &user.password_hash)? {
         return Err(AuthError::InvalidCredentials);
     }
 
@@ -199,8 +196,13 @@ pub async fn refresh_token(
     // Validate request
     request.validate()?;
 
-    // For now, return an error as refresh token logic needs to be implemented
-    Err(AuthError::feature_disabled("refresh tokens"))
+    // Refresh the token using the service
+    let response = state.auth_service.refresh_token(&request.refresh_token).await?;
+
+    Ok(Json(json!({
+        "success": true,
+        "data": response
+    })))
 }
 
 /// Forgot password endpoint
@@ -216,7 +218,10 @@ pub async fn forgot_password(
     // Validate request
     request.validate()?;
 
-    // For now, return success regardless of whether user exists (security best practice)
+    // Initiate password reset process
+    state.auth_service.forgot_password(&request.email).await?;
+
+    // Always return success for security (don't reveal if user exists)
     Ok(Json(json!({
         "success": true,
         "message": "If an account with that email exists, password reset instructions have been sent."
@@ -236,8 +241,13 @@ pub async fn reset_password(
     // Validate request
     request.validate()?;
 
-    // For now, return an error as reset token logic needs to be implemented
-    Err(AuthError::feature_disabled("password reset tokens"))
+    // Reset the password using the service
+    state.auth_service.reset_password(&request.token, &request.new_password).await?;
+
+    Ok(Json(json!({
+        "success": true,
+        "message": "Password has been reset successfully. Please log in with your new password."
+    })))
 }
 
 /// Verify email endpoint
@@ -253,8 +263,13 @@ pub async fn verify_email(
     // Validate request
     request.validate()?;
 
-    // For now, return an error as verification token logic needs to be implemented
-    Err(AuthError::feature_disabled("email verification tokens"))
+    // Verify the email using the service
+    state.auth_service.verify_email(&request.token).await?;
+
+    Ok(Json(json!({
+        "success": true,
+        "message": "Email address has been verified successfully."
+    })))
 }
 
 // Helper request models that weren't in the main models

@@ -1,0 +1,564 @@
+version: '3.8'
+
+# TracSeq 2.0 Staging Environment
+# Optimized for testing with reduced resource requirements
+
+services:
+  # ================================
+  # INFRASTRUCTURE SERVICES
+  # ================================
+  
+  # PostgreSQL for Staging
+  postgres-staging:
+    image: postgres:15-alpine
+    container_name: tracseq-postgres-staging
+    environment:
+      POSTGRES_DB: tracseq_staging
+      POSTGRES_USER: tracseq_staging
+      POSTGRES_PASSWORD: ${POSTGRES_STAGING_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+      - ../../lab_manager/migrations:/docker-entrypoint-initdb.d/
+    ports:
+      - "5433:5432"
+    command: >
+      postgres
+      -c max_connections=50
+      -c shared_buffers=128MB
+      -c effective_cache_size=512MB
+    networks:
+      - tracseq-staging-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracseq_staging -d tracseq_staging"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Staging
+  redis-staging:
+    image: redis:7-alpine
+    container_name: tracseq-redis-staging
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_staging_data:/data
+    ports:
+      - "6380:6379"
+    networks:
+      - tracseq-staging-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ================================
+  # CORE SERVICES - STAGING
+  # ================================
+
+  # Authentication Service
+  auth-service-staging:
+    build:
+      context: ../../auth_service
+      dockerfile: Dockerfile
+    container_name: tracseq-auth-staging
+    ports:
+      - "8180:8080"
+    environment:
+      PORT: 8080
+      RUST_LOG: debug
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_staging:${POSTGRES_STAGING_PASSWORD}@postgres-staging:5432/tracseq_staging
+      DB_MAX_CONNECTIONS: 10
+      DB_MIN_CONNECTIONS: 1
+      
+      # JWT Configuration
+      JWT_SECRET: ${JWT_SECRET_STAGING}
+      JWT_EXPIRATION_HOURS: 2
+      
+      # Security (relaxed for testing)
+      BCRYPT_COST: 8
+      SESSION_TIMEOUT_HOURS: 2
+      MAX_LOGIN_ATTEMPTS: 10
+      
+      # Testing flags
+      ENABLE_TEST_ENDPOINTS: true
+      ENABLE_MOCK_AUTH: false
+      
+    depends_on:
+      - postgres-staging
+      - redis-staging
+    volumes:
+      - ./logs/auth:/app/logs
+    networks:
+      - tracseq-staging-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # Sample Service
+  sample-service-staging:
+    build:
+      context: ../../sample_service
+      dockerfile: Dockerfile
+    container_name: tracseq-sample-staging
+    ports:
+      - "8181:8081"
+    environment:
+      PORT: 8081
+      RUST_LOG: debug
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_staging:${POSTGRES_STAGING_PASSWORD}@postgres-staging:5432/tracseq_staging
+      DB_MAX_CONNECTIONS: 10
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://auth-service-staging:8080
+      NOTIFICATION_SERVICE_URL: http://notification-service-staging:8085
+      EVENT_SERVICE_URL: http://event-service-staging:8087
+      
+      # Testing Configuration
+      BARCODE_PREFIX: TEST
+      AUTO_GENERATE_BARCODES: true
+      ENABLE_BATCH_OPERATIONS: false
+      MAX_BATCH_SIZE: 100
+      
+    depends_on:
+      - postgres-staging
+      - auth-service-staging
+    volumes:
+      - ./logs/sample:/app/logs
+    networks:
+      - tracseq-staging-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # Template Service
+  template-service-staging:
+    build:
+      context: ../../template_service
+      dockerfile: Dockerfile
+    container_name: tracseq-template-staging
+    ports:
+      - "8183:8083"
+    environment:
+      PORT: 8083
+      RUST_LOG: debug
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_staging:${POSTGRES_STAGING_PASSWORD}@postgres-staging:5432/tracseq_staging
+      DB_MAX_CONNECTIONS: 10
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://auth-service-staging:8080
+      NOTIFICATION_SERVICE_URL: http://notification-service-staging:8085
+      
+      # File Processing (reduced limits)
+      MAX_UPLOAD_SIZE_MB: 10
+      ALLOWED_EXTENSIONS: xlsx,xls,csv,json
+      ENABLE_VALIDATION: true
+      
+      # Testing features
+      ENABLE_VERSIONING: false
+      ENABLE_APPROVAL_WORKFLOW: false
+      AUTO_BACKUP: false
+      
+    depends_on:
+      - postgres-staging
+      - auth-service-staging
+    volumes:
+      - ./logs/template:/app/logs
+      - template_staging_uploads:/app/uploads
+    networks:
+      - tracseq-staging-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # Notification Service
+  notification-service-staging:
+    build:
+      context: ../../notification_service
+      dockerfile: Dockerfile
+    container_name: tracseq-notification-staging
+    ports:
+      - "8185:8085"
+    environment:
+      PORT: 8085
+      RUST_LOG: debug
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_staging:${POSTGRES_STAGING_PASSWORD}@postgres-staging:5432/tracseq_staging
+      DB_MAX_CONNECTIONS: 10
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://auth-service-staging:8080
+      
+      # Email Configuration (mock for staging)
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_USERNAME: test
+      SMTP_PASSWORD: test
+      SMTP_TLS: false
+      EMAIL_FROM: staging@tracseq.local
+      
+      # Testing flags
+      ENABLE_MOCK_NOTIFICATIONS: true
+      ENABLE_EMAIL_LOGGING: true
+      
+      # Performance (reduced)
+      MAX_BULK_SIZE: 100
+      RETRY_ATTEMPTS: 2
+      RATE_LIMIT_PER_MINUTE: 50
+      
+    depends_on:
+      - postgres-staging
+      - auth-service-staging
+      - mailhog
+    volumes:
+      - ./logs/notification:/app/logs
+    networks:
+      - tracseq-staging-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # Sequencing Service
+  sequencing-service-staging:
+    build:
+      context: ../../sequencing_service
+      dockerfile: Dockerfile
+    container_name: tracseq-sequencing-staging
+    ports:
+      - "8184:8084"
+    environment:
+      PORT: 8084
+      RUST_LOG: debug
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_staging:${POSTGRES_STAGING_PASSWORD}@postgres-staging:5432/tracseq_staging
+      DB_MAX_CONNECTIONS: 10
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://auth-service-staging:8080
+      SAMPLE_SERVICE_URL: http://sample-service-staging:8081
+      TEMPLATE_SERVICE_URL: http://template-service-staging:8083
+      NOTIFICATION_SERVICE_URL: http://notification-service-staging:8085
+      
+      # Sequencing Configuration (testing)
+      ENABLE_ILLUMINA: true
+      ENABLE_NANOPORE: false
+      ENABLE_PACBIO: false
+      
+      # Job Management (reduced)
+      MAX_CONCURRENT_JOBS: 2
+      JOB_TIMEOUT_HOURS: 1
+      AUTO_CLEANUP_DAYS: 7
+      
+      # Mock sequencing for testing
+      ENABLE_MOCK_SEQUENCING: true
+      MOCK_JOB_DURATION_SECONDS: 30
+      
+    depends_on:
+      - postgres-staging
+      - auth-service-staging
+      - sample-service-staging
+    volumes:
+      - ./logs/sequencing:/app/logs
+      - sequencing_staging_data:/app/data
+    networks:
+      - tracseq-staging-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # Transaction Service
+  transaction-service-staging:
+    build:
+      context: ../../transaction_service
+      dockerfile: Dockerfile
+    container_name: tracseq-transaction-staging
+    ports:
+      - "8188:8088"
+    environment:
+      PORT: 8088
+      RUST_LOG: debug
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://tracseq_staging:${POSTGRES_STAGING_PASSWORD}@postgres-staging:5432/tracseq_staging
+      DB_MAX_CONNECTIONS: 10
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://auth-service-staging:8080
+      SAMPLE_SERVICE_URL: http://sample-service-staging:8081
+      TEMPLATE_SERVICE_URL: http://template-service-staging:8083
+      SEQUENCING_SERVICE_URL: http://sequencing-service-staging:8084
+      NOTIFICATION_SERVICE_URL: http://notification-service-staging:8085
+      
+      # Transaction Configuration (testing)
+      MAX_CONCURRENT_SAGAS: 10
+      DEFAULT_TIMEOUT_MS: 60000
+      CLEANUP_AFTER_HOURS: 1
+      ENABLE_PERSISTENCE: true
+      
+      # Testing flags
+      ENABLE_MOCK_TRANSACTIONS: true
+      ENABLE_TRANSACTION_LOGGING: true
+      
+      # Redis for State Management
+      REDIS_URL: redis://redis-staging:6379
+      
+    depends_on:
+      - postgres-staging
+      - redis-staging
+      - auth-service-staging
+    volumes:
+      - ./logs/transaction:/app/logs
+    networks:
+      - tracseq-staging-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # ================================
+  # TESTING SERVICES
+  # ================================
+
+  # API Gateway (with debug features)
+  api-gateway-staging:
+    build:
+      context: ../../api_gateway
+      dockerfile: Dockerfile
+    container_name: tracseq-api-gateway-staging
+    ports:
+      - "8189:8089"
+    environment:
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: 8089
+      GATEWAY_DEBUG: true
+      
+      # Service Discovery
+      AUTH_SERVICE_URL: http://auth-service-staging:8080
+      SAMPLE_SERVICE_URL: http://sample-service-staging:8081
+      TEMPLATE_SERVICE_URL: http://template-service-staging:8083
+      SEQUENCING_SERVICE_URL: http://sequencing-service-staging:8084
+      NOTIFICATION_SERVICE_URL: http://notification-service-staging:8085
+      TRANSACTION_SERVICE_URL: http://transaction-service-staging:8088
+      
+      # Security (relaxed for testing)
+      JWT_SECRET_KEY: ${JWT_SECRET_STAGING}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRATION_HOURS: 2
+      
+      # Performance (testing)
+      RATE_LIMITING_ENABLED: false
+      DEFAULT_RATE_LIMIT: 10000
+      CIRCUIT_BREAKER_ENABLED: false
+      
+      # Monitoring
+      METRICS_ENABLED: true
+      TRACING_ENABLED: true
+      
+    depends_on:
+      - auth-service-staging
+      - sample-service-staging
+      - template-service-staging
+    volumes:
+      - ./logs/gateway:/app/logs
+    networks:
+      - tracseq-staging-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # MailHog for Email Testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: tracseq-mailhog-staging
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - tracseq-staging-network
+    restart: unless-stopped
+
+  # ================================
+  # TESTING & MONITORING
+  # ================================
+
+  # Prometheus (lightweight)
+  prometheus-staging:
+    image: prom/prometheus:latest
+    container_name: tracseq-prometheus-staging
+    ports:
+      - "9091:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ../monitoring/prometheus-staging.yml:/etc/prometheus/prometheus.yml
+      - prometheus_staging_data:/prometheus
+    networks:
+      - tracseq-staging-network
+    restart: unless-stopped
+
+  # Grafana (lightweight)
+  grafana-staging:
+    image: grafana/grafana:latest
+    container_name: tracseq-grafana-staging
+    ports:
+      - "3002:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: staging123
+      GF_USERS_ALLOW_SIGN_UP: false
+      GF_INSTALL_PLUGINS: grafana-clock-panel
+    volumes:
+      - grafana_staging_data:/var/lib/grafana
+    depends_on:
+      - prometheus-staging
+    networks:
+      - tracseq-staging-network
+    restart: unless-stopped
+
+  # ================================
+  # TEST AUTOMATION
+  # ================================
+
+  # Integration Test Runner
+  test-runner:
+    build:
+      context: ../../
+      dockerfile: test.Dockerfile
+    container_name: tracseq-test-runner
+    environment:
+      # Test Configuration
+      TEST_ENV: staging
+      API_BASE_URL: http://api-gateway-staging:8089
+      AUTH_SERVICE_URL: http://auth-service-staging:8080
+      DATABASE_URL: postgresql://tracseq_staging:${POSTGRES_STAGING_PASSWORD}@postgres-staging:5432/tracseq_staging
+      
+      # Test credentials
+      TEST_ADMIN_EMAIL: admin@test.local
+      TEST_ADMIN_PASSWORD: test123
+      
+      # Test flags
+      RUN_INTEGRATION_TESTS: true
+      RUN_LOAD_TESTS: false
+      TEST_TIMEOUT_MINUTES: 30
+      
+    depends_on:
+      - api-gateway-staging
+      - auth-service-staging
+      - sample-service-staging
+    volumes:
+      - ./test-results:/app/test-results
+      - ./logs/tests:/app/logs
+    networks:
+      - tracseq-staging-network
+    command: ["./run-tests.sh"]
+    profiles:
+      - testing
+
+# ================================
+# NETWORKS
+# ================================
+networks:
+  tracseq-staging-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/16
+
+# ================================
+# VOLUMES
+# ================================
+volumes:
+  # Database Volumes
+  postgres_staging_data:
+    driver: local
+  redis_staging_data:
+    driver: local
+
+  # Application Volumes
+  template_staging_uploads:
+    driver: local
+  sequencing_staging_data:
+    driver: local
+
+  # Monitoring Volumes
+  prometheus_staging_data:
+    driver: local
+  grafana_staging_data:
+    driver: local 

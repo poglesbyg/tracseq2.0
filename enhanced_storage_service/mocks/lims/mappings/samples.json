@@ -1,0 +1,24 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/samples"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "samples": [
+        {
+          "id": "LIMS-001",
+          "barcode": "SAMPLE-20241201-001",
+          "status": "processed",
+          "type": "blood",
+          "created_at": "2024-12-01T10:00:00Z"
+        }
+      ],
+      "total": 1
+    }
+  }
+}

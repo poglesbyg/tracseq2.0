@@ -223,6 +223,20 @@ class TracSeqAPIGatewayConfig(BaseSettings):
                 path_prefix="/rag",
                 health_check_path="/api/v1/health"
             ),
+            "events": ServiceEndpoint(
+                name="Event Service",
+                host="event-service",
+                port=8087,
+                path_prefix="/events",
+                health_check_path="/api/v1/health"
+            ),
+            "transactions": ServiceEndpoint(
+                name="Transaction Service",
+                host="transaction-service",
+                port=8088,
+                path_prefix="/transactions",
+                health_check_path="/api/v1/health"
+            ),
         }
     )
     

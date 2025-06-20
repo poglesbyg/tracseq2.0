@@ -158,6 +158,147 @@ pub struct SlackMessage {
 }
 
 // ================================
+// Subscription Models
+// ================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct NotificationSubscription {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub event_type: String,
+    pub channels: Vec<Channel>,
+    pub enabled: bool,
+    pub filters: serde_json::Value,
+    pub preferences: NotificationPreferences,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NotificationPreferences {
+    pub quiet_hours: Option<QuietHours>,
+    pub frequency_limit: Option<FrequencyLimit>,
+    pub priority_threshold: Option<Priority>,
+    pub group_similar: bool,
+    pub digest_mode: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuietHours {
+    pub start_time: String, // HH:MM format
+    pub end_time: String,   // HH:MM format
+    pub timezone: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FrequencyLimit {
+    pub max_per_hour: Option<u32>,
+    pub max_per_day: Option<u32>,
+}
+
+// ================================
+// Metrics and Statistics Models
+// ================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NotificationMetrics {
+    pub notifications_sent: u64,
+    pub notifications_failed: u64,
+    pub delivery_rate: f64,
+    pub avg_delivery_time_ms: u64,
+    pub email_sent: u64,
+    pub email_failed: u64,
+    pub email_avg_response_time_ms: u64,
+    pub sms_sent: u64,
+    pub sms_failed: u64,
+    pub sms_avg_response_time_ms: u64,
+    pub slack_sent: u64,
+    pub slack_failed: u64,
+    pub slack_avg_response_time_ms: u64,
+    pub teams_sent: u64,
+    pub teams_failed: u64,
+    pub teams_avg_response_time_ms: u64,
+}
+
+// ================================
+// Template Extensions
+// ================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Template {
+    pub id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    pub template_type: TemplateType,
+    pub subject: Option<String>,
+    pub body_html: Option<String>,
+    pub body_text: String,
+    pub variables: Vec<String>,
+    pub metadata: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TemplatePreviewResponse {
+    pub subject: Option<String>,
+    pub body_html: Option<String>,
+    pub body_text: String,
+    pub missing_variables: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TemplateValidationResult {
+    pub is_valid: bool,
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+// ================================
+// Channel Configuration Models
+// ================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelConfigResponse {
+    pub channel: Channel,
+    pub enabled: bool,
+    pub config: serde_json::Value,
+    pub rate_limit: Option<RateLimit>,
+    pub last_test: Option<DateTime<Utc>>,
+    pub last_test_result: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RateLimit {
+    pub requests_per_minute: u32,
+    pub requests_per_hour: u32,
+    pub requests_per_day: u32,
+}
+
+// ================================
+// Delivery Status Models
+// ================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelDeliveryStatus {
+    pub channel: Channel,
+    pub status: DeliveryStatus,
+    pub delivered_at: Option<DateTime<Utc>>,
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DeliveryStatus {
+    Pending,
+    Sent,
+    Delivered,
+    Failed,
+    Bounced,
+    Opened,
+    Clicked,
+}
+
+// ================================
 // Validation Helpers
 // ================================
 
@@ -182,3 +323,43 @@ impl CreateNotificationRequest {
         Ok(())
     }
 }
+
+impl Default for NotificationPreferences {
+    fn default() -> Self {
+        Self {
+            quiet_hours: None,
+            frequency_limit: None,
+            priority_threshold: Some(Priority::Low),
+            group_similar: false,
+            digest_mode: false,
+        }
+    }
+}
+
+// ================================
+// Trait Implementations
+// ================================
+
+impl std::hash::Hash for Channel {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+    }
+}
+
+impl Eq for Channel {}
+
+impl std::hash::Hash for Priority {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+    }
+}
+
+impl Eq for Priority {}
+
+impl std::hash::Hash for NotificationType {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+    }
+}
+
+impl Eq for NotificationType {}

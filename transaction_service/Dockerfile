@@ -1,58 +1,76 @@
 # Multi-stage build for TracSeq Transaction Service
-
-# Build stage
+# Stage 1: Build stage
 FROM rust:1.75-slim as builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
+    libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
-WORKDIR /app
+# Create app user for security
+RUN useradd -m -u 1001 appuser
+
+# Set work directory
+WORKDIR /usr/src/app
 
 # Copy manifest files
-COPY Cargo.toml ./
+COPY Cargo.toml Cargo.lock ./
 
-# Create a dummy main.rs to build dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+# Create dummy source to cache dependencies
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs
 
-# Build dependencies (this will be cached if Cargo.toml doesn't change)
-RUN cargo build --release
-RUN rm src/main.rs
+# Build dependencies (this layer will be cached unless Cargo.toml changes)
+RUN cargo build --release && \
+    rm -rf src target/release/deps/tracseq_transaction_service*
 
-# Copy source code
+# Copy actual source code
 COPY src ./src
+COPY migrations ./migrations
 
 # Build the application
 RUN cargo build --release
 
-# Runtime stage
+# Verify the binary was built correctly
+RUN ls -la target/release/ && \
+    ldd target/release/transaction-service || true
+
+# Stage 2: Runtime stage
 FROM debian:bookworm-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    libssl3 \
+    libpq5 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user
-RUN useradd -r -s /bin/false -m -d /app appuser
+RUN useradd -m -u 1001 appuser
 
-# Set working directory
-WORKDIR /app
+# Create necessary directories
+RUN mkdir -p /app/logs /app/config && \
+    chown -R appuser:appuser /app
 
 # Copy the binary from builder stage
-COPY --from=builder /app/target/release/tracseq-transaction-service ./transaction-service
+COPY --from=builder /usr/src/app/target/release/transaction-service /app/transaction-service
 
-# Copy any additional files if needed
-# COPY config/ ./config/
+# Copy migrations
+COPY --from=builder /usr/src/app/migrations /app/migrations
 
-# Change ownership
-RUN chown -R appuser:appuser /app
+# Set permissions
+RUN chmod +x /app/transaction-service && \
+    chown appuser:appuser /app/transaction-service
 
-# Switch to app user
+# Switch to non-root user
 USER appuser
+
+# Set work directory
+WORKDIR /app
 
 # Expose port
 EXPOSE 8088
@@ -61,9 +79,10 @@ EXPOSE 8088
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8088/health || exit 1
 
-# Set environment variables
-ENV RUST_LOG=info
-ENV PORT=8088
+# Environment variables
+ENV RUST_LOG=info \
+    RUST_BACKTRACE=1 \
+    PORT=8088
 
-# Run the application
+# Run the binary
 CMD ["./transaction-service"] 
