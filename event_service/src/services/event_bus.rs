@@ -121,7 +121,7 @@ impl RedisEventBus {
     pub async fn subscribe(&self, config: SubscriptionConfig) -> Result<()> {
         // Create consumer group for each event type
         for event_type in &config.event_types {
-            let stream_name = format!("tracseq:events:{}", event_type.replace('.', ':'));
+            let stream_name = format!("tracseq:events:{}", event_type.replace('.', ":"));
             
             if let Err(e) = self.create_consumer_group(&stream_name, &config.consumer_group).await {
                 debug!("Consumer group creation result: {}", e);
@@ -156,14 +156,14 @@ impl RedisEventBus {
             let stream_names: Vec<String> = config
                 .event_types
                 .iter()
-                .map(|event_type| format!("tracseq:events:{}", event_type.replace('.', ':')))
+                .map(|event_type| format!("tracseq:events:{}", event_type.replace('.', ":")))
                 .collect();
 
             // Read from multiple streams
             let opts = StreamReadOptions::default()
                 .group(&config.consumer_group, &config.consumer_name)
                 .count(config.batch_size)
-                .block(config.timeout_ms);
+                .block(config.timeout_ms as usize);
 
             let streams_result: RedisResult<HashMap<String, Vec<HashMap<String, HashMap<String, String>>>>> = 
                 conn.xread_options(&stream_names, &vec![">"; stream_names.len()], &opts).await;
@@ -299,4 +299,23 @@ pub trait EventBus: Send + Sync {
     async fn register_handler(&self, handler: Arc<dyn EventHandler>) -> Result<()>;
     async fn subscribe(&self, config: SubscriptionConfig) -> Result<()>;
     async fn get_stats(&self) -> EventBusStats;
+}
+
+#[async_trait]
+impl EventBus for RedisEventBus {
+    async fn publish(&self, event: Event) -> Result<EventPublicationResult> {
+        self.publish(event).await
+    }
+
+    async fn register_handler(&self, handler: Arc<dyn EventHandler>) -> Result<()> {
+        self.register_handler(handler).await
+    }
+
+    async fn subscribe(&self, config: SubscriptionConfig) -> Result<()> {
+        self.subscribe(config).await
+    }
+
+    async fn get_stats(&self) -> EventBusStats {
+        self.get_stats().await
+    }
 }

@@ -15,8 +15,8 @@ pub enum AuthError {
     #[error("JWT error: {0}")]
     Jwt(#[from] jsonwebtoken::errors::Error),
 
-    #[error("Password hashing error: {0}")]
-    PasswordHash(#[from] argon2::password_hash::Error),
+    #[error("Password hashing error")]
+    PasswordHash(String),
 
     #[error("Configuration error: {0}")]
     Config(#[from] anyhow::Error),

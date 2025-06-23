@@ -19,6 +19,8 @@ COPY Cargo.toml ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
 # Build dependencies (this will be cached if Cargo.toml doesn't change)
+ENV DATABASE_URL=postgres://postgres:postgres@localhost:5432/lab_manager
+ENV SQLX_OFFLINE=true
 RUN cargo build --release
 RUN rm src/main.rs
 
@@ -26,6 +28,8 @@ RUN rm src/main.rs
 COPY src ./src
 
 # Build the application
+ENV DATABASE_URL=postgres://postgres:postgres@localhost:5432/lab_manager
+ENV SQLX_OFFLINE=true
 RUN cargo build --release
 
 # Runtime stage

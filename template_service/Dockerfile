@@ -1,4 +1,4 @@
-FROM rust:1.82-slim as builder
+FROM rustlang/rust:nightly-slim as builder
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \

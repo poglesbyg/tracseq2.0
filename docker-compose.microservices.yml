@@ -17,8 +17,9 @@ services:
       - DATABASE_URL=postgres://postgres:postgres@enhanced_storage_service-postgres-1:5432/lab_manager
       - REDIS_URL=redis://enhanced_storage_service-redis-1:6379
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
-      - RUST_LOG=info
-      - RUST_BACKTRACE=1
+      - AUTH_PORT=8080
+      - RUST_LOG=debug
+      - RUST_BACKTRACE=full
     networks:
       - enhanced_storage_service_enhanced_storage_network
       - tracseq20_lab_network
@@ -215,8 +216,10 @@ services:
       - DATABASE_URL=postgres://postgres:postgres@enhanced_storage_service-postgres-1:5432/lab_manager
       - REDIS_URL=redis://enhanced_storage_service-redis-1:6379
       - AUTH_SERVICE_URL=http://auth-service:8080
-      - RUST_LOG=info
-      - RUST_BACKTRACE=1
+      - PORT=8087
+      - HOST=0.0.0.0
+      - RUST_LOG=debug
+      - RUST_BACKTRACE=full
     depends_on:
       - auth-service
     networks:

@@ -1,6 +1,6 @@
 # Multi-stage build for TracSeq Sequencing Service
 # Stage 1: Build stage
-FROM rust:1.82-slim as builder
+FROM rustlang/rust:nightly-slim as builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -17,7 +17,7 @@ RUN useradd -m -u 1001 appuser
 WORKDIR /usr/src/app
 
 # Copy manifest files
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
 # Create dummy source to cache dependencies
 RUN mkdir src && \

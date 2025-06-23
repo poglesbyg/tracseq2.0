@@ -1,5 +1,6 @@
 use axum::{extract::State, Json};
 use serde_json::json;
+use sqlx::Row;
 
 use crate::{
     AppState,
@@ -156,7 +157,7 @@ pub async fn list_sessions(
     State(state): State<AppState>,
     _admin_user: User, // Injected by admin middleware
 ) -> Result<Json<serde_json::Value>, AuthError> {
-    let sessions = sqlx::query!(
+    let sessions = sqlx::query(
         r#"
         SELECT 
             s.id, s.user_id, s.device_info, s.ip_address, s.user_agent,
@@ -174,17 +175,17 @@ pub async fn list_sessions(
 
     let session_data: Vec<serde_json::Value> = sessions
         .into_iter()
-        .map(|session| json!({
-            "id": session.id,
-            "user_id": session.user_id,
-            "user_email": session.email,
-            "user_name": format!("{} {}", session.first_name, session.last_name),
-            "device_info": session.device_info,
-            "ip_address": session.ip_address,
-            "created_at": session.created_at,
-            "last_used_at": session.last_used_at,
-            "expires_at": session.expires_at,
-            "revoked": session.revoked
+        .map(|row| json!({
+            "id": row.get::<uuid::Uuid, _>("id"),
+            "user_id": row.get::<uuid::Uuid, _>("user_id"),
+            "user_email": row.get::<String, _>("email"),
+            "user_name": format!("{} {}", row.get::<String, _>("first_name"), row.get::<String, _>("last_name")),
+            "device_info": row.get::<Option<serde_json::Value>, _>("device_info"),
+            "ip_address": row.get::<Option<String>, _>("ip_address"),
+            "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
+            "last_used_at": row.get::<chrono::DateTime<chrono::Utc>, _>("last_used_at"),
+            "expires_at": row.get::<chrono::DateTime<chrono::Utc>, _>("expires_at"),
+            "revoked": row.get::<bool, _>("revoked")
         }))
         .collect();
 
@@ -199,7 +200,7 @@ pub async fn get_audit_log(
     State(state): State<AppState>,
     _admin_user: User, // Injected by admin middleware
 ) -> Result<Json<serde_json::Value>, AuthError> {
-    let logs = sqlx::query!(
+    let logs = sqlx::query(
         r#"
         SELECT 
             id, event_id, event_type, user_id, user_email, ip_address,
@@ -214,17 +215,17 @@ pub async fn get_audit_log(
 
     let log_data: Vec<serde_json::Value> = logs
         .into_iter()
-        .map(|log| json!({
-            "id": log.id,
-            "event_id": log.event_id,
-            "event_type": log.event_type,
-            "user_id": log.user_id,
-            "user_email": log.user_email,
-            "ip_address": log.ip_address,
-            "user_agent": log.user_agent,
-            "details": log.details,
-            "severity": log.severity,
-            "timestamp": log.timestamp
+        .map(|row| json!({
+            "id": row.get::<i32, _>("id"),
+            "event_id": row.get::<uuid::Uuid, _>("event_id"),
+            "event_type": row.get::<String, _>("event_type"),
+            "user_id": row.get::<Option<uuid::Uuid>, _>("user_id"),
+            "user_email": row.get::<Option<String>, _>("user_email"),
+            "ip_address": row.get::<Option<String>, _>("ip_address"),
+            "user_agent": row.get::<Option<String>, _>("user_agent"),
+            "details": row.get::<Option<serde_json::Value>, _>("details"),
+            "severity": row.get::<String, _>("severity"),
+            "timestamp": row.get::<chrono::DateTime<chrono::Utc>, _>("timestamp")
         }))
         .collect();
 

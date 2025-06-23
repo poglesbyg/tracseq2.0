@@ -11,7 +11,7 @@ keywords = ["event-driven", "microservices", "redis-streams", "async", "laborato
 # Web Framework
 axum = { version = "0.7", features = ["macros", "json", "ws"] }
 tower = { version = "0.4", features = ["full"] }
-tower-http = { version = "0.5", features = ["cors", "trace", "compression"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
 hyper = { version = "1.0", features = ["full"] }
 
 # Async Runtime
@@ -64,7 +64,7 @@ tokio-retry = "0.3"
 regex = "1.10"
 
 # Monitoring and health checks
-health-check = "0.1"
+# health_check = "0.1"  # Commented out - not needed for basic health endpoints
 
 [dev-dependencies]
 tokio-test = "0.4"

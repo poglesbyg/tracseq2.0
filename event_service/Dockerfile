@@ -1,5 +1,5 @@
 # TracSeq Event Service Dockerfile
-FROM rust:1.82-slim AS builder
+FROM rustlang/rust:nightly-slim AS builder
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \

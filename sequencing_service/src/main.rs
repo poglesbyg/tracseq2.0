@@ -20,7 +20,7 @@ mod error;
 mod handlers;
 mod models;
 mod services;
-mod middleware as sequencing_middleware;
+mod middleware;
 mod clients;
 mod workflow;
 mod analysis;
@@ -129,7 +129,7 @@ fn create_app(state: AppState) -> Router {
         .route("/jobs/:job_id/cancel", post(handlers::jobs::cancel_job))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            sequencing_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Workflow management routes
@@ -142,7 +142,7 @@ fn create_app(state: AppState) -> Router {
         .route("/workflows/:workflow_id/abort", post(handlers::workflows::abort_workflow))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            sequencing_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Sample sheet management routes
@@ -156,7 +156,7 @@ fn create_app(state: AppState) -> Router {
         .route("/sample-sheets/:sheet_id/validate", post(handlers::sample_sheets::validate_sample_sheet))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            sequencing_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Sequencing run management routes
@@ -171,7 +171,7 @@ fn create_app(state: AppState) -> Router {
         .route("/runs/:run_id/metrics", get(handlers::runs::get_run_metrics))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            sequencing_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Analysis pipeline routes
@@ -184,7 +184,7 @@ fn create_app(state: AppState) -> Router {
         .route("/analysis/jobs/:job_id/results", get(handlers::analysis::get_analysis_results))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            sequencing_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Quality control routes
@@ -196,7 +196,7 @@ fn create_app(state: AppState) -> Router {
         .route("/qc/thresholds", put(handlers::quality::update_qc_thresholds))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            sequencing_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Scheduling routes
@@ -209,7 +209,7 @@ fn create_app(state: AppState) -> Router {
         .route("/schedule/calendar", get(handlers::scheduling::get_schedule_calendar))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            sequencing_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Integration routes
@@ -220,7 +220,7 @@ fn create_app(state: AppState) -> Router {
         .route("/integration/lims/sync", post(handlers::integration::sync_with_lims))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            sequencing_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Data export routes
@@ -231,7 +231,7 @@ fn create_app(state: AppState) -> Router {
         .route("/export/results", get(handlers::export::export_results))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            sequencing_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Admin routes (require admin privileges)
@@ -244,7 +244,7 @@ fn create_app(state: AppState) -> Router {
         .route("/admin/backup", post(handlers::admin::backup_data))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            sequencing_middleware::admin_middleware,
+            crate::middleware::admin_middleware,
         ));
 
     // Combine all routes

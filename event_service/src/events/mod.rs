@@ -95,7 +95,7 @@ impl Event {
     
     /// Get event stream name based on type
     pub fn stream_name(&self) -> String {
-        format!("tracseq:events:{}", self.event_type.replace('.', ':'))
+        format!("tracseq:events:{}", self.event_type.replace('.', ":"))
     }
 }
 
@@ -151,7 +151,7 @@ impl Default for SubscriptionConfig {
 }
 
 /// Event processing context
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EventContext {
     pub event: Event,
     pub delivery_count: u32,

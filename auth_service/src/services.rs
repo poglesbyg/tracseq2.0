@@ -6,7 +6,7 @@ use argon2::{
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use sha2::{Digest, Sha256};
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use std::collections::HashMap;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -293,18 +293,21 @@ impl AuthServiceImpl {
         // Find and validate reset token
         let token_hash = self.hash_token(token);
         
-        let reset_token = sqlx::query!(
+        let reset_token_row = sqlx::query(
             r#"
             SELECT id, user_id FROM password_reset_tokens 
             WHERE token_hash = $1 
             AND expires_at > NOW() 
             AND used = FALSE
             "#,
-            token_hash
         )
+        .bind(&token_hash)
         .fetch_optional(&self.db.pool)
         .await?
         .ok_or(AuthError::TokenInvalid)?;
+        
+        let reset_token_id: Uuid = reset_token_row.get("id");
+        let reset_token_user_id: Uuid = reset_token_row.get("user_id");
 
         // Hash new password
         let password_hash = self.hash_password(new_password)?;
@@ -314,24 +317,24 @@ impl AuthServiceImpl {
             "UPDATE users SET password_hash = $1, password_changed_at = NOW() WHERE id = $2"
         )
         .bind(&password_hash)
-        .bind(reset_token.user_id)
+        .bind(reset_token_user_id)
         .execute(&self.db.pool)
         .await?;
 
         // Mark reset token as used
         sqlx::query("UPDATE password_reset_tokens SET used = TRUE WHERE id = $1")
-            .bind(reset_token.id)
+            .bind(reset_token_id)
             .execute(&self.db.pool)
             .await?;
 
         // Revoke all existing sessions for security
         sqlx::query("UPDATE user_sessions SET revoked = TRUE, revoked_at = NOW() WHERE user_id = $1")
-            .bind(reset_token.user_id)
+            .bind(reset_token_user_id)
             .execute(&self.db.pool)
             .await?;
 
         // Log password reset
-        self.log_security_event("PASSWORD_RESET_COMPLETED", Some(reset_token.user_id), None, None).await?;
+        self.log_security_event("PASSWORD_RESET_COMPLETED", Some(reset_token_user_id), None, None).await?;
 
         Ok(())
     }
@@ -341,33 +344,36 @@ impl AuthServiceImpl {
         // Find and validate verification token
         let token_hash = self.hash_token(token);
         
-        let verification_token = sqlx::query!(
+        let verification_token_row = sqlx::query(
             r#"
             SELECT id, user_id FROM email_verification_tokens 
             WHERE token_hash = $1 
             AND expires_at > NOW() 
             AND used = FALSE
             "#,
-            token_hash
         )
+        .bind(&token_hash)
         .fetch_optional(&self.db.pool)
         .await?
         .ok_or(AuthError::TokenInvalid)?;
+        
+        let verification_token_id: Uuid = verification_token_row.get("id");
+        let verification_token_user_id: Uuid = verification_token_row.get("user_id");
 
         // Update user email_verified status
         sqlx::query("UPDATE users SET email_verified = TRUE WHERE id = $1")
-            .bind(verification_token.user_id)
+            .bind(verification_token_user_id)
             .execute(&self.db.pool)
             .await?;
 
         // Mark verification token as used
         sqlx::query("UPDATE email_verification_tokens SET used = TRUE WHERE id = $1")
-            .bind(verification_token.id)
+            .bind(verification_token_id)
             .execute(&self.db.pool)
             .await?;
 
         // Log email verification
-        self.log_security_event("EMAIL_VERIFIED", Some(verification_token.user_id), None, None).await?;
+        self.log_security_event("EMAIL_VERIFIED", Some(verification_token_user_id), None, None).await?;
 
         Ok(())
     }
@@ -476,13 +482,13 @@ impl AuthServiceImpl {
         argon2
             .hash_password(password.as_bytes(), &salt)
             .map(|hash| hash.to_string())
-            .map_err(|e| AuthError::PasswordHash(e))
+            .map_err(|e| AuthError::PasswordHash(e.to_string()))
     }
 
     /// Verify password using Argon2 (public method)
     pub fn verify_password(&self, password: &str, hash: &str) -> AuthResult<bool> {
         let parsed_hash = argon2::PasswordHash::new(hash)
-            .map_err(|e| AuthError::PasswordHash(e))?;
+            .map_err(|e| AuthError::PasswordHash(e.to_string()))?;
         
         let argon2 = Argon2::default();
         Ok(argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok())

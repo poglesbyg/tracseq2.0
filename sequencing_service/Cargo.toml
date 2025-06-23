@@ -10,7 +10,7 @@ description = "Sequencing workflow management microservice for laboratory sequen
 axum = "0.7"
 tokio = { version = "1.0", features = ["full"] }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace", "compression", "multipart"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -47,19 +47,19 @@ tempfile = "3.8"
 mime = "0.3"
 
 # Sequencing-specific libraries
-bioinformatics = "0.3"
+# bioinformatics = "0.3"  # Commented out - package not found
 bio = "1.6"
 
 # Job scheduling and workflow
-async-cron = "0.1"
+# async-cron = "0.1"  # Commented out - yanked version
 futures = "0.3"
 
 # Metrics and monitoring
 prometheus = "0.13"
 
 # Machine learning for sequencing analysis
-ndarray = "0.15"
-candle-core = "0.3"
+# ndarray = "0.15"  # Commented out - complex dependency issues
+# candle-core = "0.3"  # Commented out - complex dependency issues
 
 # File compression
 flate2 = "1.0"
