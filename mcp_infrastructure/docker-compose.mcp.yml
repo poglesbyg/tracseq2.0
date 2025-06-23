@@ -1,0 +1,360 @@
+version: '3.8'
+
+services:
+  # MCP Registry - Central discovery service
+  mcp-registry:
+    build:
+      context: ./mcp-registry
+      dockerfile: Dockerfile
+    ports:
+      - "9000:9000"
+    environment:
+      - REGISTRY_PORT=9000
+      - REGISTRY_HOST=0.0.0.0
+      - DATABASE_URL=postgresql://tracseq:tracseq@postgres:5432/mcp_registry
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=INFO
+      - ENABLE_AUTHENTICATION=true
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - tracseq-network
+    volumes:
+      - mcp-registry-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MCP Gateway - Load balancer and routing
+  mcp-gateway:
+    build:
+      context: ./mcp-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "9001:9001"
+    environment:
+      - GATEWAY_PORT=9001
+      - GATEWAY_HOST=0.0.0.0
+      - REGISTRY_URL=http://mcp-registry:9000
+      - LOAD_BALANCER_STRATEGY=round_robin
+      - RATE_LIMIT_REQUESTS_PER_MINUTE=1000
+      - ENABLE_CORS=true
+      - LOG_LEVEL=INFO
+    depends_on:
+      - mcp-registry
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Sample Service MCP Server
+  sample-service-mcp:
+    build:
+      context: ./sample-service-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - MCP_SERVER_PORT=8081
+      - MCP_SERVER_HOST=0.0.0.0
+      - MCP_REGISTRY_URL=http://mcp-registry:9000
+      - SAMPLE_SERVICE_URL=http://sample-service:8080
+      - DATABASE_URL=postgresql://tracseq:tracseq@postgres:5432/samples
+      - RUST_LOG=info
+      - MCP_SERVER_NAME=sample-service
+      - MCP_SERVER_VERSION=1.0.0
+      - OAUTH_ENABLED=true
+      - OAUTH_ISSUER=${OAUTH_ISSUER:-http://auth-service:8080}
+    depends_on:
+      - mcp-registry
+      - sample-service
+      - postgres
+    networks:
+      - tracseq-network
+    volumes:
+      - ./sample-service-mcp/config:/app/config:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/mcp/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # RAG Service MCP Server
+  rag-service-mcp:
+    build:
+      context: ./rag-service-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MCP_SERVER_PORT=8000
+      - MCP_SERVER_HOST=0.0.0.0
+      - MCP_REGISTRY_URL=http://mcp-registry:9000
+      - RAG_SERVICE_URL=http://rag-service:8000
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - VECTOR_STORE_PATH=/app/data/vector_store
+      - UPLOAD_DIR=/app/data/uploads
+      - LOG_LEVEL=INFO
+      - MCP_SERVER_NAME=rag-service
+      - MCP_SERVER_VERSION=1.0.0
+    depends_on:
+      - mcp-registry
+    networks:
+      - tracseq-network
+    volumes:
+      - rag-data:/app/data
+      - ./lab_submission_rag:/app/rag_service:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/mcp/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Storage Service MCP Server
+  storage-service-mcp:
+    build:
+      context: ./storage-service-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - MCP_SERVER_PORT=8082
+      - MCP_SERVER_HOST=0.0.0.0
+      - MCP_REGISTRY_URL=http://mcp-registry:9000
+      - STORAGE_SERVICE_URL=http://enhanced-storage-service:8080
+      - DATABASE_URL=postgresql://tracseq:tracseq@postgres:5432/storage
+      - REDIS_URL=redis://redis:6379/1
+      - RUST_LOG=info
+      - MCP_SERVER_NAME=storage-service
+      - MCP_SERVER_VERSION=1.0.0
+      - IOT_SENSOR_ENABLED=true
+      - BLOCKCHAIN_ENABLED=false
+    depends_on:
+      - mcp-registry
+      - enhanced-storage-service
+      - postgres
+      - redis
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/mcp/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Transaction Service MCP Server
+  transaction-service-mcp:
+    build:
+      context: ./transaction-service-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "8088:8088"
+    environment:
+      - MCP_SERVER_PORT=8088
+      - MCP_SERVER_HOST=0.0.0.0
+      - MCP_REGISTRY_URL=http://mcp-registry:9000
+      - TRANSACTION_SERVICE_URL=http://transaction-service:8080
+      - DATABASE_URL=postgresql://tracseq:tracseq@postgres:5432/transactions
+      - EVENT_SERVICE_URL=http://event-service:8080
+      - RUST_LOG=info
+      - MCP_SERVER_NAME=transaction-service
+      - MCP_SERVER_VERSION=1.0.0
+      - SAGA_PERSISTENCE_ENABLED=true
+      - MAX_CONCURRENT_SAGAS=100
+    depends_on:
+      - mcp-registry
+      - transaction-service
+      - postgres
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/mcp/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # QA/QC Service MCP Server
+  qaqc-service-mcp:
+    build:
+      context: ./qaqc-service-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8085"
+    environment:
+      - MCP_SERVER_PORT=8085
+      - MCP_SERVER_HOST=0.0.0.0
+      - MCP_REGISTRY_URL=http://mcp-registry:9000
+      - QAQC_SERVICE_URL=http://qaqc-service:8080
+      - DATABASE_URL=postgresql://tracseq:tracseq@postgres:5432/qaqc
+      - RUST_LOG=info
+      - MCP_SERVER_NAME=qaqc-service
+      - MCP_SERVER_VERSION=1.0.0
+      - AI_ANALYSIS_ENABLED=true
+      - COMPLIANCE_CHECKS_ENABLED=true
+    depends_on:
+      - mcp-registry
+      - qaqc-service
+      - postgres
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/mcp/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Laboratory Assistant Agent
+  lab-assistant-agent:
+    build:
+      context: ./lab-assistant-agent
+      dockerfile: Dockerfile
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MCP_GATEWAY_URL=http://mcp-gateway:9001
+      - MCP_REGISTRY_URL=http://mcp-registry:9000
+      - CONFIDENCE_THRESHOLD=0.7
+      - MAX_RETRY_ATTEMPTS=3
+      - OPERATION_TIMEOUT=300
+      - ENABLE_NOTIFICATIONS=true
+      - LOG_LEVEL=INFO
+      - AGENT_SESSION_PERSISTENCE=true
+      - REDIS_URL=redis://redis:6379/2
+    depends_on:
+      - mcp-gateway
+      - sample-service-mcp
+      - rag-service-mcp
+      - storage-service-mcp
+      - transaction-service-mcp
+      - qaqc-service-mcp
+    networks:
+      - tracseq-network
+    volumes:
+      - agent-data:/app/data
+      - ./lab_submission_rag/uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8090/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MCP Monitoring Dashboard
+  mcp-dashboard:
+    build:
+      context: ./mcp-dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - MCP_REGISTRY_URL=http://mcp-registry:9000
+      - MCP_GATEWAY_URL=http://mcp-gateway:9001
+      - GRAFANA_URL=http://grafana:3000
+      - PROMETHEUS_URL=http://prometheus:9090
+      - NODE_ENV=production
+    depends_on:
+      - mcp-registry
+      - mcp-gateway
+    networks:
+      - tracseq-network
+    volumes:
+      - dashboard-data:/app/data
+
+  # Existing TracSeq services (referenced)
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=tracseq
+      - POSTGRES_USER=tracseq
+      - POSTGRES_PASSWORD=tracseq
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-mcp-dbs.sql:/docker-entrypoint-initdb.d/20-init-mcp-dbs.sql
+    networks:
+      - tracseq-network
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - tracseq-network
+    ports:
+      - "6379:6379"
+
+  # Existing services would be included here...
+  sample-service:
+    image: tracseq/sample-service:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://tracseq:tracseq@postgres:5432/samples
+    depends_on:
+      - postgres
+    networks:
+      - tracseq-network
+
+  enhanced-storage-service:
+    image: tracseq/enhanced-storage-service:latest
+    ports:
+      - "8083:8080"
+    environment:
+      - DATABASE_URL=postgresql://tracseq:tracseq@postgres:5432/storage
+    depends_on:
+      - postgres
+    networks:
+      - tracseq-network
+
+  transaction-service:
+    image: tracseq/transaction-service:latest
+    ports:
+      - "8089:8080"
+    environment:
+      - DATABASE_URL=postgresql://tracseq:tracseq@postgres:5432/transactions
+    depends_on:
+      - postgres
+    networks:
+      - tracseq-network
+
+  qaqc-service:
+    image: tracseq/qaqc-service:latest
+    ports:
+      - "8086:8080"
+    environment:
+      - DATABASE_URL=postgresql://tracseq:tracseq@postgres:5432/qaqc
+    depends_on:
+      - postgres
+    networks:
+      - tracseq-network
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  mcp-registry-data:
+    driver: local
+  rag-data:
+    driver: local
+  agent-data:
+    driver: local
+  dashboard-data:
+    driver: local
+
+networks:
+  tracseq-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
