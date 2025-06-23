@@ -39,40 +39,30 @@ export default function Samples() {
   const [timeFilter, setTimeFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'table' | 'process'>('table');
 
-  // Helper function to generate realistic timestamp mapping
-  const generateRealisticTimestamps = (sample: Sample) => {
-    // If sample has actual timestamps, use them
-    if (sample.timestamps) {
-      return sample.timestamps;
-    }
 
-    // Create a base timestamps object
-    const baseTimestamps: Sample['timestamps'] = {
-      created_at: sample.created_at,
+
+  // Helper function to convert sample status to ProcessFlow props
+  const getProcessFlowProps = (sample: Sample) => {
+    const steps = [
+      { id: 'pending', title: 'Pending', description: 'Sample received' },
+      { id: 'validated', title: 'Validated', description: 'Quality checked' },
+      { id: 'storage', title: 'In Storage', description: 'Stored safely' },
+      { id: 'sequencing', title: 'Sequencing', description: 'Processing' },
+      { id: 'completed', title: 'Completed', description: 'Analysis done' }
+    ];
+
+    const statusToIndex = {
+      'Pending': 0,
+      'Validated': 1,
+      'InStorage': 2,
+      'InSequencing': 3,
+      'Completed': 4
     };
 
-    // Only assign timestamps for completed stages to avoid misleading simultaneous timestamps
-    // We use created_at as the base and only show the current status timestamp
-    switch (sample.status) {
-      case 'Validated':
-        baseTimestamps.validated_at = sample.updated_at;
-        break;
-      case 'InStorage':
-        // For InStorage, we know validation happened, but we don't know exactly when
-        // So we only show the storage timestamp to avoid false simultaneity
-        baseTimestamps.stored_at = sample.updated_at;
-        break;
-      case 'InSequencing':
-        // Similar logic - only show the sequencing start timestamp
-        baseTimestamps.sequencing_started_at = sample.updated_at;
-        break;
-      case 'Completed':
-        baseTimestamps.completed_at = sample.updated_at;
-        break;
-      // For 'Pending', only created_at is shown
-    }
-
-    return baseTimestamps;
+    return {
+      steps,
+      currentStepIndex: statusToIndex[sample.status] || 0
+    };
   };
 
   // Fetch samples
@@ -294,8 +284,7 @@ export default function Samples() {
               </div>
               
               <ProcessFlow
-                currentStatus={selectedSample.status}
-                timestamps={generateRealisticTimestamps(selectedSample)}
+                {...getProcessFlowProps(selectedSample)}
               />
 
               {/* Sample Details */}
@@ -492,8 +481,7 @@ export default function Samples() {
                 </div>
                 
                 <ProcessFlow
-                  currentStatus={sample.status}
-                  timestamps={generateRealisticTimestamps(sample)}
+                  {...getProcessFlowProps(sample)}
                   className="mt-4"
                 />
               </div>
