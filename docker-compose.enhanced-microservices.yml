@@ -1,0 +1,566 @@
+version: '3.8'
+
+services:
+  # ================================
+  # CONFIGURATION SERVICE
+  # ================================
+  
+  config-service:
+    build:
+      context: ./config-service
+      dockerfile: Dockerfile
+    container_name: tracseq-config-service
+    ports:
+      - "8091:8091"
+    environment:
+      - PORT=8091
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+    networks:
+      - microservices-network
+      - enhanced_storage_service_enhanced_storage_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8091/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ================================
+  # SERVICE MESH - ENVOY PROXY
+  # ================================
+
+  envoy-proxy:
+    image: envoyproxy/envoy:v1.27.0
+    container_name: tracseq-envoy-proxy
+    ports:
+      - "8090:8090"  # Service Mesh Gateway
+      - "9901:9901"  # Envoy Admin Interface
+    volumes:
+      - ./service-mesh/envoy-config.yaml:/etc/envoy/envoy.yaml
+    command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "--service-cluster", "tracseq-service-mesh", "--service-node", "envoy-gateway"]
+    networks:
+      - microservices-network
+      - enhanced_storage_service_enhanced_storage_network
+      - tracseq20_lab_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9901/stats/prometheus"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - config-service
+
+  # ================================
+  # CORE MICROSERVICES
+  # ================================
+
+  # Auth Service
+  auth-service:
+    build: 
+      context: ./auth_service
+      dockerfile: Dockerfile
+    container_name: tracseq-auth-service-enhanced
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@enhanced_storage_service-postgres-1:5432/lab_manager
+      - REDIS_URL=redis://enhanced_storage_service-redis-1:6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - AUTH_PORT=8080
+      - RUST_LOG=debug
+      - RUST_BACKTRACE=full
+      - CONFIG_SERVICE_URL=http://config-service:8091
+      - ENABLE_TRACING=true
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - CIRCUIT_BREAKER_ENABLED=true
+    networks:
+      - microservices-network
+      - enhanced_storage_service_enhanced_storage_network
+      - tracseq20_lab_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - config-service
+      - prometheus
+      - jaeger
+
+  # Sample Service
+  sample-service:
+    build:
+      context: ./sample_service
+      dockerfile: Dockerfile
+    container_name: tracseq-sample-service-enhanced
+    ports:
+      - "8081:8081"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@enhanced_storage_service-postgres-1:5432/lab_manager
+      - REDIS_URL=redis://enhanced_storage_service-redis-1:6379
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - ENHANCED_STORAGE_SERVICE_URL=http://enhanced-storage-service:8082
+      - CONFIG_SERVICE_URL=http://config-service:8091
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - ENABLE_TRACING=true
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - CIRCUIT_BREAKER_ENABLED=true
+    depends_on:
+      - auth-service
+      - config-service
+    networks:
+      - microservices-network
+      - enhanced_storage_service_enhanced_storage_network
+      - tracseq20_lab_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Enhanced Storage Service
+  enhanced-storage-service:
+    build:
+      context: ./enhanced_storage_service
+      dockerfile: Dockerfile
+    container_name: tracseq-enhanced-storage-service-enhanced
+    ports:
+      - "8082:8082"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@enhanced_storage_service-postgres-1:5432/lab_manager
+      - REDIS_URL=redis://enhanced_storage_service-redis-1:6379
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - EVENT_SERVICE_URL=http://event-service:8087
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8085
+      - CONFIG_SERVICE_URL=http://config-service:8091
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - ENABLE_TRACING=true
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - CIRCUIT_BREAKER_ENABLED=true
+    depends_on:
+      - auth-service
+      - config-service
+    networks:
+      - microservices-network
+      - enhanced_storage_service_enhanced_storage_network
+      - tracseq20_lab_network
+    volumes:
+      - enhanced_storage_data:/app/storage
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Template Service
+  template-service:
+    build:
+      context: ./template_service
+      dockerfile: Dockerfile
+    container_name: tracseq-template-service-enhanced
+    ports:
+      - "8083:8083"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@enhanced_storage_service-postgres-1:5432/lab_manager
+      - REDIS_URL=redis://enhanced_storage_service-redis-1:6379
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - CONFIG_SERVICE_URL=http://config-service:8091
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - ENABLE_TRACING=true
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - CIRCUIT_BREAKER_ENABLED=true
+    depends_on:
+      - auth-service
+      - config-service
+    networks:
+      - microservices-network
+      - enhanced_storage_service_enhanced_storage_network
+      - tracseq20_lab_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Sequencing Service
+  sequencing-service:
+    build:
+      context: ./sequencing_service
+      dockerfile: Dockerfile
+    container_name: tracseq-sequencing-service-enhanced
+    ports:
+      - "8084:8084"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@enhanced_storage_service-postgres-1:5432/lab_manager
+      - REDIS_URL=redis://enhanced_storage_service-redis-1:6379
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - SAMPLE_SERVICE_URL=http://sample-service:8081
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8085
+      - CONFIG_SERVICE_URL=http://config-service:8091
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - ENABLE_TRACING=true
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - CIRCUIT_BREAKER_ENABLED=true
+    depends_on:
+      - auth-service
+      - sample-service
+      - config-service
+    networks:
+      - microservices-network
+      - enhanced_storage_service_enhanced_storage_network
+      - tracseq20_lab_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ./notification_service
+      dockerfile: Dockerfile
+    container_name: tracseq-notification-service-enhanced
+    ports:
+      - "8085:8085"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@enhanced_storage_service-postgres-1:5432/lab_manager
+      - REDIS_URL=redis://enhanced_storage_service-redis-1:6379
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - CONFIG_SERVICE_URL=http://config-service:8091
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL:-}
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - ENABLE_TRACING=true
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - CIRCUIT_BREAKER_ENABLED=true
+    depends_on:
+      - auth-service
+      - config-service
+    networks:
+      - microservices-network
+      - enhanced_storage_service_enhanced_storage_network
+      - tracseq20_lab_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Enhanced RAG Service
+  enhanced-rag-service:
+    build:
+      context: ./enhanced_rag_service
+      dockerfile: Dockerfile
+    container_name: tracseq-enhanced-rag-service-enhanced
+    ports:
+      - "8086:8086"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@enhanced_storage_service-postgres-1:5432/lab_manager
+      - REDIS_URL=redis://enhanced_storage_service-redis-1:6379
+      - CONFIG_SERVICE_URL=http://config-service:8091
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - USE_OLLAMA=true
+      - OLLAMA_BASE_URL=http://tracseq20-ollama-1:11434
+      - OLLAMA_MODEL=llama3.2:3b
+      - PYTHONPATH=/app
+      - ENABLE_TRACING=true
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+    networks:
+      - microservices-network
+      - enhanced_storage_service_enhanced_storage_network
+      - tracseq20_lab_network
+    volumes:
+      - enhanced_rag_data:/app/data
+      - enhanced_rag_uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - config-service
+
+  # Event Service
+  event-service:
+    build:
+      context: ./event_service
+      dockerfile: Dockerfile
+    container_name: tracseq-event-service-enhanced
+    ports:
+      - "8087:8087"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@enhanced_storage_service-postgres-1:5432/lab_manager
+      - REDIS_URL=redis://enhanced_storage_service-redis-1:6379
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - CONFIG_SERVICE_URL=http://config-service:8091
+      - PORT=8087
+      - HOST=0.0.0.0
+      - RUST_LOG=debug
+      - RUST_BACKTRACE=full
+      - ENABLE_TRACING=true
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - CIRCUIT_BREAKER_ENABLED=true
+    depends_on:
+      - auth-service
+      - config-service
+    networks:
+      - microservices-network
+      - enhanced_storage_service_enhanced_storage_network
+      - tracseq20_lab_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Transaction Service (Saga Coordinator)
+  transaction-service:
+    build:
+      context: ./transaction_service
+      dockerfile: Dockerfile
+    container_name: tracseq-transaction-service-enhanced
+    ports:
+      - "8088:8088"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@enhanced_storage_service-postgres-1:5432/lab_manager
+      - REDIS_URL=redis://enhanced_storage_service-redis-1:6379
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - EVENT_SERVICE_URL=http://event-service:8087
+      - CONFIG_SERVICE_URL=http://config-service:8091
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - ENABLE_TRACING=true
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - CIRCUIT_BREAKER_ENABLED=true
+    depends_on:
+      - auth-service
+      - event-service
+      - config-service
+    networks:
+      - microservices-network
+      - enhanced_storage_service_enhanced_storage_network
+      - tracseq20_lab_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Gateway (Enhanced with Service Mesh)
+  api-gateway:
+    build:
+      context: ./api_gateway
+      dockerfile: Dockerfile
+    container_name: tracseq-api-gateway-enhanced
+    ports:
+      - "8089:8089"
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - SAMPLE_SERVICE_URL=http://sample-service:8081
+      - ENHANCED_STORAGE_SERVICE_URL=http://enhanced-storage-service:8082
+      - TEMPLATE_SERVICE_URL=http://template-service:8083
+      - SEQUENCING_SERVICE_URL=http://sequencing-service:8084
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8085
+      - ENHANCED_RAG_SERVICE_URL=http://enhanced-rag-service:8086
+      - EVENT_SERVICE_URL=http://event-service:8087
+      - TRANSACTION_SERVICE_URL=http://transaction-service:8088
+      - CONFIG_SERVICE_URL=http://config-service:8091
+      - REDIS_URL=redis://enhanced_storage_service-redis-1:6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - LOG_LEVEL=INFO
+      - SERVICE_MESH_ENABLED=true
+      - ENVOY_PROXY_URL=http://envoy-proxy:8090
+      - ENABLE_TRACING=true
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - CIRCUIT_BREAKER_ENABLED=true
+    depends_on:
+      - auth-service
+      - sample-service
+      - enhanced-storage-service
+      - template-service
+      - sequencing-service
+      - notification-service
+      - event-service
+      - transaction-service
+      - config-service
+      - envoy-proxy
+    networks:
+      - microservices-network
+      - enhanced_storage_service_enhanced_storage_network
+      - tracseq20_lab_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ================================
+  # MONITORING & OBSERVABILITY STACK
+  # ================================
+
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: tracseq-prometheus-enhanced
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+      - '--log.level=info'
+    networks:
+      - microservices-network
+      - enhanced_storage_service_enhanced_storage_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Grafana - Visualization & Dashboards
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: tracseq-grafana-enhanced
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=tracseq-admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel,grafana-clock-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - prometheus
+
+  # Jaeger - Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.47
+    container_name: tracseq-jaeger-enhanced
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14250:14250"  # gRPC
+      - "14268:14268"  # HTTP
+      - "9411:9411"    # Zipkin compatible
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - QUERY_BASE_PATH=/jaeger
+      - SPAN_STORAGE_TYPE=memory
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:16686/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Loki - Log Aggregation
+  loki:
+    image: grafana/loki:2.8.0
+    container_name: tracseq-loki-enhanced
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./monitoring/loki/loki-config.yaml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Uptime Kuma - Service Uptime Monitoring
+  uptime-kuma:
+    image: louislam/uptime-kuma:1.23.0
+    container_name: tracseq-uptime-kuma-enhanced
+    ports:
+      - "3002:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+# ================================
+# VOLUMES
+# ================================
+volumes:
+  enhanced_storage_data:
+    external: true
+  enhanced_rag_data:
+    external: true
+  enhanced_rag_uploads:
+    external: true
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  loki_data:
+    driver: local
+  uptime_kuma_data:
+    driver: local
+
+# ================================
+# NETWORKS
+# ================================
+networks:
+  microservices-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+  enhanced_storage_service_enhanced_storage_network:
+    external: true
+  tracseq20_lab_network:
+    external: true
