@@ -11,6 +11,20 @@ use crate::{
     storage::Storage,
 };
 
+// New modular system imports
+pub mod components;
+pub mod product_lines;
+pub mod traits;
+
+// Re-export key types from the new modular system
+pub use product_lines::{
+    CompactLine, CompactVariant, HybridLine, ProductLine, ProfessionalLine, ProfessionalVariant,
+    StudioLine, StudioVariant,
+};
+pub use traits::{
+    Component, ComponentError, Configurable, ServiceConsumer, ServiceProvider, ServiceRegistry,
+};
+
 // Local simplified type definitions to avoid workspace import issues
 #[derive(Debug)]
 pub struct MetricsCollector {
