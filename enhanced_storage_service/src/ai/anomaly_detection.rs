@@ -2,8 +2,8 @@
 ///
 /// This module implements real-time anomaly detection for laboratory storage systems,
 /// identifying unusual patterns in temperature, access, energy consumption, and system behavior.
-use super::{AIError, AIInput, AIModel, AIOutput};
-use chrono::{DateTime, Duration, Utc};
+use super::{AIError, AIInput, AIModel, AIOutput, TrainingData, UpdateData};
+use chrono::{DateTime, Duration, Utc, Timelike};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::{HashMap, VecDeque};
@@ -414,7 +414,7 @@ impl AnomalyDetectionModel {
     }
 
     fn assess_data_quality(&self, data: &SystemData) -> f64 {
-        let mut quality_score = 1.0;
+        let mut quality_score: f64 = 1.0;
 
         // Check data completeness
         if data.temperature_readings.is_none() {
@@ -521,12 +521,28 @@ impl AIModel for AnomalyDetectionModel {
             confidence: 0.85,
             model_version: self.model_version.clone(),
             inference_time_ms: inference_time,
+            metadata: std::collections::HashMap::new(),
             generated_at: Utc::now(),
         })
     }
 
+    fn train(&mut self, _data: &TrainingData) -> Result<(), AIError> {
+        // In a real implementation, this would train the model with new data
+        Ok(())
+    }
+
+    fn update(&mut self, _data: &UpdateData) -> Result<(), AIError> {
+        // In a real implementation, this would update the model with new data
+        Ok(())
+    }
+
     fn save(&self, _path: &str) -> Result<(), AIError> {
         Ok(())
+    }
+
+    fn load(_path: &str) -> Result<Self, AIError> where Self: Sized {
+        // In a real implementation, this would load the model from disk
+        Ok(Self::new())
     }
 }
 
