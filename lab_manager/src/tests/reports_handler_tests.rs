@@ -8,7 +8,7 @@ use crate::config::database::Database;
 use crate::handlers::reports::{
     execute_report, get_report_templates, get_schema, ReportQuery, ReportResult, ReportTemplate,
 };
-use crate::AppComponents;
+use crate::assembly::AppComponents;
 
 /// Test helper to create app components with test database
 async fn create_test_app_components() -> AppComponents {

@@ -5,7 +5,6 @@ pub mod reports;
 pub mod samples;
 pub mod sequencing;
 pub mod spreadsheets;
-pub mod storage;
 pub mod templates;
 pub mod users;
 
@@ -32,7 +31,7 @@ pub use spreadsheets::{
     create_dataset, delete_dataset, get_dataset, list_datasets, search_spreadsheet_data,
     update_dataset, CreateDatasetRequest, DatasetInfo, SearchRequest, UpdateDatasetRequest,
 };
-pub use storage::{get_storage_locations, update_storage_location, StorageLocationInfo};
+
 pub use templates::{
     create_template, delete_template, get_template, list_templates, update_template,
     CreateTemplateRequest, UpdateTemplateRequest,

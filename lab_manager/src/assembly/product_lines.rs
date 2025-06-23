@@ -4,6 +4,7 @@ use super::components::{
 };
 use super::traits::{ComponentError, ServiceRegistry};
 use crate::config::{DatabaseConfig, StorageConfig};
+use std::collections::HashMap;
 
 /// Different "product lines" - pre-configured assemblies for specific use cases
 /// These are like IKEA's different furniture collections, each optimized for different needs
@@ -19,7 +20,11 @@ impl StudioLine {
         let mut registry = ServiceRegistry::new();
 
         // In-memory database for quick development
-        let db_config = DatabaseConfig::for_testing();
+        let db_config = DatabaseConfig {
+            url: "postgres://postgres:postgres@localhost:5432/lab_manager_test".to_string(),
+            max_connections: 5,
+            min_connections: 1,
+        };
         let database = DatabaseComponentBuilder::new()
             .with_config(db_config)
             .build()?;
@@ -124,9 +129,6 @@ impl CompactLine {
             }),
             max_connections: 5, // Reduced for containers
             min_connections: 1,
-            acquire_timeout: std::time::Duration::from_secs(10),
-            idle_timeout: Some(std::time::Duration::from_secs(300)),
-            max_lifetime: Some(std::time::Duration::from_secs(1800)),
         };
 
         let database = DatabaseComponentBuilder::new()
@@ -138,7 +140,6 @@ impl CompactLine {
             base_path: std::path::PathBuf::from("/tmp/tracseq"),
             max_file_size: 50 * 1024 * 1024, // 50MB
             allowed_extensions: vec!["xlsx".to_string(), "csv".to_string(), "txt".to_string()],
-            temp_dir: std::path::PathBuf::from("/tmp/tracseq"),
         };
 
         let storage = StorageComponentBuilder::new()
@@ -166,9 +167,6 @@ impl CompactLine {
             url: "sqlite:///data/tracseq.db".to_string(),
             max_connections: 2,
             min_connections: 1,
-            acquire_timeout: std::time::Duration::from_secs(5),
-            idle_timeout: Some(std::time::Duration::from_secs(600)),
-            max_lifetime: Some(std::time::Duration::from_secs(3600)),
         };
 
         let database = DatabaseComponentBuilder::new()
@@ -213,9 +211,6 @@ impl HybridLine {
             }),
             max_connections: 20,
             min_connections: 2,
-            acquire_timeout: std::time::Duration::from_secs(30),
-            idle_timeout: Some(std::time::Duration::from_secs(600)),
-            max_lifetime: Some(std::time::Duration::from_secs(3600)),
         };
 
         let database = DatabaseComponentBuilder::new()

@@ -7,7 +7,39 @@ use super::super::traits::{
     Component, ComponentError, Configurable, ServiceProvider, ServiceRegistry,
 };
 use crate::config::StorageConfig;
-use crate::storage::Storage;
+// Storage component implementation
+
+/// Basic Storage implementation for file operations
+#[derive(Debug)]
+pub struct Storage {
+    base_path: PathBuf,
+}
+
+impl Storage {
+    pub fn new(base_path: PathBuf) -> Self {
+        Self { base_path }
+    }
+
+    pub fn base_path(&self) -> &PathBuf {
+        &self.base_path
+    }
+
+    // Add basic storage operations here as needed
+    pub async fn store_file(&self, filename: &str, content: &[u8]) -> Result<(), std::io::Error> {
+        let file_path = self.base_path.join(filename);
+        tokio::fs::write(file_path, content).await
+    }
+
+    pub async fn read_file(&self, filename: &str) -> Result<Vec<u8>, std::io::Error> {
+        let file_path = self.base_path.join(filename);
+        tokio::fs::read(file_path).await
+    }
+
+    pub async fn delete_file(&self, filename: &str) -> Result<(), std::io::Error> {
+        let file_path = self.base_path.join(filename);
+        tokio::fs::remove_file(file_path).await
+    }
+}
 
 /// Modular storage component with configurable backends
 pub struct StorageComponent {

@@ -223,6 +223,53 @@ impl AppConfig {
     }
 }
 
+impl DatabaseConfig {
+    /// Create a configuration for testing
+    pub fn for_testing() -> Self {
+        Self {
+            url: "postgres://postgres:postgres@localhost:5432/lab_manager_test".to_string(),
+            max_connections: 5,
+            min_connections: 1,
+        }
+    }
+
+    /// Create configuration from environment variables
+    pub fn from_env() -> Result<Self, ConfigError> {
+        let database_url = std::env::var("DATABASE_URL")
+            .map_err(|_| ConfigError::MissingEnvVar("DATABASE_URL"))?;
+
+        Ok(Self {
+            url: database_url,
+            max_connections: 10,
+            min_connections: 1,
+        })
+    }
+}
+
+impl StorageConfig {
+    /// Create configuration from environment variables
+    pub fn from_env() -> Result<Self, ConfigError> {
+        let storage_path = std::env::var("STORAGE_PATH")
+            .map_err(|_| ConfigError::MissingEnvVar("STORAGE_PATH"))?;
+
+        Ok(Self {
+            base_path: PathBuf::from(storage_path),
+            max_file_size: 100 * 1024 * 1024, // 100MB
+            allowed_extensions: vec!["xlsx".to_string(), "xls".to_string(), "csv".to_string()],
+        })
+    }
+}
+
+impl Default for StorageConfig {
+    fn default() -> Self {
+        Self {
+            base_path: PathBuf::from("./storage"),
+            max_file_size: 100 * 1024 * 1024, // 100MB
+            allowed_extensions: vec!["xlsx".to_string(), "xls".to_string(), "csv".to_string()],
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
     #[error("Missing environment variable: {0}")]
