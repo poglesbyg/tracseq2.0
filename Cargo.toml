@@ -1,7 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "lab_manager"
+    "lab_manager",
+    "circuit-breaker-lib"
 ]
 
 [workspace.package]

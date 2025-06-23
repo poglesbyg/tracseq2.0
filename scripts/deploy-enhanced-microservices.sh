@@ -295,7 +295,45 @@ wait_for_health() {
 create_default_sidecar_configs() {
     local services=("auth-service" "sample-service" "enhanced-storage-service")
     
+    # Function to get service port based on service name
+    get_service_port() {
+        case $1 in
+            "auth-service")
+                echo "8080"
+                ;;
+            "sample-service")
+                echo "8081"
+                ;;
+            "enhanced-storage-service")
+                echo "8082"
+                ;;
+            "template-service")
+                echo "8083"
+                ;;
+            "sequencing-service")
+                echo "8084"
+                ;;
+            "notification-service")
+                echo "8085"
+                ;;
+            "enhanced-rag-service")
+                echo "8086"
+                ;;
+            "event-service")
+                echo "8087"
+                ;;
+            "transaction-service")
+                echo "8088"
+                ;;
+            *)
+                echo "8090"  # Default port for unknown services
+                ;;
+        esac
+    }
+    
     for service in "${services[@]}"; do
+        local service_port=$(get_service_port "$service")
+        
         cat > "service-mesh/sidecars/${service}-envoy.yaml" << EOF
 admin:
   access_log_path: /tmp/admin_access.log
@@ -346,7 +384,7 @@ static_resources:
             address:
               socket_address:
                 address: $service
-                port_value: 808${service: -1}
+                port_value: $service_port
 EOF
     done
 }
