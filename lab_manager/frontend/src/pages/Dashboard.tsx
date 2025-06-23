@@ -11,14 +11,36 @@ import {
   CheckCircleIcon,
   SparklesIcon,
   DocumentArrowUpIcon,
-  EyeIcon
+  EyeIcon,
+  CalendarDaysIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
+import ProcessDashboard from '../components/ProcessDashboard';
+import TimelineView from '../components/TimelineView';
 
 interface DashboardStats {
   totalTemplates: number;
   totalSamples: number;
   pendingSequencing: number;
   completedSequencing: number;
+  // Enhanced metrics for process dashboard
+  byStatus: Record<string, number>;
+  averageProcessingTime: {
+    validation: number;
+    storage: number;
+    sequencing: number;
+    overall: number;
+  };
+  recentThroughput: {
+    last24h: number;
+    last7d: number;
+    last30d: number;
+  };
+  bottlenecks: {
+    stage: string;
+    count: number;
+    avgWaitTime: number;
+  }[];
 }
 
 interface RecentActivity {
@@ -44,6 +66,7 @@ interface Sample {
   location: string;
   status: string;
   created_at: string;
+  updated_at: string;
   metadata: any;
 }
 
@@ -53,6 +76,7 @@ interface SequencingJob {
   status: string;
   sample_sheet_path: string;
   created_at: string;
+  updated_at: string;
   metadata: any;
 }
 
@@ -81,7 +105,7 @@ export default function Dashboard() {
     queryKey: ['recentSamples'],
     queryFn: async () => {
       const response = await axios.get('/api/samples');
-      return response.data.slice(0, 3); // Get latest 3
+      return response.data.slice(0, 5); // Get latest 5
     }
   });
 
@@ -94,7 +118,56 @@ export default function Dashboard() {
     }
   });
 
-  // Combine recent activities
+  // Convert to timeline events format
+  const timelineEvents = [
+    ...(recentTemplates?.map(template => ({
+      id: template.id,
+      type: 'created' as const,
+      title: `Template "${template.name}" uploaded`,
+      description: template.description || 'New template added to system',
+      timestamp: template.created_at,
+      entity: {
+        id: template.id,
+        name: template.name,
+        type: 'template' as const,
+      },
+      metadata: template.metadata,
+    })) || []),
+    ...(recentSamples?.map(sample => ({
+      id: sample.id,
+      type: sample.status === 'Completed' ? 'completed' as const : 
+            sample.status === 'Validated' ? 'validated' as const :
+            sample.status === 'InStorage' ? 'stored' as const :
+            sample.status === 'InSequencing' ? 'sequencing_started' as const :
+            'created' as const,
+      title: `Sample "${sample.name}" ${sample.status.toLowerCase()}`,
+      description: `Barcode: ${sample.barcode} | Location: ${sample.location}`,
+      timestamp: sample.updated_at || sample.created_at,
+      entity: {
+        id: sample.id,
+        name: sample.name,
+        type: 'sample' as const,
+      },
+      metadata: { ...sample.metadata, barcode: sample.barcode, location: sample.location },
+    })) || []),
+    ...(recentJobs?.map(job => ({
+      id: job.id,
+      type: job.status === 'completed' ? 'completed' as const : 
+            job.status === 'in_progress' ? 'sequencing_started' as const :
+            'created' as const,
+      title: `Sequencing job "${job.name}" ${job.status}`,
+      description: `Sample sheet: ${job.sample_sheet_path}`,
+      timestamp: job.updated_at || job.created_at,
+      entity: {
+        id: job.id,
+        name: job.name,
+        type: 'job' as const,
+      },
+      metadata: job.metadata,
+    })) || []),
+  ];
+
+  // Combine recent activities (legacy format for compatibility)
   const recentActivity: RecentActivity[] = [
     ...(recentTemplates?.map(template => ({
       id: template.id,
@@ -139,9 +212,11 @@ export default function Dashboard() {
 
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case 'completed': return 'text-green-600 bg-green-50';
-      case 'pending': return 'text-yellow-600 bg-yellow-50';
-      case 'validated': return 'text-blue-600 bg-blue-50';
+      case 'completed': case 'Completed': return 'text-green-600 bg-green-50';
+      case 'pending': case 'Pending': return 'text-yellow-600 bg-yellow-50';
+      case 'validated': case 'Validated': return 'text-blue-600 bg-blue-50';
+      case 'InStorage': return 'text-purple-600 bg-purple-50';
+      case 'InSequencing': return 'text-indigo-600 bg-indigo-50';
       case 'in_progress': return 'text-indigo-600 bg-indigo-50';
       case 'failed': return 'text-red-600 bg-red-50';
       default: return 'text-gray-600 bg-gray-50';
@@ -182,6 +257,36 @@ export default function Dashboard() {
     );
   }
 
+  // Create default metrics if not provided by API
+  const processMetrics = stats ? {
+    totalSamples: stats.totalSamples,
+    byStatus: stats.byStatus || {
+      'Pending': 0,
+      'Validated': 0,
+      'InStorage': 0,
+      'InSequencing': 0,
+      'Completed': 0,
+    },
+    averageProcessingTime: stats.averageProcessingTime || {
+      validation: 4,
+      storage: 2,
+      sequencing: 48,
+      overall: 72,
+    },
+    recentThroughput: stats.recentThroughput || {
+      last24h: 0,
+      last7d: 0,
+      last30d: 0,
+    },
+    bottlenecks: stats.bottlenecks || [],
+  } : {
+    totalSamples: 0,
+    byStatus: {},
+    averageProcessingTime: { validation: 0, storage: 0, sequencing: 0, overall: 0 },
+    recentThroughput: { last24h: 0, last7d: 0, last30d: 0 },
+    bottlenecks: [],
+  };
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
@@ -190,18 +295,27 @@ export default function Dashboard() {
           <div className="flex-1 min-w-0">
             <h1 className="text-3xl font-bold leading-tight text-gray-900">Dashboard</h1>
             <p className="mt-2 text-sm text-gray-600">
-              Welcome to Lab Manager. Here's an overview of your lab's current status.
+              Welcome to TracSeq 2.0 Laboratory Management System
             </p>
           </div>
-          <div className="mt-4 flex md:mt-0 md:ml-4">
+          <div className="mt-4 flex md:mt-0 md:ml-4 space-x-3">
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
               System Online
+            </span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              <CalendarDaysIcon className="w-3 h-3 mr-1" />
+              {new Date().toLocaleDateString()}
             </span>
           </div>
         </div>
       </div>
+
+      {/* Process Dashboard */}
+      <div className="mb-8">
+        <ProcessDashboard metrics={processMetrics} />
+      </div>
       
-      {/* Stats Grid */}
+      {/* Stats Grid - Legacy view for compatibility */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         {/* Templates Card */}
         <div className="dashboard-card group">
@@ -240,8 +354,8 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm text-gray-500">
-            <ArrowTrendingUpIcon className="h-4 w-4 text-green-500 mr-1" />
-            <span>Samples in storage</span>
+            <ChartBarIcon className="h-4 w-4 text-blue-500 mr-1" />
+            <span>Active: {processMetrics.totalSamples - (processMetrics.byStatus.Completed || 0)}</span>
           </div>
         </div>
 
@@ -374,12 +488,21 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Recent Activity Section */}
+      {/* Timeline View */}
+      <div className="mb-8">
+        <TimelineView 
+          events={timelineEvents} 
+          title="Recent Laboratory Activity"
+          showFilters={true}
+        />
+      </div>
+
+      {/* Legacy Recent Activity Section - kept for fallback */}
       <div className="dashboard-card">
         <div className="px-6 py-5 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900 flex items-center">
             <ClockIcon className="h-5 w-5 text-gray-400 mr-2" />
-            Recent Activity
+            Recent Activity (Legacy View)
           </h2>
           <p className="mt-1 text-sm text-gray-500">Latest updates from your lab operations</p>
         </div>
