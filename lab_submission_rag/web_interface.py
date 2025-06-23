@@ -5,20 +5,18 @@ Simple Web Interface for Laboratory Submission RAG System
 A lightweight FastAPI web interface for the Docker deployment.
 """
 
-import os
-import asyncio
 import json
-from pathlib import Path
-from typing import List, Dict, Any, Optional
-import uvicorn
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import uvicorn
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel
 
 # Import our RAG system
-from simple_lab_rag import LightweightLabRAG, ExtractionResult
+from simple_lab_rag import LightweightLabRAG
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,20 +26,23 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Laboratory Submission RAG System",
     description="Lightweight RAG system for processing laboratory submissions",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # Initialize RAG system
 rag_system = None
 
+
 # Models for API
 class QueryRequest(BaseModel):
     question: str
+
 
 class QueryResponse(BaseModel):
     answer: str
     confidence: float
     sources: List[str] = []
+
 
 class ProcessingResponse(BaseModel):
     success: bool
@@ -49,11 +50,13 @@ class ProcessingResponse(BaseModel):
     message: str
     extracted_data: Optional[Dict[str, Any]] = None
 
+
 class HealthResponse(BaseModel):
     status: str
     version: str
     ollama_connected: bool
     documents_processed: int
+
 
 # Initialize RAG system
 async def initialize_rag():
@@ -68,41 +71,41 @@ async def initialize_rag():
         # Don't fail completely, allow the system to work in demo mode
         rag_system = LightweightLabRAG()
 
+
 # Startup event
 @app.on_event("startup")
 async def startup_event():
     await initialize_rag()
+
 
 # Health check endpoint
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
     global rag_system
-    
+
     if not rag_system:
         raise HTTPException(status_code=503, detail="RAG system not initialized")
-    
+
     try:
         # Check Ollama connection
         ollama_connected = await rag_system._check_ollama_connection()
-        
+
         # Get document count
         docs_count = len(rag_system.submissions)
-        
+
         return HealthResponse(
             status="healthy",
             version="1.0.0",
             ollama_connected=ollama_connected,
-            documents_processed=docs_count
+            documents_processed=docs_count,
         )
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return HealthResponse(
-            status="degraded",
-            version="1.0.0",
-            ollama_connected=False,
-            documents_processed=0
+            status="degraded", version="1.0.0", ollama_connected=False, documents_processed=0
         )
+
 
 # Main web interface
 @app.get("/", response_class=HTMLResponse)
@@ -461,96 +464,92 @@ async def main_page():
     """
     return HTMLResponse(content=html_content)
 
+
 # Upload endpoint
 @app.post("/upload", response_model=ProcessingResponse)
 async def upload_document(file: UploadFile = File(...)):
     """Upload and process a laboratory document"""
     global rag_system
-    
+
     if not rag_system:
         raise HTTPException(status_code=503, detail="RAG system not initialized")
-    
+
     try:
         # Save uploaded file temporarily
         upload_dir = Path("/app/uploads")
         upload_dir.mkdir(exist_ok=True)
-        
+
         file_path = upload_dir / file.filename
         content = await file.read()
-        
+
         with open(file_path, "wb") as f:
             f.write(content)
-        
+
         # Process the document
         result = await rag_system.process_document(str(file_path))
-        
+
         # Clean up temporary file
         file_path.unlink(exist_ok=True)
-        
+
         return ProcessingResponse(
             success=result.success,
             submission_id=result.submission_id,
             message=f"Document processed successfully! Confidence: {result.confidence_score:.2f}",
-            extracted_data=result.extracted_data
+            extracted_data=result.extracted_data,
         )
-        
+
     except Exception as e:
         logger.error(f"Upload processing failed: {e}")
-        return ProcessingResponse(
-            success=False,
-            message=f"Failed to process document: {str(e)}"
-        )
+        return ProcessingResponse(success=False, message=f"Failed to process document: {str(e)}")
+
 
 # Query endpoint
 @app.post("/query", response_model=QueryResponse)
 async def query_submissions(request: QueryRequest):
     """Query the RAG system"""
     global rag_system
-    
+
     if not rag_system:
         raise HTTPException(status_code=503, detail="RAG system not initialized")
-    
+
     try:
         answer = await rag_system.query(request.question)
-        
+
         return QueryResponse(
             answer=answer,
             confidence=0.8,  # Default confidence
-            sources=[]  # Could be enhanced to include sources
+            sources=[],  # Could be enhanced to include sources
         )
-        
+
     except Exception as e:
         logger.error(f"Query failed: {e}")
         raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
+
 
 # Export endpoint
 @app.get("/export")
 async def export_data():
     """Export all processed submissions"""
     global rag_system
-    
+
     if not rag_system:
         raise HTTPException(status_code=503, detail="RAG system not initialized")
-    
+
     try:
         # Export to JSON
         export_path = await rag_system.export_submissions()
-        
+
         # Read and return the exported data
-        with open(export_path, 'r', encoding='utf-8') as f:
+        with open(export_path, encoding="utf-8") as f:
             data = json.load(f)
-        
+
         return JSONResponse(content=data)
-        
+
     except Exception as e:
         logger.error(f"Export failed: {e}")
         raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
 
+
 if __name__ == "__main__":
     # Run the web server
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8000,
-        log_level="info"
-    ) 
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

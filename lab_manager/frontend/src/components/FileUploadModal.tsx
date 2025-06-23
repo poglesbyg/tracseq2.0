@@ -18,7 +18,7 @@ interface FileUploadModalProps {
 
 interface UploadResponse {
   success: boolean;
-  data?: any[];
+  data?: unknown[];
   message: string;
 }
 
@@ -59,10 +59,10 @@ export default function FileUploadModal({ onClose, onSuccess }: FileUploadModalP
         setIsLoadingSheets(false);
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Failed to get sheet names:', error);
       setIsLoadingSheets(false);
-      setUploadMessage(error.response?.data?.message || 'Failed to read file sheets');
+      setUploadMessage((error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to read file sheets');
       setUploadStatus('error');
     },
   });
@@ -85,9 +85,9 @@ export default function FileUploadModal({ onClose, onSuccess }: FileUploadModalP
         onSuccess();
       }, 2000);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       setUploadStatus('error');
-      setUploadMessage(error.response?.data?.message || 'Upload failed. Please try again.');
+      setUploadMessage((error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Upload failed. Please try again.');
     },
   });
 

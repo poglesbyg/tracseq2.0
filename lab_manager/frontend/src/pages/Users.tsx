@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   PlusIcon, 
   MagnifyingGlassIcon, 
@@ -81,19 +81,10 @@ export default function Users() {
     { value: 'pending_verification', label: 'Pending Verification' },
   ];
 
-  // Check permissions
-  if (!hasPermission('users', 'read')) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900">Access Denied</h2>
-          <p className="mt-2 text-gray-600">You don't have permission to view users.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
+    if (!hasPermission('users', 'read')) {
+      return;
+    }
     try {
       setLoading(true);
       const token = localStorage.getItem('auth_token');
@@ -130,11 +121,11 @@ export default function Users() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, searchTerm, roleFilter, statusFilter, hasPermission]);
 
   useEffect(() => {
     fetchUsers();
-  }, [currentPage, searchTerm, roleFilter, statusFilter]);
+  }, [fetchUsers]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -196,7 +187,7 @@ export default function Users() {
     try {
       setError('');
       const token = localStorage.getItem('auth_token');
-      const { password, ...updateData } = formData;
+      const { password: _password, ...updateData } = formData;
       
       const response = await fetch(
         `${import.meta.env.VITE_API_URL || ''}/api/users/${selectedUser.id}`,
@@ -292,6 +283,18 @@ export default function Users() {
     };
     return colorMap[status];
   };
+
+  // Check permissions
+  if (!hasPermission('users', 'read')) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900">Access Denied</h2>
+          <p className="mt-2 text-gray-600">You don't have permission to view users.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8">

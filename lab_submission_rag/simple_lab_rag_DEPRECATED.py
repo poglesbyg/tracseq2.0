@@ -2,7 +2,7 @@
 """
 DEPRECATED: Simple Laboratory Submission RAG System
 
-This file has been refactored for better modularity. The original 999-line file 
+This file has been refactored for better modularity. The original 999-line file
 has been split into smaller, more maintainable components.
 
 NEW USAGE:
@@ -21,11 +21,12 @@ Please update your imports to use the refactored version.
 """
 
 import warnings
+
 warnings.warn(
     "This file is deprecated. Use simple_lab_rag_refactored.py and the simple/ module instead.",
     DeprecationWarning,
-    stacklevel=2
+    stacklevel=2,
 )
 
 print("⚠️  DEPRECATED FILE - Please use simple_lab_rag_refactored.py instead")
-print("📚 See the file header for migration instructions") 
+print("📚 See the file header for migration instructions")

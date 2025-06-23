@@ -3,88 +3,91 @@ Enhanced LLM interface for intelligent laboratory assistance
 """
 
 import asyncio
-import logging
-from typing import Dict, Any, Optional, List, Tuple
 import json
-import openai
+import logging
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
+
 import anthropic
 import ollama
-from datetime import datetime
-from pydantic import ValidationError
+import openai
 
-from models.submission import ExtractionResult
 from config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class ConversationContext:
     """Manages conversation history and context"""
-    
+
     def __init__(self, max_history: int = 10):
         self.messages = []
         self.max_history = max_history
         self.user_context = {}
-        
+
     def add_message(self, role: str, content: str, metadata: Dict = None):
         """Add a message to conversation history"""
         message = {
             "role": role,
             "content": content,
             "timestamp": datetime.now().isoformat(),
-            "metadata": metadata or {}
+            "metadata": metadata or {},
         }
         self.messages.append(message)
-        
+
         # Keep only recent messages
         if len(self.messages) > self.max_history:
-            self.messages = self.messages[-self.max_history:]
-    
+            self.messages = self.messages[-self.max_history :]
+
     def get_context_summary(self) -> str:
         """Get a summary of recent conversation for context"""
         if not self.messages:
             return ""
-        
+
         context_parts = []
         for msg in self.messages[-5:]:  # Last 5 messages
             context_parts.append(f"{msg['role']}: {msg['content'][:200]}...")
-        
+
         return "\n".join(context_parts)
+
 
 class EnhancedLLMInterface:
     """Enhanced LLM interface with lab-specific intelligence"""
-    
+
     def __init__(self):
         self.client = None
         self.client_type = None
         self.conversation_contexts = {}
         self._initialize_client()
         self.lab_system_knowledge = self._load_lab_system_knowledge()
-    
+
     def _initialize_client(self):
         """Initialize the LLM client with enhanced configuration"""
         try:
-            if hasattr(settings, 'use_ollama') and settings.use_ollama:
+            if hasattr(settings, "use_ollama") and settings.use_ollama:
                 try:
                     # Configure Ollama client with custom URL
-                    if hasattr(settings, 'ollama_base_url'):
+                    if hasattr(settings, "ollama_base_url"):
                         self.client = ollama.Client(host=settings.ollama_base_url)
                     else:
                         self.client = ollama.Client()
-                    
+
                     # Test connection
                     self.client.list()
                     self.client_type = "ollama"
-                    logger.info(f"Using enhanced Ollama with model: {settings.ollama_model} at {getattr(settings, 'ollama_base_url', 'localhost:11434')}")
+                    logger.info(
+                        f"Using enhanced Ollama with model: {settings.ollama_model} at {getattr(settings, 'ollama_base_url', 'localhost:11434')}"
+                    )
                     return
                 except Exception as e:
                     logger.warning(f"Ollama not available: {str(e)}")
-            
-            if hasattr(settings, 'openai_api_key') and settings.openai_api_key:
+
+            if hasattr(settings, "openai_api_key") and settings.openai_api_key:
                 openai.api_key = settings.openai_api_key
                 self.client_type = "openai"
                 self.model_name = "gpt-4"
                 logger.info("Using OpenAI GPT-4 for enhanced intelligence")
-            elif hasattr(settings, 'anthropic_api_key') and settings.anthropic_api_key:
+            elif hasattr(settings, "anthropic_api_key") and settings.anthropic_api_key:
                 self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
                 self.client_type = "anthropic"
                 self.model_name = "claude-3-sonnet-20240229"
@@ -95,7 +98,7 @@ class EnhancedLLMInterface:
         except Exception as e:
             logger.error(f"Failed to initialize enhanced LLM client: {str(e)}")
             self.client_type = "mock"
-    
+
     def _load_lab_system_knowledge(self) -> str:
         """Load lab manager system-specific knowledge"""
         return """
@@ -146,57 +149,57 @@ STORAGE CONDITIONS:
 - 4°C for active samples
 - Room temperature for processed samples
 """
-    
+
     def get_conversation_context(self, session_id: str = "default") -> ConversationContext:
         """Get or create conversation context for a session"""
         if session_id not in self.conversation_contexts:
             self.conversation_contexts[session_id] = ConversationContext()
         return self.conversation_contexts[session_id]
-    
+
     async def answer_query(
-        self, 
-        query: str, 
+        self,
+        query: str,
         relevant_chunks: List[Tuple[str, float]],
         session_id: str = "default",
-        submission_data: Optional[dict] = None
+        submission_data: Optional[dict] = None,
     ) -> str:
         """Answer questions with enhanced intelligence and context"""
         try:
             context = self.get_conversation_context(session_id)
-            
+
             context_parts = [
                 "=== LAB MANAGER SYSTEM KNOWLEDGE ===",
                 self.lab_system_knowledge,
                 "",
                 "=== RECENT CONVERSATION ===",
                 context.get_context_summary(),
-                ""
+                "",
             ]
-            
+
             if relevant_chunks:
                 context_parts.append("=== RELEVANT DOCUMENTS ===")
                 for chunk_content, similarity_score in relevant_chunks:
                     context_parts.append(f"[Relevance: {similarity_score:.2f}]\n{chunk_content}")
                 context_parts.append("")
-            
+
             if submission_data:
                 context_parts.append("=== CURRENT SUBMISSION DATA ===")
                 context_parts.append(json.dumps(submission_data, indent=2))
                 context_parts.append("")
-            
+
             full_context = "\n".join(context_parts)
             prompt = self._create_smart_assistant_prompt(query, full_context)
             response = await self._get_enhanced_llm_response(prompt)
-            
+
             context.add_message("user", query)
             context.add_message("assistant", response)
-            
+
             return response
-            
+
         except Exception as e:
             logger.error(f"Error in enhanced query processing: {str(e)}")
-            return f"I apologize, but I encountered an error while processing your query. Please try rephrasing your question or contact support if the issue persists."
-    
+            return "I apologize, but I encountered an error while processing your query. Please try rephrasing your question or contact support if the issue persists."
+
     def _create_smart_assistant_prompt(self, query: str, context: str) -> str:
         """Create an enhanced prompt for intelligent lab assistance"""
         return f"""You are an expert laboratory management assistant specializing in the Lab Manager system. You have deep knowledge of:
@@ -227,7 +230,7 @@ User Question: {query}
 
 Please provide a comprehensive, intelligent response that helps the user accomplish their laboratory management goals effectively.
 """
-    
+
     async def _get_enhanced_llm_response(self, prompt: str) -> str:
         """Get response from LLM with enhanced parameters"""
         try:
@@ -237,51 +240,52 @@ Please provide a comprehensive, intelligent response that helps the user accompl
                     model=settings.ollama_model,
                     prompt=prompt,
                     options={
-                        "temperature": getattr(settings, 'llm_temperature', 0.3),
-                        "num_predict": getattr(settings, 'max_tokens', 2048),
+                        "temperature": getattr(settings, "llm_temperature", 0.3),
+                        "num_predict": getattr(settings, "max_tokens", 2048),
                         "top_p": 0.9,
                         "repeat_penalty": 1.1,
-                    }
+                    },
                 )
-                return response['response']
-                
+                return response["response"]
+
             elif self.client_type == "openai":
                 response = await openai.ChatCompletion.acreate(
                     model="gpt-4",
                     messages=[
-                        {"role": "system", "content": "You are an expert laboratory management assistant."},
-                        {"role": "user", "content": prompt}
+                        {
+                            "role": "system",
+                            "content": "You are an expert laboratory management assistant.",
+                        },
+                        {"role": "user", "content": prompt},
                     ],
                     temperature=0.3,
                     max_tokens=2048,
                     top_p=0.9,
                     frequency_penalty=0.1,
-                    presence_penalty=0.1
+                    presence_penalty=0.1,
                 )
                 return response.choices[0].message.content
-                
+
             elif self.client_type == "anthropic":
                 response = await self.client.messages.create(
                     model="claude-3-sonnet-20240229",
                     max_tokens=2048,
                     temperature=0.3,
-                    messages=[
-                        {"role": "user", "content": prompt}
-                    ]
+                    messages=[{"role": "user", "content": prompt}],
                 )
                 return response.content[0].text
-                
+
             else:
                 return self._generate_smart_mock_response(prompt)
-                
+
         except Exception as e:
             logger.error(f"Error getting enhanced LLM response: {str(e)}")
             return self._generate_smart_mock_response(prompt)
-    
+
     def _generate_smart_mock_response(self, prompt: str) -> str:
         """Generate intelligent mock responses for testing"""
         query_lower = prompt.lower()
-        
+
         if "submit" in query_lower and "sample" in query_lower:
             return """To submit a new sample in the Lab Manager system:
 
@@ -341,5 +345,6 @@ Need help setting up storage locations or moving samples?"""
 
 What specific aspect would you like help with? Just describe what you're trying to accomplish!"""
 
+
 # Create enhanced instance
-enhanced_llm = EnhancedLLMInterface() 
+enhanced_llm = EnhancedLLMInterface()

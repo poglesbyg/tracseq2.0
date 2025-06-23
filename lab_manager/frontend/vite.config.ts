@@ -8,21 +8,38 @@ export default defineConfig({
     host: true,
     port: 5173,
     proxy: {
+      // RAG API - route to RAG service (containerized development)
+      '/api/rag': {
+        target: process.env.RAG_API_URL || 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.log('RAG API proxy error', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req) => {
+            console.log('Sending RAG Request to the Target:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req) => {
+            console.log('Received RAG Response from the Target:', proxyRes.statusCode, req.url);
+          });
+        },
+      },
       // Route ALL API requests through the API Gateway
       // This enables gradual microservices migration with feature flags
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
-        configure: (_proxy, _options) => {
-          _proxy.on('error', (_err, _req, _res) => {
-            console.log('proxy error', _err);
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.log('proxy error', err);
           });
-          _proxy.on('proxyReq', (_proxyReq, req, _res) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
             console.log('Sending Request to the Target:', req.method, req.url);
           });
-          _proxy.on('proxyRes', (_proxyRes, req, _res) => {
-            console.log('Received Response from the Target:', _proxyRes.statusCode, req.url);
+          proxy.on('proxyRes', (proxyRes, req) => {
+            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
           });
         },
       },

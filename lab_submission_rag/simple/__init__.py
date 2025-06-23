@@ -13,17 +13,17 @@ Components:
 __version__ = "1.0.0"
 
 # Import main classes for convenience
-from .models import LabSubmission, ExtractionResult, AdministrativeInfo, SampleInfo, SequencingInfo
 from .document_processor import SimpleDocumentProcessor
-from .llm_interface import SimpleLLMInterface, DemoLLMInterface
+from .llm_interface import DemoLLMInterface, SimpleLLMInterface
+from .models import AdministrativeInfo, ExtractionResult, LabSubmission, SampleInfo, SequencingInfo
 
 __all__ = [
     "LabSubmission",
-    "ExtractionResult", 
+    "ExtractionResult",
     "AdministrativeInfo",
     "SampleInfo",
     "SequencingInfo",
     "SimpleDocumentProcessor",
     "SimpleLLMInterface",
-    "DemoLLMInterface"
-] 
+    "DemoLLMInterface",
+]

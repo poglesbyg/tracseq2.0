@@ -21,7 +21,7 @@ interface Template {
   name: string;
   description?: string;
   created_at: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 interface StorageLocation {
@@ -42,6 +42,19 @@ interface BatchSampleCreationProps {
   onComplete: () => void;
 }
 
+interface SampleData {
+  name: string;
+  barcode: string;
+  location: string;
+  metadata: {
+    template_id: string;
+    template_name: string;
+    source_template: string;
+    original_row: number;
+    template_data: Record<string, string>;
+  };
+}
+
 export default function BatchSampleCreation({ templateData, onClose, onComplete }: BatchSampleCreationProps) {
   const { template, data } = templateData;
   const activeSheet = data.sheets[0];
@@ -57,7 +70,7 @@ export default function BatchSampleCreation({ templateData, onClose, onComplete 
       try {
         const response = await api.get('/api/storage/locations');
         return response.data;
-      } catch (error) {
+      } catch {
         // Return default locations if API fails
         return [
           { id: 1, name: 'Lab Room A' },
@@ -71,7 +84,7 @@ export default function BatchSampleCreation({ templateData, onClose, onComplete 
 
   // Batch create samples mutation
   const createSamplesMutation = useMutation({
-    mutationFn: async (samples: any[]) => {
+    mutationFn: async (samples: SampleData[]) => {
       const response = await api.post('/api/samples/batch', { samples });
       return response.data;
     },

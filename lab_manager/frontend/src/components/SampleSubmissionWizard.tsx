@@ -28,7 +28,7 @@ interface SampleSubmissionData {
   name: string;
   barcode: string;
   location: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, string>;
 }
 
 interface SampleSubmissionWizardProps {

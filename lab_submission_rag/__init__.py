@@ -6,4 +6,4 @@ from documents to integrate with existing lab management systems.
 """
 
 __version__ = "1.0.0"
-__author__ = "Paul Greenwood" 
+__author__ = "Paul Greenwood"
