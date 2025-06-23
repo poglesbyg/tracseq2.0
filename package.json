@@ -1,0 +1,32 @@
+{
+  "name": "tracseq2.0",
+  "version": "2.0.0",
+  "description": "TracSeq 2.0 Laboratory Management System - AI-powered sample tracking and document processing",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "lab_manager",
+    "lab_manager/frontend"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter @app/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "fix": "pnpm -r fix",
+    "test": "pnpm -r test",
+    "test:web": "pnpm test --filter @app/web",
+    "test:api": "pnpm test --filter @app/api", 
+    "test:db": "pnpm test --filter @app/db",
+    "clean": "pnpm -r clean",
+    "install:all": "pnpm install -r"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@10.12.2"
+} 

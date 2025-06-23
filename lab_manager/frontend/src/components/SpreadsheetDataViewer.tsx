@@ -205,7 +205,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
     advancedFilters.forEach((filter) => {
       if (filter.value.trim()) {
         const columnName = filter.column;
-        let filterValue = filter.value.trim();
+        const filterValue = filter.value.trim();
         
         // Convert advanced filter operators to basic patterns where possible
         switch (filter.operator) {

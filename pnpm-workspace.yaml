@@ -1,0 +1,20 @@
+packages:
+  # Lab Manager service with frontend
+  - 'lab_manager'
+  - 'lab_manager/frontend'
+  
+  # Enhanced RAG service (Python-based but may have Node.js tooling)
+  - 'enhanced_rag_service'
+  
+  # API Gateway (Python-based but may have Node.js tooling)
+  - 'api_gateway'
+  
+  # Any other Node.js/TypeScript services
+  - 'packages/*'
+  - 'services/*'
+  
+  # Exclude build and output directories
+  - '!**/node_modules'
+  - '!**/dist'
+  - '!**/build'
+  - '!**/target' 
