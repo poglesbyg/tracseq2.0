@@ -624,6 +624,62 @@ services:
     profiles:
       - phase2
 
+  # Spreadsheet Versioning Service
+  spreadsheet-versioning-service:
+    build:
+      context: ../../spreadsheet_versioning_service
+      dockerfile: Dockerfile
+    container_name: tracseq-spreadsheet-versioning
+    ports:
+      - "8088:8088"
+    environment:
+      PORT: 8088
+      RUST_LOG: info
+      RUST_BACKTRACE: 1
+      
+      # Database
+      DATABASE_URL: postgresql://versioning_user:${POSTGRES_PASSWORD}@postgres-primary:5432/tracseq_versioning_prod
+      DB_MAX_CONNECTIONS: 20
+      DB_MIN_CONNECTIONS: 5
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://auth-service:8080
+      EVENT_SERVICE_URL: http://event-service:8087
+      
+      # File Processing
+      MAX_FILE_SIZE_MB: 100
+      MAX_VERSIONS_PER_SPREADSHEET: 50
+      ENABLE_AUTO_VERSIONING: true
+      RETENTION_DAYS: 365
+      
+      # Diff Algorithm
+      DIFF_ALGORITHM: structural_aware
+      
+      # Conflict Resolution
+      CONFLICT_STRATEGY: manual_review
+      AUTO_RESOLVE_THRESHOLD: 0.95
+      REQUIRE_MANUAL_APPROVAL: true
+      
+    depends_on:
+      - postgres-primary
+      - auth-service
+      - event-service
+    volumes:
+      - ./logs/versioning:/app/logs
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+
   # ================================
   # MONITORING & OBSERVABILITY
   # ================================

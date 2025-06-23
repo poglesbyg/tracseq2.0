@@ -1,81 +1,75 @@
 ---
-description: Documents the core data models, entities and their relationships for a laboratory sample submission and management system
-globs: **/models/**,**/entities/**,**/schemas/**,**/*model*.{ts,js,py,rs},**/*entity*.{ts,js,py,rs}
+description: Documents data models and domain entity relationships for scientific laboratory sample management system
+globs: **/models/*.rs,**/models/*.py,**/models.rs,**/models.py,**/schemas/*.py,**/schemas/*.rs
 alwaysApply: false
 ---
 
 
-# data-models-and-relationships
+# Data Models and Relationships
 
 ## Core Domain Models
 
-### Laboratory Submission Model (Importance: 95)
-Core model representing a laboratory sample submission with comprehensive metadata:
+### AdministrativeInfo
+Captures submitter and project information:
+- Submitter name, email, department, role
+- Project identifiers and approvals
+- Administrative metadata with audit trail
 
-- **AdministrativeInfo**:
-  - Submitter details (name, email, department)
-  - Project information and priority level
-  - Submission timestamps and status
+### SourceMaterial
+Defines biological sample properties:
+- Material type (DNA, RNA, cells, tissue)
+- Origin and collection details  
+- Storage requirements and conditions
+- Sample quality metrics
 
-- **SourceMaterial**: 
-  - Sample origin and type
-  - Collection date and conditions
-  - Material properties (concentration, volume)
+### PoolingInfo
+Manages sample pooling configurations:
+- Pool composition and ratios
+- Barcode/index assignments
+- QC requirements per pool
+- Cross-contamination controls
 
-- **PoolingInfo**:
-  - Multiplexing strategy
-  - Sample combinations
-  - Pooling ratios and conditions
+### SequenceGeneration  
+Controls sequencing parameters:
+- Platform-specific configurations
+- Read length and coverage targets
+- Chemistry version and requirements
+- Run QC thresholds
 
-- **SequenceGeneration**:
-  - Platform configuration
-  - Chemistry version
-  - Run parameters
-  - Quality thresholds
+### ContainerInfo
+Tracks physical sample containers:
+- Container type and specifications
+- Volume and concentration data
+- Temperature requirements
+- Position tracking in storage
 
-- **ContainerInfo**:
-  - Storage requirements
-  - Container type and dimensions
-  - Temperature conditions
-  - Location tracking
+### InformaticsInfo
+Defines analysis requirements:
+- Reference genome versions
+- Analysis pipeline parameters
+- Output format specifications
+- Computational requirements
 
-- **InformaticsInfo**:
-  - Analysis requirements
-  - Data delivery format
-  - Custom pipeline parameters
+### SampleDetails
+Comprehensive sample tracking:
+- Unique identifiers and barcodes
+- Processing status and history
+- Quality control metrics
+- Chain of custody
 
-- **SampleDetails**:
-  - Sample identifiers and metadata
-  - Quality scores
-  - Processing history
-  - Current status
+## Key Relationships
 
-### Model Relationships
+- AdministrativeInfo -> SampleDetails: 1:N
+- SourceMaterial -> SampleDetails: 1:1
+- PoolingInfo -> SampleDetails: N:N
+- SequenceGeneration -> SampleDetails: 1:N
+- ContainerInfo -> SampleDetails: 1:1
+- InformaticsInfo -> SampleDetails: 1:N
 
-```mermaid
-graph TD
-    LabSubmission --> AdministrativeInfo
-    LabSubmission --> SourceMaterial
-    LabSubmission --> PoolingInfo
-    LabSubmission --> SequenceGeneration
-    LabSubmission --> ContainerInfo
-    LabSubmission --> InformaticsInfo
-    LabSubmission --> SampleDetails
-```
-
-### Validation Rules (Importance: 85)
-- Administrative data requires submitter contact information
-- Source material must specify type and collection details
-- Container information must include storage requirements
-- Sample details require unique identifiers
-- Sequencing data requires platform specification
-
-### File Paths
-```
-lab_submission_rag/models/submission.py
-lab_submission_rag/models/rag_models.py
-lab_submission_rag/models/database.py
-```
+File Paths:
+- `lab_submission_rag/models/submission.py`
+- `lab_submission_rag/models/rag_models.py` 
+- `lab_submission_rag/models/database.py`
 
 $END$
 

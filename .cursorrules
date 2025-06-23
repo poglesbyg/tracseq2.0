@@ -10,51 +10,62 @@
 - Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
 
 
-The Laboratory Management System integrates traditional sample tracking with AI-powered document processing through a multi-tier architecture:
+The TracSeq 2.0 laboratory management system implements domain-specific logic across several key business areas:
 
-## Core Laboratory Management
-- Implements a state-based sample workflow: Pending → Validated → InStorage → InSequencing → Completed
-- Manages temperature-controlled storage zones (-80°C, -20°C, 4°C, RT, 37°C) with capacity monitoring
-- Enforces chain of custody tracking for regulatory compliance
-- Generates standardized barcodes in format {TYPE}-{TIMESTAMP}-{RANDOM}
+1. Laboratory Sample Management
+- Multi-stage sample processing workflow through states: Pending → Validated → InStorage → InSequencing → Completed
+- AI-powered document processing for sample submission extraction
+- Custom validation rules for sample metadata and storage requirements
+- Automated barcode generation following laboratory naming conventions
 
-File paths:
-- lab_manager/src/workflow.rs
-- lab_manager/src/storage/temperature_zones.rs
-- lab_manager/src/storage/chain_of_custody.rs
+2. Storage Management System
+- Temperature zone management (-80°C, -20°C, 4°C, RT, 37°C)
+- IoT sensor integration for real-time environmental monitoring
+- Blockchain-based chain of custody tracking
+- AI-optimized sample placement algorithms
 
-## AI-Powered Document Processing
-- RAG system extracts structured data from laboratory documents (PDF, DOCX, TXT)
-- Implements confidence scoring (0.5-1.0) for extraction quality assessment
-- Supports natural language querying of extracted information
-- Provides vector-based similarity search for related documents
+3. Document Processing Pipeline
+- RAG (Retrieval Augmented Generation) system for laboratory document analysis
+- Domain-specific information extraction for:
+  - Administrative data
+  - Sample specifications
+  - Sequencing requirements 
+  - Storage conditions
+- Confidence scoring system for extraction quality
 
-File paths:
-- lab_submission_rag/rag/document_processor.py
-- lab_submission_rag/rag/llm_interface.py
-- lab_submission_rag/rag/vector_store.py
+4. Laboratory Workflow Orchestration
+- Event-driven communication between 10 microservices
+- Saga pattern implementation for distributed transactions
+- Role-based access control aligned with laboratory hierarchy
+- Template-based validation system for laboratory data
 
-## MLOps Integration
-- Tracks model experiments with laboratory-specific metrics
-- Manages A/B testing of extraction model variants
-- Implements continuous learning pipeline for model improvement
-- Monitors extraction quality and performance metrics
+Key Business Components:
 
-File paths:
-- lab_submission_rag/mlops/experiment_tracker.py
-- lab_submission_rag/mlops/ab_testing.py
-- lab_submission_rag/mlops/continuous_learning.py
+1. Sample Processing Service
+File: `sample_service/src/models.rs`
+- Sample lifecycle management
+- Custom validation rules
+- Quality control tracking
 
-## Access Control and Security
-- Implements role-based access (Lab Admin, PI, Technician, Scientist, Analyst, Guest)
-- Enforces department and lab-specific access restrictions
-- Maintains comprehensive audit logging for compliance
-- Supports multi-tenant laboratory environments
+2. Enhanced Storage Service
+File: `enhanced_storage_service/src/handlers/storage.rs`
+- Temperature zone control
+- IoT sensor integration  
+- Chain of custody tracking
 
-File paths:
-- lab_manager/src/auth/roles.rs
-- lab_manager/src/multi_tenancy.rs
-- lab_manager/src/audit_logging.rs
+3. RAG Document Service
+File: `lab_submission_rag/rag_orchestrator.py`
+- Laboratory document processing
+- Information extraction
+- Query handling
+
+4. Laboratory Transaction Service 
+File: `transaction_service/src/workflows/laboratory/mod.rs`
+- Workflow orchestration
+- Distributed transactions
+- Equipment management
+
+The system emphasizes laboratory compliance, sample integrity, and workflow automation through specialized services and domain-specific implementations.
 
 $END$
 

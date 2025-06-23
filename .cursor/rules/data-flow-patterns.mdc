@@ -1,81 +1,65 @@
 ---
-description: Documents data flows through laboratory information system including document processing, RAG orchestration, and sample workflows
-globs: **/rag/**/*.{py,rs},**/lab_manager/**/*.{rs,py},**/mlops/**/*.{py,rs}
+description: Used to understand data flows through laboratory document processing, including sample submissions, RAG pipelines, and document management.
+globs: lab_submission_rag/*,lab_manager/src/data/*,notification_service/src/handlers/*
 alwaysApply: false
 ---
 
 
 # data-flow-patterns
 
-The data flow patterns in this laboratory information system focus on two main paths: document processing and sample management.
+## Core Data Flow Components
 
-## Document Processing Pipeline
-Importance Score: 95
+1. **Document Ingestion Pipeline**
+- Documents enter through multiple channels:
+  - Web UI upload portal
+  - Automated folder monitoring 
+  - API submissions
+  - Email attachments
+- Files are validated and queued for processing based on priority levels
+- Raw documents stored in staging with generated IDs
+- Document metadata extraction starts parallel to storage
 
-The RAG system implements a multi-stage document processing pipeline:
+2. **RAG Processing Pipeline**
+- Document chunking optimized for laboratory content
+- Vector embeddings generated using biomedical model
+- Chunks stored in ChromaDB with metadata linking
+- LLM extraction of structured laboratory data:
+  - Administrative information
+  - Sample details
+  - Sequencing requirements
+  - Storage conditions
 
-1. Initial Document Ingestion
-- Documents uploaded through web interface or file system monitoring
-- Automatic file type detection and validation
-- Assignment to processing queue with priority levels
+3. **Laboratory Database Integration**
+- Extracted data validated against lab schemas
+- Sample records created in lab_manager database
+- Storage assignments generated based on requirements
+- Notification events triggered for new submissions
 
-2. Document Chunking and Processing 
-- Text extraction based on document type
-- Recursive chunking with configurable overlap
-- Chunk enrichment with metadata
-- Vector embedding generation
+4. **Query Processing Flow**
+- Natural language queries parsed for intent
+- Relevant chunks retrieved from vector store
+- Context assembled from multiple sources:
+  - Retrieved document chunks
+  - Database records
+  - Template definitions
+- Responses generated with citations
 
-3. Information Extraction
-- RAG-based extraction using prompt templates
-- Structured data mapping to laboratory schema
-- Confidence scoring and validation
-- Failed extraction retry with different models
+5. **Event Propagation**
+- Document status changes trigger notifications
+- Sample creation events flow to storage service
+- Template updates propagate to document processors
+- System alerts route through notification service
 
-## Sample Management Flow 
-Importance Score: 90
-
-The sample workflow orchestrates:
-
-1. Sample Creation
-- From processed documents or manual entry
-- Automated barcode generation
-- Multi-level validation
-- Storage location assignment
-
-2. Sample State Transitions
+Key File Paths:
 ```
-Pending -> Validated -> InStorage -> InSequencing -> Completed
+lab_submission_rag/core/document_processor.py
+lab_submission_rag/rag/vector_store.py 
+lab_submission_rag/services/notification.py
+lab_manager/src/data/sample_processor.rs
+notification_service/src/handlers/events.rs
 ```
 
-3. Storage Management
-- Real-time capacity tracking
-- Temperature zone control (-80°C to 37°C)
-- Chain of custody logging
-- Container organization hierarchy
-
-## Integration Points
-Importance Score: 85
-
-Key data flow integration points:
-
-1. Database Integration
-- Submission storage with RAG system tables
-- Sample tracking tables
-- Storage management tables
-- Audit logging tables
-
-2. External Systems
-- Sequencing equipment integration
-- Storage system monitoring
-- Laboratory information system (LIMS) sync
-- Authentication system integration
-
-## File Paths
-- `lab_submission_rag/rag/document_processor.py`
-- `lab_submission_rag/rag/llm_interface.py` 
-- `lab_manager/src/workflow.rs`
-- `lab_manager/src/storage/chain_of_custody.rs`
-- `lab_manager/src/integration/lims.rs`
+The data flow patterns emphasize reliable document processing, structured data extraction, and event-driven integration between laboratory services.
 
 $END$
 
