@@ -854,12 +854,17 @@ class SimpleLabRAG:
         """Initialize the simple RAG system"""
         self.rag = LightweightLabRAG(use_ollama=use_ollama, use_openai=use_openai, data_dir=data_dir)
         
+        # Task management - store references to prevent garbage collection
+        self.background_tasks: set = set()
+        
         # Initialize synchronously  
         import asyncio
         try:
             loop = asyncio.get_running_loop()
-            # If loop is running, schedule the initialization
-            asyncio.create_task(self.rag.initialize())
+            # If loop is running, schedule the initialization with proper task management
+            task = asyncio.create_task(self.rag.initialize())
+            self.background_tasks.add(task)
+            task.add_done_callback(self.background_tasks.discard)
         except RuntimeError:
             # No loop running, create one
             asyncio.run(self.rag.initialize())
