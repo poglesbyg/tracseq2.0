@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::config::database::Database;
 use crate::handlers::dashboard::{get_dashboard_stats, health_check, DashboardStats, HealthStatus};
-use crate::AppComponents;
+use crate::assembly::AppComponents;
 
 /// Test helper to create app components with test database
 async fn create_test_app_components() -> AppComponents {

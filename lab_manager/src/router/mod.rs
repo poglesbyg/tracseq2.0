@@ -7,7 +7,7 @@ use tower_http::cors::CorsLayer;
 use crate::{
     assembly::AppComponents,
     handlers::{
-        dashboard, health, rag_proxy, reports, samples, sequencing, spreadsheets, storage,
+        dashboard, health, rag_proxy, reports, samples, sequencing, spreadsheets,
         templates, users,
     },
 };
@@ -92,25 +92,10 @@ pub fn sequencing_routes() -> Router<AppComponents> {
         )
 }
 
-/// Storage management routes
+/// Storage management routes (disabled - storage module removed)
 pub fn storage_routes() -> Router<AppComponents> {
     Router::new()
-        .route(
-            "/api/storage/locations",
-            get(storage::list_storage_locations),
-        )
-        .route(
-            "/api/storage/locations",
-            post(storage::create_storage_location),
-        )
-        .route("/api/storage/store", post(storage::store_sample))
-        .route("/api/storage/move", post(storage::move_sample))
-        .route("/api/storage/remove", post(storage::remove_sample))
-        .route(
-            "/api/storage/scan/:barcode",
-            get(storage::scan_sample_barcode),
-        )
-        .route("/api/storage/capacity", get(storage::get_capacity_overview))
+        // Storage routes temporarily disabled
 }
 
 /// Reports and analytics routes
@@ -297,16 +282,7 @@ pub fn create_app_router() -> Router<AppComponents> {
             "/api/spreadsheets/upload",
             post(spreadsheets::upload_spreadsheet),
         )
-        // Storage API routes
-        .route(
-            "/api/storage/locations",
-            get(storage::list_storage_locations),
-        )
-        .route(
-            "/api/storage/locations",
-            post(storage::create_storage_location),
-        )
-        .route("/api/storage/capacity", get(storage::get_capacity_overview))
+        // Storage API routes - temporarily disabled
         // Reports API routes
         .route("/api/reports/templates", get(reports::get_report_templates))
         .route("/api/reports/schema", get(reports::get_schema))
@@ -326,9 +302,7 @@ pub fn create_app_router() -> Router<AppComponents> {
         .route("/sequencing/:id", get(sequencing::get_sequencing_job))
         .route("/sequencing/:id", put(sequencing::update_sequencing_job))
         .route("/sequencing/:id", delete(sequencing::delete_sequencing_job))
-        // Storage management routes
-        .route("/storage", get(storage::get_storage_locations))
-        .route("/storage/:id", put(storage::update_storage_location))
+        // Storage management routes - temporarily disabled
         // Template management routes
         .route("/templates", get(templates::list_templates))
         .route("/templates", post(templates::create_template))

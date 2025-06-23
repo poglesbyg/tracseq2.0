@@ -76,7 +76,7 @@ pub async fn upload_template(
     let file_path = state
         .storage
         .storage
-        .save_file(&original_filename, &file_content)
+        .store_file(&original_filename, &file_content)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 

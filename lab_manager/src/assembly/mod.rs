@@ -8,7 +8,6 @@ use crate::{
     sample_submission::SampleSubmissionManager,
     sequencing::SequencingManager,
     services::{auth_service::AuthService, spreadsheet_service::SpreadsheetService},
-    storage::Storage,
 };
 
 // New modular system imports
@@ -119,7 +118,7 @@ pub struct DatabaseComponent {
 
 #[derive(Debug, Clone)]
 pub struct StorageComponent {
-    pub storage: Arc<crate::storage::Storage>,
+    pub storage: Arc<components::storage::Storage>,
 }
 
 #[derive(Debug, Clone)]
@@ -150,7 +149,7 @@ pub struct RepositoriesComponent {
 pub struct ComponentBuilder {
     pub config: AppConfig,
     database_pool: Option<PgPool>,
-    storage: Option<Arc<Storage>>,
+    storage: Option<Arc<components::storage::Storage>>,
     sample_manager: Option<Arc<SampleSubmissionManager>>,
     sequencing_manager: Option<Arc<SequencingManager>>,
     repository_factory: Option<Arc<PostgresRepositoryFactory>>,
@@ -197,7 +196,7 @@ impl ComponentBuilder {
             .await
             .map_err(AssemblyError::StorageSetup)?;
 
-        let storage = Arc::new(Storage::new(self.config.storage.base_path.clone()));
+        let storage = Arc::new(components::storage::Storage::new(self.config.storage.base_path.clone()));
         self.storage = Some(storage);
         Ok(self)
     }
@@ -391,7 +390,7 @@ impl CustomAssembly {
     /// Create components for API-only mode (no storage operations)
     pub async fn api_only(config: AppConfig) -> Result<AppComponents, AssemblyError> {
         // Create minimal storage that doesn't write to disk
-        let storage = Arc::new(Storage::new(std::env::temp_dir()));
+        let storage = Arc::new(components::storage::Storage::new(std::env::temp_dir()));
 
         let components = ComponentBuilder::new(config)
             .with_database()
@@ -424,7 +423,7 @@ impl CustomAssembly {
             .await
             .map_err(AssemblyError::StorageSetup)?;
 
-        let storage = Arc::new(Storage::new(config.storage.base_path));
+        let storage = Arc::new(components::storage::Storage::new(config.storage.base_path));
         Ok(StorageComponent { storage })
     }
 }
