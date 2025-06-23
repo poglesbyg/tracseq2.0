@@ -322,6 +322,7 @@ impl ValidationErrors {
         Self { errors: Vec::new() }
     }
 
+    #[allow(dead_code)]
     pub fn add(&mut self, error: ValidationError) {
         self.errors.push(error);
     }
@@ -335,6 +336,7 @@ impl ValidationErrors {
         self.errors.push(ValidationError::new(field, code, message));
     }
 
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.errors.is_empty()
     }
@@ -377,7 +379,7 @@ impl From<validator::ValidationErrors> for ValidationErrors {
                     .message
                     .as_ref()
                     .map(|m| m.to_string())
-                    .unwrap_or_else(|| format!("Invalid value for field '{}'", field));
+                    .unwrap_or_else(|| format!("Invalid value for field '{field}'"));
 
                 validation_errors.add_field_error(field, error.code.as_ref(), message);
             }

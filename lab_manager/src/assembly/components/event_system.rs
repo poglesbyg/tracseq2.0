@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
 use super::super::traits::{
-    Component, ComponentError, Configurable, ServiceConsumer, ServiceProvider, ServiceRegistry,
+    Component, ComponentError, Configurable, ServiceProvider, ServiceRegistry,
 };
 
 /// Configuration for the event system component
@@ -607,7 +607,7 @@ impl EventSystemComponent {
 }
 
 /// Default event handlers
-
+///
 /// Handles audit trail generation for all events
 struct AuditTrailHandler;
 

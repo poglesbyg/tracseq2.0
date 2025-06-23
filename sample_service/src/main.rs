@@ -20,7 +20,7 @@ mod error;
 mod handlers;
 mod models;
 mod services;
-mod middleware as sample_middleware;
+mod middleware;
 mod clients;
 
 use config::Config;

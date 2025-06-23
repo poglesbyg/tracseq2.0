@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use super::super::traits::{
-    Component, ComponentError, Configurable, ServiceConsumer, ServiceProvider, ServiceRegistry,
+    Component, ComponentError, Configurable, ServiceProvider, ServiceRegistry,
 };
 
 /// Configuration for the monitoring component
