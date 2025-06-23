@@ -20,7 +20,7 @@ mod error;
 mod handlers;
 mod models;
 mod services;
-mod middleware as storage_middleware;
+mod middleware;
 mod iot;
 mod analytics;
 mod digital_twin;
