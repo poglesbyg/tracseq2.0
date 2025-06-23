@@ -11,10 +11,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
-use uuid::Uuid;
 
 /// Redis-based event bus implementation
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct RedisEventBus {
     /// Redis connection pool
     pool: Pool,
@@ -28,6 +28,7 @@ pub struct RedisEventBus {
 
 /// Event bus statistics
 #[derive(Debug, Default, Clone)]
+#[allow(dead_code)]
 pub struct EventBusStats {
     pub events_published: u64,
     pub events_consumed: u64,
@@ -37,6 +38,7 @@ pub struct EventBusStats {
 
 impl RedisEventBus {
     /// Create a new Redis event bus
+    #[allow(dead_code)]
     pub async fn new(redis_url: &str) -> Result<Self> {
         let config = Config::from_url(redis_url);
         let pool = config
@@ -60,6 +62,7 @@ impl RedisEventBus {
     }
 
     /// Publish an event to the event bus
+    #[allow(dead_code)]
     pub async fn publish(&self, event: Event) -> Result<EventPublicationResult> {
         let mut conn = self.pool.get().await.context("Failed to get Redis connection")?;
 
@@ -95,6 +98,7 @@ impl RedisEventBus {
     }
 
     /// Register an event handler
+    #[allow(dead_code)]
     pub async fn register_handler(&self, handler: Arc<dyn EventHandler>) -> Result<()> {
         let handler_name = handler.name();
         let event_types = handler.event_types();
@@ -118,6 +122,7 @@ impl RedisEventBus {
     }
 
     /// Subscribe to events with the given configuration
+    #[allow(dead_code)]
     pub async fn subscribe(&self, config: SubscriptionConfig) -> Result<()> {
         // Create consumer group for each event type
         for event_type in &config.event_types {
@@ -135,6 +140,7 @@ impl RedisEventBus {
     }
 
     /// Start a consumer task for processing events
+    #[allow(dead_code)]
     async fn start_consumer(&self, config: SubscriptionConfig) -> Result<()> {
         let bus = self.clone();
 
@@ -148,6 +154,7 @@ impl RedisEventBus {
     }
 
     /// Consume events from Redis Streams
+    #[allow(dead_code)]
     async fn consume_events(&self, config: SubscriptionConfig) -> Result<()> {
         let mut conn = self.pool.get().await.context("Failed to get Redis connection")?;
 
@@ -204,6 +211,7 @@ impl RedisEventBus {
     }
 
     /// Process a single event
+    #[allow(dead_code)]
     async fn process_event(
         &self,
         _stream_name: &str,
@@ -260,6 +268,7 @@ impl RedisEventBus {
     }
 
     /// Create a consumer group for a stream
+    #[allow(dead_code)]
     async fn create_consumer_group(&self, stream_name: &str, group_name: &str) -> Result<()> {
         let mut conn = self.pool.get().await.context("Failed to get Redis connection")?;
 
@@ -271,6 +280,7 @@ impl RedisEventBus {
     }
 
     /// Check if event type matches pattern
+    #[allow(dead_code)]
     fn matches_pattern(&self, pattern: &str, event_type: &str) -> bool {
         if pattern == "*" {
             return true;
@@ -287,6 +297,7 @@ impl RedisEventBus {
     }
 
     /// Get event bus statistics
+    #[allow(dead_code)]
     pub async fn get_stats(&self) -> EventBusStats {
         self.stats.read().await.clone()
     }
@@ -294,6 +305,7 @@ impl RedisEventBus {
 
 /// Event bus trait for dependency injection
 #[async_trait]
+#[allow(dead_code)]
 pub trait EventBus: Send + Sync {
     async fn publish(&self, event: Event) -> Result<EventPublicationResult>;
     async fn register_handler(&self, handler: Arc<dyn EventHandler>) -> Result<()>;
@@ -303,18 +315,22 @@ pub trait EventBus: Send + Sync {
 
 #[async_trait]
 impl EventBus for RedisEventBus {
+    #[allow(dead_code)]
     async fn publish(&self, event: Event) -> Result<EventPublicationResult> {
         self.publish(event).await
     }
 
+    #[allow(dead_code)]
     async fn register_handler(&self, handler: Arc<dyn EventHandler>) -> Result<()> {
         self.register_handler(handler).await
     }
 
+    #[allow(dead_code)]
     async fn subscribe(&self, config: SubscriptionConfig) -> Result<()> {
         self.subscribe(config).await
     }
 
+    #[allow(dead_code)]
     async fn get_stats(&self) -> EventBusStats {
         self.get_stats().await
     }

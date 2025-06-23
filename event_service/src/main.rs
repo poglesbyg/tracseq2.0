@@ -6,10 +6,10 @@ mod services;
 
 use anyhow::Result;
 use axum::{
-    extract::{Path, State},
+    extract::State,
     http::StatusCode,
     response::Json,
-    routing::{get, post},
+    routing::get,
     Router,
 };
 use serde::{Deserialize, Serialize};
@@ -30,6 +30,7 @@ struct AppState {
 
 /// Health check response
 #[derive(Serialize)]
+#[allow(dead_code)]
 struct HealthResponse {
     status: String,
     version: String,
@@ -38,6 +39,7 @@ struct HealthResponse {
 
 /// Event publication request
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct PublishEventRequest {
     event_type: String,
     source_service: String,
@@ -49,6 +51,7 @@ struct PublishEventRequest {
 
 /// Event bus statistics response
 #[derive(Serialize)]
+#[allow(dead_code)]
 struct StatsResponse {
     events_published: u64,
     events_consumed: u64,
@@ -86,7 +89,7 @@ async fn main() -> Result<()> {
     // Initialize event bus
     println!("EVENT SERVICE: Initializing event bus");
     info!("🔗 Connecting to Redis at {}", redis_url);
-    let event_bus: Arc<dyn EventBus> = match RedisEventBus::new(&redis_url).await {
+    let _event_bus: Arc<dyn EventBus> = match RedisEventBus::new(&redis_url).await {
         Ok(bus) => {
             println!("EVENT SERVICE: Redis event bus initialized successfully");
             Arc::new(bus)
@@ -96,10 +99,6 @@ async fn main() -> Result<()> {
             return Err(e.into());
         }
     };
-
-    // Create application state
-    println!("EVENT SERVICE: Creating application state");
-    let app_state = AppState { event_bus };
 
     // Build the application router  
     println!("EVENT SERVICE: Building application router");
@@ -168,6 +167,7 @@ async fn simple_health_check() -> Json<serde_json::Value> {
 }
 
 /// Health check endpoint
+#[allow(dead_code)]
 async fn health_check(State(state): State<AppState>) -> Json<HealthResponse> {
     let _stats = state.event_bus.get_stats().await;
     
@@ -179,6 +179,7 @@ async fn health_check(State(state): State<AppState>) -> Json<HealthResponse> {
 }
 
 /// Publish an event
+#[allow(dead_code)]
 async fn publish_event(
     State(state): State<AppState>,
     Json(request): Json<PublishEventRequest>,
@@ -211,6 +212,7 @@ async fn publish_event(
 }
 
 /// Subscribe to events
+#[allow(dead_code)]
 async fn subscribe_to_events(
     State(state): State<AppState>,
     Json(config): Json<SubscriptionConfig>,
@@ -226,6 +228,7 @@ async fn subscribe_to_events(
 }
 
 /// Get event bus statistics
+#[allow(dead_code)]
 async fn get_stats(State(state): State<AppState>) -> Json<StatsResponse> {
     let stats = state.event_bus.get_stats().await;
     

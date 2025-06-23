@@ -85,6 +85,10 @@ optional = true
 version = "0.36"
 optional = true
 
+[lib]
+name = "tracseq_event_service"
+path = "src/lib.rs"
+
 [[bin]]
 name = "event-service"
 path = "src/main.rs"
