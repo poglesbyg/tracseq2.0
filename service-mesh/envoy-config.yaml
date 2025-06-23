@@ -1,0 +1,477 @@
+admin:
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+      protocol: TCP
+      address: 0.0.0.0
+      port_value: 9901
+
+static_resources:
+  listeners:
+  # API Gateway Listener
+  - name: api_gateway_listener
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 8090
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: api_gateway
+          access_log:
+          - name: envoy.access_loggers.stdout
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+          http_filters:
+          - name: envoy.filters.http.fault
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+              delay:
+                header_delay: {}
+                percentage:
+                  numerator: 1
+                  denominator: HUNDRED
+          - name: envoy.filters.http.router
+          route_config:
+            name: api_gateway_route
+            virtual_hosts:
+            - name: api_gateway
+              domains: ["*"]
+              routes:
+              # Auth Service Routes
+              - match:
+                  prefix: "/auth/"
+                route:
+                  cluster: auth_service_cluster
+                  prefix_rewrite: "/"
+                  retry_policy:
+                    retry_on: "5xx,reset,connect-failure,refused-stream"
+                    num_retries: 3
+                    per_try_timeout: 10s
+              
+              # Sample Service Routes  
+              - match:
+                  prefix: "/samples/"
+                route:
+                  cluster: sample_service_cluster
+                  prefix_rewrite: "/"
+                  retry_policy:
+                    retry_on: "5xx,reset,connect-failure,refused-stream"
+                    num_retries: 3
+                    per_try_timeout: 15s
+
+              # Enhanced Storage Service Routes
+              - match:
+                  prefix: "/storage/"
+                route:
+                  cluster: enhanced_storage_service_cluster
+                  prefix_rewrite: "/"
+                  retry_policy:
+                    retry_on: "5xx,reset,connect-failure,refused-stream"
+                    num_retries: 2
+                    per_try_timeout: 20s
+
+              # Template Service Routes
+              - match:
+                  prefix: "/templates/"
+                route:
+                  cluster: template_service_cluster
+                  prefix_rewrite: "/"
+                  retry_policy:
+                    retry_on: "5xx,reset,connect-failure,refused-stream"
+                    num_retries: 3
+                    per_try_timeout: 10s
+
+              # Sequencing Service Routes
+              - match:
+                  prefix: "/sequencing/"
+                route:
+                  cluster: sequencing_service_cluster
+                  prefix_rewrite: "/"
+                  retry_policy:
+                    retry_on: "5xx,reset,connect-failure,refused-stream"
+                    num_retries: 2
+                    per_try_timeout: 30s
+
+              # Notification Service Routes
+              - match:
+                  prefix: "/notifications/"
+                route:
+                  cluster: notification_service_cluster
+                  prefix_rewrite: "/"
+                  retry_policy:
+                    retry_on: "5xx,reset,connect-failure,refused-stream"
+                    num_retries: 5
+                    per_try_timeout: 5s
+
+              # Enhanced RAG Service Routes
+              - match:
+                  prefix: "/rag/"
+                route:
+                  cluster: enhanced_rag_service_cluster
+                  prefix_rewrite: "/"
+                  retry_policy:
+                    retry_on: "5xx,reset,connect-failure,refused-stream"
+                    num_retries: 2
+                    per_try_timeout: 60s
+
+              # Event Service Routes
+              - match:
+                  prefix: "/events/"
+                route:
+                  cluster: event_service_cluster
+                  prefix_rewrite: "/"
+                  retry_policy:
+                    retry_on: "5xx,reset,connect-failure,refused-stream"
+                    num_retries: 3
+                    per_try_timeout: 10s
+
+              # Transaction Service Routes
+              - match:
+                  prefix: "/transactions/"
+                route:
+                  cluster: transaction_service_cluster
+                  prefix_rewrite: "/"
+                  retry_policy:
+                    retry_on: "5xx,reset,connect-failure,refused-stream"
+                    num_retries: 3
+                    per_try_timeout: 30s
+
+              # Health Check Routes
+              - match:
+                  prefix: "/health"
+                route:
+                  cluster: health_check_cluster
+                  
+              # Default Route to API Gateway
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: api_gateway_cluster
+
+  clusters:
+  # Auth Service Cluster
+  - name: auth_service_cluster
+    connect_timeout: 5s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 100
+        max_pending_requests: 50
+        max_requests: 200
+        max_retries: 3
+    health_checks:
+    - timeout: 5s
+      interval: 10s
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+      http_health_check:
+        path: "/health"
+        expected_statuses:
+        - 200
+    load_assignment:
+      cluster_name: auth_service_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: auth-service
+                port_value: 8080
+
+  # Sample Service Cluster
+  - name: sample_service_cluster
+    connect_timeout: 5s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: LEAST_REQUEST
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 150
+        max_pending_requests: 75
+        max_requests: 300
+        max_retries: 3
+    health_checks:
+    - timeout: 5s
+      interval: 10s
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+      http_health_check:
+        path: "/health"
+        expected_statuses:
+        - 200
+    load_assignment:
+      cluster_name: sample_service_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: sample-service
+                port_value: 8081
+
+  # Enhanced Storage Service Cluster
+  - name: enhanced_storage_service_cluster
+    connect_timeout: 10s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: LEAST_REQUEST
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 200
+        max_pending_requests: 100
+        max_requests: 500
+        max_retries: 2
+    health_checks:
+    - timeout: 10s
+      interval: 15s
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+      http_health_check:
+        path: "/health"
+        expected_statuses:
+        - 200
+    load_assignment:
+      cluster_name: enhanced_storage_service_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: enhanced-storage-service
+                port_value: 8082
+
+  # Template Service Cluster
+  - name: template_service_cluster
+    connect_timeout: 5s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 100
+        max_pending_requests: 50
+        max_requests: 200
+        max_retries: 3
+    health_checks:
+    - timeout: 5s
+      interval: 10s
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+      http_health_check:
+        path: "/health"
+        expected_statuses:
+        - 200
+    load_assignment:
+      cluster_name: template_service_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: template-service
+                port_value: 8083
+
+  # Sequencing Service Cluster
+  - name: sequencing_service_cluster
+    connect_timeout: 10s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: LEAST_REQUEST
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 50
+        max_pending_requests: 25
+        max_requests: 100
+        max_retries: 2
+    health_checks:
+    - timeout: 10s
+      interval: 20s
+      unhealthy_threshold: 2
+      healthy_threshold: 2
+      http_health_check:
+        path: "/health"
+        expected_statuses:
+        - 200
+    load_assignment:
+      cluster_name: sequencing_service_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: sequencing-service
+                port_value: 8084
+
+  # Notification Service Cluster
+  - name: notification_service_cluster
+    connect_timeout: 3s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 200
+        max_pending_requests: 100
+        max_requests: 400
+        max_retries: 5
+    health_checks:
+    - timeout: 3s
+      interval: 10s
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+      http_health_check:
+        path: "/health"
+        expected_statuses:
+        - 200
+    load_assignment:
+      cluster_name: notification_service_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: notification-service
+                port_value: 8085
+
+  # Enhanced RAG Service Cluster
+  - name: enhanced_rag_service_cluster
+    connect_timeout: 15s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: LEAST_REQUEST
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 50
+        max_pending_requests: 25
+        max_requests: 100
+        max_retries: 2
+    health_checks:
+    - timeout: 15s
+      interval: 30s
+      unhealthy_threshold: 2
+      healthy_threshold: 2
+      http_health_check:
+        path: "/health"
+        expected_statuses:
+        - 200
+    load_assignment:
+      cluster_name: enhanced_rag_service_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: enhanced-rag-service
+                port_value: 8086
+
+  # Event Service Cluster
+  - name: event_service_cluster
+    connect_timeout: 5s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 150
+        max_pending_requests: 75
+        max_requests: 300
+        max_retries: 3
+    health_checks:
+    - timeout: 5s
+      interval: 10s
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+      http_health_check:
+        path: "/health"
+        expected_statuses:
+        - 200
+    load_assignment:
+      cluster_name: event_service_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: event-service
+                port_value: 8087
+
+  # Transaction Service Cluster
+  - name: transaction_service_cluster
+    connect_timeout: 10s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: LEAST_REQUEST
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 100
+        max_pending_requests: 50
+        max_requests: 200
+        max_retries: 3
+    health_checks:
+    - timeout: 10s
+      interval: 15s
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+      http_health_check:
+        path: "/health"
+        expected_statuses:
+        - 200
+    load_assignment:
+      cluster_name: transaction_service_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: transaction-service
+                port_value: 8088
+
+  # API Gateway Cluster (fallback)
+  - name: api_gateway_cluster
+    connect_timeout: 5s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 100
+        max_pending_requests: 50
+        max_requests: 200
+        max_retries: 3
+    load_assignment:
+      cluster_name: api_gateway_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: api-gateway
+                port_value: 8089
+
+layered_runtime:
+  layers:
+  - name: static_layer_0
+    static_layer:
+      envoy:
+        resource_limits:
+          listener:
+            example_listener_name:
+              connection_limit: 10000
+      overload:
+        global_downstream_max_connections: 50000
