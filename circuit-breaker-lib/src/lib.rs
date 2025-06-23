@@ -175,7 +175,11 @@ impl CircuitBreaker {
 
     async fn on_success(&self) {
         let mut state = self.state.write().await;
-        self.decrement_concurrent_requests().await;
+        
+        // Decrement concurrent requests within the same lock scope
+        if state.concurrent_requests > 0 {
+            state.concurrent_requests -= 1;
+        }
         
         match state.state {
             CircuitState::Closed => {
@@ -201,7 +205,11 @@ impl CircuitBreaker {
 
     async fn on_failure(&self) {
         let mut state = self.state.write().await;
-        self.decrement_concurrent_requests().await;
+        
+        // Decrement concurrent requests within the same lock scope
+        if state.concurrent_requests > 0 {
+            state.concurrent_requests -= 1;
+        }
         
         state.failure_count += 1;
         state.last_failure_time = Some(Instant::now());
