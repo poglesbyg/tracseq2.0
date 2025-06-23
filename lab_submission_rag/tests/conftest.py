@@ -2,25 +2,22 @@
 Pytest configuration and shared fixtures for the RAG system tests
 """
 
-import pytest
 import asyncio
-import tempfile
 import shutil
-from pathlib import Path
-from typing import List, Dict, Any
-from unittest.mock import Mock, AsyncMock, MagicMock
-import os
 import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import AsyncMock, Mock
+
+import pytest
 
 # Add the parent directory to the path to import the application modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from models.rag_models import DocumentChunk, DocumentMetadata, ExtractionResult
+from models.rag_models import DocumentChunk, ExtractionResult
 from models.submission import LabSubmission
 from rag.document_processor import DocumentProcessor
 from rag.vector_store import VectorStore
-from rag.llm_interface import LLMInterface
-from rag.enhanced_llm_interface import EnhancedLLMInterface
 
 
 @pytest.fixture(scope="session")
@@ -83,11 +80,11 @@ def sample_document_chunk():
             "file_type": "pdf",
             "page_number": 1,
             "chunk_index": 0,
-            "source_document": "test_document.pdf"
+            "source_document": "test_document.pdf",
         },
         source_document="test_document.pdf",
         chunk_index=0,
-        embedding=[0.1, 0.2, 0.3, 0.4, 0.5]  # Sample embedding vector
+        embedding=[0.1, 0.2, 0.3, 0.4, 0.5],  # Sample embedding vector
     )
 
 
@@ -103,11 +100,11 @@ def sample_document_chunks():
                 "file_type": "pdf",
                 "page_number": (i // 2) + 1,
                 "chunk_index": i,
-                "source_document": "test_document.pdf"
+                "source_document": "test_document.pdf",
             },
             source_document="test_document.pdf",
             chunk_index=i,
-            embedding=[0.1 * i, 0.2 * i, 0.3 * i, 0.4 * i, 0.5 * i]
+            embedding=[0.1 * i, 0.2 * i, 0.3 * i, 0.4 * i, 0.5 * i],
         )
         chunks.append(chunk)
     return chunks
@@ -127,7 +124,7 @@ def sample_lab_submission():
         tests_requested=["CBC", "Lipid Panel", "Glucose"],
         healthcare_provider="Dr. Jane Smith",
         provider_license="ML-98765",
-        clinical_notes="Routine health screening"
+        clinical_notes="Routine health screening",
     )
 
 
@@ -144,29 +141,30 @@ def mock_chromadb_client():
     """Mock ChromaDB client for testing"""
     mock_client = Mock()
     mock_collection = Mock()
-    
+
     # Mock collection methods
     mock_collection.add = Mock()
-    mock_collection.query = Mock(return_value={
-        'documents': [['Test document content']],
-        'metadatas': [[{'source_document': 'test.pdf', 'chunk_index': 0}]],
-        'ids': [['test_chunk_001']],
-        'distances': [[0.1]],
-        'embeddings': [[[0.1, 0.2, 0.3, 0.4, 0.5]]]
-    })
+    mock_collection.query = Mock(
+        return_value={
+            "documents": [["Test document content"]],
+            "metadatas": [[{"source_document": "test.pdf", "chunk_index": 0}]],
+            "ids": [["test_chunk_001"]],
+            "distances": [[0.1]],
+            "embeddings": [[[0.1, 0.2, 0.3, 0.4, 0.5]]],
+        }
+    )
     mock_collection.count = Mock(return_value=5)
-    mock_collection.get = Mock(return_value={
-        'ids': ['test_chunk_001', 'test_chunk_002'],
-        'metadatas': [
-            {'source_document': 'test.pdf'},
-            {'source_document': 'test.pdf'}
-        ]
-    })
+    mock_collection.get = Mock(
+        return_value={
+            "ids": ["test_chunk_001", "test_chunk_002"],
+            "metadatas": [{"source_document": "test.pdf"}, {"source_document": "test.pdf"}],
+        }
+    )
     mock_collection.delete = Mock()
-    
+
     mock_client.get_or_create_collection = Mock(return_value=mock_collection)
     mock_client.reset = Mock()
-    
+
     return mock_client
 
 
@@ -174,9 +172,11 @@ def mock_chromadb_client():
 def mock_llm_client():
     """Mock LLM client for testing"""
     mock_client = AsyncMock()
-    mock_client.chat.completions.create = AsyncMock(return_value=Mock(
-        choices=[Mock(message=Mock(content="This is a test response from the LLM."))]
-    ))
+    mock_client.chat.completions.create = AsyncMock(
+        return_value=Mock(
+            choices=[Mock(message=Mock(content="This is a test response from the LLM."))]
+        )
+    )
     return mock_client
 
 
@@ -216,8 +216,8 @@ def sample_extraction_result():
         extracted_data={
             "patient_name": "John Doe",
             "patient_id": "PAT-12345",
-            "sample_type": "Blood"
-        }
+            "sample_type": "Blood",
+        },
     )
 
 
@@ -245,7 +245,7 @@ def mock_vector_store():
 def mock_rag_system():
     """Mock RAG system for integration testing"""
     from rag_orchestrator import LabSubmissionRAG
-    
+
     mock_rag = Mock(spec=LabSubmissionRAG)
     mock_rag.process_document = AsyncMock()
     mock_rag.query_submissions = AsyncMock(return_value="Test response")
@@ -259,7 +259,7 @@ TEST_QUERIES = [
     "What are the requirements for blood sample collection?",
     "How long does it take to process a CBC test?",
     "What information is required for a lab submission?",
-    "Can you help me understand the test results?"
+    "Can you help me understand the test results?",
 ]
 
 TEST_DOCUMENTS = [
@@ -267,5 +267,5 @@ TEST_DOCUMENTS = [
     "Blood collection procedures",
     "Test result interpretation guide",
     "Patient information requirements",
-    "Quality control procedures"
-] 
+    "Quality control procedures",
+]

@@ -49,7 +49,7 @@ interface SpreadsheetDataViewerProps {
 interface DataRecord {
   id: string;
   row_number: number;
-  row_data: Record<string, any>;
+  row_data: Record<string, unknown>;
   created_at: string;
 }
 
@@ -296,7 +296,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
   const orderedColumns = [...pinnedColumnsArray, ...unpinnedColumns];
 
   // Data type detection utilities
-  const detectDataType = useCallback((value: any): DataType => {
+  const detectDataType = useCallback((value: unknown): DataType => {
     if (value === null || value === undefined || value === '') return 'text';
     
     const strValue = String(value).trim();
@@ -405,7 +405,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
           comparison = Number(aVal) - Number(bVal);
           break;
         case 'date':
-          comparison = new Date(aVal).getTime() - new Date(bVal).getTime();
+          comparison = new Date(aVal as string | number | Date).getTime() - new Date(bVal as string | number | Date).getTime();
           break;
         default:
           comparison = String(aVal).localeCompare(String(bVal));
@@ -747,7 +747,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
     }
   };
 
-  const formatCellValue = (value: any, type: DataType) => {
+  const formatCellValue = (value: unknown, type: DataType) => {
     if (value === null || value === undefined || value === '') {
       return <span className="text-gray-400 italic">—</span>;
     }
@@ -755,14 +755,15 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
     const stringValue = String(value);
     
     switch (type) {
-      case 'number':
+      case 'number': {
         const num = Number(value);
         return isNaN(num) ? stringValue : (
           <span className="font-mono text-right">{num.toLocaleString()}</span>
         );
+      }
       case 'date':
         try {
-          const date = new Date(value);
+          const date = new Date(value as string | number | Date);
           return isNaN(date.getTime()) ? stringValue : (
             <span className="text-gray-700">{date.toLocaleDateString()}</span>
           );
@@ -784,7 +785,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
             </svg>
           </a>
         );
-      case 'boolean':
+      case 'boolean': {
         const lowerVal = stringValue.toLowerCase();
         const isTrue = ['true', 'yes', '1'].includes(lowerVal);
         return (
@@ -794,6 +795,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
             {isTrue ? '✓ Yes' : '✗ No'}
           </span>
         );
+      }
       default:
         return <span className="text-gray-900">{stringValue}</span>;
     }

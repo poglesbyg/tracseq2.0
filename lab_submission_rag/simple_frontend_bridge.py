@@ -4,19 +4,18 @@ Simple Frontend API Bridge for RAG Submissions
 Provides basic API endpoints that the lab_manager frontend needs
 """
 
+import uuid
+from typing import List, Optional
+
+import asyncpg
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
-import asyncio
-import asyncpg
-import uuid
-from datetime import datetime
 
 app = FastAPI(
     title="Simple RAG Submissions API Bridge",
     description="Basic API bridge for lab_manager frontend to access RAG submissions",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # Enable CORS for lab_manager frontend
@@ -30,15 +29,17 @@ app.add_middleware(
 
 # Database connection
 DB_CONFIG = {
-    'host': 'postgres',
-    'port': 5432,
-    'database': 'lab_manager',
-    'user': 'postgres',
-    'password': 'postgres'
+    "host": "postgres",
+    "port": 5432,
+    "database": "lab_manager",
+    "user": "postgres",
+    "password": "postgres",
 }
+
 
 class RagSubmissionResponse(BaseModel):
     """Response model for RAG submissions"""
+
     id: str
     submission_id: str
     submitter_name: Optional[str]
@@ -49,14 +50,17 @@ class RagSubmissionResponse(BaseModel):
     created_at: str
     status: str = "completed"
 
+
 async def get_db_connection():
     """Get database connection"""
     return await asyncpg.connect(**DB_CONFIG)
+
 
 @app.get("/")
 async def root():
     """Root endpoint"""
     return {"message": "Simple RAG Submissions API Bridge", "status": "operational"}
+
 
 @app.get("/health")
 async def health_check():
@@ -68,14 +72,16 @@ async def health_check():
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Database connection failed: {e}")
 
+
 @app.get("/api/rag/submissions", response_model=List[RagSubmissionResponse])
 async def get_rag_submissions(limit: int = 50, offset: int = 0):
     """Get RAG submissions for the frontend"""
     try:
         conn = await get_db_connection()
-        
+
         # Query RAG submissions from database
-        submissions = await conn.fetch("""
+        submissions = await conn.fetch(
+            """
             SELECT 
                 submission_id,
                 submitter_name,
@@ -87,62 +93,73 @@ async def get_rag_submissions(limit: int = 50, offset: int = 0):
             FROM rag_submissions 
             ORDER BY created_at DESC 
             LIMIT $1 OFFSET $2
-        """, limit, offset)
-        
+        """,
+            limit,
+            offset,
+        )
+
         await conn.close()
-        
+
         # Convert to response format
         result = []
         for row in submissions:
-            result.append(RagSubmissionResponse(
-                id=str(uuid.uuid4())[:8],  # Short ID for display
-                submission_id=row['submission_id'],
-                submitter_name=row['submitter_name'],
-                submitter_email=row['submitter_email'],
-                sample_type=row['sample_type'] or "Unknown",
-                sample_name=row['document_name'],
-                confidence_score=row['confidence_score'] or 0.0,
-                created_at=row['created_at'].isoformat() if row['created_at'] else "",
-                status="completed"
-            ))
-        
+            result.append(
+                RagSubmissionResponse(
+                    id=str(uuid.uuid4())[:8],  # Short ID for display
+                    submission_id=row["submission_id"],
+                    submitter_name=row["submitter_name"],
+                    submitter_email=row["submitter_email"],
+                    sample_type=row["sample_type"] or "Unknown",
+                    sample_name=row["document_name"],
+                    confidence_score=row["confidence_score"] or 0.0,
+                    created_at=row["created_at"].isoformat() if row["created_at"] else "",
+                    status="completed",
+                )
+            )
+
         return result
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch submissions: {e}")
+
 
 @app.get("/api/rag/stats")
 async def get_rag_statistics():
     """Get RAG system statistics"""
     try:
         conn = await get_db_connection()
-        
+
         # Get submission counts
         total_submissions = await conn.fetchval("SELECT COUNT(*) FROM rag_submissions")
-        
+
         # Get recent activity
-        recent_count = await conn.fetchval("""
+        recent_count = await conn.fetchval(
+            """
             SELECT COUNT(*) FROM rag_submissions 
             WHERE created_at >= NOW() - INTERVAL '7 days'
-        """)
-        
+        """
+        )
+
         # Get average confidence
-        avg_confidence = await conn.fetchval("""
+        avg_confidence = await conn.fetchval(
+            """
             SELECT AVG(confidence_score) FROM rag_submissions 
             WHERE confidence_score > 0
-        """)
-        
+        """
+        )
+
         await conn.close()
-        
+
         return {
             "total_submissions": total_submissions or 0,
             "recent_submissions": recent_count or 0,
             "average_confidence": float(avg_confidence or 0.0),
-            "status": "operational"
+            "status": "operational",
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get statistics: {e}")
+
 
 @app.post("/api/rag/process")
 async def process_document():
@@ -150,25 +167,30 @@ async def process_document():
     return {
         "success": False,
         "message": "Document processing not implemented in simple bridge",
-        "processing_time": 0.0
+        "processing_time": 0.0,
     }
+
 
 class QueryRequest(BaseModel):
     """Request model for queries"""
+
     query: str
     session_id: Optional[str] = "default"
 
+
 class QueryResponse(BaseModel):
     """Response model for queries"""
+
     answer: str
+
 
 def get_intelligent_response(query: str) -> str:
     """Generate intelligent responses based on query content"""
     query_lower = query.lower().strip()
-    
+
     # Greeting responses
-    if any(word in query_lower for word in ['hello', 'hi', 'hey', 'greetings']):
-        return f"""Hello! I'm your lab management assistant. I can help you with sample processing, storage management, sequencing workflows, and more.
+    if any(word in query_lower for word in ["hello", "hi", "hey", "greetings"]):
+        return """Hello! I'm your lab management assistant. I can help you with sample processing, storage management, sequencing workflows, and more.
 
 What can I help you with today? You can ask me about:
 • Submitting new samples
@@ -178,7 +200,19 @@ What can I help you with today? You can ask me about:
 • Using the lab management system"""
 
     # Sample submission and processing (check this BEFORE general help)
-    elif any(phrase in query_lower for phrase in ['submit', 'upload', 'create sample', 'new sample', 'add sample', 'submit a sample', 'submit sample', 'submission']):
+    elif any(
+        phrase in query_lower
+        for phrase in [
+            "submit",
+            "upload",
+            "create sample",
+            "new sample",
+            "add sample",
+            "submit a sample",
+            "submit sample",
+            "submission",
+        ]
+    ):
         return """To submit new samples, you have several options:
 
 1. 📄 AI DOCUMENT PROCESSING (Recommended)
@@ -199,7 +233,10 @@ What can I help you with today? You can ask me about:
 Which method would you prefer to use?"""
 
     # Storage and temperature questions
-    elif any(word in query_lower for word in ['storage', 'store', 'temperature', 'freezer', 'refrigerator', 'location']):
+    elif any(
+        word in query_lower
+        for word in ["storage", "store", "temperature", "freezer", "refrigerator", "location"]
+    ):
         return """For sample storage management:
 
 🌡️ TEMPERATURE REQUIREMENTS:
@@ -222,7 +259,10 @@ Which method would you prefer to use?"""
 Would you like help setting up storage locations or finding a specific sample?"""
 
     # Sequencing and molecular biology
-    elif any(word in query_lower for word in ['sequencing', 'sequence', 'dna', 'rna', 'library', 'prep', 'qc', 'quality']):
+    elif any(
+        word in query_lower
+        for word in ["sequencing", "sequence", "dna", "rna", "library", "prep", "qc", "quality"]
+    ):
         return """For sequencing workflows and quality control:
 
 🧬 SEQUENCING PLATFORMS SUPPORTED:
@@ -247,8 +287,20 @@ Would you like help setting up storage locations or finding a specific sample?""
 
 What type of sequencing are you planning?"""
 
-    # Reports and data analysis  
-    elif any(word in query_lower for word in ['report', 'export', 'data', 'analysis', 'statistics', 'analytics', 'generate report', 'create report']):
+    # Reports and data analysis
+    elif any(
+        word in query_lower
+        for word in [
+            "report",
+            "export",
+            "data",
+            "analysis",
+            "statistics",
+            "analytics",
+            "generate report",
+            "create report",
+        ]
+    ):
         return """For reports and data analysis:
 
 📊 AVAILABLE REPORTS:
@@ -279,7 +331,19 @@ What type of sequencing are you planning?"""
 What kind of report would you like to generate?"""
 
     # Barcode and tracking
-    elif any(phrase in query_lower for phrase in ['barcode', 'track', 'find sample', 'locate sample', 'scan', 'find a sample', 'locate a sample', 'where is sample']):
+    elif any(
+        phrase in query_lower
+        for phrase in [
+            "barcode",
+            "track",
+            "find sample",
+            "locate sample",
+            "scan",
+            "find a sample",
+            "locate a sample",
+            "where is sample",
+        ]
+    ):
         return """For barcode tracking and sample location:
 
 🏷️ BARCODE SYSTEM:
@@ -308,7 +372,7 @@ What kind of report would you like to generate?"""
 Need help finding a specific sample or setting up barcode printing?"""
 
     # Templates and batch processing
-    elif any(word in query_lower for word in ['template', 'excel', 'batch', 'bulk', 'multiple']):
+    elif any(word in query_lower for word in ["template", "excel", "batch", "bulk", "multiple"]):
         return """For template-based batch processing:
 
 📊 EXCEL TEMPLATES:
@@ -339,7 +403,16 @@ Need help finding a specific sample or setting up barcode printing?"""
 How many samples are you looking to upload at once?"""
 
     # Help and general queries (check after specific ones)
-    elif any(phrase in query_lower for phrase in ['help', 'what can you do', 'what do you do', 'how can you help', 'what are your capabilities']):
+    elif any(
+        phrase in query_lower
+        for phrase in [
+            "help",
+            "what can you do",
+            "what do you do",
+            "how can you help",
+            "what are your capabilities",
+        ]
+    ):
         return """I'm here to help with your laboratory management needs! Here's what I can assist with:
 
 🧪 SAMPLE MANAGEMENT
@@ -365,7 +438,10 @@ How many samples are you looking to upload at once?"""
 Just ask me a specific question about any of these areas!"""
 
     # Login, access, and system issues
-    elif any(word in query_lower for word in ['login', 'access', 'permission', 'error', 'problem', 'issue']):
+    elif any(
+        word in query_lower
+        for word in ["login", "access", "permission", "error", "problem", "issue"]
+    ):
         return """For system access and troubleshooting:
 
 🔐 ACCESS ISSUES:
@@ -417,18 +493,20 @@ I'm your lab management assistant and I can help with many laboratory tasks. Her
 
 Could you rephrase your question or ask about a specific lab management task? I'm here to help make your laboratory work more efficient!"""
 
+
 @app.post("/query", response_model=QueryResponse)
 async def query_submission_information(request: QueryRequest):
     """Query the RAG system for information about submitted samples"""
     try:
         answer = get_intelligent_response(request.query)
         return QueryResponse(answer=answer)
-        
-    except Exception as e:
+
+    except Exception:
         # Return a helpful error message
         return QueryResponse(
-            answer=f"I apologize, but I'm having trouble processing your question right now. This could be due to a temporary system issue. Please try again in a moment, or contact your lab administrator if the problem persists."
+            answer="I apologize, but I'm having trouble processing your question right now. This could be due to a temporary system issue. Please try again in a moment, or contact your lab administrator if the problem persists."
         )
+
 
 # Startup event to test database connection
 @app.on_event("startup")
@@ -441,10 +519,12 @@ async def startup_event():
     except Exception as e:
         print(f"❌ Database connection failed: {e}")
 
+
 if __name__ == "__main__":
     import uvicorn
+
     print("🚀 Starting Simple RAG Submissions API Bridge")
     print("📡 Providing basic RAG data access for frontend")
     print("🌐 CORS enabled for all origins")
-    
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)

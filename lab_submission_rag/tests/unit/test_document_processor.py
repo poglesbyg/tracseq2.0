@@ -2,18 +2,16 @@
 Unit tests for the DocumentProcessor class
 """
 
-import pytest
-import asyncio
-from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
-import tempfile
-import os
-
 import sys
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from rag.document_processor import DocumentProcessor
 from models.rag_models import DocumentChunk
+from rag.document_processor import DocumentProcessor
 
 
 class TestDocumentProcessor:
@@ -54,110 +52,110 @@ class TestDocumentProcessor:
         txt_file = temp_dir / "test.txt"
         with open(txt_file, "w") as f:
             f.write("This is a text file")
-        
+
         result = await processor.process_document(txt_file)
         assert result == []
 
     @pytest.mark.asyncio
-    @patch('rag.document_processor.PdfReader')
+    @patch("rag.document_processor.PdfReader")
     async def test_process_pdf_success(self, mock_pdf_reader, processor, create_test_pdf):
         """Test successful PDF processing"""
         # Mock PDF reader
         mock_page = Mock()
         mock_page.extract_text.return_value = "Sample PDF text content"
-        
+
         mock_pdf_instance = Mock()
         mock_pdf_instance.pages = [mock_page]
         mock_pdf_instance.__enter__ = Mock(return_value=mock_pdf_instance)
         mock_pdf_instance.__exit__ = Mock(return_value=None)
-        
+
         mock_pdf_reader.return_value = mock_pdf_instance
 
         result = await processor.process_document(create_test_pdf)
-        
+
         assert len(result) == 1
         assert isinstance(result[0], DocumentChunk)
         assert result[0].source_document == str(create_test_pdf)
         assert "pdf" in result[0].metadata["file_type"]
 
     @pytest.mark.asyncio
-    @patch('rag.document_processor.Document')
+    @patch("rag.document_processor.Document")
     async def test_process_docx_success(self, mock_document, processor, create_test_docx):
         """Test successful DOCX processing"""
         # Mock DOCX document
         mock_paragraph = Mock()
         mock_paragraph.text = "Sample DOCX paragraph text"
-        
+
         mock_doc_instance = Mock()
         mock_doc_instance.paragraphs = [mock_paragraph]
-        
+
         mock_document.return_value = mock_doc_instance
 
         result = await processor.process_document(create_test_docx)
-        
+
         assert len(result) == 1
         assert isinstance(result[0], DocumentChunk)
         assert result[0].source_document == str(create_test_docx)
         assert "docx" in result[0].metadata["file_type"]
 
     @pytest.mark.asyncio
-    @patch('rag.document_processor.PdfReader')
+    @patch("rag.document_processor.PdfReader")
     async def test_process_pdf_empty_pages(self, mock_pdf_reader, processor, create_test_pdf):
         """Test PDF processing with empty pages"""
         # Mock PDF reader with empty pages
         mock_page = Mock()
         mock_page.extract_text.return_value = ""
-        
+
         mock_pdf_instance = Mock()
         mock_pdf_instance.pages = [mock_page]
         mock_pdf_instance.__enter__ = Mock(return_value=mock_pdf_instance)
         mock_pdf_instance.__exit__ = Mock(return_value=None)
-        
+
         mock_pdf_reader.return_value = mock_pdf_instance
 
         result = await processor.process_document(create_test_pdf)
-        
+
         # Should return empty list for empty pages
         assert result == []
 
     @pytest.mark.asyncio
-    @patch('rag.document_processor.Document')
+    @patch("rag.document_processor.Document")
     async def test_process_docx_empty_paragraphs(self, mock_document, processor, create_test_docx):
         """Test DOCX processing with empty paragraphs"""
         # Mock DOCX document with empty paragraphs
         mock_paragraph = Mock()
         mock_paragraph.text = ""
-        
+
         mock_doc_instance = Mock()
         mock_doc_instance.paragraphs = [mock_paragraph]
-        
+
         mock_document.return_value = mock_doc_instance
 
         result = await processor.process_document(create_test_docx)
-        
+
         # Should return empty list for empty paragraphs
         assert result == []
 
     @pytest.mark.asyncio
-    @patch('rag.document_processor.PdfReader')
+    @patch("rag.document_processor.PdfReader")
     async def test_process_pdf_multiple_pages(self, mock_pdf_reader, processor, create_test_pdf):
         """Test PDF processing with multiple pages"""
         # Mock PDF reader with multiple pages
         mock_page1 = Mock()
         mock_page1.extract_text.return_value = "Page 1 content"
-        
+
         mock_page2 = Mock()
         mock_page2.extract_text.return_value = "Page 2 content"
-        
+
         mock_pdf_instance = Mock()
         mock_pdf_instance.pages = [mock_page1, mock_page2]
         mock_pdf_instance.__enter__ = Mock(return_value=mock_pdf_instance)
         mock_pdf_instance.__exit__ = Mock(return_value=None)
-        
+
         mock_pdf_reader.return_value = mock_pdf_instance
 
         result = await processor.process_document(create_test_pdf)
-        
+
         assert len(result) == 2
         assert all(isinstance(chunk, DocumentChunk) for chunk in result)
         assert result[0].content != result[1].content
@@ -166,9 +164,9 @@ class TestDocumentProcessor:
         """Test chunk creation"""
         test_file = temp_dir / "test.pdf"
         test_text = "This is a test document for chunk creation."
-        
+
         chunk = processor._create_chunk(test_text, test_file, page_number=1, chunk_index=0)
-        
+
         assert isinstance(chunk, DocumentChunk)
         assert chunk.source_document == str(test_file)
         assert chunk.metadata["file_type"] == "pdf"
@@ -185,7 +183,7 @@ class TestDocumentProcessor:
             f.write("This is not a valid PDF file")
 
         result = await processor.process_document(malformed_pdf)
-        
+
         # Should handle exception gracefully and return empty list
         assert result == []
 
@@ -198,16 +196,16 @@ class TestDocumentProcessor:
             f.write("This is not a valid DOCX file")
 
         result = await processor.process_document(malformed_docx)
-        
+
         # Should handle exception gracefully and return empty list
         assert result == []
 
     def test_processor_initialization(self):
         """Test DocumentProcessor initialization"""
         processor = DocumentProcessor()
-        
+
         assert processor.text_splitter is not None
-        assert hasattr(processor.text_splitter, 'split_text')
+        assert hasattr(processor.text_splitter, "split_text")
 
     @pytest.mark.asyncio
     async def test_process_document_with_path_object(self, processor, temp_dir):
@@ -216,7 +214,7 @@ class TestDocumentProcessor:
         txt_path = temp_dir / "test.txt"
         with open(txt_path, "w") as f:
             f.write("This is a text file")
-        
+
         result = await processor.process_document(txt_path)
         # Should handle Path objects without error and return empty for unsupported format
         assert isinstance(result, list)
@@ -229,7 +227,7 @@ class TestDocumentProcessor:
         pdf_path = temp_dir / "test.PDF"
         with open(pdf_path, "wb") as f:
             f.write(b"Mock PDF")
-        
+
         # Should handle case insensitive extensions (if implemented)
         result = await processor.process_document(pdf_path)
-        assert isinstance(result, list) 
+        assert isinstance(result, list)

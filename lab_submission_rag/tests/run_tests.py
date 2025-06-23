@@ -5,10 +5,9 @@ Test runner script for the RAG system tests
 This script provides convenient ways to run different test suites with various options.
 """
 
-import sys
-import os
-import subprocess
 import argparse
+import subprocess
+import sys
 from pathlib import Path
 
 # Add the parent directory to the path to import the application modules
@@ -21,7 +20,7 @@ def run_command(cmd, description):
     print(f"Running: {description}")
     print(f"Command: {' '.join(cmd)}")
     print(f"{'='*60}")
-    
+
     try:
         result = subprocess.run(cmd, capture_output=False, text=True, check=True)
         print(f"\n✅ {description} completed successfully")
@@ -55,14 +54,16 @@ def run_all_tests():
 def run_tests_with_coverage():
     """Run tests with coverage reporting"""
     cmd = [
-        "python", "-m", "pytest", 
-        "tests/", 
-        "-v", 
-        "--cov=rag", 
+        "python",
+        "-m",
+        "pytest",
+        "tests/",
+        "-v",
+        "--cov=rag",
         "--cov=api",
         "--cov-report=html:htmlcov",
         "--cov-report=term-missing",
-        "--cov-report=xml"
+        "--cov-report=xml",
     ]
     return run_command(cmd, "Tests with Coverage")
 
@@ -88,22 +89,23 @@ def run_marked_tests(marker):
 def check_test_environment():
     """Check if the test environment is properly set up"""
     print("🔍 Checking test environment...")
-    
+
     # Check if pytest is installed
     try:
         import pytest
+
         print(f"✅ pytest is installed (version: {pytest.__version__})")
     except ImportError:
         print("❌ pytest is not installed")
         return False
-    
+
     # Check if required test dependencies are available
     test_deps = [
         "pytest-asyncio",
         "pytest-cov",
         "httpx",  # For FastAPI testing
     ]
-    
+
     missing_deps = []
     for dep in test_deps:
         try:
@@ -112,12 +114,12 @@ def check_test_environment():
         except ImportError:
             missing_deps.append(dep)
             print(f"❌ {dep} is not installed")
-    
+
     if missing_deps:
         print(f"\n❌ Missing dependencies: {', '.join(missing_deps)}")
         print("Install them with: pip install " + " ".join(missing_deps))
         return False
-    
+
     # Check if test directory structure exists
     test_dirs = ["tests", "tests/unit", "tests/integration"]
     for test_dir in test_dirs:
@@ -126,7 +128,7 @@ def check_test_environment():
             return False
         else:
             print(f"✅ Test directory {test_dir} exists")
-    
+
     print("\n✅ Test environment is properly set up!")
     return True
 
@@ -146,9 +148,9 @@ Examples:
   python tests/run_tests.py --marker api          # Run API tests only
   python tests/run_tests.py --specific tests/unit/test_document_processor.py
   python tests/run_tests.py --check               # Check test environment
-        """
+        """,
     )
-    
+
     parser.add_argument("--unit", action="store_true", help="Run unit tests only")
     parser.add_argument("--integration", action="store_true", help="Run integration tests only")
     parser.add_argument("--all", action="store_true", help="Run all tests")
@@ -157,40 +159,40 @@ Examples:
     parser.add_argument("--marker", type=str, help="Run tests with specific marker")
     parser.add_argument("--specific", type=str, help="Run specific test file or function")
     parser.add_argument("--check", action="store_true", help="Check test environment")
-    
+
     args = parser.parse_args()
-    
+
     # If no arguments provided, show help
     if not any(vars(args).values()):
         parser.print_help()
         return
-    
+
     success = True
-    
+
     if args.check:
         success = check_test_environment()
-    
+
     if args.unit:
         success = run_unit_tests() and success
-    
+
     if args.integration:
         success = run_integration_tests() and success
-    
+
     if args.all:
         success = run_all_tests() and success
-    
+
     if args.coverage:
         success = run_tests_with_coverage() and success
-    
+
     if args.fast:
         success = run_fast_tests() and success
-    
+
     if args.marker:
         success = run_marked_tests(args.marker) and success
-    
+
     if args.specific:
         success = run_specific_test(args.specific) and success
-    
+
     if success:
         print("\n🎉 All requested tests completed successfully!")
         sys.exit(0)
@@ -200,4 +202,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    main() 
+    main()
