@@ -89,7 +89,7 @@ export default function TimelineView({ events, title = 'Timeline', className = '
     };
   };
 
-  const getEventIcon = (type: string) => {
+  const getEventIcon = () => {
     return ClockIcon; // Could be expanded with more specific icons
   };
 
@@ -230,7 +230,7 @@ export default function TimelineView({ events, title = 'Timeline', className = '
               <div className="relative">
                 {dayEvents.map((event, index) => {
                   const timestamp = formatTimestamp(event.timestamp);
-                  const Icon = getEventIcon(event.type);
+                  const Icon = getEventIcon();
                   const isLast = index === dayEvents.length - 1;
                   
                   return (

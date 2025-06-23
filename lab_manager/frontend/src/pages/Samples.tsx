@@ -20,7 +20,7 @@ interface Sample {
   status: 'Pending' | 'Validated' | 'InStorage' | 'InSequencing' | 'Completed';
   created_at: string;
   updated_at: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
   // Enhanced temporal data
   timestamps?: {
     created_at?: string;
@@ -38,6 +38,42 @@ export default function Samples() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [timeFilter, setTimeFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'table' | 'process'>('table');
+
+  // Helper function to generate realistic timestamp mapping
+  const generateRealisticTimestamps = (sample: Sample) => {
+    // If sample has actual timestamps, use them
+    if (sample.timestamps) {
+      return sample.timestamps;
+    }
+
+    // Create a base timestamps object
+    const baseTimestamps: Sample['timestamps'] = {
+      created_at: sample.created_at,
+    };
+
+    // Only assign timestamps for completed stages to avoid misleading simultaneous timestamps
+    // We use created_at as the base and only show the current status timestamp
+    switch (sample.status) {
+      case 'Validated':
+        baseTimestamps.validated_at = sample.updated_at;
+        break;
+      case 'InStorage':
+        // For InStorage, we know validation happened, but we don't know exactly when
+        // So we only show the storage timestamp to avoid false simultaneity
+        baseTimestamps.stored_at = sample.updated_at;
+        break;
+      case 'InSequencing':
+        // Similar logic - only show the sequencing start timestamp
+        baseTimestamps.sequencing_started_at = sample.updated_at;
+        break;
+      case 'Completed':
+        baseTimestamps.completed_at = sample.updated_at;
+        break;
+      // For 'Pending', only created_at is shown
+    }
+
+    return baseTimestamps;
+  };
 
   // Fetch samples
   const { data: samples, isLoading: isLoadingSamples, refetch } = useQuery<Sample[]>({
@@ -259,13 +295,7 @@ export default function Samples() {
               
               <ProcessFlow
                 currentStatus={selectedSample.status}
-                timestamps={selectedSample.timestamps || {
-                  created_at: selectedSample.created_at,
-                  validated_at: selectedSample.status === 'Validated' || selectedSample.status === 'InStorage' || selectedSample.status === 'InSequencing' || selectedSample.status === 'Completed' ? selectedSample.updated_at : undefined,
-                  stored_at: selectedSample.status === 'InStorage' || selectedSample.status === 'InSequencing' || selectedSample.status === 'Completed' ? selectedSample.updated_at : undefined,
-                  sequencing_started_at: selectedSample.status === 'InSequencing' || selectedSample.status === 'Completed' ? selectedSample.updated_at : undefined,
-                  completed_at: selectedSample.status === 'Completed' ? selectedSample.updated_at : undefined,
-                }}
+                timestamps={generateRealisticTimestamps(selectedSample)}
               />
 
               {/* Sample Details */}
@@ -383,7 +413,7 @@ export default function Samples() {
                                   <span className="font-mono text-xs">{sample.barcode}</span>
                                 </div>
                                 <div className="text-xs text-gray-400">
-                                  Template: {sample.metadata?.template_name || 'N/A'}
+                                  Template: {(sample.metadata?.template_name && typeof sample.metadata.template_name === 'string') ? sample.metadata.template_name : 'N/A'}
                                 </div>
                               </div>
                             </td>
@@ -463,13 +493,7 @@ export default function Samples() {
                 
                 <ProcessFlow
                   currentStatus={sample.status}
-                  timestamps={{
-                    created_at: sample.created_at,
-                    validated_at: sample.status === 'Validated' || sample.status === 'InStorage' || sample.status === 'InSequencing' || sample.status === 'Completed' ? sample.updated_at : undefined,
-                    stored_at: sample.status === 'InStorage' || sample.status === 'InSequencing' || sample.status === 'Completed' ? sample.updated_at : undefined,
-                    sequencing_started_at: sample.status === 'InSequencing' || sample.status === 'Completed' ? sample.updated_at : undefined,
-                    completed_at: sample.status === 'Completed' ? sample.updated_at : undefined,
-                  }}
+                  timestamps={generateRealisticTimestamps(sample)}
                   className="mt-4"
                 />
               </div>

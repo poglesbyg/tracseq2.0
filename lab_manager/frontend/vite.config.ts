@@ -11,18 +11,18 @@ export default defineConfig({
       // Route ALL API requests through the API Gateway
       // This enables gradual microservices migration with feature flags
       '/api': {
-        target: process.env.API_GATEWAY_URL || 'http://localhost:8000',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
-        configure: (proxy, _options) => {
-          proxy.on('error', (err, _req, _res) => {
-            console.log('API Gateway proxy error', err);
+        configure: (_proxy, _options) => {
+          _proxy.on('error', (_err, _req, _res) => {
+            console.log('proxy error', _err);
           });
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('Sending Request to API Gateway:', req.method, req.url);
+          _proxy.on('proxyReq', (_proxyReq, req, _res) => {
+            console.log('Sending Request to the Target:', req.method, req.url);
           });
-          proxy.on('proxyRes', (proxyRes, req, _res) => {
-            console.log('Received Response from API Gateway:', proxyRes.statusCode, req.url);
+          _proxy.on('proxyRes', (_proxyRes, req, _res) => {
+            console.log('Received Response from the Target:', _proxyRes.statusCode, req.url);
           });
         },
       },

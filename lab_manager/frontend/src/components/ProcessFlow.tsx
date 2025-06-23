@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircleIcon, ClockIcon, BeakerIcon, DatabaseIcon, CogIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, ClockIcon, BeakerIcon, CircleStackIcon, CogIcon } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/solid';
 
 interface ProcessStep {
@@ -56,7 +56,7 @@ export default function ProcessFlow({ currentStatus, timestamps, className = '' 
       id: 'instorage',
       name: 'In Storage',
       description: 'Sample stored in designated location',
-      icon: DatabaseIcon,
+      icon: CircleStackIcon,
       status: currentStepIndex >= 2 ? 'completed' : currentStepIndex === 1 ? 'current' : 'upcoming',
       timestamp: timestamps?.stored_at,
     },

@@ -6,7 +6,7 @@ import {
   ChartBarIcon,
   ArrowRightIcon,
   CalendarIcon,
-  TrendingUpIcon
+  ArrowTrendingUpIcon
 } from '@heroicons/react/24/outline';
 import { useMemo } from 'react';
 
@@ -132,7 +132,7 @@ export default function ProcessDashboard({ metrics, className = '' }: ProcessDas
 
         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
           <div className="flex items-center">
-            <TrendingUpIcon className="h-8 w-8 text-green-600" />
+            <ArrowTrendingUpIcon className="h-8 w-8 text-green-600" />
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-500">Avg. Processing</p>
               <p className="text-2xl font-semibold text-gray-900">

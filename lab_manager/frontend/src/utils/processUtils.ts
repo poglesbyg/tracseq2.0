@@ -22,7 +22,7 @@ export interface TimelineEvent {
     name: string;
     type: 'sample' | 'job' | 'template' | 'user';
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ProcessMetrics {
@@ -48,28 +48,28 @@ export interface ProcessMetrics {
 
 // Status configuration for consistent UI rendering
 export const statusConfig = {
-  'Pending': { 
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-200', 
+  'Pending': {
+    color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     description: 'Awaiting validation',
     order: 0
   },
-  'Validated': { 
-    color: 'bg-blue-100 text-blue-800 border-blue-200', 
+  'Validated': {
+    color: 'bg-blue-100 text-blue-800 border-blue-200',
     description: 'Ready for storage',
     order: 1
   },
-  'InStorage': { 
-    color: 'bg-purple-100 text-purple-800 border-purple-200', 
+  'InStorage': {
+    color: 'bg-purple-100 text-purple-800 border-purple-200',
     description: 'Stored and available',
     order: 2
   },
-  'InSequencing': { 
-    color: 'bg-indigo-100 text-indigo-800 border-indigo-200', 
+  'InSequencing': {
+    color: 'bg-indigo-100 text-indigo-800 border-indigo-200',
     description: 'Currently sequencing',
     order: 3
   },
-  'Completed': { 
-    color: 'bg-green-100 text-green-800 border-green-200', 
+  'Completed': {
+    color: 'bg-green-100 text-green-800 border-green-200',
     description: 'Processing complete',
     order: 4
   },
@@ -80,7 +80,7 @@ export const formatRelativeTime = (timestamp: string): string => {
   const date = new Date(timestamp);
   const now = new Date();
   const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-  
+
   if (diffInHours < 1) return 'Just now';
   if (diffInHours < 24) return `${diffInHours}h ago`;
   const diffInDays = Math.floor(diffInHours / 24);
@@ -174,20 +174,20 @@ const getTimestampForStage = (stageId: string, timestamps: Record<string, string
     'insequencing': 'sequencing_started_at',
     'completed': 'completed_at',
   };
-  
+
   return timestamps[mapping[stageId]];
 };
 
-const calculateStageDuration = (stageId: string, stages: any[], timestamps: Record<string, string>): number | undefined => {
+const calculateStageDuration = (stageId: string, stages: { id: string }[], timestamps: Record<string, string>): number | undefined => {
   const stageIndex = stages.findIndex(s => s.id === stageId);
   if (stageIndex === 0) return undefined; // First stage has no previous stage
-  
+
   const currentTimestamp = getTimestampForStage(stageId, timestamps);
   const previousStageId = stages[stageIndex - 1]?.id;
   const previousTimestamp = getTimestampForStage(previousStageId, timestamps);
-  
+
   if (!currentTimestamp || !previousTimestamp) return undefined;
-  
+
   const current = new Date(currentTimestamp);
   const previous = new Date(previousTimestamp);
   return (current.getTime() - previous.getTime()) / (1000 * 60 * 60); // hours
@@ -214,27 +214,27 @@ export const getNextValidStatuses = (currentStatus: string): string[] => {
     'InSequencing': ['Completed'],
     'Completed': [],
   };
-  
+
   return validTransitions[currentStatus] || [];
 };
 
 // Timeline utilities
 export const groupEventsByDate = (events: TimelineEvent[]): Record<string, TimelineEvent[]> => {
   const groups: Record<string, TimelineEvent[]> = {};
-  
+
   events.forEach(event => {
     const date = new Date(event.timestamp).toDateString();
     if (!groups[date]) groups[date] = [];
     groups[date].push(event);
   });
-  
+
   return groups;
 };
 
 export const filterEventsByTimeRange = (events: TimelineEvent[], timeRange: string): TimelineEvent[] => {
   const now = new Date();
   let cutoffTime: Date;
-  
+
   switch (timeRange) {
     case '1h':
       cutoffTime = new Date(now.getTime() - 1 * 60 * 60 * 1000);
@@ -254,16 +254,16 @@ export const filterEventsByTimeRange = (events: TimelineEvent[], timeRange: stri
     default:
       return events; // 'all' or unknown
   }
-  
+
   return events.filter(event => new Date(event.timestamp) >= cutoffTime);
 };
 
 // Analytics utilities
-export const calculateProcessingMetrics = (samples: any[]): ProcessMetrics => {
+export const calculateProcessingMetrics = (samples: { status: string; created_at: string }[]): ProcessMetrics => {
   const byStatus = samples.reduce((acc, sample) => {
     acc[sample.status] = (acc[sample.status] || 0) + 1;
     return acc;
-  }, {});
+  }, {} as Record<string, number>);
 
   // Calculate average processing times (mock data - would be calculated from actual timestamps)
   const averageProcessingTime = {
@@ -306,7 +306,7 @@ export const calculateProcessingMetrics = (samples: any[]): ProcessMetrics => {
   };
 };
 
-const calculateAverageStageTime = (samples: any[], stage: string): number => {
+const calculateAverageStageTime = (_samples: any[], stage: string): number => {
   // Mock implementation - would calculate from actual timestamp data
   const mockTimes: Record<string, number> = {
     validation: 4, // 4 hours
@@ -314,13 +314,13 @@ const calculateAverageStageTime = (samples: any[], stage: string): number => {
     sequencing: 48, // 48 hours
     overall: 72,   // 72 hours total
   };
-  
+
   return mockTimes[stage] || 0;
 };
 
 const identifyBottlenecks = (byStatus: Record<string, number>): ProcessMetrics['bottlenecks'] => {
   const bottlenecks: ProcessMetrics['bottlenecks'] = [];
-  
+
   // Simple heuristic: stages with high counts might be bottlenecks
   Object.entries(byStatus).forEach(([status, count]) => {
     if (count > 10 && status !== 'Completed') { // Arbitrary threshold
@@ -331,7 +331,7 @@ const identifyBottlenecks = (byStatus: Record<string, number>): ProcessMetrics['
       });
     }
   });
-  
+
   return bottlenecks.sort((a, b) => b.avgWaitTime - a.avgWaitTime);
 };
 
