@@ -42,8 +42,8 @@ config = "0.14"
 validator = { version = "0.18", features = ["derive"] }
 
 # Statistics and analytics
-statistical_analyzer = "0.1.0"
-linfa = { version = "0.7", features = ["ols"] }
+linfa = "0.7"
+linfa-linear = "0.7"
 ndarray = "0.15"
 
 # Metrics
