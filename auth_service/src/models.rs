@@ -1,8 +1,8 @@
 use crate::error::AuthError;
 use axum::{
     async_trait,
-    extract::{FromRequestParts, Request},
-    http::{request::Parts, StatusCode},
+    extract::FromRequestParts,
+    http::request::Parts,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -153,6 +153,7 @@ pub struct UserSession {
     #[serde(skip_serializing)]
     pub token_hash: String,
     #[serde(skip_serializing)]
+    #[allow(dead_code)]
     pub refresh_token_hash: Option<String>,
 
     // Session metadata
@@ -226,11 +227,13 @@ pub struct ValidateTokenResponse {
 pub struct ValidatePermissionsRequest {
     #[validate(length(min = 1, message = "Token is required"))]
     pub token: String,
+    #[allow(dead_code)]
     pub required_role: UserRole,
 }
 
 /// Permission validation response
 #[derive(Debug, Clone, Serialize)]
+#[allow(dead_code)]
 pub struct ValidatePermissionsResponse {
     pub authorized: bool,
     pub user: Option<serde_json::Value>,
@@ -248,23 +251,36 @@ pub struct CreateUserRequest {
     pub first_name: String,
     #[validate(length(min = 1, message = "Last name is required"))]
     pub last_name: String,
+    #[allow(dead_code)]
     pub role: UserRole,
+    #[allow(dead_code)]
     pub department: Option<String>,
+    #[allow(dead_code)]
     pub position: Option<String>,
+    #[allow(dead_code)]
     pub lab_affiliation: Option<String>,
+    #[allow(dead_code)]
     pub phone: Option<String>,
 }
 
 /// User update request
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct UpdateUserRequest {
+    #[allow(dead_code)]
     pub first_name: Option<String>,
+    #[allow(dead_code)]
     pub last_name: Option<String>,
+    #[allow(dead_code)]
     pub department: Option<String>,
+    #[allow(dead_code)]
     pub position: Option<String>,
+    #[allow(dead_code)]
     pub lab_affiliation: Option<String>,
+    #[allow(dead_code)]
     pub phone: Option<String>,
+    #[allow(dead_code)]
     pub role: Option<UserRole>,
+    #[allow(dead_code)]
     pub status: Option<UserStatus>,
 }
 
@@ -285,6 +301,7 @@ pub struct SecurityAuditLog {
 }
 
 /// Helper function to check role hierarchy
+#[allow(dead_code)]
 pub fn has_role_or_higher(user_role: &UserRole, required_role: &UserRole) -> bool {
     let role_hierarchy = [
         UserRole::Guest,
@@ -308,6 +325,7 @@ pub fn has_role_or_higher(user_role: &UserRole, required_role: &UserRole) -> boo
 }
 
 /// Result type for authentication operations
+#[allow(dead_code)]
 pub type AuthResult<T> = Result<T, crate::error::AuthError>;
 
 /// Axum extractor for authenticated users

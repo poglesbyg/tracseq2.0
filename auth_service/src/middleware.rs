@@ -1,6 +1,6 @@
 use axum::{
     extract::{Request, State},
-    http::{header::AUTHORIZATION, StatusCode},
+    http::header::AUTHORIZATION,
     middleware::Next,
     response::Response,
 };
@@ -8,10 +8,10 @@ use axum::{
 use crate::{
     AppState,
     error::AuthError,
-    models::*,
 };
 
 /// Authentication middleware that verifies JWT tokens and injects user info
+#[allow(dead_code)]
 pub async fn auth_middleware(
     State(state): State<AppState>,
     mut request: Request,
@@ -23,13 +23,7 @@ pub async fn auth_middleware(
     let auth_header = headers
         .get(AUTHORIZATION)
         .and_then(|header| header.to_str().ok())
-        .and_then(|header| {
-            if header.starts_with("Bearer ") {
-                Some(&header[7..])
-            } else {
-                None
-            }
-        });
+        .and_then(|header| header.strip_prefix("Bearer "));
 
     let token = match auth_header {
         Some(token) => token,
@@ -66,6 +60,7 @@ pub async fn auth_middleware(
 }
 
 /// Admin middleware that requires admin privileges
+#[allow(dead_code)]
 pub async fn admin_middleware(
     State(state): State<AppState>,
     mut request: Request,
@@ -77,13 +72,7 @@ pub async fn admin_middleware(
     let auth_header = headers
         .get(AUTHORIZATION)
         .and_then(|header| header.to_str().ok())
-        .and_then(|header| {
-            if header.starts_with("Bearer ") {
-                Some(&header[7..])
-            } else {
-                None
-            }
-        });
+        .and_then(|header| header.strip_prefix("Bearer "));
 
     let token = match auth_header {
         Some(token) => token,
@@ -125,9 +114,10 @@ pub async fn admin_middleware(
 }
 
 /// Service authentication middleware for inter-service communication
+#[allow(dead_code)]
 pub async fn service_auth_middleware(
     State(state): State<AppState>,
-    mut request: Request,
+    request: Request,
     next: Next,
 ) -> Result<Response, AuthError> {
     let headers = request.headers();
@@ -170,6 +160,7 @@ pub async fn service_auth_middleware(
 }
 
 /// Optional authentication middleware that doesn't require authentication but injects user if present
+#[allow(dead_code)]
 pub async fn optional_auth_middleware(
     State(state): State<AppState>,
     mut request: Request,
@@ -181,13 +172,7 @@ pub async fn optional_auth_middleware(
     if let Some(auth_header) = headers
         .get(AUTHORIZATION)
         .and_then(|header| header.to_str().ok())
-        .and_then(|header| {
-            if header.starts_with("Bearer ") {
-                Some(&header[7..])
-            } else {
-                None
-            }
-        })
+        .and_then(|header| header.strip_prefix("Bearer "))
     {
         // Try to validate token and inject user if valid
         if let Ok(token_response) = state.auth_service.validate_token(auth_header).await {

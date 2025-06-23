@@ -1,4 +1,4 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{extract::State, Json};
 use serde_json::json;
 use validator::Validate;
 
@@ -9,6 +9,7 @@ use crate::{
 };
 
 /// Login endpoint
+#[allow(dead_code)]
 pub async fn login(
     State(state): State<AppState>,
     Json(request): Json<LoginRequest>,
@@ -26,6 +27,7 @@ pub async fn login(
 }
 
 /// Register endpoint (if registration is enabled)
+#[allow(dead_code)]
 pub async fn register(
     State(state): State<AppState>,
     Json(request): Json<RegisterRequest>,
@@ -55,6 +57,7 @@ pub async fn register(
 }
 
 /// Logout endpoint
+#[allow(dead_code)]
 pub async fn logout(
     State(state): State<AppState>,
     Json(request): Json<LogoutRequest>,
@@ -72,6 +75,7 @@ pub async fn logout(
 }
 
 /// Get current user endpoint (requires authentication)
+#[allow(dead_code)]
 pub async fn get_current_user(
     State(_state): State<AppState>,
     user: User, // Injected by middleware
@@ -96,6 +100,7 @@ pub async fn get_current_user(
 }
 
 /// Get user sessions endpoint
+#[allow(dead_code)]
 pub async fn get_sessions(
     State(state): State<AppState>,
     user: User, // Injected by middleware
@@ -126,6 +131,7 @@ pub async fn get_sessions(
 }
 
 /// Revoke session endpoint
+#[allow(dead_code)]
 pub async fn revoke_session(
     State(state): State<AppState>,
     axum::extract::Path(session_id): axum::extract::Path<uuid::Uuid>,
@@ -151,6 +157,7 @@ pub async fn revoke_session(
 }
 
 /// Change password endpoint
+#[allow(dead_code)]
 pub async fn change_password(
     State(state): State<AppState>,
     Json(request): Json<ChangePasswordRequest>,
@@ -189,6 +196,7 @@ pub async fn change_password(
 }
 
 /// Refresh token endpoint
+#[allow(dead_code)]
 pub async fn refresh_token(
     State(state): State<AppState>,
     Json(request): Json<RefreshTokenRequest>,
@@ -206,6 +214,7 @@ pub async fn refresh_token(
 }
 
 /// Forgot password endpoint
+#[allow(dead_code)]
 pub async fn forgot_password(
     State(state): State<AppState>,
     Json(request): Json<ForgotPasswordRequest>,
@@ -229,6 +238,7 @@ pub async fn forgot_password(
 }
 
 /// Reset password endpoint
+#[allow(dead_code)]
 pub async fn reset_password(
     State(state): State<AppState>,
     Json(request): Json<ResetPasswordRequest>,
@@ -251,6 +261,7 @@ pub async fn reset_password(
 }
 
 /// Verify email endpoint
+#[allow(dead_code)]
 pub async fn verify_email(
     State(state): State<AppState>,
     Json(request): Json<VerifyEmailRequest>,
@@ -284,13 +295,17 @@ pub struct RegisterRequest {
     pub first_name: String,
     #[validate(length(min = 1, message = "Last name is required"))]
     pub last_name: String,
+    #[allow(dead_code)]
     pub department: Option<String>,
+    #[allow(dead_code)]
     pub position: Option<String>,
+    #[allow(dead_code)]
     pub lab_affiliation: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct LogoutRequest {
+    #[allow(dead_code)]
     pub session_id: uuid::Uuid,
 }
 
