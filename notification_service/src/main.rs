@@ -20,7 +20,7 @@ mod error;
 mod handlers;
 mod models;
 mod services;
-mod middleware as notification_middleware;
+mod middleware;
 mod clients;
 
 use config::Config;
@@ -120,7 +120,7 @@ fn create_app(state: AppState) -> Router {
         .route("/notifications/bulk", post(handlers::notifications::send_bulk_notifications))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            notification_middleware::auth_middleware,
+            middleware::auth_middleware,
         ));
 
     // Channel management routes
@@ -136,7 +136,7 @@ fn create_app(state: AppState) -> Router {
         .route("/channels/slack/webhooks", post(handlers::channels::create_slack_webhook))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            notification_middleware::auth_middleware,
+            middleware::auth_middleware,
         ));
 
     // Template management routes
@@ -150,7 +150,7 @@ fn create_app(state: AppState) -> Router {
         .route("/templates/:template_id/validate", post(handlers::templates::validate_template))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            notification_middleware::auth_middleware,
+            middleware::auth_middleware,
         ));
 
     // Subscription management routes
@@ -164,7 +164,7 @@ fn create_app(state: AppState) -> Router {
         .route("/subscriptions/event/:event_type", get(handlers::subscriptions::get_event_subscriptions))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            notification_middleware::auth_middleware,
+            middleware::auth_middleware,
         ));
 
     // Integration routes
@@ -176,7 +176,7 @@ fn create_app(state: AppState) -> Router {
         .route("/integration/system-alerts", post(handlers::integration::handle_system_alert))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            notification_middleware::auth_middleware,
+            middleware::auth_middleware,
         ));
 
     // Admin routes (require admin privileges)
@@ -190,7 +190,7 @@ fn create_app(state: AppState) -> Router {
         .route("/admin/rate-limits", put(handlers::admin::update_rate_limits))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            notification_middleware::admin_middleware,
+            middleware::admin_middleware,
         ));
 
     // Combine all routes
