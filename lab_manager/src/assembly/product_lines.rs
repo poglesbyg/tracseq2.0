@@ -1,16 +1,13 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-
 use super::components::{
-    database::{DatabaseComponent, DatabaseComponentBuilder},
-    storage::{StorageBackend, StorageComponent, StorageComponentBuilder},
+    database::{DatabaseComponentBuilder},
+    storage::{StorageComponentBuilder},
 };
-use super::traits::{Component, ComponentError, ServiceRegistry};
-use crate::config::{AppConfig, DatabaseConfig, StorageConfig};
+use super::traits::{ComponentError, ServiceRegistry};
+use crate::config::{DatabaseConfig, StorageConfig};
 
 /// Different "product lines" - pre-configured assemblies for specific use cases
 /// These are like IKEA's different furniture collections, each optimized for different needs
-
+///
 /// The "Studio" line - minimal components for development and testing
 pub struct StudioLine;
 

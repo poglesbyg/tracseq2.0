@@ -2,9 +2,10 @@ use axum::{extract::State, http::StatusCode, Json};
 use chrono::Utc;
 use serde_json::json;
 
-use crate::{AppState, models::*};
+use crate::AppState;
 
 /// Basic health check endpoint
+#[allow(dead_code)]
 pub async fn health_check() -> Result<Json<serde_json::Value>, StatusCode> {
     let response = json!({
         "status": "healthy",
@@ -17,6 +18,7 @@ pub async fn health_check() -> Result<Json<serde_json::Value>, StatusCode> {
 }
 
 /// Readiness probe endpoint  
+#[allow(dead_code)]
 pub async fn readiness_check(
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
@@ -35,7 +37,7 @@ pub async fn readiness_check(
             Ok(Json(response))
         }
         Err(_) => {
-            let response = json!({
+            let _response = json!({
                 "status": "not_ready",
                 "timestamp": Utc::now().to_rfc3339(),
                 "service": "auth-service",
@@ -50,6 +52,7 @@ pub async fn readiness_check(
 }
 
 /// Metrics endpoint
+#[allow(dead_code)]
 pub async fn metrics(
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {

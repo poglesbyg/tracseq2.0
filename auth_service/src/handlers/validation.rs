@@ -9,6 +9,7 @@ use crate::{
 };
 
 /// Validate JWT token endpoint (for other services)
+#[allow(dead_code)]
 pub async fn validate_token(
     State(state): State<AppState>,
     Json(request): Json<ValidateTokenRequest>,
@@ -43,6 +44,7 @@ pub async fn validate_token(
 }
 
 /// Validate permissions endpoint (for other services)
+#[allow(dead_code)]
 pub async fn validate_permissions(
     State(state): State<AppState>,
     Json(request): Json<ValidatePermissionsRequest>,
@@ -112,6 +114,7 @@ pub async fn validate_permissions(
 }
 
 /// Extract user from token endpoint (for middleware)
+#[allow(dead_code)]
 pub async fn extract_user(
     State(state): State<AppState>,
     Json(request): Json<ValidateTokenRequest>,
@@ -153,6 +156,7 @@ pub async fn extract_user(
 }
 
 // Helper function to check role hierarchy
+#[allow(dead_code)]
 fn has_role_or_higher(user_role: &UserRole, required_role: &UserRole) -> bool {
     let role_hierarchy = [
         UserRole::Guest,
@@ -187,6 +191,8 @@ pub struct ValidateTokenRequest {
 pub struct ValidatePermissionsRequest {
     #[validate(length(min = 1, message = "Token is required"))]
     pub token: String,
+    #[allow(dead_code)]
     pub required_role: UserRole,
+    #[allow(dead_code)]
     pub resource: Option<String>,
 } 

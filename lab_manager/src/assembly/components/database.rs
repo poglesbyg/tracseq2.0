@@ -1,7 +1,9 @@
+use sqlx::{Pool, Postgres, PgPool};
+use sqlx::postgres::PgPoolOptions;
+use tracing::{info, warn, error};
 use async_trait::async_trait;
-use sqlx::PgPool;
+use serde_json;
 use std::any::Any;
-use std::sync::Arc;
 
 use super::super::traits::{
     Component, ComponentError, Configurable, ServiceProvider, ServiceRegistry,
@@ -50,7 +52,7 @@ impl Component for DatabaseComponent {
             return Ok(());
         }
 
-        tracing::info!("Initializing database connection pool");
+        info!("Initializing database connection pool");
 
         // Create the connection pool
         let pool = crate::config::database::create_pool(&self.config.url)
@@ -69,7 +71,7 @@ impl Component for DatabaseComponent {
         self.pool = Some(pool);
         self.is_initialized = true;
 
-        tracing::info!("Database component initialized successfully");
+        info!("Database component initialized successfully");
         Ok(())
     }
 
@@ -96,7 +98,7 @@ impl Component for DatabaseComponent {
 
     async fn shutdown(&mut self) -> Result<(), ComponentError> {
         if let Some(pool) = &self.pool {
-            tracing::info!("Closing database connection pool");
+            info!("Closing database connection pool");
             pool.close().await;
         }
 

@@ -66,6 +66,9 @@ async-trait = "0.1"
 # Async utilities
 futures = "0.3"
 
+# Version constraints for problematic dependencies
+base64ct = "1.6"
+
 # Metrics
 metrics = "0.21"
 metrics-exporter-prometheus = "0.12"

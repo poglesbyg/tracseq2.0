@@ -1,16 +1,10 @@
 use anyhow::Result;
 use axum::{
-    routing::{get, post, delete},
+    routing::get,
     Router,
 };
 use std::net::SocketAddr;
-use std::io::Write;
-use tower::ServiceBuilder;
-use tower_http::{
-    cors::CorsLayer,
-    trace::TraceLayer,
-};
-use tracing::{info, warn};
+use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod config;
@@ -50,7 +44,7 @@ async fn main() -> Result<()> {
             config
         }
         Err(e) => {
-            println!("AUTH SERVICE: Failed to load configuration: {}", e);
+            println!("AUTH SERVICE: Failed to load configuration: {e}");
             return Err(e);
         }
     };
@@ -64,7 +58,7 @@ async fn main() -> Result<()> {
             pool
         }
         Err(e) => {
-            println!("AUTH SERVICE: Failed to establish database connection: {}", e);
+            println!("AUTH SERVICE: Failed to establish database connection: {e}");
             return Err(e);
         }
     };
@@ -73,7 +67,7 @@ async fn main() -> Result<()> {
     // Run database migrations
     println!("AUTH SERVICE: Running database migrations");
     if let Err(e) = db_pool.migrate().await {
-        println!("AUTH SERVICE: Database migration failed: {}", e);
+        println!("AUTH SERVICE: Database migration failed: {e}");
         return Err(e);
     }
     println!("AUTH SERVICE: Database migrations completed");
@@ -87,7 +81,7 @@ async fn main() -> Result<()> {
             service
         }
         Err(e) => {
-            println!("AUTH SERVICE: Failed to initialize authentication service: {}", e);
+            println!("AUTH SERVICE: Failed to initialize authentication service: {e}");
             return Err(e);
         }
     };
@@ -107,23 +101,23 @@ async fn main() -> Result<()> {
 
     // Start the server
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
-    println!("AUTH SERVICE: Starting server on {}", addr);
-    info!("Authentication service listening on {}", addr);
+    println!("AUTH SERVICE: Starting server on {addr}");
+    info!("Authentication service listening on {addr}");
 
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(listener) => {
-            println!("AUTH SERVICE: Successfully bound to address {}", addr);
+            println!("AUTH SERVICE: Successfully bound to address {addr}");
             listener
         }
         Err(e) => {
-            println!("AUTH SERVICE: Failed to bind to address {}: {}", addr, e);
+            println!("AUTH SERVICE: Failed to bind to address {addr}: {e}");
             return Err(e.into());
         }
     };
 
     println!("AUTH SERVICE: About to start serving requests");
     if let Err(e) = axum::serve(listener, app).await {
-        println!("AUTH SERVICE: Server failed with error: {}", e);
+        println!("AUTH SERVICE: Server failed with error: {e}");
         return Err(e.into());
     }
 

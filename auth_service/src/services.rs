@@ -6,9 +6,8 @@ use argon2::{
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use sha2::{Digest, Sha256};
-use sqlx::{PgPool, Row};
-use std::collections::HashMap;
-use tracing::{error, info, warn};
+use sqlx::Row;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{
@@ -134,7 +133,7 @@ impl AuthServiceImpl {
         role: UserRole,
     ) -> AuthResult<User> {
         // Check if user already exists
-        if let Ok(_) = self.get_user_by_email(&email).await {
+        if (self.get_user_by_email(&email).await).is_ok() {
             return Err(AuthError::UserAlreadyExists);
         }
 
@@ -535,7 +534,7 @@ impl AuthServiceImpl {
     fn generate_jwt_token(&self, claims: &AuthClaims) -> AuthResult<String> {
         let header = Header::new(Algorithm::HS256);
         encode(&header, claims, &self.encoding_key)
-            .map_err(|e| AuthError::Jwt(e))
+            .map_err(AuthError::Jwt)
     }
 
     /// Decode JWT token
@@ -545,7 +544,7 @@ impl AuthServiceImpl {
         validation.set_audience(&[&self.config.jwt.audience]);
 
         let token_data = decode::<AuthClaims>(token, &self.decoding_key, &validation)
-            .map_err(|e| AuthError::Jwt(e))?;
+            .map_err(AuthError::Jwt)?;
 
         Ok(token_data.claims)
     }

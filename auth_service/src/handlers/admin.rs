@@ -9,6 +9,7 @@ use crate::{
 };
 
 /// List all users (admin only)
+#[allow(dead_code)]
 pub async fn list_users(
     State(state): State<AppState>,
     _admin_user: User, // Injected by admin middleware
@@ -46,6 +47,7 @@ pub async fn list_users(
 }
 
 /// Get specific user (admin only)
+#[allow(dead_code)]
 pub async fn get_user(
     State(state): State<AppState>,
     axum::extract::Path(user_id): axum::extract::Path<uuid::Uuid>,
@@ -80,6 +82,7 @@ pub async fn get_user(
 }
 
 /// Delete user (admin only)
+#[allow(dead_code)]
 pub async fn delete_user(
     State(state): State<AppState>,
     axum::extract::Path(user_id): axum::extract::Path<uuid::Uuid>,
@@ -101,6 +104,7 @@ pub async fn delete_user(
 }
 
 /// Disable user (admin only)
+#[allow(dead_code)]
 pub async fn disable_user(
     State(state): State<AppState>,
     axum::extract::Path(user_id): axum::extract::Path<uuid::Uuid>,
@@ -130,6 +134,7 @@ pub async fn disable_user(
 }
 
 /// Enable user (admin only)
+#[allow(dead_code)]
 pub async fn enable_user(
     State(state): State<AppState>,
     axum::extract::Path(user_id): axum::extract::Path<uuid::Uuid>,
@@ -153,6 +158,7 @@ pub async fn enable_user(
 }
 
 /// List all sessions (admin only)
+#[allow(dead_code)]
 pub async fn list_sessions(
     State(state): State<AppState>,
     _admin_user: User, // Injected by admin middleware
@@ -196,6 +202,7 @@ pub async fn list_sessions(
 }
 
 /// Get audit log (admin only)
+#[allow(dead_code)]
 pub async fn get_audit_log(
     State(state): State<AppState>,
     _admin_user: User, // Injected by admin middleware
