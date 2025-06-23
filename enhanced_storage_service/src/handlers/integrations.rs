@@ -15,7 +15,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Utc, Duration, Datelike};
 use tracing::{info, error, warn};
 
 use crate::{
@@ -130,7 +130,7 @@ pub async fn sync_sample_to_lims(
     // Simulate LIMS sync operation
     let sync_result = LIMSSyncResult {
         sample_id: request.sample_id,
-        lims_id: format!("LIMS-{}", Uuid::new_v4().to_simple().to_string()[..8].to_uppercase()),
+        lims_id: format!("LIMS-{}", Uuid::new_v4().simple().to_string()[..8].to_uppercase()),
         sync_status: "success".to_string(),
         sync_timestamp: Utc::now(),
         warnings: vec![],
@@ -184,7 +184,7 @@ pub async fn get_lims_workflow_status(
                 completed_at: None,
             },
         ],
-        samples_processed: vec![request.sample_id],
+        samples_processed: vec![Uuid::new_v4()], // Mock sample ID
         metadata: json!({
             "operator": "lab_tech_001",
             "equipment_used": ["PCR_001", "SEQUENCER_002"],
@@ -204,10 +204,10 @@ pub async fn create_erp_purchase_requisition(
     info!("Creating ERP purchase requisition");
 
     let requisition_result = ERPRequisitionResult {
-        requisition_id: format!("REQ-{}", Uuid::new_v4().to_simple().to_string()[..8].to_uppercase()),
+        requisition_id: format!("REQ-{}", Uuid::new_v4().simple().to_string()[..8].to_uppercase()),
         erp_reference: format!("ERP-PR-{}", Utc::now().format("%Y%m%d%H%M%S")),
         status: "submitted".to_string(),
-        approval_workflow_id: Some(format!("WF-{}", Uuid::new_v4().to_simple().to_string()[..6].to_uppercase())),
+        approval_workflow_id: Some(format!("WF-{}", Uuid::new_v4().simple().to_string()[..6].to_uppercase())),
         estimated_approval_date: Utc::now() + Duration::days(3),
         total_amount: request.items.iter().map(|item| item.estimated_cost).sum(),
         currency: "USD".to_string(),
@@ -550,14 +550,18 @@ pub async fn configure_integration_settings(
     let config_result = IntegrationConfigResult {
         configuration_id: Uuid::new_v4(),
         integration_name: request.integration_name.clone(),
-        settings_applied: request.settings.keys().len(),
+        settings_applied: if let serde_json::Value::Object(map) = &request.settings {
+            map.keys().len()
+        } else {
+            0
+        },
         validation_status: "passed".to_string(),
         restart_required: request.restart_required.unwrap_or(false),
         configuration_backup_id: Some(Uuid::new_v4()),
         applied_at: Utc::now(),
         applied_by: request.applied_by,
         changes_summary: vec![
-            format!("Updated {} configuration parameters", request.settings.keys().len()),
+            format!("Updated {} configuration parameters", if let serde_json::Value::Object(map) = &request.settings { map.keys().len() } else { 0 }),
             "Connection timeout increased to 60 seconds".to_string(),
             "Retry policy updated to 3 attempts with exponential backoff".to_string(),
             "Logging level set to INFO".to_string(),

@@ -66,7 +66,8 @@ async fn main() -> Result<()> {
     info!("🤖 AI/ML Platform initialized");
 
     // Initialize enterprise integrations
-    let integration_hub = integrations::initialize_integration_hub().await?;
+    let integration_config = integrations::IntegrationConfig::default();
+    let integration_hub = integrations::initialize_integration_hub(integration_config).await?;
     info!("🏢 Enterprise Integration Hub initialized");
 
     // Initialize enhanced storage service
@@ -99,7 +100,6 @@ async fn main() -> Result<()> {
 }
 
 /// Application state shared across handlers - Phase 3 Enhanced
-#[derive(Clone)]
 pub struct AppState {
     pub storage_service: EnhancedStorageService,
     pub config: Config,

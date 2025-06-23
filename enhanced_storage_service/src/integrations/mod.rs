@@ -23,7 +23,6 @@ use uuid::Uuid;
 use async_trait::async_trait;
 
 /// Integration platform manager
-#[derive(Debug)]
 pub struct IntegrationHub {
     integrations: HashMap<String, Box<dyn Integration>>,
     orchestration_engine: orchestration::OrchestrationEngine,
@@ -567,7 +566,7 @@ pub struct WorkflowError {
 }
 
 /// Integration platform errors
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, Serialize, thiserror::Error)]
 pub enum IntegrationError {
     #[error("System not found: {0}")]
     SystemNotFound(String),
