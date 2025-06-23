@@ -4,16 +4,19 @@ Multi-Agent Orchestrator for TracSeq 2.0
 
 This orchestrator coordinates multiple specialized AI agents using 
 the Multi-Agent Communication Protocol (MACP) extension to MCP.
+Enhanced with proper async task management to prevent task garbage 
+collection and resource leaks.
 """
 
 import asyncio
 import logging
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional, Union, Set, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 import uuid
 import json
+import weakref
 
 from anthropic import AsyncAnthropic
 from mcp_client import McpClient, McpError
@@ -30,6 +33,11 @@ class AgentType(Enum):
     OPTIMIZATION = "optimization"
     COMPLIANCE = "compliance"
     RESEARCH_ASSISTANT = "research_assistant"
+    DOCUMENT_PROCESSOR = "document_processor"
+    SAMPLE_TRACKER = "sample_tracker"
+    QUALITY_CONTROLLER = "quality_controller"
+    WORKFLOW_MANAGER = "workflow_manager"
+    NOTIFICATION_HANDLER = "notification_handler"
 
 class TaskPriority(Enum):
     """Task priority levels"""
@@ -42,6 +50,7 @@ class TaskStatus(Enum):
     """Task execution status"""
     PENDING = "pending"
     ASSIGNED = "assigned"
+    RUNNING = "running"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -65,6 +74,8 @@ class Task:
     error: Optional[str] = None
     dependencies: List[str] = field(default_factory=list)
     estimated_duration: Optional[int] = None  # seconds
+    retry_count: int = 0
+    max_retries: int = 3
 
 @dataclass
 class Agent:
@@ -80,6 +91,7 @@ class Agent:
     performance_metrics: Dict[str, float] = field(default_factory=dict)
     last_heartbeat: Optional[datetime] = None
     status: str = "idle"  # idle, busy, error, offline
+    handler: Optional[Callable] = None  # For direct handler registration
 
 @dataclass
 class CollaborationRequest:
@@ -95,20 +107,24 @@ class CollaborationRequest:
 class MultiAgentOrchestrator:
     """
     Advanced multi-agent orchestrator that coordinates AI agents
-    for complex laboratory management tasks.
+    for complex laboratory management tasks with proper async task management.
     """
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], max_concurrent_tasks: int = 100):
         self.config = config
-        self.anthropic = AsyncAnthropic(api_key=config.get("anthropic_api_key"))
+        self.max_concurrent_tasks = max_concurrent_tasks
+        self.anthropic = AsyncAnthropic(api_key=config.get("anthropic_api_key", ""))
         
         # Agent management
         self.agents: Dict[str, Agent] = {}
         self.mcp_clients: Dict[str, McpClient] = {}
         
-        # Task management
+        # Task management with proper async handling
         self.tasks: Dict[str, Task] = {}
         self.task_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
+        self.active_tasks: Set[asyncio.Task] = set()  # Store task references
+        self.completed_tasks: Dict[str, Task] = {}
+        self.task_registry: Dict[str, Task] = {}
         self.active_collaborations: Dict[str, CollaborationRequest] = {}
         
         # Performance tracking
@@ -118,6 +134,11 @@ class MultiAgentOrchestrator:
         # Orchestrator state
         self.is_running = False
         self.orchestrator_id = str(uuid.uuid4())
+        self._shutdown_event = asyncio.Event()
+        self._cleanup_interval = 300  # 5 minutes
+        
+        # Background tasks with proper reference management
+        self._background_tasks: Set[asyncio.Task] = set()
         
         self._initialize_agents()
     
@@ -149,36 +170,113 @@ class MultiAgentOrchestrator:
                 logger.error(f"Failed to initialize agent {agent_id}: {e}")
     
     async def start_orchestration(self):
-        """Start the orchestration engine"""
+        """Start the orchestration engine with proper async task management"""
         logger.info("Starting Multi-Agent Orchestrator")
         self.is_running = True
         
-        # Start background tasks
+        # Start background tasks with proper reference management
         orchestration_tasks = [
-            asyncio.create_task(self._task_scheduler()),
-            asyncio.create_task(self._agent_health_monitor()),
-            asyncio.create_task(self._performance_monitor()),
-            asyncio.create_task(self._collaboration_coordinator())
+            self._create_background_task(self._task_scheduler()),
+            self._create_background_task(self._agent_health_monitor()),
+            self._create_background_task(self._performance_monitor()),
+            self._create_background_task(self._collaboration_coordinator()),
+            self._create_background_task(self._cleanup_completed_tasks())
         ]
         
         try:
-            await asyncio.gather(*orchestration_tasks)
+            await asyncio.gather(*orchestration_tasks, return_exceptions=True)
         except Exception as e:
             logger.error(f"Orchestration error: {e}")
         finally:
             self.is_running = False
     
+    def _create_background_task(self, coro) -> asyncio.Task:
+        """Create a background task with proper reference management"""
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
+    
     async def stop_orchestration(self):
-        """Stop the orchestration engine"""
+        """Stop the orchestration engine with proper cleanup"""
         logger.info("Stopping Multi-Agent Orchestrator")
         self.is_running = False
+        self._shutdown_event.set()
+        
+        # Cancel all active tasks
+        for task in self.active_tasks.copy():
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+        
+        # Cancel background tasks
+        for task in self._background_tasks.copy():
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+        
+        self.active_tasks.clear()
+        self._background_tasks.clear()
+        logger.info("Multi-Agent Orchestrator stopped")
     
-    async def submit_task(self, task: Task) -> str:
-        """Submit a task for execution"""
+    def register_agent(self, agent_type: AgentType, handler: Callable, 
+                      max_concurrent_tasks: int = 5, name: str = None) -> str:
+        """Register a new agent with direct handler"""
+        agent_id = str(uuid.uuid4())
+        agent = Agent(
+            id=agent_id,
+            type=agent_type,
+            name=name or f"{agent_type.value}_agent",
+            description=f"Agent for {agent_type.value}",
+            mcp_endpoint="",  # No MCP endpoint for direct handlers
+            capabilities=[agent_type.value],
+            max_concurrent_tasks=max_concurrent_tasks,
+            handler=handler
+        )
+        self.agents[agent_id] = agent
+        logger.info(f"Registered agent {agent_id} of type {agent_type}")
+        return agent_id
+    
+    def unregister_agent(self, agent_id: str):
+        """Unregister an agent"""
+        if agent_id in self.agents:
+            del self.agents[agent_id]
+            if agent_id in self.mcp_clients:
+                del self.mcp_clients[agent_id]
+            logger.info(f"Unregistered agent {agent_id}")
+    
+    async def submit_task(self, task: Task = None, agent_type: AgentType = None, 
+                         payload: Dict[str, Any] = None, priority: int = None) -> str:
+        """Submit a task for execution (supports both styles)"""
+        
+        # Support both new Task object and legacy parameters
+        if task is None and agent_type and payload is not None:
+            task_priority = TaskPriority.MEDIUM
+            if priority is not None:
+                priority_map = {1: TaskPriority.CRITICAL, 2: TaskPriority.HIGH, 
+                              3: TaskPriority.MEDIUM, 4: TaskPriority.LOW}
+                task_priority = priority_map.get(priority, TaskPriority.MEDIUM)
+            
+            task = Task(
+                type=agent_type.value,
+                description=f"Task for {agent_type.value}",
+                priority=task_priority,
+                context=payload
+            )
+        elif task is None:
+            raise ValueError("Either task object or agent_type+payload must be provided")
+        
         logger.info(f"Submitting task: {task.description} (Priority: {task.priority.value})")
         
         # Store task
         self.tasks[task.id] = task
+        self.task_registry[task.id] = task
         
         # Add to priority queue (lower number = higher priority)
         priority_map = {
@@ -520,7 +618,7 @@ class MultiAgentOrchestrator:
     
     async def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get the current status of a task"""
-        task = self.tasks.get(task_id)
+        task = self.tasks.get(task_id) or self.completed_tasks.get(task_id)
         if not task:
             return None
         
@@ -534,7 +632,8 @@ class MultiAgentOrchestrator:
             "started_at": task.started_at.isoformat() if task.started_at else None,
             "completed_at": task.completed_at.isoformat() if task.completed_at else None,
             "result": task.result,
-            "error": task.error
+            "error": task.error,
+            "retry_count": task.retry_count
         }
     
     async def get_orchestrator_status(self) -> Dict[str, Any]:
@@ -550,11 +649,108 @@ class MultiAgentOrchestrator:
             "performance_metrics": self.performance_metrics,
             "active_collaborations": len(self.active_collaborations)
         }
-
-# Example usage and configuration
-async def main():
-    """Example orchestrator setup and usage"""
     
+    async def _cleanup_completed_tasks(self):
+        """Periodically clean up old completed tasks"""
+        while not self._shutdown_event.is_set():
+            try:
+                await asyncio.sleep(self._cleanup_interval)
+                
+                # Remove completed tasks older than 1 hour
+                cutoff_time = datetime.now() - timedelta(hours=1)
+                tasks_to_remove = []
+                
+                for task_id, task in self.completed_tasks.items():
+                    if task.created_at < cutoff_time:
+                        tasks_to_remove.append(task_id)
+                
+                for task_id in tasks_to_remove:
+                    del self.completed_tasks[task_id]
+                
+                if tasks_to_remove:
+                    logger.info(f"Cleaned up {len(tasks_to_remove)} old completed tasks")
+                    
+            except Exception as e:
+                logger.error(f"Error during cleanup: {e}")
+    
+    async def cancel_task(self, task_id: str) -> bool:
+        """Cancel a running task"""
+        task = self.task_registry.get(task_id)
+        if not task:
+            return False
+        
+        # Find and cancel the corresponding async task
+        for async_task in self.active_tasks:
+            if hasattr(async_task, '_task_id') and async_task._task_id == task_id:
+                async_task.cancel()
+                return True
+        
+        return False
+    
+    async def wait_for_completion(self, timeout: Optional[float] = None):
+        """Wait for all active tasks to complete"""
+        if not self.active_tasks:
+            return
+        
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*self.active_tasks, return_exceptions=True),
+                timeout=timeout
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Timeout waiting for task completion")
+    
+    async def get_system_status(self) -> Dict[str, Any]:
+        """Get current system status"""
+        return {
+            "active_tasks": len(self.active_tasks),
+            "queued_tasks": self.task_queue.qsize(),
+            "completed_tasks": len(self.completed_tasks),
+            "registered_agents": len(self.agents),
+            "orchestrator_id": self.orchestrator_id,
+            "is_running": self.is_running,
+            "agents": [
+                {
+                    "agent_id": agent.id,
+                    "agent_type": agent.type.value,
+                    "current_tasks": len(agent.current_tasks),
+                    "max_concurrent_tasks": agent.max_concurrent_tasks,
+                    "status": agent.status,
+                    "last_activity": agent.last_heartbeat.isoformat() if agent.last_heartbeat else None
+                }
+                for agent in self.agents.values()
+            ]
+        }
+
+
+# Example usage and agent implementations
+class SampleAgent:
+    """Example agent implementation"""
+    
+    def __init__(self, agent_type: AgentType):
+        self.agent_type = agent_type
+        self.logger = logging.getLogger(f"{__name__}.{agent_type.value}")
+    
+    async def handle_task(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle a task payload"""
+        self.logger.info(f"Processing {self.agent_type.value} task: {payload}")
+        
+        # Simulate work
+        await asyncio.sleep(1.0)
+        
+        return {
+            "status": "success",
+            "agent_type": self.agent_type.value,
+            "processed_payload": payload,
+            "timestamp": datetime.now().isoformat()
+        }
+
+
+async def main():
+    """Example usage of the Multi-Agent Orchestrator"""
+    logging.basicConfig(level=logging.INFO)
+    
+    # Configuration for MCP-based agents
     config = {
         "anthropic_api_key": "your-anthropic-api-key",
         "operation_timeout": 300,
@@ -574,22 +770,62 @@ async def main():
                 "mcp_endpoint": "http://localhost:8091/mcp",
                 "capabilities": ["prediction", "analysis", "optimization"],
                 "max_concurrent_tasks": 3
-            },
-            "quality_intelligence": {
-                "type": "quality_intelligence",
-                "name": "Quality Intelligence Agent",
-                "description": "Advanced quality control and compliance",
-                "mcp_endpoint": "http://localhost:8092/mcp",
-                "capabilities": ["quality_control", "compliance_check", "vision_analysis"],
-                "max_concurrent_tasks": 4
             }
         }
     }
     
-    orchestrator = MultiAgentOrchestrator(config)
+    # Create orchestrator
+    orchestrator = MultiAgentOrchestrator(config, max_concurrent_tasks=50)
     
-    # Start orchestration
-    await orchestrator.start_orchestration()
+    # Create sample agents for direct registration
+    doc_agent = SampleAgent(AgentType.DOCUMENT_PROCESSOR)
+    sample_agent = SampleAgent(AgentType.SAMPLE_TRACKER)
+    qc_agent = SampleAgent(AgentType.QUALITY_CONTROLLER)
+    
+    # Register agents with direct handlers
+    orchestrator.register_agent(
+        AgentType.DOCUMENT_PROCESSOR, 
+        doc_agent.handle_task, 
+        max_concurrent_tasks=3
+    )
+    orchestrator.register_agent(
+        AgentType.SAMPLE_TRACKER, 
+        sample_agent.handle_task, 
+        max_concurrent_tasks=5
+    )
+    orchestrator.register_agent(
+        AgentType.QUALITY_CONTROLLER, 
+        qc_agent.handle_task, 
+        max_concurrent_tasks=2
+    )
+    
+    try:
+        # Start orchestrator
+        await orchestrator.start_orchestration()
+        
+        # Submit some tasks
+        tasks = []
+        for i in range(10):
+            task_id = await orchestrator.submit_task(
+                agent_type=AgentType.DOCUMENT_PROCESSOR,
+                payload={"document_id": f"doc_{i}", "action": "process"},
+                priority=i
+            )
+            tasks.append(task_id)
+        
+        # Wait a bit for processing
+        await asyncio.sleep(5)
+        
+        # Check system status
+        status = await orchestrator.get_system_status()
+        print(f"System Status: {json.dumps(status, indent=2)}")
+        
+        # Wait for all tasks to complete
+        await orchestrator.wait_for_completion(timeout=30.0)
+        
+    finally:
+        # Clean shutdown
+        await orchestrator.stop_orchestration()
 
 if __name__ == "__main__":
     asyncio.run(main())

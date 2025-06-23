@@ -88,9 +88,12 @@ class DocumentWatcher(FileSystemEventHandler):
             file_path = Path(event.src_path)
             if file_path.suffix.lower() in self.supported_extensions:
                 logger.info(f"📄 New document detected: {file_path.name}")
-                asyncio.create_task(
+                # Create task and store reference to prevent garbage collection
+                task = asyncio.create_task(
                     self.automation_manager.queue_document_for_processing(str(file_path))
                 )
+                self.automation_manager.background_tasks.add(task)
+                task.add_done_callback(self.automation_manager.background_tasks.discard)
     
     def on_moved(self, event):
         """Handle file moves (like drag & drop)"""
@@ -98,9 +101,12 @@ class DocumentWatcher(FileSystemEventHandler):
             file_path = Path(event.dest_path)
             if file_path.suffix.lower() in self.supported_extensions:
                 logger.info(f"📄 Document moved to watch folder: {file_path.name}")
-                asyncio.create_task(
+                # Create task and store reference to prevent garbage collection
+                task = asyncio.create_task(
                     self.automation_manager.queue_document_for_processing(str(file_path))
                 )
+                self.automation_manager.background_tasks.add(task)
+                task.add_done_callback(self.automation_manager.background_tasks.discard)
 
 class LabAutomationManager:
     """Main automation manager for lab document processing"""
@@ -136,6 +142,9 @@ class LabAutomationManager:
         self.observer = Observer()
         self.watcher = DocumentWatcher(self)
         
+        # Task management - store references to prevent garbage collection
+        self.background_tasks: set = set()
+        
         # Callbacks for custom processing
         self.pre_processing_callbacks: List[Callable] = []
         self.post_processing_callbacks: List[Callable] = []
@@ -149,12 +158,16 @@ class LabAutomationManager:
         self.observer.start()
         logger.info(f"📁 Watching for documents in: {self.inbox_dir}")
         
-        # Start processing loop
-        asyncio.create_task(self._processing_loop())
+        # Start processing loop with proper task management
+        processing_task = asyncio.create_task(self._processing_loop())
+        self.background_tasks.add(processing_task)
+        processing_task.add_done_callback(self.background_tasks.discard)
         logger.info("⚙️ Processing loop started")
         
-        # Start cleanup task
-        asyncio.create_task(self._cleanup_loop())
+        # Start cleanup task with proper task management
+        cleanup_task = asyncio.create_task(self._cleanup_loop())
+        self.background_tasks.add(cleanup_task)
+        cleanup_task.add_done_callback(self.background_tasks.discard)
         logger.info("🧹 Cleanup task started")
         
         print("\n" + "="*60)
@@ -171,6 +184,17 @@ class LabAutomationManager:
         logger.info("🛑 Stopping automation system...")
         self.observer.stop()
         self.observer.join()
+        
+        # Cancel all background tasks
+        for task in self.background_tasks.copy():
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+        
+        self.background_tasks.clear()
         
         # Wait for active jobs to complete
         while self.active_jobs:
@@ -219,7 +243,10 @@ class LabAutomationManager:
                        self.job_queue):
                     
                     job = self.job_queue.pop(0)
-                    asyncio.create_task(self._process_job(job))
+                    # Create task and store reference to prevent garbage collection
+                    task = asyncio.create_task(self._process_job(job))
+                    self.background_tasks.add(task)
+                    task.add_done_callback(self.background_tasks.discard)
                 
                 await asyncio.sleep(self.check_interval)
                 
