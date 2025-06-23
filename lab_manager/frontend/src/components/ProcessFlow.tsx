@@ -1,209 +1,119 @@
 import React from 'react';
-import { CheckCircleIcon, ClockIcon, BeakerIcon, CircleStackIcon, CogIcon } from '@heroicons/react/24/outline';
-import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/solid';
 
-interface ProcessStep {
+interface Step {
   id: string;
-  name: string;
-  description: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  status: 'completed' | 'current' | 'upcoming';
-  timestamp?: string;
-  duration?: string;
+  title: string;
+  description?: string;
 }
 
 interface ProcessFlowProps {
-  currentStatus: string;
-  timestamps?: {
-    created_at?: string;
-    validated_at?: string;
-    stored_at?: string;
-    sequencing_started_at?: string;
-    completed_at?: string;
-  };
+  steps: Step[];
+  currentStepIndex: number;
   className?: string;
 }
 
-const statusToStepMap: Record<string, number> = {
-  'Pending': 0,
-  'Validated': 1,
-  'InStorage': 2,
-  'InSequencing': 3,
-  'Completed': 4,
-};
+type StepStatus = 'pending' | 'current' | 'completed';
 
-export default function ProcessFlow({ currentStatus, timestamps, className = '' }: ProcessFlowProps) {
-  const currentStepIndex = statusToStepMap[currentStatus] ?? 0;
-
-  const steps: ProcessStep[] = [
-    {
-      id: 'pending',
-      name: 'Sample Submitted',
-      description: 'Sample received and awaiting validation',
-      icon: ClockIcon,
-      status: currentStepIndex >= 0 ? 'completed' : 'upcoming',
-      timestamp: timestamps?.created_at,
-    },
-    {
-      id: 'validated',
-      name: 'Validated',
-      description: 'Sample passed validation checks',
-      icon: CheckCircleIcon,
-      status: currentStepIndex >= 1 ? 'completed' : currentStepIndex === 0 ? 'current' : 'upcoming',
-      timestamp: timestamps?.validated_at,
-    },
-    {
-      id: 'instorage',
-      name: 'In Storage',
-      description: 'Sample stored in designated location',
-      icon: CircleStackIcon,
-      status: currentStepIndex >= 2 ? 'completed' : currentStepIndex === 1 ? 'current' : 'upcoming',
-      timestamp: timestamps?.stored_at,
-    },
-    {
-      id: 'insequencing',
-      name: 'In Sequencing',
-      description: 'Sample processing for sequencing',
-      icon: CogIcon,
-      status: currentStepIndex >= 3 ? 'completed' : currentStepIndex === 2 ? 'current' : 'upcoming',
-      timestamp: timestamps?.sequencing_started_at,
-    },
-    {
-      id: 'completed',
-      name: 'Completed',
-      description: 'Sample processing finished',
-      icon: BeakerIcon,
-      status: currentStepIndex >= 4 ? 'completed' : currentStepIndex === 3 ? 'current' : 'upcoming',
-      timestamp: timestamps?.completed_at,
-    },
-  ];
-
-  const getStepStyles = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return {
-          container: 'bg-green-50 border-green-200',
-          icon: 'bg-green-500 text-white',
-          title: 'text-green-800',
-          description: 'text-green-600',
-          connector: 'bg-green-500',
-        };
-      case 'current':
-        return {
-          container: 'bg-blue-50 border-blue-200',
-          icon: 'bg-blue-500 text-white',
-          title: 'text-blue-800',
-          description: 'text-blue-600',
-          connector: 'bg-gray-300',
-        };
-      default:
-        return {
-          container: 'bg-gray-50 border-gray-200',
-          icon: 'bg-gray-300 text-gray-500',
-          title: 'text-gray-500',
-          description: 'text-gray-400',
-          connector: 'bg-gray-300',
-        };
+const ProcessFlow: React.FC<ProcessFlowProps> = ({
+  steps,
+  currentStepIndex,
+  className = ''
+}) => {
+  const getStepStatus = (stepIndex: number): StepStatus => {
+    if (currentStepIndex > stepIndex) {
+      return 'completed';
+    } else if (currentStepIndex === stepIndex) {
+      return 'current';
+    } else {
+      return 'pending';
     }
   };
 
-  const formatTimestamp = (timestamp?: string) => {
-    if (!timestamp) return null;
-    const date = new Date(timestamp);
-    return {
-      date: date.toLocaleDateString(),
-      time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      relative: getRelativeTime(date),
-    };
+  const getStepClasses = (status: StepStatus): string => {
+    const baseClasses = 'flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-medium';
+    
+    switch (status) {
+      case 'completed':
+        return `${baseClasses} bg-green-500 border-green-500 text-white`;
+      case 'current':
+        return `${baseClasses} bg-blue-500 border-blue-500 text-white`;
+      case 'pending':
+        return `${baseClasses} bg-gray-100 border-gray-300 text-gray-500`;
+      default:
+        return baseClasses;
+    }
   };
 
-  const getRelativeTime = (date: Date) => {
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+  const getConnectorClasses = (stepIndex: number): string => {
+    const baseClasses = 'flex-1 h-0.5 mx-2';
     
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays}d ago`;
-    return date.toLocaleDateString();
+    if (stepIndex < steps.length - 1) {
+      // Connector is completed if both current step and next step are completed
+      if (currentStepIndex > stepIndex) {
+        return `${baseClasses} bg-green-500`;
+      } else {
+        return `${baseClasses} bg-gray-300`;
+      }
+    }
+    
+    return '';
   };
 
-  const calculateDuration = (start?: string, end?: string) => {
-    if (!start || !end) return null;
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const diffInHours = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 24) return `${diffInHours}h`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `${diffInDays}d ${diffInHours % 24}h`;
+  const getStepIcon = (status: StepStatus, stepIndex: number): React.ReactNode => {
+    switch (status) {
+      case 'completed':
+        return (
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+        );
+      case 'current':
+        return (
+          <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+        );
+      case 'pending':
+        return stepIndex + 1;
+      default:
+        return stepIndex + 1;
+    }
   };
 
   return (
     <div className={`process-flow ${className}`}>
-      <div className="relative">
+      <div className="flex items-center justify-between w-full">
         {steps.map((step, index) => {
-          const styles = getStepStyles(step.status);
-          const timestamp = formatTimestamp(step.timestamp);
-          const isLast = index === steps.length - 1;
-          const IconComponent = step.icon;
+          const status = getStepStatus(index);
           
           return (
-            <div key={step.id} className="relative">
-              {/* Connector Line */}
-              {!isLast && (
-                <div
-                  className={`absolute left-6 top-12 w-0.5 h-16 ${styles.connector}`}
-                  aria-hidden="true"
-                />
-              )}
-              
-              {/* Step Container */}
-              <div className={`relative flex items-start space-x-4 pb-8 last:pb-0`}>
-                {/* Icon */}
-                <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${styles.icon} relative z-10`}>
-                  {step.status === 'completed' ? (
-                    <CheckCircleIconSolid className="w-6 h-6" />
-                  ) : (
-                    <IconComponent className="w-6 h-6" />
+            <React.Fragment key={step.id}>
+              <div className="flex flex-col items-center">
+                <div className={getStepClasses(status)}>
+                  {getStepIcon(status, index)}
+                </div>
+                <div className="mt-2 text-center">
+                  <div className={`text-sm font-medium ${
+                    status === 'current' ? 'text-blue-600' : 
+                    status === 'completed' ? 'text-green-600' : 'text-gray-500'
+                  }`}>
+                    {step.title}
+                  </div>
+                  {step.description && (
+                    <div className="text-xs text-gray-400 mt-1">
+                      {step.description}
+                    </div>
                   )}
                 </div>
-                
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className={`p-4 rounded-lg border ${styles.container}`}>
-                    <div className="flex items-center justify-between">
-                      <h3 className={`text-sm font-semibold ${styles.title}`}>
-                        {step.name}
-                      </h3>
-                      {timestamp && (
-                        <div className="text-right">
-                          <div className={`text-xs font-medium ${styles.title}`}>
-                            {timestamp.relative}
-                          </div>
-                          <div className={`text-xs ${styles.description}`}>
-                            {timestamp.date} {timestamp.time}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <p className={`text-sm mt-1 ${styles.description}`}>
-                      {step.description}
-                    </p>
-                    
-                    {/* Duration */}
-                    {index > 0 && step.timestamp && steps[index - 1].timestamp && (
-                      <div className={`text-xs mt-2 ${styles.description}`}>
-                        Duration: {calculateDuration(steps[index - 1].timestamp, step.timestamp)}
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
-            </div>
+              
+              {index < steps.length - 1 && (
+                <div className={getConnectorClasses(index)} />
+              )}
+            </React.Fragment>
           );
         })}
       </div>
     </div>
   );
-}
+};
+
+export default ProcessFlow;
