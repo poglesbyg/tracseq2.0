@@ -50,6 +50,7 @@ pub struct Event {
 
 impl Event {
     /// Create a new event
+    #[allow(dead_code)]
     pub fn new(
         event_type: String,
         source_service: String,
@@ -70,30 +71,35 @@ impl Event {
     }
     
     /// Set correlation ID for request tracing
+    #[allow(dead_code)]
     pub fn with_correlation_id(mut self, correlation_id: Uuid) -> Self {
         self.correlation_id = Some(correlation_id);
         self
     }
     
     /// Set event subject
+    #[allow(dead_code)]
     pub fn with_subject(mut self, subject: String) -> Self {
         self.subject = Some(subject);
         self
     }
     
     /// Set event priority
+    #[allow(dead_code)]
     pub fn with_priority(mut self, priority: u8) -> Self {
         self.priority = priority;
         self
     }
     
     /// Add metadata
+    #[allow(dead_code)]
     pub fn with_metadata(mut self, key: String, value: String) -> Self {
         self.metadata.insert(key, value);
         self
     }
     
     /// Get event stream name based on type
+    #[allow(dead_code)]
     pub fn stream_name(&self) -> String {
         format!("tracseq:events:{}", self.event_type.replace('.', ":"))
     }
@@ -101,6 +107,7 @@ impl Event {
 
 /// Event publication result
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct EventPublicationResult {
     pub event_id: Uuid,
     pub stream_id: String,
@@ -152,6 +159,7 @@ impl Default for SubscriptionConfig {
 
 /// Event processing context
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct EventContext {
     pub event: Event,
     pub delivery_count: u32,
@@ -161,6 +169,7 @@ pub struct EventContext {
 
 /// Event handler trait for processing events
 #[async_trait::async_trait]
+#[allow(dead_code)]
 pub trait EventHandler: Send + Sync {
     /// Handle an incoming event
     async fn handle(&self, context: EventContext) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
@@ -193,6 +202,7 @@ pub struct EventFilter {
 
 impl EventFilter {
     /// Check if event matches this filter
+    #[allow(dead_code)]
     pub fn matches(&self, event: &Event) -> bool {
         // Check event types
         if !self.event_types.is_empty() && !self.matches_patterns(&self.event_types, &event.event_type) {
@@ -233,6 +243,7 @@ impl EventFilter {
     }
     
     /// Check if value matches any of the patterns (supports wildcards)
+    #[allow(dead_code)]
     fn matches_patterns(&self, patterns: &[String], value: &str) -> bool {
         patterns.iter().any(|pattern| {
             if pattern == "*" {

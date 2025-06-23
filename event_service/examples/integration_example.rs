@@ -4,9 +4,9 @@
 //! with other TracSeq microservices.
 
 use tracseq_event_service::{
-    events::{Event, EventHandler, EventContext, SubscriptionConfig},
+    events::{EventHandler, EventContext, SubscriptionConfig},
     services::{
-        event_bus::{EventBus, RedisEventBus},
+        event_bus::RedisEventBus,
         client::EventServiceClient,
     },
 };
@@ -120,12 +120,16 @@ async fn sample_service_example() -> Result<()> {
     println!("📝 Creating sample: {}", sample_id);
 
     // Publish sample created event
+    let sample_data = serde_json::json!({
+        "sample_id": sample_id,
+        "barcode": "SAM-20240101-001",
+        "sample_type": "DNA",
+        "submitter_id": submitter_id,
+        "lab_id": lab_id
+    });
     let result = client.publish_sample_created(
-        sample_id,
-        "SAM-20240101-001",
-        "DNA",
-        submitter_id,
-        lab_id,
+        &sample_id.to_string(),
+        sample_data,
     ).await?;
 
     println!("✅ Published sample.created event: {}", result.event_id);
@@ -135,22 +139,20 @@ async fn sample_service_example() -> Result<()> {
 
     println!("🔄 Updating sample status: Pending → Validated");
     client.publish_sample_status_changed(
-        sample_id,
-        "SAM-20240101-001",
+        &sample_id.to_string(),
         "Pending",
         "Validated",
-        submitter_id,
+        None,
     ).await?;
 
     sleep(Duration::from_secs(1)).await;
 
     println!("🔄 Updating sample status: Validated → InStorage");
     client.publish_sample_status_changed(
-        sample_id,
-        "SAM-20240101-001",
+        &sample_id.to_string(),
         "Validated",
         "InStorage",
-        submitter_id,
+        None,
     ).await?;
 
     Ok(())
@@ -183,11 +185,10 @@ async fn storage_service_example() -> Result<()> {
     println!("🚨 Temperature threshold exceeded!");
 
     client.publish_temperature_alert(
-        location_id,
         "freezer-zone-1",
         -75.5,  // Current temperature
         -80.0,  // Target temperature
-        "temp-sensor-001",
+        "critical",
     ).await?;
 
     println!("✅ Published storage.temperature_alert event");

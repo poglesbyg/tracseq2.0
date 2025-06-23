@@ -237,30 +237,48 @@ pub enum DocumentEvent {
 /// Event type constants for easy reference
 pub mod event_types {
     // Sample events
+    #[allow(dead_code)]
     pub const SAMPLE_CREATED: &str = "sample.created";
+    #[allow(dead_code)]
     pub const SAMPLE_VALIDATED: &str = "sample.validated";
+    #[allow(dead_code)]
     pub const SAMPLE_STATUS_CHANGED: &str = "sample.status_changed";
+    #[allow(dead_code)]
     pub const SAMPLE_STORED: &str = "sample.stored";
+    #[allow(dead_code)]
     pub const SAMPLE_ASSIGNED_TO_SEQUENCING: &str = "sample.assigned_to_sequencing";
+    #[allow(dead_code)]
     pub const SAMPLE_COMPLETED: &str = "sample.completed";
 
     // Storage events
+    #[allow(dead_code)]
     pub const TEMPERATURE_ALERT: &str = "storage.temperature_alert";
+    #[allow(dead_code)]
     pub const CAPACITY_WARNING: &str = "storage.capacity_warning";
+    #[allow(dead_code)]
     pub const SENSOR_DATA_RECEIVED: &str = "storage.sensor_data_received";
 
     // Auth events
+    #[allow(dead_code)]
     pub const USER_LOGGED_IN: &str = "auth.user_logged_in";
+    #[allow(dead_code)]
     pub const USER_LOGGED_OUT: &str = "auth.user_logged_out";
+    #[allow(dead_code)]
     pub const LOGIN_FAILED: &str = "auth.login_failed";
 
     // Sequencing events
+    #[allow(dead_code)]
     pub const JOB_CREATED: &str = "sequencing.job_created";
+    #[allow(dead_code)]
     pub const JOB_STATUS_CHANGED: &str = "sequencing.job_status_changed";
+    #[allow(dead_code)]
     pub const JOB_COMPLETED: &str = "sequencing.job_completed";
 
     // Document events
+    #[allow(dead_code)]
     pub const DOCUMENT_UPLOADED: &str = "document.uploaded";
+    #[allow(dead_code)]
     pub const PROCESSING_COMPLETED: &str = "document.processing_completed";
+    #[allow(dead_code)]
     pub const INFORMATION_EXTRACTED: &str = "document.information_extracted";
 }
