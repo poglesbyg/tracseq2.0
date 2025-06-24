@@ -119,8 +119,9 @@ impl TransactionSaga {
                     self.state.completed_steps = step_index as u32;
                 }
                 Err(error) => {
+                    let failed_step_name = step.name().to_string();
                     self.state.status = SagaStatus::Compensating;
-                    self.state.failed_step = Some(step.name().to_string());
+                    self.state.failed_step = Some(failed_step_name.clone());
                     
                     let compensation_result = self.execute_compensation().await;
                     
@@ -134,7 +135,7 @@ impl TransactionSaga {
                             SagaStatus::Failed 
                         },
                         completed_steps: step_index as u32,
-                        failed_step: Some(step.name().to_string()),
+                        failed_step: Some(failed_step_name),
                         error_message: Some(error.to_string()),
                         execution_time_ms: execution_time,
                         compensation_executed: true,

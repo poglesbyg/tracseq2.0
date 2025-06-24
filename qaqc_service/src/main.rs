@@ -19,6 +19,7 @@ mod middleware;
 
 use config::Config;
 use database::create_pool;
+use handlers::{qc_workflows, quality_metrics, compliance, reports};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -71,11 +72,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/v1/reports/compliance", get(reports::compliance_report))
         .route("/api/v1/reports/trends", get(reports::trend_analysis))
         .route("/api/v1/reports/export", get(reports::export_data))
-        
-        // Service state management
-        .with_state(qaqc_service.clone())
-        .with_state(metrics_service.clone())
-        .with_state(compliance_service.clone())
         
         // Middleware
         .layer(axum::middleware::from_fn(crate::middleware::auth_middleware))
