@@ -5,6 +5,7 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde_json::json;
+use sqlx::Row;
 use uuid::Uuid;
 
 use crate::{
@@ -79,7 +80,9 @@ pub async fn get_analysis_status(
         .bind(analysis_id)
         .fetch_optional(&state.db_pool.pool)
         .await?
-        .ok_or(SequencingError::AnalysisNotFound { analysis_id })?;
+        .ok_or(SequencingError::AnalysisNotFound {
+            analysis_id: analysis_id.to_string(),
+        })?;
 
     // Get quality metrics if available
     let quality_metrics =
@@ -89,7 +92,7 @@ pub async fn get_analysis_status(
             .await?;
 
     // Get analysis results if completed
-    let results = if analysis.status == AnalysisStatus::Completed {
+    let results = if matches!(analysis.status, JobStatus::Completed) {
         sqlx::query_as::<_, AnalysisResult>("SELECT * FROM analysis_results WHERE analysis_id = $1")
             .bind(analysis_id)
             .fetch_all(&state.db_pool.pool)
@@ -193,7 +196,9 @@ pub async fn update_analysis_status(
     .bind(request.error_message.as_deref())
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::AnalysisNotFound { analysis_id })?;
+    .ok_or(SequencingError::AnalysisNotFound {
+        analysis_id: analysis_id.to_string(),
+    })?;
 
     // If analysis completed, update the parent job
     if request.status == AnalysisStatus::Completed {
@@ -230,7 +235,9 @@ pub async fn submit_quality_metrics(
         .bind(analysis_id)
         .fetch_optional(&state.db_pool.pool)
         .await?
-        .ok_or(SequencingError::AnalysisNotFound { analysis_id })?;
+        .ok_or(SequencingError::AnalysisNotFound {
+            analysis_id: analysis_id.to_string(),
+        })?;
 
     let metrics = sqlx::query_as::<_, QualityMetrics>(
         r#"
@@ -284,7 +291,9 @@ pub async fn submit_analysis_results(
         .bind(analysis_id)
         .fetch_optional(&state.db_pool.pool)
         .await?
-        .ok_or(SequencingError::AnalysisNotFound { analysis_id })?;
+        .ok_or(SequencingError::AnalysisNotFound {
+            analysis_id: analysis_id.to_string(),
+        })?;
 
     let mut created_results = Vec::new();
 
@@ -331,7 +340,7 @@ pub async fn get_qc_summary(
     let start_date = Utc::now() - chrono::Duration::days(period_days);
 
     // Get QC metrics summary
-    let qc_stats = sqlx::query!(
+    let qc_stats = sqlx::query(
         r#"
         SELECT 
             COUNT(*) as total_analyses,
@@ -345,13 +354,13 @@ pub async fn get_qc_summary(
         LEFT JOIN quality_metrics qm ON aj.id = qm.analysis_id
         WHERE aj.created_at > $1 AND aj.status = 'completed'
         "#,
-        start_date
     )
+    .bind(start_date)
     .fetch_one(&state.db_pool.pool)
     .await?;
 
     // Get platform-specific QC metrics
-    let platform_qc = sqlx::query!(
+    let platform_qc = sqlx::query(
         r#"
         SELECT 
             sj.platform,
@@ -365,13 +374,13 @@ pub async fn get_qc_summary(
         GROUP BY sj.platform
         ORDER BY job_count DESC
         "#,
-        start_date
     )
+    .bind(start_date)
     .fetch_all(&state.db_pool.pool)
     .await?;
 
     // Get daily QC trends
-    let daily_trends = sqlx::query!(
+    let daily_trends = sqlx::query(
         r#"
         SELECT 
             DATE(aj.created_at) as date,
@@ -384,8 +393,8 @@ pub async fn get_qc_summary(
         GROUP BY DATE(aj.created_at)
         ORDER BY date
         "#,
-        start_date
     )
+    .bind(start_date)
     .fetch_all(&state.db_pool.pool)
     .await?;
 
@@ -394,25 +403,25 @@ pub async fn get_qc_summary(
         "data": {
             "period_days": period_days,
             "overview": {
-                "total_analyses": qc_stats.total_analyses,
-                "avg_q30_percentage": qc_stats.avg_q30,
-                "avg_gc_content": qc_stats.avg_gc_content,
-                "avg_quality_score": qc_stats.avg_quality_score,
-                "avg_duplication_rate": qc_stats.avg_duplication_rate,
-                "high_quality_count": qc_stats.high_quality_count,
-                "low_quality_count": qc_stats.low_quality_count
+                "total_analyses": qc_stats.get::<i64, _>("total_analyses"),
+                "avg_q30_percentage": qc_stats.get::<Option<f64>, _>("avg_q30"),
+                "avg_gc_content": qc_stats.get::<Option<f64>, _>("avg_gc_content"),
+                "avg_quality_score": qc_stats.get::<Option<f64>, _>("avg_quality_score"),
+                "avg_duplication_rate": qc_stats.get::<Option<f64>, _>("avg_duplication_rate"),
+                "high_quality_count": qc_stats.get::<i64, _>("high_quality_count"),
+                "low_quality_count": qc_stats.get::<i64, _>("low_quality_count")
             },
             "platform_metrics": platform_qc.into_iter().map(|row| json!({
-                "platform": row.platform,
-                "job_count": row.job_count,
-                "avg_q30": row.avg_q30,
-                "avg_quality_score": row.avg_quality_score
+                "platform": row.get::<Option<String>, _>("platform"),
+                "job_count": row.get::<i64, _>("job_count"),
+                "avg_q30": row.get::<Option<f64>, _>("avg_q30"),
+                "avg_quality_score": row.get::<Option<f64>, _>("avg_quality_score")
             })).collect::<Vec<_>>(),
             "daily_trends": daily_trends.into_iter().map(|row| json!({
-                "date": row.date,
-                "analysis_count": row.analysis_count,
-                "avg_q30": row.avg_q30,
-                "avg_quality_score": row.avg_quality_score
+                "date": row.get::<Option<chrono::NaiveDate>, _>("date"),
+                "analysis_count": row.get::<i64, _>("analysis_count"),
+                "avg_q30": row.get::<Option<f64>, _>("avg_q30"),
+                "avg_quality_score": row.get::<Option<f64>, _>("avg_quality_score")
             })).collect::<Vec<_>>()
         }
     })))
@@ -466,7 +475,9 @@ pub async fn cancel_analysis(
     .bind(analysis_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::AnalysisNotFound { analysis_id })?;
+    .ok_or(SequencingError::AnalysisNotFound {
+        analysis_id: analysis_id.to_string(),
+    })?;
 
     // Update parent job analysis status
     sqlx::query(

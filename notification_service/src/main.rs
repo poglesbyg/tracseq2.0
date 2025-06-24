@@ -1,32 +1,28 @@
 use anyhow::Result;
 use axum::{
-    middleware,
-    routing::{get, post, put, delete},
     Router,
+    middleware::from_fn_with_state,
+    routing::{delete, get, post, put},
 };
 use std::net::SocketAddr;
 use tower::ServiceBuilder;
-use tower_http::{
-    cors::CorsLayer,
-    trace::TraceLayer,
-    compression::CompressionLayer,
-};
-use tracing::{info, warn};
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod clients;
 mod config;
 mod database;
 mod error;
 mod handlers;
+mod middleware;
 mod models;
 mod services;
-mod middleware;
-mod clients;
 
+use clients::{AuthClient, EmailClient, SlackClient, SmsClient, TeamsClient};
 use config::Config;
 use database::DatabasePool;
 use services::NotificationServiceImpl;
-use clients::{AuthClient, SlackClient, TeamsClient, EmailClient, SmsClient};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -69,7 +65,8 @@ async fn main() -> Result<()> {
         teams_client,
         email_client,
         sms_client,
-    ).await?;
+    )
+    .await?;
     info!("Notification service initialized");
 
     // Setup application state
@@ -112,13 +109,31 @@ fn create_app(state: AppState) -> Router {
 
     // Notification management routes
     let notification_routes = Router::new()
-        .route("/notifications", post(handlers::notifications::send_notification))
-        .route("/notifications", get(handlers::notifications::list_notifications))
-        .route("/notifications/:notification_id", get(handlers::notifications::get_notification))
-        .route("/notifications/:notification_id/status", get(handlers::notifications::get_notification_status))
-        .route("/notifications/:notification_id/retry", post(handlers::notifications::retry_notification))
-        .route("/notifications/bulk", post(handlers::notifications::send_bulk_notifications))
-        .layer(middleware::from_fn_with_state(
+        .route(
+            "/notifications",
+            post(handlers::notifications::send_notification),
+        )
+        .route(
+            "/notifications",
+            get(handlers::notifications::list_notifications),
+        )
+        .route(
+            "/notifications/:notification_id",
+            get(handlers::notifications::get_notification),
+        )
+        .route(
+            "/notifications/:notification_id/status",
+            get(handlers::notifications::get_notification_status),
+        )
+        .route(
+            "/notifications/:notification_id/retry",
+            post(handlers::notifications::retry_notification),
+        )
+        .route(
+            "/notifications/bulk",
+            post(handlers::notifications::send_bulk_notifications),
+        )
+        .layer(from_fn_with_state(
             state.clone(),
             middleware::auth_middleware,
         ));
@@ -126,15 +141,39 @@ fn create_app(state: AppState) -> Router {
     // Channel management routes
     let channel_routes = Router::new()
         .route("/channels", get(handlers::channels::list_channels))
-        .route("/channels/email/test", post(handlers::channels::test_email_channel))
-        .route("/channels/sms/test", post(handlers::channels::test_sms_channel))
-        .route("/channels/slack/test", post(handlers::channels::test_slack_channel))
-        .route("/channels/teams/test", post(handlers::channels::test_teams_channel))
-        .route("/channels/:channel_type/config", get(handlers::channels::get_channel_config))
-        .route("/channels/:channel_type/config", put(handlers::channels::update_channel_config))
-        .route("/channels/email/templates", get(handlers::channels::list_email_templates))
-        .route("/channels/slack/webhooks", post(handlers::channels::create_slack_webhook))
-        .layer(middleware::from_fn_with_state(
+        .route(
+            "/channels/email/test",
+            post(handlers::channels::test_email_channel),
+        )
+        .route(
+            "/channels/sms/test",
+            post(handlers::channels::test_sms_channel),
+        )
+        .route(
+            "/channels/slack/test",
+            post(handlers::channels::test_slack_channel),
+        )
+        .route(
+            "/channels/teams/test",
+            post(handlers::channels::test_teams_channel),
+        )
+        .route(
+            "/channels/:channel_type/config",
+            get(handlers::channels::get_channel_config),
+        )
+        .route(
+            "/channels/:channel_type/config",
+            put(handlers::channels::update_channel_config),
+        )
+        .route(
+            "/channels/email/templates",
+            get(handlers::channels::list_email_templates),
+        )
+        .route(
+            "/channels/slack/webhooks",
+            post(handlers::channels::create_slack_webhook),
+        )
+        .layer(from_fn_with_state(
             state.clone(),
             middleware::auth_middleware,
         ));
@@ -143,52 +182,121 @@ fn create_app(state: AppState) -> Router {
     let template_routes = Router::new()
         .route("/templates", post(handlers::templates::create_template))
         .route("/templates", get(handlers::templates::list_templates))
-        .route("/templates/:template_id", get(handlers::templates::get_template))
-        .route("/templates/:template_id", put(handlers::templates::update_template))
-        .route("/templates/:template_id", delete(handlers::templates::delete_template))
-        .route("/templates/:template_id/preview", post(handlers::templates::preview_template))
-        .route("/templates/:template_id/validate", post(handlers::templates::validate_template))
-        .layer(middleware::from_fn_with_state(
+        .route(
+            "/templates/:template_id",
+            get(handlers::templates::get_template),
+        )
+        .route(
+            "/templates/:template_id",
+            put(handlers::templates::update_template),
+        )
+        .route(
+            "/templates/:template_id",
+            delete(handlers::templates::delete_template),
+        )
+        .route(
+            "/templates/:template_id/preview",
+            post(handlers::templates::preview_template),
+        )
+        .route(
+            "/templates/:template_id/validate",
+            post(handlers::templates::validate_template),
+        )
+        .layer(from_fn_with_state(
             state.clone(),
             middleware::auth_middleware,
         ));
 
     // Subscription management routes
     let subscription_routes = Router::new()
-        .route("/subscriptions", post(handlers::subscriptions::create_subscription))
-        .route("/subscriptions", get(handlers::subscriptions::list_subscriptions))
-        .route("/subscriptions/:subscription_id", get(handlers::subscriptions::get_subscription))
-        .route("/subscriptions/:subscription_id", put(handlers::subscriptions::update_subscription))
-        .route("/subscriptions/:subscription_id", delete(handlers::subscriptions::delete_subscription))
-        .route("/subscriptions/user/:user_id", get(handlers::subscriptions::get_user_subscriptions))
-        .route("/subscriptions/event/:event_type", get(handlers::subscriptions::get_event_subscriptions))
-        .layer(middleware::from_fn_with_state(
+        .route(
+            "/subscriptions",
+            post(handlers::subscriptions::create_subscription),
+        )
+        .route(
+            "/subscriptions",
+            get(handlers::subscriptions::list_subscriptions),
+        )
+        .route(
+            "/subscriptions/:subscription_id",
+            get(handlers::subscriptions::get_subscription),
+        )
+        .route(
+            "/subscriptions/:subscription_id",
+            put(handlers::subscriptions::update_subscription),
+        )
+        .route(
+            "/subscriptions/:subscription_id",
+            delete(handlers::subscriptions::delete_subscription),
+        )
+        .route(
+            "/subscriptions/user/:user_id",
+            get(handlers::subscriptions::get_user_subscriptions),
+        )
+        .route(
+            "/subscriptions/event/:event_type",
+            get(handlers::subscriptions::get_event_subscriptions),
+        )
+        .layer(from_fn_with_state(
             state.clone(),
             middleware::auth_middleware,
         ));
 
     // Integration routes
     let integration_routes = Router::new()
-        .route("/integration/lab-events", post(handlers::integration::handle_lab_event))
-        .route("/integration/sample-events", post(handlers::integration::handle_sample_event))
-        .route("/integration/sequencing-events", post(handlers::integration::handle_sequencing_event))
-        .route("/integration/template-events", post(handlers::integration::handle_template_event))
-        .route("/integration/system-alerts", post(handlers::integration::handle_system_alert))
-        .layer(middleware::from_fn_with_state(
+        .route(
+            "/integration/lab-events",
+            post(handlers::integration::handle_lab_event),
+        )
+        .route(
+            "/integration/sample-events",
+            post(handlers::integration::handle_sample_event),
+        )
+        .route(
+            "/integration/sequencing-events",
+            post(handlers::integration::handle_sequencing_event),
+        )
+        .route(
+            "/integration/template-events",
+            post(handlers::integration::handle_template_event),
+        )
+        .route(
+            "/integration/system-alerts",
+            post(handlers::integration::handle_system_alert),
+        )
+        .layer(from_fn_with_state(
             state.clone(),
             middleware::auth_middleware,
         ));
 
     // Admin routes (require admin privileges)
     let admin_routes = Router::new()
-        .route("/admin/statistics", get(handlers::admin::get_notification_statistics))
-        .route("/admin/failed-notifications", get(handlers::admin::get_failed_notifications))
-        .route("/admin/retry-failed", post(handlers::admin::retry_failed_notifications))
-        .route("/admin/cleanup", post(handlers::admin::cleanup_old_notifications))
-        .route("/admin/channels/health", get(handlers::admin::check_channel_health))
+        .route(
+            "/admin/statistics",
+            get(handlers::admin::get_notification_statistics),
+        )
+        .route(
+            "/admin/failed-notifications",
+            get(handlers::admin::get_failed_notifications),
+        )
+        .route(
+            "/admin/retry-failed",
+            post(handlers::admin::retry_failed_notifications),
+        )
+        .route(
+            "/admin/cleanup",
+            post(handlers::admin::cleanup_old_notifications),
+        )
+        .route(
+            "/admin/channels/health",
+            get(handlers::admin::check_channel_health),
+        )
         .route("/admin/rate-limits", get(handlers::admin::get_rate_limits))
-        .route("/admin/rate-limits", put(handlers::admin::update_rate_limits))
-        .layer(middleware::from_fn_with_state(
+        .route(
+            "/admin/rate-limits",
+            put(handlers::admin::update_rate_limits),
+        )
+        .layer(from_fn_with_state(
             state.clone(),
             middleware::admin_middleware,
         ));
@@ -205,8 +313,7 @@ fn create_app(state: AppState) -> Router {
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
-                .layer(CompressionLayer::new())
-                .layer(CorsLayer::permissive()) // Configure CORS as needed
+                .layer(CorsLayer::permissive()), // Configure CORS as needed
         )
         .with_state(state)
-} 
+}

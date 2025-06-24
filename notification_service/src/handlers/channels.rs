@@ -1,15 +1,11 @@
 use axum::{
-    extract::{Path, Query, State},
     Json,
+    extract::{Path, Query, State},
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{
-    error::Result,
-    models::*,
-    AppState,
-};
+use crate::{AppState, error::Result, models::*};
 
 #[derive(Debug, Deserialize)]
 pub struct TestChannelRequest {
@@ -32,23 +28,16 @@ pub struct ChannelConfigResponse {
     pub channel: Channel,
     pub enabled: bool,
     pub config: serde_json::Value,
-    pub rate_limit: Option<RateLimit>,
+    pub rate_limit: Option<crate::models::RateLimit>,
     pub last_test: Option<chrono::DateTime<chrono::Utc>>,
     pub last_test_result: Option<bool>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct RateLimit {
-    pub requests_per_minute: u32,
-    pub requests_per_hour: u32,
-    pub requests_per_day: u32,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateChannelConfigRequest {
     pub enabled: Option<bool>,
     pub config: Option<serde_json::Value>,
-    pub rate_limit: Option<RateLimit>,
+    pub rate_limit: Option<crate::models::RateLimit>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -71,7 +60,9 @@ pub struct SlackWebhookResponse {
 
 /// List all available channels
 /// GET /channels
-pub async fn list_channels(State(state): State<AppState>) -> Result<Json<Vec<ChannelConfigResponse>>> {
+pub async fn list_channels(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<ChannelConfigResponse>>> {
     let channels = state.notification_service.list_channels().await?;
     Ok(Json(channels))
 }
@@ -83,13 +74,19 @@ pub async fn test_email_channel(
     Json(request): Json<TestChannelRequest>,
 ) -> Result<Json<ChannelTestResponse>> {
     let start_time = std::time::Instant::now();
-    
-    let result = state.notification_service.test_email_channel(
-        &request.recipient,
-        request.subject.as_deref().unwrap_or("Test Email"),
-        request.message.as_deref().unwrap_or("This is a test email from TracSeq Notification Service"),
-    ).await;
-    
+
+    let result = state
+        .notification_service
+        .test_email_channel(
+            &request.recipient,
+            request.subject.as_deref().unwrap_or("Test Email"),
+            request
+                .message
+                .as_deref()
+                .unwrap_or("This is a test email from TracSeq Notification Service"),
+        )
+        .await;
+
     let response_time = start_time.elapsed().as_millis() as u64;
 
     Ok(Json(ChannelTestResponse {
@@ -112,12 +109,18 @@ pub async fn test_sms_channel(
     Json(request): Json<TestChannelRequest>,
 ) -> Result<Json<ChannelTestResponse>> {
     let start_time = std::time::Instant::now();
-    
-    let result = state.notification_service.test_sms_channel(
-        &request.recipient,
-        request.message.as_deref().unwrap_or("This is a test SMS from TracSeq Notification Service"),
-    ).await;
-    
+
+    let result = state
+        .notification_service
+        .test_sms_channel(
+            &request.recipient,
+            request
+                .message
+                .as_deref()
+                .unwrap_or("This is a test SMS from TracSeq Notification Service"),
+        )
+        .await;
+
     let response_time = start_time.elapsed().as_millis() as u64;
 
     Ok(Json(ChannelTestResponse {
@@ -140,12 +143,18 @@ pub async fn test_slack_channel(
     Json(request): Json<TestChannelRequest>,
 ) -> Result<Json<ChannelTestResponse>> {
     let start_time = std::time::Instant::now();
-    
-    let result = state.notification_service.test_slack_channel(
-        &request.recipient,
-        request.message.as_deref().unwrap_or("This is a test message from TracSeq Notification Service"),
-    ).await;
-    
+
+    let result = state
+        .notification_service
+        .test_slack_channel(
+            &request.recipient,
+            request
+                .message
+                .as_deref()
+                .unwrap_or("This is a test message from TracSeq Notification Service"),
+        )
+        .await;
+
     let response_time = start_time.elapsed().as_millis() as u64;
 
     Ok(Json(ChannelTestResponse {
@@ -168,12 +177,18 @@ pub async fn test_teams_channel(
     Json(request): Json<TestChannelRequest>,
 ) -> Result<Json<ChannelTestResponse>> {
     let start_time = std::time::Instant::now();
-    
-    let result = state.notification_service.test_teams_channel(
-        &request.recipient,
-        request.message.as_deref().unwrap_or("This is a test message from TracSeq Notification Service"),
-    ).await;
-    
+
+    let result = state
+        .notification_service
+        .test_teams_channel(
+            &request.recipient,
+            request
+                .message
+                .as_deref()
+                .unwrap_or("This is a test message from TracSeq Notification Service"),
+        )
+        .await;
+
     let response_time = start_time.elapsed().as_millis() as u64;
 
     Ok(Json(ChannelTestResponse {
@@ -200,10 +215,17 @@ pub async fn get_channel_config(
         "sms" => Channel::Sms,
         "slack" => Channel::Slack,
         "teams" => Channel::Teams,
-        _ => return Err(crate::error::NotificationError::InvalidChannel(channel_type)),
+        _ => {
+            return Err(crate::error::NotificationError::InvalidChannel(
+                channel_type,
+            ));
+        }
     };
 
-    let config = state.notification_service.get_channel_config(channel).await?;
+    let config = state
+        .notification_service
+        .get_channel_config(channel)
+        .await?;
     Ok(Json(config))
 }
 
@@ -219,22 +241,26 @@ pub async fn update_channel_config(
         "sms" => Channel::Sms,
         "slack" => Channel::Slack,
         "teams" => Channel::Teams,
-        _ => return Err(crate::error::NotificationError::InvalidChannel(channel_type)),
+        _ => {
+            return Err(crate::error::NotificationError::InvalidChannel(
+                channel_type,
+            ));
+        }
     };
 
-    let config = state.notification_service.update_channel_config(
-        channel,
-        request.enabled,
-        request.config,
-        request.rate_limit,
-    ).await?;
-    
+    let config = state
+        .notification_service
+        .update_channel_config(channel, request.enabled, request.config, request.rate_limit)
+        .await?;
+
     Ok(Json(config))
 }
 
 /// List email templates
 /// GET /channels/email/templates
-pub async fn list_email_templates(State(state): State<AppState>) -> Result<Json<Vec<EmailTemplate>>> {
+pub async fn list_email_templates(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<EmailTemplate>>> {
     let templates = state.notification_service.list_email_templates().await?;
     Ok(Json(templates))
 }
@@ -245,13 +271,16 @@ pub async fn create_slack_webhook(
     State(state): State<AppState>,
     Json(request): Json<CreateSlackWebhookRequest>,
 ) -> Result<Json<SlackWebhookResponse>> {
-    let webhook = state.notification_service.create_slack_webhook(
-        request.name,
-        request.webhook_url,
-        request.channel,
-        request.username,
-        request.icon_emoji,
-    ).await?;
+    let webhook = state
+        .notification_service
+        .create_slack_webhook(
+            request.name,
+            request.webhook_url,
+            request.channel,
+            request.username,
+            request.icon_emoji,
+        )
+        .await?;
 
     Ok(Json(SlackWebhookResponse {
         id: webhook.id,
@@ -282,4 +311,4 @@ pub struct SlackWebhook {
     pub username: Option<String>,
     pub icon_emoji: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
-} 
+}

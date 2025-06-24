@@ -1,36 +1,31 @@
 use anyhow::Result;
 use axum::{
-    middleware as axum_middleware,
-    routing::{get, post, put, delete},
-    Router,
+    Router, middleware as axum_middleware,
+    routing::{delete, get, post, put},
 };
 use std::net::SocketAddr;
 use tower::ServiceBuilder;
-use tower_http::{
-    cors::CorsLayer,
-    trace::TraceLayer,
-    compression::CompressionLayer,
-};
-use tracing::{info, warn};
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod clients;
 mod config;
 mod database;
 mod error;
 mod handlers;
+mod middleware;
 mod models;
 mod services;
-mod middleware;
-mod clients;
 // TODO: Re-enable when modules exist
 // mod workflow;
-// mod analysis; 
+// mod analysis;
 // mod scheduling;
 
+use clients::{AuthClient, NotificationClient, SampleClient, StorageClient, TemplateClient};
 use config::Config;
 use database::DatabasePool;
 use services::SequencingServiceImpl;
-use clients::{AuthClient, SampleClient, NotificationClient, TemplateClient, StorageClient};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -128,7 +123,10 @@ fn create_app(state: AppState) -> Router {
         .route("/jobs/:job_id", get(handlers::jobs::get_job))
         .route("/jobs/:job_id", put(handlers::jobs::update_job))
         .route("/jobs/:job_id", delete(handlers::jobs::delete_job))
-        .route("/jobs/:job_id/status", put(handlers::jobs::update_job_status))
+        .route(
+            "/jobs/:job_id/status",
+            put(handlers::jobs::update_job_status),
+        )
         .route("/jobs/:job_id/clone", post(handlers::jobs::clone_job))
         .route("/jobs/:job_id/cancel", post(handlers::jobs::cancel_job))
         .layer(axum_middleware::from_fn_with_state(
@@ -139,8 +137,14 @@ fn create_app(state: AppState) -> Router {
     // Workflow management routes
     let workflow_routes = Router::new()
         .route("/workflows", get(handlers::workflows::list_workflows))
-        .route("/workflows/:workflow_id", get(handlers::workflows::get_workflow))
-        .route("/workflows/:workflow_id/execute", post(handlers::workflows::execute_workflow))
+        .route(
+            "/workflows/:workflow_id",
+            get(handlers::workflows::get_workflow),
+        )
+        .route(
+            "/workflows/:workflow_id/execute",
+            post(handlers::workflows::execute_workflow),
+        )
         // TODO: Implement missing workflow control handlers
         // .route("/workflows/:workflow_id/pause", post(handlers::workflows::pause_workflow))
         // .route("/workflows/:workflow_id/resume", post(handlers::workflows::resume_workflow))
@@ -152,14 +156,32 @@ fn create_app(state: AppState) -> Router {
 
     // Sample sheet management routes
     let sample_sheet_routes = Router::new()
-        .route("/sample-sheets", post(handlers::sample_sheets::create_sample_sheet))
-        .route("/sample-sheets", get(handlers::sample_sheets::list_sample_sheets))
-        .route("/sample-sheets/:sheet_id", get(handlers::sample_sheets::get_sample_sheet))
-        .route("/sample-sheets/:sheet_id", put(handlers::sample_sheets::update_sample_sheet))
-        .route("/sample-sheets/:sheet_id", delete(handlers::sample_sheets::delete_sample_sheet))
+        .route(
+            "/sample-sheets",
+            post(handlers::sample_sheets::create_sample_sheet),
+        )
+        .route(
+            "/sample-sheets",
+            get(handlers::sample_sheets::list_sample_sheets),
+        )
+        .route(
+            "/sample-sheets/:sheet_id",
+            get(handlers::sample_sheets::get_sample_sheet),
+        )
+        .route(
+            "/sample-sheets/:sheet_id",
+            put(handlers::sample_sheets::update_sample_sheet),
+        )
+        .route(
+            "/sample-sheets/:sheet_id",
+            delete(handlers::sample_sheets::delete_sample_sheet),
+        )
         // TODO: Implement missing sample sheet download handler
         // .route("/sample-sheets/:sheet_id/download", get(handlers::sample_sheets::download_sample_sheet))
-        .route("/sample-sheets/:sheet_id/validate", post(handlers::sample_sheets::validate_sample_sheet))
+        .route(
+            "/sample-sheets/:sheet_id/validate",
+            post(handlers::sample_sheets::validate_sample_sheet),
+        )
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
@@ -174,7 +196,10 @@ fn create_app(state: AppState) -> Router {
         .route("/runs/:run_id", delete(handlers::runs::delete_run))
         .route("/runs/:run_id/start", post(handlers::runs::start_run))
         .route("/runs/:run_id/stop", post(handlers::runs::stop_run))
-        .route("/runs/:run_id/metrics", get(handlers::runs::get_run_metrics))
+        .route(
+            "/runs/:run_id/metrics",
+            get(handlers::runs::get_run_metrics),
+        )
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
@@ -229,7 +254,10 @@ fn create_app(state: AppState) -> Router {
         // TODO: Implement missing handlers
         // .route("/integration/templates/sequencing", get(handlers::integration::get_sequencing_templates))
         // .route("/integration/notifications/subscribe", post(handlers::integration::subscribe_to_notifications))
-        .route("/integration/lims/sync", post(handlers::integration::sync_with_lims))
+        .route(
+            "/integration/lims/sync",
+            post(handlers::integration::sync_with_lims),
+        )
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
@@ -249,7 +277,10 @@ fn create_app(state: AppState) -> Router {
 
     // Admin routes (require admin privileges)
     let admin_routes = Router::new()
-        .route("/admin/statistics", get(handlers::admin::get_system_statistics))
+        .route(
+            "/admin/statistics",
+            get(handlers::admin::get_system_statistics),
+        )
         // TODO: Implement missing admin handlers
         // .route("/admin/maintenance", post(handlers::admin::run_maintenance))
         // .route("/admin/config", get(handlers::admin::get_configuration))
@@ -277,8 +308,7 @@ fn create_app(state: AppState) -> Router {
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
-                .layer(CompressionLayer::new())
-                .layer(CorsLayer::permissive()) // Configure CORS as needed
+                .layer(CorsLayer::permissive()), // Configure CORS as needed
         )
         .with_state(state)
-} 
+}

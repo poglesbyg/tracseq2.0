@@ -1,10 +1,7 @@
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::Json,
-};
-use serde_json::{json, Value};
-use tracing::{info, error};
+use axum::{extract::State, http::StatusCode, response::Json};
+use serde_json::{Value, json};
+use sqlx::Row;
+use tracing::{error, info};
 
 use crate::{AppState, error::Result};
 
@@ -128,7 +125,10 @@ pub async fn readiness_check(State(state): State<AppState>) -> Result<(StatusCod
         "checks": checks
     });
 
-    info!("Readiness check completed - status: {}", if ready { "ready" } else { "not_ready" });
+    info!(
+        "Readiness check completed - status: {}",
+        if ready { "ready" } else { "not_ready" }
+    );
 
     Ok((status_code, Json(response)))
 }
@@ -164,25 +164,27 @@ pub async fn metrics(State(state): State<AppState>) -> Result<Json<Value>> {
 }
 
 async fn get_job_metrics(state: &AppState) -> Result<Value> {
-    let rows = sqlx::query!(
+    let rows = sqlx::query(
         r#"
         SELECT 
             status::text,
             COUNT(*) as count
         FROM sequencing_jobs 
         GROUP BY status
-        "#
+        "#,
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
 
     let mut job_counts = json!({});
     for row in rows {
-        job_counts[row.status.unwrap_or_default()] = json!(row.count.unwrap_or(0));
+        let status: Option<String> = row.get("status");
+        let count: Option<i64> = row.get("count");
+        job_counts[status.unwrap_or_default()] = json!(count.unwrap_or(0));
     }
 
     Ok(json!({
-        "total": job_counts.as_object().map(|obj| 
+        "total": job_counts.as_object().map(|obj|
             obj.values().filter_map(|v| v.as_i64()).sum::<i64>()
         ).unwrap_or(0),
         "by_status": job_counts
@@ -190,25 +192,27 @@ async fn get_job_metrics(state: &AppState) -> Result<Value> {
 }
 
 async fn get_run_metrics(state: &AppState) -> Result<Value> {
-    let rows = sqlx::query!(
+    let rows = sqlx::query(
         r#"
         SELECT 
             status::text,
             COUNT(*) as count
         FROM sequencing_runs 
         GROUP BY status
-        "#
+        "#,
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
 
     let mut run_counts = json!({});
     for row in rows {
-        run_counts[row.status.unwrap_or_default()] = json!(row.count.unwrap_or(0));
+        let status: Option<String> = row.get("status");
+        let count: Option<i64> = row.get("count");
+        run_counts[status.unwrap_or_default()] = json!(count.unwrap_or(0));
     }
 
     Ok(json!({
-        "total": run_counts.as_object().map(|obj| 
+        "total": run_counts.as_object().map(|obj|
             obj.values().filter_map(|v| v.as_i64()).sum::<i64>()
         ).unwrap_or(0),
         "by_status": run_counts

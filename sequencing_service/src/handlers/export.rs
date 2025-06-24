@@ -5,6 +5,7 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde_json::json;
+use sqlx::Row;
 use uuid::Uuid;
 
 use crate::{
@@ -274,7 +275,9 @@ pub async fn export_analysis_results(
         .bind(analysis_id)
         .fetch_optional(&state.db_pool.pool)
         .await?
-        .ok_or(SequencingError::AnalysisNotFound { analysis_id })?;
+        .ok_or(SequencingError::AnalysisNotFound {
+            analysis_id: analysis_id.to_string(),
+        })?;
 
     // Get analysis results
     let results = sqlx::query_as::<_, AnalysisResult>(
@@ -707,7 +710,7 @@ async fn generate_jobs_summary_report(
 
     let where_clause = where_conditions.join(" AND ");
 
-    let summary = sqlx::query!(&format!(
+    let summary = sqlx::query(&format!(
         r#"
             SELECT 
                 COUNT(*) as total_jobs,
@@ -722,6 +725,11 @@ async fn generate_jobs_summary_report(
     .fetch_one(&state.db_pool.pool)
     .await?;
 
+    let total_jobs: Option<i64> = summary.get("total_jobs");
+    let completed_jobs: Option<i64> = summary.get("completed_jobs");
+    let failed_jobs: Option<i64> = summary.get("failed_jobs");
+    let running_jobs: Option<i64> = summary.get("running_jobs");
+
     Ok(json!({
         "report_type": "jobs_summary",
         "period": {
@@ -729,12 +737,12 @@ async fn generate_jobs_summary_report(
             "end_date": end_date
         },
         "summary": {
-            "total_jobs": summary.total_jobs,
-            "completed_jobs": summary.completed_jobs,
-            "failed_jobs": summary.failed_jobs,
-            "running_jobs": summary.running_jobs,
-            "success_rate": if summary.total_jobs.unwrap_or(0) > 0 {
-                (summary.completed_jobs.unwrap_or(0) as f64 / summary.total_jobs.unwrap_or(1) as f64 * 100.0).round()
+            "total_jobs": total_jobs,
+            "completed_jobs": completed_jobs,
+            "failed_jobs": failed_jobs,
+            "running_jobs": running_jobs,
+            "success_rate": if total_jobs.unwrap_or(0) > 0 {
+                (completed_jobs.unwrap_or(0) as f64 / total_jobs.unwrap_or(1) as f64 * 100.0).round()
             } else { 0.0 }
         }
     }))

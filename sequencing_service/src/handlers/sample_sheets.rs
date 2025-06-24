@@ -430,7 +430,7 @@ pub async fn delete_sample_sheet(
 
     if active_usage > 0 {
         return Err(SequencingError::SampleSheetInUse {
-            sheet_id,
+            sheet_id: sheet_id.to_string(),
             active_jobs: active_usage as u32,
         });
     }
@@ -592,29 +592,28 @@ async fn perform_sample_sheet_validation(
 
 fn validate_sample_sheet_format(samples_data: &serde_json::Value) -> Result<()> {
     if !samples_data.is_array() {
-        return Err(SequencingError::Validation {
-            message: "Samples data must be an array".to_string(),
-        });
+        return Err(SequencingError::Validation(
+            "Samples data must be an array".to_string(),
+        ));
     }
 
     let samples = samples_data.as_array().unwrap();
     for (index, sample) in samples.iter().enumerate() {
         if !sample.is_object() {
-            return Err(SequencingError::Validation {
-                message: format!("Sample at index {} must be an object", index),
-            });
+            return Err(SequencingError::Validation(format!(
+                "Sample at index {} must be an object",
+                index
+            )));
         }
 
         // Check required fields
         let required_fields = ["Sample_Name", "Sample_ID"];
         for field in &required_fields {
             if sample.get(field).is_none() {
-                return Err(SequencingError::Validation {
-                    message: format!(
-                        "Sample at index {} missing required field: {}",
-                        index, field
-                    ),
-                });
+                return Err(SequencingError::Validation(format!(
+                    "Sample at index {} missing required field: {}",
+                    index, field
+                )));
             }
         }
     }

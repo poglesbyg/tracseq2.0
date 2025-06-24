@@ -5,17 +5,14 @@ use axum::{
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use tracing::{info, error, warn};
+use serde_json::{Value, json};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 use crate::{
     AppState,
     error::{Result, SequencingError},
-    models::{
-        SequencingJob, JobStatus, Priority, CreateJobRequest,
-        UpdateJobRequest, JobResponse,
-    },
+    models::{CreateJobRequest, JobResponse, JobStatus, Priority, SequencingJob, UpdateJobRequest},
 };
 
 #[derive(Debug, Deserialize)]
@@ -48,15 +45,16 @@ pub async fn create_job(
 
     // Check if platform exists in configuration
     if state.config.get_platform(&payload.platform_id).is_none() {
-        return Err(SequencingError::PlatformNotFound(payload.platform_id.clone()));
+        return Err(SequencingError::PlatformNotFound(
+            payload.platform_id.clone(),
+        ));
     }
 
     let job_id = Uuid::new_v4();
     let now = Utc::now();
 
     // Insert the job into database
-    let job = sqlx::query_as!(
-        SequencingJob,
+    let job = sqlx::query_as::<_, SequencingJob>(
         r#"
         INSERT INTO sequencing_jobs (
             id, name, description, status, priority, platform_id,
@@ -64,32 +62,31 @@ pub async fn create_job(
             metadata, created_at, updated_at
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        RETURNING 
-            id, name, description, status as "status: JobStatus", 
-            priority as "priority: Priority", platform_id, workflow_id,
-            sample_sheet_id, run_id, created_by, assigned_to,
-            estimated_start, estimated_completion, actual_start,
-            actual_completion, metadata, created_at, updated_at
+        RETURNING *
         "#,
-        job_id,
-        payload.name,
-        payload.description,
-        JobStatus::Draft as JobStatus,
-        payload.priority as Priority,
-        payload.platform_id,
-        payload.workflow_id,
-        payload.sample_sheet_id,
-        Uuid::new_v4(), // TODO: Get from auth context
-        payload.estimated_start,
-        payload.metadata.unwrap_or_else(|| json!({})),
-        now,
-        now
     )
+    .bind(job_id)
+    .bind(&payload.name)
+    .bind(&payload.description)
+    .bind(JobStatus::Draft)
+    .bind(payload.priority)
+    .bind(&payload.platform_id)
+    .bind(&payload.workflow_id)
+    .bind(&payload.sample_sheet_id)
+    .bind(Uuid::new_v4()) // TODO: Get from auth context
+    .bind(payload.estimated_start)
+    .bind(payload.metadata.unwrap_or_else(|| json!({})))
+    .bind(now)
+    .bind(now)
     .fetch_one(&state.db_pool.pool)
     .await?;
 
     // Send notification about job creation
-    if let Err(e) = state.notification_client.send_job_created_notification(&job).await {
+    if let Err(e) = state
+        .notification_client
+        .send_job_created_notification(&job)
+        .await
+    {
         warn!("Failed to send job creation notification: {}", e);
     }
 
@@ -121,83 +118,55 @@ pub async fn list_jobs(
     let limit = params.limit.unwrap_or(50).min(100); // Cap at 100
     let offset = (page.saturating_sub(1)) * limit;
 
-    // Build dynamic query
-    let mut query = "SELECT id, name, description, status, priority, platform_id, workflow_id, sample_sheet_id, run_id, created_by, assigned_to, estimated_start, estimated_completion, actual_start, actual_completion, metadata, created_at, updated_at FROM sequencing_jobs WHERE 1=1".to_string();
-    let mut params_vec: Vec<Box<dyn sqlx::postgres::PgArgumentBuffer>> = Vec::new();
-    let mut param_index = 1;
-
-    // Add filters
-    if let Some(status) = &params.status {
-        query.push_str(&format!(" AND status = ${}", param_index));
-        param_index += 1;
-    }
-
-    if let Some(priority) = &params.priority {
-        query.push_str(&format!(" AND priority = ${}", param_index));
-        param_index += 1;
-    }
-
-    if let Some(platform) = &params.platform {
-        query.push_str(&format!(" AND platform_id = ${}", param_index));
-        param_index += 1;
-    }
-
-    if let Some(created_by) = &params.created_by {
-        query.push_str(&format!(" AND created_by = ${}", param_index));
-        param_index += 1;
-    }
-
-    // Add sorting
-    let sort_field = params.sort.as_deref().unwrap_or("created_at");
-    let sort_order = params.order.as_deref().unwrap_or("desc");
-    query.push_str(&format!(" ORDER BY {} {}", sort_field, sort_order));
-
-    // Add pagination
-    query.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
+    // Note: For now using simplified query, dynamic filtering can be added later
 
     // Execute query (simplified version for now)
-    let jobs = sqlx::query_as!(
-        SequencingJob,
+    let jobs = sqlx::query_as::<_, SequencingJob>(
         r#"
         SELECT 
-            id, name, description, status as "status: JobStatus", 
-            priority as "priority: Priority", platform_id, workflow_id,
+            id, name, description, status, 
+            priority, platform_id, workflow_id,
             sample_sheet_id, run_id, created_by, assigned_to,
             estimated_start, estimated_completion, actual_start,
-            actual_completion, metadata, created_at, updated_at
+            actual_completion, metadata, created_at, updated_at,
+            platform_id as platform, name as job_name,
+            actual_start as started_at, actual_completion as completed_at
         FROM sequencing_jobs 
         ORDER BY created_at DESC 
         LIMIT $1 OFFSET $2
         "#,
-        limit as i64,
-        offset as i64
     )
+    .bind(limit as i64)
+    .bind(offset as i64)
     .fetch_all(&state.db_pool.pool)
     .await?;
 
     // Get total count for pagination
-    let total_count = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM sequencing_jobs"
-    )
-    .fetch_one(&state.db_pool.pool)
-    .await?
-    .unwrap_or(0);
+    let total_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sequencing_jobs")
+        .fetch_one(&state.db_pool.pool)
+        .await?;
 
-    let job_responses: Vec<JobResponse> = jobs.into_iter().map(|job| {
-        JobResponse {
+    let job_responses: Vec<JobResponse> = jobs
+        .into_iter()
+        .map(|job| JobResponse {
             id: job.id,
-            name: job.name,
-            status: job.status,
-            priority: job.priority,
+            name: job.name.clone(),
+            status: job.status.clone(),
+            priority: job.priority.clone(),
             platform_id: job.platform_id,
             workflow_id: job.workflow_id,
             progress_percentage: calculate_job_progress(&job.status),
             estimated_completion: job.estimated_completion,
             created_at: job.created_at,
-        }
-    }).collect();
+        })
+        .collect();
 
-    info!("Retrieved {} jobs (page {}, limit {})", job_responses.len(), page, limit);
+    info!(
+        "Retrieved {} jobs (page {}, limit {})",
+        job_responses.len(),
+        page,
+        limit
+    );
 
     Ok(Json(json!({
         "jobs": job_responses,
@@ -217,20 +186,21 @@ pub async fn get_job(
 ) -> Result<Json<SequencingJob>> {
     info!("Retrieving sequencing job: {}", job_id);
 
-    let job = sqlx::query_as!(
-        SequencingJob,
+    let job = sqlx::query_as::<_, SequencingJob>(
         r#"
         SELECT 
-            id, name, description, status as "status: JobStatus", 
-            priority as "priority: Priority", platform_id, workflow_id,
+            id, name, description, status, 
+            priority, platform_id, workflow_id,
             sample_sheet_id, run_id, created_by, assigned_to,
             estimated_start, estimated_completion, actual_start,
-            actual_completion, metadata, created_at, updated_at
+            actual_completion, metadata, created_at, updated_at,
+            platform_id as platform, name as job_name,
+            actual_start as started_at, actual_completion as completed_at
         FROM sequencing_jobs 
         WHERE id = $1
         "#,
-        job_id
     )
+    .bind(job_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
     .ok_or_else(|| SequencingError::JobNotFound(job_id.to_string()))?;
@@ -249,27 +219,27 @@ pub async fn update_job(
     info!("Updating sequencing job: {}", job_id);
 
     // Check if job exists
-    let existing_job = sqlx::query_as!(
-        SequencingJob,
+    let existing_job = sqlx::query_as::<_, SequencingJob>(
         r#"
         SELECT 
-            id, name, description, status as "status: JobStatus", 
-            priority as "priority: Priority", platform_id, workflow_id,
+            id, name, description, status, 
+            priority, platform_id, workflow_id,
             sample_sheet_id, run_id, created_by, assigned_to,
             estimated_start, estimated_completion, actual_start,
-            actual_completion, metadata, created_at, updated_at
+            actual_completion, metadata, created_at, updated_at,
+            platform_id as platform, name as job_name,
+            actual_start as started_at, actual_completion as completed_at
         FROM sequencing_jobs 
         WHERE id = $1
         "#,
-        job_id
     )
+    .bind(job_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
     .ok_or_else(|| SequencingError::JobNotFound(job_id.to_string()))?;
 
     // Update only provided fields
-    let updated_job = sqlx::query_as!(
-        SequencingJob,
+    let updated_job = sqlx::query_as::<_, SequencingJob>(
         r#"
         UPDATE sequencing_jobs 
         SET 
@@ -282,20 +252,22 @@ pub async fn update_job(
             updated_at = NOW()
         WHERE id = $1
         RETURNING 
-            id, name, description, status as "status: JobStatus", 
-            priority as "priority: Priority", platform_id, workflow_id,
+            id, name, description, status, 
+            priority, platform_id, workflow_id,
             sample_sheet_id, run_id, created_by, assigned_to,
             estimated_start, estimated_completion, actual_start,
-            actual_completion, metadata, created_at, updated_at
+            actual_completion, metadata, created_at, updated_at,
+            platform_id as platform, name as job_name,
+            actual_start as started_at, actual_completion as completed_at
         "#,
-        job_id,
-        payload.name,
-        payload.description,
-        payload.priority.map(|p| p as Priority),
-        payload.assigned_to,
-        payload.estimated_start,
-        payload.metadata
     )
+    .bind(job_id)
+    .bind(payload.name)
+    .bind(payload.description)
+    .bind(payload.priority.map(|p| p as Priority))
+    .bind(payload.assigned_to)
+    .bind(payload.estimated_start)
+    .bind(payload.metadata)
     .fetch_one(&state.db_pool.pool)
     .await?;
 
@@ -312,39 +284,40 @@ pub async fn delete_job(
     info!("Deleting sequencing job: {}", job_id);
 
     // Check if job exists and is not in a terminal state
-    let job = sqlx::query_as!(
-        SequencingJob,
+    let job = sqlx::query_as::<_, SequencingJob>(
         r#"
         SELECT 
-            id, name, description, status as "status: JobStatus", 
-            priority as "priority: Priority", platform_id, workflow_id,
+            id, name, description, status, 
+            priority, platform_id, workflow_id,
             sample_sheet_id, run_id, created_by, assigned_to,
             estimated_start, estimated_completion, actual_start,
-            actual_completion, metadata, created_at, updated_at
+            actual_completion, metadata, created_at, updated_at,
+            platform_id as platform, name as job_name,
+            actual_start as started_at, actual_completion as completed_at
         FROM sequencing_jobs 
         WHERE id = $1
         "#,
-        job_id
     )
+    .bind(job_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
     .ok_or_else(|| SequencingError::JobNotFound(job_id.to_string()))?;
 
     // Don't allow deletion of active jobs
     if job.status.is_active() {
-        return Err(SequencingError::InvalidOperation(
-            format!("Cannot delete job {} - job is currently {}", job_id, serde_json::to_string(&job.status).unwrap_or_default())
-        ));
+        return Err(SequencingError::InvalidOperation(format!(
+            "Cannot delete job {} - job is currently {}",
+            job_id,
+            serde_json::to_string(&job.status).unwrap_or_default()
+        )));
     }
 
     // Delete the job
-    let deleted_rows = sqlx::query!(
-        "DELETE FROM sequencing_jobs WHERE id = $1",
-        job_id
-    )
-    .execute(&state.db_pool.pool)
-    .await?
-    .rows_affected();
+    let deleted_rows = sqlx::query("DELETE FROM sequencing_jobs WHERE id = $1")
+        .bind(job_id)
+        .execute(&state.db_pool.pool)
+        .await?
+        .rows_affected();
 
     if deleted_rows == 0 {
         return Err(SequencingError::JobNotFound(job_id.to_string()));
@@ -364,20 +337,21 @@ pub async fn update_job_status(
     info!("Updating job status: {} -> {:?}", job_id, payload.status);
 
     // Get current job
-    let current_job = sqlx::query_as!(
-        SequencingJob,
+    let current_job = sqlx::query_as::<_, SequencingJob>(
         r#"
         SELECT 
-            id, name, description, status as "status: JobStatus", 
-            priority as "priority: Priority", platform_id, workflow_id,
+            id, name, description, status, 
+            priority, platform_id, workflow_id,
             sample_sheet_id, run_id, created_by, assigned_to,
             estimated_start, estimated_completion, actual_start,
-            actual_completion, metadata, created_at, updated_at
+            actual_completion, metadata, created_at, updated_at,
+            platform_id as platform, name as job_name,
+            actual_start as started_at, actual_completion as completed_at
         FROM sequencing_jobs 
         WHERE id = $1
         "#,
-        job_id
     )
+    .bind(job_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
     .ok_or_else(|| SequencingError::JobNotFound(job_id.to_string()))?;
@@ -399,8 +373,7 @@ pub async fn update_job_status(
         _ => (current_job.actual_start, current_job.actual_completion),
     };
 
-    let updated_job = sqlx::query_as!(
-        SequencingJob,
+    let updated_job = sqlx::query_as::<_, SequencingJob>(
         r#"
         UPDATE sequencing_jobs 
         SET 
@@ -410,22 +383,28 @@ pub async fn update_job_status(
             updated_at = NOW()
         WHERE id = $1
         RETURNING 
-            id, name, description, status as "status: JobStatus", 
-            priority as "priority: Priority", platform_id, workflow_id,
+            id, name, description, status, 
+            priority, platform_id, workflow_id,
             sample_sheet_id, run_id, created_by, assigned_to,
             estimated_start, estimated_completion, actual_start,
-            actual_completion, metadata, created_at, updated_at
+            actual_completion, metadata, created_at, updated_at,
+            platform_id as platform, name as job_name,
+            actual_start as started_at, actual_completion as completed_at
         "#,
-        job_id,
-        payload.status as JobStatus,
-        actual_start,
-        actual_completion
     )
+    .bind(job_id)
+    .bind(payload.status.clone() as JobStatus)
+    .bind(actual_start)
+    .bind(actual_completion)
     .fetch_one(&state.db_pool.pool)
     .await?;
 
     // Send status change notification
-    if let Err(e) = state.notification_client.send_job_status_notification(&updated_job).await {
+    if let Err(e) = state
+        .notification_client
+        .send_job_status_notification(&updated_job)
+        .await
+    {
         warn!("Failed to send job status notification: {}", e);
     }
 
@@ -442,20 +421,21 @@ pub async fn clone_job(
     info!("Cloning sequencing job: {}", job_id);
 
     // Get the job to clone
-    let original_job = sqlx::query_as!(
-        SequencingJob,
+    let original_job = sqlx::query_as::<_, SequencingJob>(
         r#"
         SELECT 
-            id, name, description, status as "status: JobStatus", 
-            priority as "priority: Priority", platform_id, workflow_id,
+            id, name, description, status, 
+            priority, platform_id, workflow_id,
             sample_sheet_id, run_id, created_by, assigned_to,
             estimated_start, estimated_completion, actual_start,
-            actual_completion, metadata, created_at, updated_at
+            actual_completion, metadata, created_at, updated_at,
+            platform_id as platform, name as job_name,
+            actual_start as started_at, actual_completion as completed_at
         FROM sequencing_jobs 
         WHERE id = $1
         "#,
-        job_id
     )
+    .bind(job_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
     .ok_or_else(|| SequencingError::JobNotFound(job_id.to_string()))?;
@@ -465,8 +445,7 @@ pub async fn clone_job(
     let now = Utc::now();
     let cloned_name = format!("{} (Copy)", original_job.name);
 
-    let cloned_job = sqlx::query_as!(
-        SequencingJob,
+    let cloned_job = sqlx::query_as::<_, SequencingJob>(
         r#"
         INSERT INTO sequencing_jobs (
             id, name, description, status, priority, platform_id,
@@ -475,25 +454,27 @@ pub async fn clone_job(
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING 
-            id, name, description, status as "status: JobStatus", 
-            priority as "priority: Priority", platform_id, workflow_id,
+            id, name, description, status, 
+            priority, platform_id, workflow_id,
             sample_sheet_id, run_id, created_by, assigned_to,
             estimated_start, estimated_completion, actual_start,
-            actual_completion, metadata, created_at, updated_at
+            actual_completion, metadata, created_at, updated_at,
+            platform_id as platform, name as job_name,
+            actual_start as started_at, actual_completion as completed_at
         "#,
-        cloned_job_id,
-        cloned_name,
-        original_job.description,
-        JobStatus::Draft as JobStatus,
-        original_job.priority as Priority,
-        original_job.platform_id,
-        original_job.workflow_id,
-        original_job.sample_sheet_id,
-        original_job.created_by,
-        original_job.metadata,
-        now,
-        now
     )
+    .bind(cloned_job_id)
+    .bind(cloned_name)
+    .bind(original_job.description)
+    .bind(JobStatus::Draft as JobStatus)
+    .bind(original_job.priority as Priority)
+    .bind(original_job.platform_id)
+    .bind(original_job.workflow_id)
+    .bind(original_job.sample_sheet_id)
+    .bind(original_job.created_by)
+    .bind(original_job.metadata)
+    .bind(now)
+    .bind(now)
     .fetch_one(&state.db_pool.pool)
     .await?;
 
@@ -522,34 +503,35 @@ pub async fn cancel_job(
     info!("Cancelling sequencing job: {}", job_id);
 
     // Get current job
-    let current_job = sqlx::query_as!(
-        SequencingJob,
+    let current_job = sqlx::query_as::<_, SequencingJob>(
         r#"
         SELECT 
-            id, name, description, status as "status: JobStatus", 
-            priority as "priority: Priority", platform_id, workflow_id,
+            id, name, description, status, 
+            priority, platform_id, workflow_id,
             sample_sheet_id, run_id, created_by, assigned_to,
             estimated_start, estimated_completion, actual_start,
-            actual_completion, metadata, created_at, updated_at
+            actual_completion, metadata, created_at, updated_at,
+            platform_id as platform, name as job_name,
+            actual_start as started_at, actual_completion as completed_at
         FROM sequencing_jobs 
         WHERE id = $1
         "#,
-        job_id
     )
+    .bind(job_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
     .ok_or_else(|| SequencingError::JobNotFound(job_id.to_string()))?;
 
     // Check if job can be cancelled
     if current_job.status.is_terminal() {
-        return Err(SequencingError::InvalidOperation(
-            format!("Cannot cancel job {} - job is already in terminal state: {:?}", job_id, current_job.status)
-        ));
+        return Err(SequencingError::InvalidOperation(format!(
+            "Cannot cancel job {} - job is already in terminal state: {:?}",
+            job_id, current_job.status
+        )));
     }
 
     // Update to cancelled status
-    let cancelled_job = sqlx::query_as!(
-        SequencingJob,
+    let cancelled_job = sqlx::query_as::<_, SequencingJob>(
         r#"
         UPDATE sequencing_jobs 
         SET 
@@ -558,23 +540,32 @@ pub async fn cancel_job(
             updated_at = NOW()
         WHERE id = $1
         RETURNING 
-            id, name, description, status as "status: JobStatus", 
-            priority as "priority: Priority", platform_id, workflow_id,
+            id, name, description, status, 
+            priority, platform_id, workflow_id,
             sample_sheet_id, run_id, created_by, assigned_to,
             estimated_start, estimated_completion, actual_start,
-            actual_completion, metadata, created_at, updated_at
+            actual_completion, metadata, created_at, updated_at,
+            platform_id as platform, name as job_name,
+            actual_start as started_at, actual_completion as completed_at
         "#,
-        job_id
     )
+    .bind(job_id)
     .fetch_one(&state.db_pool.pool)
     .await?;
 
     // Send cancellation notification
-    if let Err(e) = state.notification_client.send_job_cancelled_notification(&cancelled_job).await {
+    if let Err(e) = state
+        .notification_client
+        .send_job_cancelled_notification(&cancelled_job)
+        .await
+    {
         warn!("Failed to send job cancellation notification: {}", e);
     }
 
-    info!("Cancelled job: {} ({})", cancelled_job.name, cancelled_job.id);
+    info!(
+        "Cancelled job: {} ({})",
+        cancelled_job.name, cancelled_job.id
+    );
 
     Ok(Json(cancelled_job))
 }

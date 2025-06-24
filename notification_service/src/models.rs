@@ -29,7 +29,7 @@ pub struct Notification {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq, Hash)]
 #[sqlx(type_name = "notification_type", rename_all = "snake_case")]
 pub enum NotificationType {
     Alert,
@@ -42,7 +42,7 @@ pub enum NotificationType {
     System,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq, Hash)]
 #[sqlx(type_name = "priority", rename_all = "snake_case")]
 pub enum Priority {
     Low,
@@ -52,7 +52,7 @@ pub enum Priority {
     Urgent,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq, Hash)]
 #[sqlx(type_name = "notification_status", rename_all = "snake_case")]
 pub enum NotificationStatus {
     Pending,
@@ -65,7 +65,7 @@ pub enum NotificationStatus {
     Retrying,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq, Hash)]
 #[sqlx(type_name = "channel", rename_all = "snake_case")]
 pub enum Channel {
     Email,
@@ -100,7 +100,7 @@ pub struct NotificationTemplate {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq)]
 #[sqlx(type_name = "template_type", rename_all = "snake_case")]
 pub enum TemplateType {
     Email,
@@ -287,7 +287,7 @@ pub struct ChannelDeliveryStatus {
     pub error_message: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DeliveryStatus {
     Pending,
     Sent,
@@ -340,26 +340,9 @@ impl Default for NotificationPreferences {
 // Trait Implementations
 // ================================
 
-impl std::hash::Hash for Channel {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        std::mem::discriminant(self).hash(state);
+// PostgreSQL array support for Channel enum
+impl sqlx::postgres::PgHasArrayType for Channel {
+    fn array_type_info() -> sqlx::postgres::PgTypeInfo {
+        sqlx::postgres::PgTypeInfo::with_name("_channel")
     }
 }
-
-impl Eq for Channel {}
-
-impl std::hash::Hash for Priority {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        std::mem::discriminant(self).hash(state);
-    }
-}
-
-impl Eq for Priority {}
-
-impl std::hash::Hash for NotificationType {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        std::mem::discriminant(self).hash(state);
-    }
-}
-
-impl Eq for NotificationType {}

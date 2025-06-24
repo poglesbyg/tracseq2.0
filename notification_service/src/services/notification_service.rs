@@ -2,12 +2,12 @@ use crate::{
     config::Config,
     database::DatabasePool,
     error::{NotificationError, Result},
-    models::*,
     handlers::{
-        admin::{NotificationStatistics, ChannelHealthResponse, RateLimitResponse, HealthStatus},
+        admin::{ChannelHealthResponse, HealthStatus, NotificationStatistics, RateLimitResponse},
         channels::{ChannelConfigResponse, EmailTemplate, SlackWebhook},
         integration::AlertSeverity,
     },
+    models::*,
 };
 use chrono::{DateTime, Utc};
 use reqwest::Client;
@@ -88,11 +88,12 @@ impl NotificationServiceImpl {
 
     pub async fn send_notification_by_id(&self, notification_id: Uuid) -> Result<()> {
         let mut notification = self.get_notification(notification_id).await?;
-        
-        if notification.status != NotificationStatus::Pending 
-            && notification.status != NotificationStatus::Scheduled {
+
+        if notification.status != NotificationStatus::Pending
+            && notification.status != NotificationStatus::Scheduled
+        {
             return Err(NotificationError::InvalidOperation(
-                "Notification is not in a sendable state".to_string()
+                "Notification is not in a sendable state".to_string(),
             ));
         }
 
@@ -102,13 +103,13 @@ impl NotificationServiceImpl {
 
         let delivery_results = self.deliver_notification(&notification).await;
         let overall_success = delivery_results.iter().any(|r| r.is_ok());
-        
+
         notification.status = if overall_success {
             NotificationStatus::Sent
         } else {
             NotificationStatus::Failed
         };
-        
+
         if overall_success {
             notification.sent_at = Some(Utc::now());
         }
@@ -118,14 +119,14 @@ impl NotificationServiceImpl {
     }
 
     pub async fn get_notification(&self, notification_id: Uuid) -> Result<Notification> {
-        let notification = query_as!(
-            Notification,
-            "SELECT * FROM notifications WHERE id = $1",
-            notification_id
-        )
-        .fetch_optional(&self.database.pool)
-        .await?
-        .ok_or_else(|| NotificationError::NotificationNotFound(notification_id.to_string()))?;
+        let notification =
+            sqlx::query_as::<_, Notification>("SELECT * FROM notifications WHERE id = $1")
+                .bind(notification_id)
+                .fetch_optional(&self.database.pool)
+                .await?
+                .ok_or_else(|| {
+                    NotificationError::NotificationNotFound(notification_id.to_string())
+                })?;
 
         Ok(notification)
     }
@@ -139,12 +140,11 @@ impl NotificationServiceImpl {
         priority: Option<Priority>,
     ) -> Result<Vec<Notification>> {
         // This is a simplified version - in production, you'd build dynamic queries
-        let notifications = query_as!(
-            Notification,
+        let notifications = sqlx::query_as::<_, Notification>(
             "SELECT * FROM notifications ORDER BY created_at DESC LIMIT $1 OFFSET $2",
-            limit,
-            offset
         )
+        .bind(limit)
+        .bind(offset)
         .fetch_all(&self.database.pool)
         .await?;
 
@@ -153,23 +153,26 @@ impl NotificationServiceImpl {
 
     pub async fn retry_notification(&self, notification_id: Uuid) -> Result<Notification> {
         let mut notification = self.get_notification(notification_id).await?;
-        
+
         if notification.status != NotificationStatus::Failed {
             return Err(NotificationError::InvalidOperation(
-                "Only failed notifications can be retried".to_string()
+                "Only failed notifications can be retried".to_string(),
             ));
         }
 
         notification.status = NotificationStatus::Pending;
         self.update_notification(&notification).await?;
-        
+
         // Trigger async sending
         let _ = self.send_notification_by_id(notification_id).await;
-        
+
         Ok(notification)
     }
 
-    pub async fn get_delivery_status(&self, notification_id: Uuid) -> Result<Vec<ChannelDeliveryStatus>> {
+    pub async fn get_delivery_status(
+        &self,
+        notification_id: Uuid,
+    ) -> Result<Vec<ChannelDeliveryStatus>> {
         // Simplified implementation - would query delivery_attempts table
         Ok(vec![])
     }
@@ -178,11 +181,16 @@ impl NotificationServiceImpl {
     // Channel Testing Methods
     // ================================
 
-    pub async fn test_email_channel(&self, recipient: &str, subject: &str, message: &str) -> Result<()> {
+    pub async fn test_email_channel(
+        &self,
+        recipient: &str,
+        subject: &str,
+        message: &str,
+    ) -> Result<()> {
         if !self.config.email.enabled {
             return Err(NotificationError::ChannelDisabled("email".to_string()));
         }
-        
+
         info!("Test email sent to {} with subject: {}", recipient, subject);
         Ok(())
     }
@@ -191,7 +199,7 @@ impl NotificationServiceImpl {
         if !self.config.sms.enabled {
             return Err(NotificationError::ChannelDisabled("sms".to_string()));
         }
-        
+
         info!("Test SMS sent to {}: {}", recipient, message);
         Ok(())
     }
@@ -200,7 +208,7 @@ impl NotificationServiceImpl {
         if !self.config.slack.enabled {
             return Err(NotificationError::ChannelDisabled("slack".to_string()));
         }
-        
+
         info!("Test Slack message sent to {}: {}", channel, message);
         Ok(())
     }
@@ -209,7 +217,7 @@ impl NotificationServiceImpl {
         if !self.config.teams.enabled {
             return Err(NotificationError::ChannelDisabled("teams".to_string()));
         }
-        
+
         info!("Test Teams message sent to {}: {}", webhook, message);
         Ok(())
     }
@@ -415,12 +423,21 @@ impl NotificationServiceImpl {
         })
     }
 
-    pub async fn list_subscriptions(&self, limit: i64, offset: i64) -> Result<Vec<NotificationSubscription>> {
+    pub async fn list_subscriptions(
+        &self,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<NotificationSubscription>> {
         Ok(vec![])
     }
 
-    pub async fn get_subscription(&self, subscription_id: Uuid) -> Result<NotificationSubscription> {
-        Err(NotificationError::SubscriptionNotFound(subscription_id.to_string()))
+    pub async fn get_subscription(
+        &self,
+        subscription_id: Uuid,
+    ) -> Result<NotificationSubscription> {
+        Err(NotificationError::SubscriptionNotFound(
+            subscription_id.to_string(),
+        ))
     }
 
     pub async fn update_subscription(
@@ -439,11 +456,17 @@ impl NotificationServiceImpl {
         Ok(())
     }
 
-    pub async fn get_user_subscriptions(&self, user_id: Uuid) -> Result<Vec<NotificationSubscription>> {
+    pub async fn get_user_subscriptions(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<NotificationSubscription>> {
         Ok(vec![])
     }
 
-    pub async fn get_event_subscriptions(&self, event_type: &str) -> Result<Vec<NotificationSubscription>> {
+    pub async fn get_event_subscriptions(
+        &self,
+        event_type: &str,
+    ) -> Result<Vec<NotificationSubscription>> {
         Ok(vec![])
     }
 
@@ -487,7 +510,10 @@ impl NotificationServiceImpl {
                     })),
                 };
 
-                if let Ok(notification) = self.create_notification(notification_request, user_id.unwrap_or_default()).await {
+                if let Ok(notification) = self
+                    .create_notification(notification_request, user_id.unwrap_or_default())
+                    .await
+                {
                     notifications.push(notification);
                 }
             }
@@ -580,7 +606,10 @@ impl NotificationServiceImpl {
             })),
         };
 
-        if let Ok(notification) = self.create_notification(notification_request, Uuid::new_v4()).await {
+        if let Ok(notification) = self
+            .create_notification(notification_request, Uuid::new_v4())
+            .await
+        {
             Ok(vec![notification])
         } else {
             Ok(vec![])
@@ -613,7 +642,11 @@ impl NotificationServiceImpl {
         })
     }
 
-    pub async fn get_failed_notifications(&self, limit: i64, offset: i64) -> Result<Vec<Notification>> {
+    pub async fn get_failed_notifications(
+        &self,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Notification>> {
         Ok(vec![])
     }
 
@@ -621,7 +654,11 @@ impl NotificationServiceImpl {
         Ok(0)
     }
 
-    pub async fn cleanup_old_notifications(&self, older_than_days: u32, keep_failed: bool) -> Result<usize> {
+    pub async fn cleanup_old_notifications(
+        &self,
+        older_than_days: u32,
+        keep_failed: bool,
+    ) -> Result<usize> {
         Ok(0)
     }
 
@@ -640,7 +677,9 @@ impl NotificationServiceImpl {
         requests_per_hour: Option<u32>,
         requests_per_day: Option<u32>,
     ) -> Result<RateLimitResponse> {
-        Err(NotificationError::NotImplemented("Rate limit updates not implemented".to_string()))
+        Err(NotificationError::NotImplemented(
+            "Rate limit updates not implemented".to_string(),
+        ))
     }
 
     pub async fn get_metrics(&self) -> Result<NotificationMetrics> {
@@ -678,7 +717,10 @@ impl NotificationServiceImpl {
                     Channel::Sms => self.send_sms(notification, recipient).await,
                     Channel::Slack => self.send_slack(notification, recipient).await,
                     Channel::Teams => self.send_teams(notification, recipient).await,
-                    _ => Err(NotificationError::ChannelNotSupported(format!("{:?}", channel))),
+                    _ => Err(NotificationError::ChannelNotSupported(format!(
+                        "{:?}",
+                        channel
+                    ))),
                 };
 
                 results.push(result);
@@ -692,8 +734,11 @@ impl NotificationServiceImpl {
         if !self.config.email.enabled {
             return Err(NotificationError::ChannelDisabled("email".to_string()));
         }
-        
-        info!("Sending email to {} with subject: {}", recipient, notification.title);
+
+        info!(
+            "Sending email to {} with subject: {}",
+            recipient, notification.title
+        );
         Ok(())
     }
 
@@ -701,7 +746,7 @@ impl NotificationServiceImpl {
         if !self.config.sms.enabled {
             return Err(NotificationError::ChannelDisabled("sms".to_string()));
         }
-        
+
         info!("Sending SMS to {}: {}", recipient, notification.message);
         Ok(())
     }
@@ -710,8 +755,11 @@ impl NotificationServiceImpl {
         if !self.config.slack.enabled {
             return Err(NotificationError::ChannelDisabled("slack".to_string()));
         }
-        
-        info!("Sending Slack message to {}: {}", channel, notification.message);
+
+        info!(
+            "Sending Slack message to {}: {}",
+            channel, notification.message
+        );
         Ok(())
     }
 
@@ -719,8 +767,11 @@ impl NotificationServiceImpl {
         if !self.config.teams.enabled {
             return Err(NotificationError::ChannelDisabled("teams".to_string()));
         }
-        
-        info!("Sending Teams message to {}: {}", webhook, notification.message);
+
+        info!(
+            "Sending Teams message to {}: {}",
+            webhook, notification.message
+        );
         Ok(())
     }
 
@@ -735,4 +786,4 @@ impl NotificationServiceImpl {
         info!("Updating notification: {}", notification.id);
         Ok(())
     }
-} 
+}
