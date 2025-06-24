@@ -20,8 +20,7 @@ pub struct ListProtocolsQuery {
 #[derive(Debug, Deserialize)]
 pub struct RecommendProtocolRequest {
     library_type: String,
-    kit_id: Option<Uuid>,
-    platform_id: Option<Uuid>,
+    sample_requirements: serde_json::Value,
 }
 
 pub async fn list_protocols(
@@ -87,8 +86,7 @@ pub async fn recommend_protocol(
 ) -> Result<Json<Vec<ProtocolRecommendation>>> {
     let recommendations = service.recommend_protocol(
         request.library_type,
-        request.kit_id,
-        request.platform_id,
+        request.sample_requirements,
     ).await?;
     Ok(Json(recommendations))
 }

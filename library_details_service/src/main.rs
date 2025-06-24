@@ -1,6 +1,6 @@
 use axum::{
     routing::{get, post, put, delete},
-    Router,
+    Router, Server,
 };
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
@@ -105,7 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = format!("{}:{}", config.host, config.port);
     tracing::info!("Library Details service listening on {}", addr);
     
-    axum::Server::bind(&addr.parse()?)
+    Server::bind(&addr.parse()?)
         .serve(app.into_make_service())
         .await?;
     

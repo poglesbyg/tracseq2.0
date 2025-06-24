@@ -20,7 +20,7 @@ pub struct ListQCMetricsQuery {
 
 #[derive(Debug, Deserialize)]
 pub struct GenerateReportRequest {
-    library_ids: Vec<Uuid>,
+    library_id: Uuid,
 }
 
 pub async fn list_qc_metrics(
@@ -61,7 +61,7 @@ pub async fn get_quality_thresholds(
 pub async fn generate_quality_report(
     State(service): State<Arc<QualityControlService>>,
     Json(request): Json<GenerateReportRequest>,
-) -> Result<Json<Vec<QualityReport>>> {
-    let reports = service.generate_quality_report(request.library_ids).await?;
-    Ok(Json(reports))
+) -> Result<Json<QualityReport>> {
+    let report = service.generate_quality_report(request.library_id).await?;
+    Ok(Json(report))
 }
