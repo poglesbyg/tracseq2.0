@@ -1,0 +1,1508 @@
+---
+description: 
+globs: *.rs,*.toml
+alwaysApply: false
+---
+# Rust Development Guide for Laboratory Management System
+
+## Table of Contents
+
+1. [Project Overview](mdc:#project-overview)
+2. [Workspace Structure](mdc:#workspace-structure)
+3. [Development Environment Setup](mdc:#development-environment-setup)
+4. [Code Conventions & Standards](mdc:#code-conventions--standards)
+5. [Service Architecture Patterns](mdc:#service-architecture-patterns)
+6. [Security & Authentication](mdc:#security--authentication)
+7. [Database Integration](mdc:#database-integration)
+8. [Testing Strategies](mdc:#testing-strategies)
+9. [Performance Optimization](mdc:#performance-optimization)
+10. [Monitoring & Observability](mdc:#monitoring--observability)
+11. [Error Handling](mdc:#error-handling)
+12. [Deployment & Production](mdc:#deployment--production)
+13. [Debugging & Troubleshooting](mdc:#debugging--troubleshooting)
+14. [Contributing Guidelines](mdc:#contributing-guidelines)
+
+---
+
+## Project Overview
+
+This laboratory management system is built using Rust with a microservices architecture. It manages biological sample processing, storage tracking, sequencing workflows, and AI-powered document processing.
+
+### Core Services
+
+- **lab_manager**: Main laboratory management service
+- **auth_service**: Standalone authentication service
+- **sample_service**: Sample tracking and management
+- **sequencing_service**: Sequencing workflow management
+- **notification_service**: Event-driven notifications
+- **enhanced_storage_service**: Storage management with AI features
+- **event_service**: Event processing and pub/sub
+- **transaction_service**: Distributed transaction management
+- **template_service**: Template management for workflows
+
+---
+
+## Workspace Structure
+
+### Root Workspace Configuration
+
+```toml
+# Cargo.toml
+[workspace]
+resolver = "2"
+members = [
+    "lab_manager",
+    "auth_service",
+    "sample_service",
+    "sequencing_service",
+    "notification_service",
+    "enhanced_storage_service",
+    "event_service",
+    "transaction_service",
+    "template_service"
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/poglesbyg/tracseq2.0"
+
+[workspace.dependencies]
+# Shared dependencies for all workspace members
+tokio = { version = "1.36", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.6.1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1.0"
+thiserror = "1.0"
+```
+
+### Service Structure Pattern
+
+Each service follows this standardized structure:
+
+```
+service_name/
+├── Cargo.toml
+├── src/
+│   ├── main.rs                 # Service entry point
+│   ├── lib.rs                  # Library exports
+│   ├── config/                 # Configuration management
+│   ├── handlers/               # HTTP handlers
+│   ├── services/               # Business logic
+│   ├── models/                 # Data models
+│   ├── database.rs             # Database connections
+│   ├── error.rs                # Error definitions
+│   └── middleware/             # Custom middleware
+├── migrations/                 # Database migrations
+├── tests/                      # Test files
+└── README.md                   # Service documentation
+```
+
+---
+
+## Development Environment Setup
+
+### Prerequisites
+
+```bash
+# Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+
+# Install required tools
+cargo install cargo-watch      # Auto-rebuild on changes
+cargo install cargo-audit      # Security auditing
+cargo install sqlx-cli         # Database CLI
+cargo install cargo-tarpaulin  # Code coverage
+```
+
+### Environment Configuration
+
+```bash
+# Core environment variables
+export DATABASE_URL="postgres://postgres:postgres@localhost:5432/lab_manager"
+export RUST_LOG="info"
+export SQLX_OFFLINE="false"  # Use online mode for development
+
+# Security settings
+export JWT_SECRET="your-secret-key"
+export ARGON2_SECRET="your-argon2-secret"
+
+# Service-specific ports
+export AUTH_SERVICE_PORT="8001"
+export SAMPLE_SERVICE_PORT="8002"
+export SEQUENCING_SERVICE_PORT="8003"
+export NOTIFICATION_SERVICE_PORT="8004"
+```
+
+### Development Workflow
+
+```bash
+# Start all services with hot reloading
+./scripts/dev-start.sh
+
+# Or start individual services
+cargo watch -x "run --bin auth_service"
+cargo watch -x "run --bin sample_service"
+
+# Run tests in watch mode
+cargo watch -x test
+
+# Build entire workspace
+cargo build --workspace
+
+# Run specific service
+cargo run --bin lab_manager
+```
+
+---
+
+## Code Conventions & Standards
+
+### Naming Conventions
+
+```rust
+// Modules: snake_case
+mod sample_management;
+mod storage_tracking;
+
+// Structs: PascalCase
+struct SampleRecord {
+    sample_id: Uuid,
+    storage_location: String,
+}
+
+// Enums: PascalCase
+enum SampleStatus {
+    Pending,
+    Validated,
+    InStorage,
+    InSequencing,
+    Completed,
+}
+
+// Functions: snake_case
+fn process_sample_batch(samples: Vec<Sample>) -> Result<(), ProcessingError> {
+    // Implementation
+}
+
+// Constants: SCREAMING_SNAKE_CASE
+const MAX_BATCH_SIZE: usize = 100;
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+```
+
+### Code Organization
+
+```rust
+// lib.rs - Export public API
+pub mod config;
+pub mod handlers;
+pub mod services;
+pub mod models;
+pub mod error;
+
+// Re-exports for convenience
+pub use config::Config;
+pub use error::{Error, Result};
+pub use models::*;
+
+// Feature flags
+#[cfg(feature = "security")]
+pub mod security;
+
+#[cfg(feature = "monitoring")]
+pub mod monitoring;
+```
+
+### Documentation Standards
+
+```rust
+/// Processes a batch of laboratory samples for sequencing.
+///
+/// This function validates sample metadata, assigns storage locations,
+/// and creates sequencing jobs based on sample type and priority.
+///
+/// # Arguments
+///
+/// * `samples` - A vector of sample records to process
+/// * `options` - Processing options including batch size and priority
+///
+/// # Returns
+///
+/// * `Ok(ProcessingResult)` - Successfully processed samples
+/// * `Err(ProcessingError)` - Processing failed with specific error
+///
+/// # Examples
+///
+/// ```rust
+/// use lab_manager::services::sample_processor::process_samples;
+/// 
+/// let samples = vec![/* sample data */];
+/// let options = ProcessingOptions::default();
+/// 
+/// match process_samples(samples, options).await {
+///     Ok(result) => println!("Processed {} samples", result.count),
+///     Err(e) => eprintln!("Processing failed: {}", e),
+/// }
+/// ```
+///
+/// # Security
+///
+/// This function validates all input data and enforces access controls
+/// based on the authenticated user's role and permissions.
+pub async fn process_samples(
+    samples: Vec<Sample>,
+    options: ProcessingOptions,
+) -> Result<ProcessingResult, ProcessingError> {
+    // Implementation
+}
+```
+
+---
+
+## Service Architecture Patterns
+
+### Axum Web Framework Setup
+
+```rust
+// main.rs
+use axum::{
+    routing::{get, post},
+    Router,
+    middleware,
+};
+use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize tracing
+    tracing_subscriber::fmt::init();
+
+    // Build application router
+    let app = Router::new()
+        .route("/health", get(health_check))
+        .route("/api/samples", post(create_sample))
+        .route("/api/samples/:id", get(get_sample))
+        .layer(middleware::from_fn(auth_middleware))
+        .layer(CorsLayer::permissive())
+        .layer(TraceLayer::new_for_http());
+
+    // Start server
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
+    axum::serve(listener, app).await?;
+    
+    Ok(())
+}
+```
+
+### Handler Pattern
+
+```rust
+// handlers/samples.rs
+use axum::{
+    extract::{Path, State, Json},
+    response::Json as ResponseJson,
+    http::StatusCode,
+};
+use uuid::Uuid;
+use crate::{
+    models::{Sample, CreateSampleRequest},
+    services::SampleService,
+    error::{Error, Result},
+};
+
+/// Create a new sample record
+pub async fn create_sample(
+    State(service): State<SampleService>,
+    Json(request): Json<CreateSampleRequest>,
+) -> Result<ResponseJson<Sample>, Error> {
+    // Validate input
+    request.validate()?;
+    
+    // Create sample
+    let sample = service.create_sample(request).await?;
+    
+    Ok(ResponseJson(sample))
+}
+
+/// Get sample by ID
+pub async fn get_sample(
+    State(service): State<SampleService>,
+    Path(id): Path<Uuid>,
+) -> Result<ResponseJson<Sample>, Error> {
+    let sample = service.get_sample(id).await?;
+    Ok(ResponseJson(sample))
+}
+
+/// Health check endpoint
+pub async fn health_check() -> StatusCode {
+    StatusCode::OK
+}
+```
+
+### Service Layer Pattern
+
+```rust
+// services/sample_service.rs
+use async_trait::async_trait;
+use sqlx::PgPool;
+use uuid::Uuid;
+use crate::{
+    models::{Sample, CreateSampleRequest},
+    repositories::SampleRepository,
+    error::{Error, Result},
+};
+
+#[async_trait]
+pub trait SampleServiceTrait {
+    async fn create_sample(&self, request: CreateSampleRequest) -> Result<Sample>;
+    async fn get_sample(&self, id: Uuid) -> Result<Sample>;
+    async fn update_sample(&self, id: Uuid, update: UpdateSampleRequest) -> Result<Sample>;
+    async fn delete_sample(&self, id: Uuid) -> Result<()>;
+}
+
+#[derive(Clone)]
+pub struct SampleService {
+    repository: SampleRepository,
+}
+
+impl SampleService {
+    pub fn new(pool: PgPool) -> Self {
+        Self {
+            repository: SampleRepository::new(pool),
+        }
+    }
+}
+
+#[async_trait]
+impl SampleServiceTrait for SampleService {
+    async fn create_sample(&self, request: CreateSampleRequest) -> Result<Sample> {
+        // Validate business rules
+        self.validate_sample_creation(&request)?;
+        
+        // Generate unique ID
+        let sample_id = Uuid::new_v4();
+        
+        // Create sample record
+        let sample = Sample {
+            id: sample_id,
+            name: request.name,
+            sample_type: request.sample_type,
+            status: SampleStatus::Pending,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+        
+        // Save to database
+        self.repository.create(&sample).await?;
+        
+        Ok(sample)
+    }
+    
+    async fn get_sample(&self, id: Uuid) -> Result<Sample> {
+        self.repository.get_by_id(id).await?
+            .ok_or(Error::NotFound(format!("Sample with id {} not found", id)))
+    }
+}
+```
+
+---
+
+## Security & Authentication
+
+### JWT Authentication
+
+```rust
+// middleware/auth.rs
+use axum::{
+    extract::Request,
+    middleware::Next,
+    response::Response,
+    http::{StatusCode, header::AUTHORIZATION},
+};
+use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Claims {
+    pub sub: String,
+    pub role: String,
+    pub exp: usize,
+}
+
+pub async fn auth_middleware(
+    mut request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let auth_header = request.headers()
+        .get(AUTHORIZATION)
+        .and_then(|header| header.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    let token = auth_header.strip_prefix("Bearer ")
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    let claims = decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(JWT_SECRET.as_ref()),
+        &Validation::new(Algorithm::HS256),
+    )
+    .map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    // Add claims to request extensions
+    request.extensions_mut().insert(claims.claims);
+
+    Ok(next.run(request).await)
+}
+```
+
+### Password Hashing
+
+```rust
+// security/password.rs
+use argon2::{
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2,
+};
+use rand_core::OsRng;
+
+pub struct PasswordService;
+
+impl PasswordService {
+    pub fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        let password_hash = argon2.hash_password(password.as_bytes(), &salt)?;
+        Ok(password_hash.to_string())
+    }
+
+    pub fn verify_password(
+        password: &str,
+        hash: &str,
+    ) -> Result<bool, argon2::password_hash::Error> {
+        let parsed_hash = PasswordHash::new(hash)?;
+        let argon2 = Argon2::default();
+        Ok(argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok())
+    }
+}
+```
+
+### Input Validation
+
+```rust
+// validation/mod.rs
+use validator::{Validate, ValidationError};
+use regex::Regex;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref SAMPLE_ID_REGEX: Regex = Regex::new(r"^[A-Z]{3}-\d{8}-[A-Z0-9]{6}$").unwrap();
+    static ref EMAIL_REGEX: Regex = Regex::new(r"^[^\s@]+@[^\s@]+\.[^\s@]+$").unwrap();
+}
+
+#[derive(Debug, Validate)]
+pub struct CreateSampleRequest {
+    #[validate(length(min = 1, max = 100))]
+    pub name: String,
+    
+    #[validate(custom = "validate_sample_id")]
+    pub sample_id: String,
+    
+    #[validate(email)]
+    pub submitter_email: String,
+    
+    #[validate(range(min = 1, max = 1000))]
+    pub volume_ml: f64,
+}
+
+fn validate_sample_id(sample_id: &str) -> Result<(), ValidationError> {
+    if SAMPLE_ID_REGEX.is_match(sample_id) {
+        Ok(())
+    } else {
+        Err(ValidationError::new("invalid_sample_id_format"))
+    }
+}
+```
+
+---
+
+## Database Integration
+
+### SQLx Configuration
+
+```rust
+// database.rs
+use sqlx::{PgPool, postgres::PgPoolOptions, Row};
+use std::time::Duration;
+
+pub async fn create_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
+    PgPoolOptions::new()
+        .max_connections(10)
+        .min_connections(1)
+        .acquire_timeout(Duration::from_secs(30))
+        .idle_timeout(Duration::from_secs(600))
+        .max_lifetime(Duration::from_secs(1800))
+        .connect(database_url)
+        .await
+}
+
+pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
+    sqlx::migrate!("./migrations").run(pool).await
+}
+```
+
+### Repository Pattern
+
+```rust
+// repositories/sample_repository.rs
+use sqlx::{PgPool, Row};
+use uuid::Uuid;
+use crate::{models::Sample, error::Result};
+
+#[derive(Clone)]
+pub struct SampleRepository {
+    pool: PgPool,
+}
+
+impl SampleRepository {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    pub async fn create(&self, sample: &Sample) -> Result<()> {
+        sqlx::query!(
+            r#"
+            INSERT INTO samples (id, name, sample_type, status, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            "#,
+            sample.id,
+            sample.name,
+            sample.sample_type as _,
+            sample.status as _,
+            sample.created_at,
+            sample.updated_at
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn get_by_id(&self, id: Uuid) -> Result<Option<Sample>> {
+        let row = sqlx::query!(
+            r#"
+            SELECT id, name, sample_type, status, created_at, updated_at
+            FROM samples
+            WHERE id = $1
+            "#,
+            id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|r| Sample {
+            id: r.id,
+            name: r.name,
+            sample_type: r.sample_type.into(),
+            status: r.status.into(),
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+        }))
+    }
+}
+```
+
+### Migration Example
+
+```sql
+-- migrations/001_create_samples.sql
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TYPE sample_type AS ENUM ('DNA', 'RNA', 'Protein', 'Tissue');
+CREATE TYPE sample_status AS ENUM ('Pending', 'Validated', 'InStorage', 'InSequencing', 'Completed');
+
+CREATE TABLE samples (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    sample_type sample_type NOT NULL,
+    status sample_status NOT NULL DEFAULT 'Pending',
+    submitter_id UUID,
+    storage_location VARCHAR(100),
+    temperature_zone VARCHAR(20),
+    volume_ml DECIMAL(10,2),
+    concentration_ng_ul DECIMAL(10,2),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_samples_status ON samples(status);
+CREATE INDEX idx_samples_storage ON samples(storage_location);
+CREATE INDEX idx_samples_created_at ON samples(created_at);
+```
+
+---
+
+## Testing Strategies
+
+### Unit Testing
+
+```rust
+// tests/unit/sample_service_test.rs
+use crate::services::{SampleService, SampleServiceTrait};
+use crate::models::{CreateSampleRequest, SampleType};
+use mockall::mock;
+
+mock! {
+    SampleRepository {
+        async fn create(&self, sample: &Sample) -> Result<()>;
+        async fn get_by_id(&self, id: Uuid) -> Result<Option<Sample>>;
+    }
+}
+
+#[tokio::test]
+async fn test_create_sample_success() {
+    let mut mock_repo = MockSampleRepository::new();
+    mock_repo
+        .expect_create()
+        .times(1)
+        .returning(|_| Ok(()));
+
+    let service = SampleService::new(mock_repo);
+    let request = CreateSampleRequest {
+        name: "Test Sample".to_string(),
+        sample_type: SampleType::DNA,
+        submitter_email: "test@example.com".to_string(),
+        volume_ml: 10.0,
+    };
+
+    let result = service.create_sample(request).await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_create_sample_validation_error() {
+    let mock_repo = MockSampleRepository::new();
+    let service = SampleService::new(mock_repo);
+    let request = CreateSampleRequest {
+        name: "".to_string(), // Invalid: empty name
+        sample_type: SampleType::DNA,
+        submitter_email: "invalid-email".to_string(),
+        volume_ml: -1.0, // Invalid: negative volume
+    };
+
+    let result = service.create_sample(request).await;
+    assert!(result.is_err());
+}
+```
+
+### Integration Testing
+
+```rust
+// tests/integration/api_test.rs
+use axum_test::TestServer;
+use sqlx::PgPool;
+use crate::create_app;
+
+#[tokio::test]
+async fn test_create_sample_endpoint() {
+    let pool = setup_test_database().await;
+    let app = create_app(pool).await;
+    let server = TestServer::new(app).unwrap();
+
+    let request_body = serde_json::json!({
+        "name": "Test Sample",
+        "sample_type": "DNA",
+        "submitter_email": "test@example.com",
+        "volume_ml": 10.0
+    });
+
+    let response = server
+        .post("/api/samples")
+        .json(&request_body)
+        .await;
+
+    assert_eq!(response.status_code(), 201);
+    
+    let sample: Sample = response.json();
+    assert_eq!(sample.name, "Test Sample");
+    assert_eq!(sample.sample_type, SampleType::DNA);
+}
+
+async fn setup_test_database() -> PgPool {
+    let database_url = std::env::var("TEST_DATABASE_URL")
+        .expect("TEST_DATABASE_URL must be set");
+    
+    let pool = PgPool::connect(&database_url).await.unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    pool
+}
+```
+
+### Property-Based Testing
+
+```rust
+// tests/property/sample_validation_test.rs
+use proptest::prelude::*;
+use crate::validation::validate_sample_id;
+
+prop_compose! {
+    fn valid_sample_id()(
+        prefix in "[A-Z]{3}",
+        timestamp in "\\d{8}",
+        suffix in "[A-Z0-9]{6}"
+    ) -> String {
+        format!("{}-{}-{}", prefix, timestamp, suffix)
+    }
+}
+
+proptest! {
+    #[test]
+    fn test_valid_sample_ids_pass_validation(id in valid_sample_id()) {
+        prop_assert!(validate_sample_id(&id).is_ok());
+    }
+
+    #[test]
+    fn test_invalid_sample_ids_fail_validation(
+        id in "[a-z]{1,5}-\\d{1,10}-[a-z0-9]{1,10}"
+    ) {
+        prop_assume!(!id.matches(valid_sample_id_pattern()));
+        prop_assert!(validate_sample_id(&id).is_err());
+    }
+}
+```
+
+---
+
+## Performance Optimization
+
+### Async Configuration
+
+```rust
+// config/async_config.rs
+use tokio::runtime::Runtime;
+use std::thread;
+
+pub fn create_runtime() -> Runtime {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(num_cpus::get())
+        .max_blocking_threads(512)
+        .thread_name("lab-manager-worker")
+        .thread_stack_size(3 * 1024 * 1024)
+        .enable_all()
+        .build()
+        .expect("Failed to create Tokio runtime")
+}
+
+// Connection pooling optimization
+pub fn optimize_database_pool() -> PgPoolOptions {
+    PgPoolOptions::new()
+        .max_connections(50)
+        .min_connections(5)
+        .acquire_timeout(Duration::from_secs(30))
+        .idle_timeout(Duration::from_secs(600))
+        .max_lifetime(Duration::from_secs(1800))
+        .before_acquire(|conn, _| Box::pin(async move {
+            // Connection health check
+            sqlx::query("SELECT 1").execute(conn).await.map(|_| ()).map_err(Into::into)
+        }))
+}
+```
+
+### Memory Management
+
+```rust
+// utils/memory_pool.rs
+use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
+
+pub struct MemoryPool<T> {
+    objects: Arc<Mutex<VecDeque<T>>>,
+    factory: Box<dyn Fn() -> T + Send + Sync>,
+}
+
+impl<T> MemoryPool<T> {
+    pub fn new<F>(factory: F) -> Self
+    where
+        F: Fn() -> T + Send + Sync + 'static,
+    {
+        Self {
+            objects: Arc::new(Mutex::new(VecDeque::new())),
+            factory: Box::new(factory),
+        }
+    }
+
+    pub fn get(&self) -> T {
+        self.objects
+            .lock()
+            .unwrap()
+            .pop_front()
+            .unwrap_or_else(|| (self.factory)())
+    }
+
+    pub fn return_object(&self, obj: T) {
+        let mut objects = self.objects.lock().unwrap();
+        if objects.len() < 100 { // Limit pool size
+            objects.push_back(obj);
+        }
+    }
+}
+```
+
+### Caching Strategy
+
+```rust
+// cache/mod.rs
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
+
+pub struct TTLCache<K, V> {
+    data: Arc<RwLock<HashMap<K, (V, Instant)>>>,
+    ttl: Duration,
+}
+
+impl<K, V> TTLCache<K, V>
+where
+    K: Hash + Eq + Clone,
+    V: Clone,
+{
+    pub fn new(ttl: Duration) -> Self {
+        Self {
+            data: Arc::new(RwLock::new(HashMap::new())),
+            ttl,
+        }
+    }
+
+    pub fn get(&self, key: &K) -> Option<V> {
+        let data = self.data.read().unwrap();
+        data.get(key).and_then(|(value, timestamp)| {
+            if timestamp.elapsed() < self.ttl {
+                Some(value.clone())
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn insert(&self, key: K, value: V) {
+        let mut data = self.data.write().unwrap();
+        data.insert(key, (value, Instant::now()));
+    }
+
+    pub fn cleanup_expired(&self) {
+        let mut data = self.data.write().unwrap();
+        data.retain(|_, (_, timestamp)| timestamp.elapsed() < self.ttl);
+    }
+}
+```
+
+---
+
+## Monitoring & Observability
+
+### Tracing Setup
+
+```rust
+// observability/tracing.rs
+use tracing::{info, warn, error};
+use tracing_subscriber::{
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+    EnvFilter,
+};
+use opentelemetry::trace::TraceError;
+use opentelemetry_jaeger::new_agent_pipeline;
+
+pub fn init_tracing() -> Result<(), TraceError> {
+    // Initialize Jaeger tracer
+    let tracer = new_agent_pipeline()
+        .with_service_name("lab-manager")
+        .with_endpoint("http://jaeger:14268/api/traces")
+        .install_simple()?;
+
+    // Initialize tracing subscriber
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_target(false)
+                .with_timer(tracing_subscriber::fmt::time::time()),
+        )
+        .with(EnvFilter::from_default_env())
+        .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .init();
+
+    Ok(())
+}
+
+// Usage in handlers
+#[tracing::instrument(skip(service))]
+pub async fn create_sample(
+    State(service): State<SampleService>,
+    Json(request): Json<CreateSampleRequest>,
+) -> Result<ResponseJson<Sample>, Error> {
+    info!("Creating new sample: {}", request.name);
+    
+    match service.create_sample(request).await {
+        Ok(sample) => {
+            info!("Sample created successfully: {}", sample.id);
+            Ok(ResponseJson(sample))
+        }
+        Err(e) => {
+            error!("Failed to create sample: {}", e);
+            Err(e)
+        }
+    }
+}
+```
+
+### Metrics Collection
+
+```rust
+// observability/metrics.rs
+use metrics::{counter, histogram, gauge, register_counter, register_histogram};
+use metrics_exporter_prometheus::PrometheusBuilder;
+use std::time::Instant;
+
+pub fn init_metrics() -> Result<(), Box<dyn std::error::Error>> {
+    PrometheusBuilder::new()
+        .with_http_listener(([0, 0, 0, 0], 9090))
+        .install()?;
+
+    // Register application metrics
+    register_counter!("samples_created_total", "Total number of samples created");
+    register_counter!("samples_processed_total", "Total number of samples processed");
+    register_histogram!("request_duration_seconds", "Request duration in seconds");
+    
+    Ok(())
+}
+
+// Usage in services
+pub struct MetricsService;
+
+impl MetricsService {
+    pub fn record_sample_created(&self) {
+        counter!("samples_created_total").increment(1);
+    }
+
+    pub fn record_request_duration(&self, duration: std::time::Duration) {
+        histogram!("request_duration_seconds").record(duration.as_secs_f64());
+    }
+
+    pub fn set_active_connections(&self, count: usize) {
+        gauge!("active_connections").set(count as f64);
+    }
+}
+
+// Middleware for automatic metrics collection
+pub async fn metrics_middleware(
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let start = Instant::now();
+    let response = next.run(request).await;
+    let duration = start.elapsed();
+    
+    histogram!("request_duration_seconds").record(duration.as_secs_f64());
+    counter!("requests_total").increment(1);
+    
+    Ok(response)
+}
+```
+
+---
+
+## Error Handling
+
+### Centralized Error Types
+
+```rust
+// error.rs
+use axum::{
+    response::{IntoResponse, Response},
+    http::StatusCode,
+    Json,
+};
+use serde_json::json;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+    
+    #[error("Validation error: {0}")]
+    Validation(#[from] validator::ValidationErrors),
+    
+    #[error("Authentication error: {0}")]
+    Authentication(String),
+    
+    #[error("Authorization error: {0}")]
+    Authorization(String),
+    
+    #[error("Not found: {0}")]
+    NotFound(String),
+    
+    #[error("Conflict: {0}")]
+    Conflict(String),
+    
+    #[error("Internal server error: {0}")]
+    Internal(#[from] anyhow::Error),
+    
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
+}
+
+impl IntoResponse for Error {
+    fn into_response(self) -> Response {
+        let (status, error_message) = match self {
+            Error::Database(e) => {
+                tracing::error!("Database error: {}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+            }
+            Error::Validation(e) => {
+                tracing::warn!("Validation error: {}", e);
+                (StatusCode::BAD_REQUEST, "Invalid input")
+            }
+            Error::Authentication(msg) => {
+                tracing::warn!("Authentication error: {}", msg);
+                (StatusCode::UNAUTHORIZED, "Authentication required")
+            }
+            Error::Authorization(msg) => {
+                tracing::warn!("Authorization error: {}", msg);
+                (StatusCode::FORBIDDEN, "Access denied")
+            }
+            Error::NotFound(msg) => {
+                tracing::info!("Not found: {}", msg);
+                (StatusCode::NOT_FOUND, "Resource not found")
+            }
+            Error::Conflict(msg) => {
+                tracing::warn!("Conflict: {}", msg);
+                (StatusCode::CONFLICT, "Resource conflict")
+            }
+            Error::Internal(e) => {
+                tracing::error!("Internal error: {}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+            }
+            Error::ServiceUnavailable(msg) => {
+                tracing::error!("Service unavailable: {}", msg);
+                (StatusCode::SERVICE_UNAVAILABLE, "Service temporarily unavailable")
+            }
+        };
+
+        let body = Json(json!({
+            "error": error_message,
+            "status": status.as_u16()
+        }));
+
+        (status, body).into_response()
+    }
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+```
+
+### Circuit Breaker Pattern
+
+```rust
+// resilience/circuit_breaker.rs
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+use tokio::time::sleep;
+
+#[derive(Debug, Clone)]
+pub enum CircuitState {
+    Closed,
+    Open,
+    HalfOpen,
+}
+
+pub struct CircuitBreaker {
+    state: Arc<Mutex<CircuitState>>,
+    failure_count: Arc<Mutex<u32>>,
+    failure_threshold: u32,
+    recovery_timeout: Duration,
+    last_failure_time: Arc<Mutex<Option<Instant>>>,
+}
+
+impl CircuitBreaker {
+    pub fn new(failure_threshold: u32, recovery_timeout: Duration) -> Self {
+        Self {
+            state: Arc::new(Mutex::new(CircuitState::Closed)),
+            failure_count: Arc::new(Mutex::new(0)),
+            failure_threshold,
+            recovery_timeout,
+            last_failure_time: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    pub async fn call<F, T, E>(&self, operation: F) -> Result<T, E>
+    where
+        F: std::future::Future<Output = Result<T, E>>,
+    {
+        // Check if circuit is open
+        if self.is_open() {
+            return Err(/* Circuit breaker error */);
+        }
+
+        // Execute operation
+        match operation.await {
+            Ok(result) => {
+                self.on_success();
+                Ok(result)
+            }
+            Err(e) => {
+                self.on_failure();
+                Err(e)
+            }
+        }
+    }
+
+    fn is_open(&self) -> bool {
+        let state = self.state.lock().unwrap();
+        matches!(*state, CircuitState::Open)
+    }
+
+    fn on_success(&self) {
+        let mut state = self.state.lock().unwrap();
+        let mut failure_count = self.failure_count.lock().unwrap();
+        
+        *failure_count = 0;
+        *state = CircuitState::Closed;
+    }
+
+    fn on_failure(&self) {
+        let mut state = self.state.lock().unwrap();
+        let mut failure_count = self.failure_count.lock().unwrap();
+        let mut last_failure_time = self.last_failure_time.lock().unwrap();
+
+        *failure_count += 1;
+        *last_failure_time = Some(Instant::now());
+
+        if *failure_count >= self.failure_threshold {
+            *state = CircuitState::Open;
+        }
+    }
+}
+```
+
+---
+
+## Deployment & Production
+
+### Docker Configuration
+
+```dockerfile
+# Dockerfile
+FROM rust:1.75-slim as builder
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace files
+COPY Cargo.toml Cargo.lock ./
+COPY lab_manager/Cargo.toml ./lab_manager/
+
+# Build dependencies (cached layer)
+RUN mkdir -p lab_manager/src && \
+    echo "fn main() {}" > lab_manager/src/main.rs && \
+    cargo build --release --bin lab_manager && \
+    rm -rf lab_manager/src
+
+# Copy source code
+COPY lab_manager/src ./lab_manager/src
+COPY lab_manager/migrations ./lab_manager/migrations
+
+# Build application
+RUN touch lab_manager/src/main.rs && \
+    cargo build --release --bin lab_manager
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy binary
+COPY --from=builder /app/target/release/lab_manager /usr/local/bin/lab_manager
+
+# Create non-root user
+RUN useradd -r -s /bin/false labuser && \
+    chown -R labuser:labuser /app
+
+USER labuser
+
+EXPOSE 3000
+
+CMD ["lab_manager"]
+```
+
+### Production Configuration
+
+```rust
+// config/production.rs
+use serde::{Deserialize, Serialize};
+use std::env;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductionConfig {
+    pub database_url: String,
+    pub redis_url: String,
+    pub jwt_secret: String,
+    pub log_level: String,
+    pub max_connections: u32,
+    pub server_host: String,
+    pub server_port: u16,
+    pub metrics_port: u16,
+    pub health_check_port: u16,
+}
+
+impl ProductionConfig {
+    pub fn from_env() -> Result<Self, env::VarError> {
+        Ok(Self {
+            database_url: env::var("DATABASE_URL")?,
+            redis_url: env::var("REDIS_URL")?,
+            jwt_secret: env::var("JWT_SECRET")?,
+            log_level: env::var("LOG_LEVEL").unwrap_or_else(|_| "info".to_string()),
+            max_connections: env::var("MAX_CONNECTIONS")
+                .unwrap_or_else(|_| "50".to_string())
+                .parse()
+                .unwrap_or(50),
+            server_host: env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
+            server_port: env::var("SERVER_PORT")
+                .unwrap_or_else(|_| "3000".to_string())
+                .parse()
+                .unwrap_or(3000),
+            metrics_port: env::var("METRICS_PORT")
+                .unwrap_or_else(|_| "9090".to_string())
+                .parse()
+                .unwrap_or(9090),
+            health_check_port: env::var("HEALTH_CHECK_PORT")
+                .unwrap_or_else(|_| "8080".to_string())
+                .parse()
+                .unwrap_or(8080),
+        })
+    }
+}
+```
+
+---
+
+## Debugging & Troubleshooting
+
+### Debug Logging
+
+```rust
+// debug/logger.rs
+use tracing::{Level, debug, info, warn, error};
+use tracing_subscriber::{fmt, EnvFilter};
+
+pub fn init_debug_logging() {
+    fmt()
+        .with_max_level(Level::DEBUG)
+        .with_file(true)
+        .with_line_number(true)
+        .with_target(true)
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
+}
+
+// Usage throughout application
+#[tracing::instrument(skip(self))]
+impl SampleService {
+    pub async fn create_sample(&self, request: CreateSampleRequest) -> Result<Sample> {
+        debug!("Creating sample with request: {:?}", request);
+        
+        // Validate request
+        if let Err(validation_errors) = request.validate() {
+            warn!("Validation failed: {:?}", validation_errors);
+            return Err(Error::Validation(validation_errors));
+        }
+        
+        info!("Sample validation passed");
+        
+        // Create sample
+        match self.repository.create_sample(request).await {
+            Ok(sample) => {
+                info!("Sample created successfully: {}", sample.id);
+                Ok(sample)
+            }
+            Err(e) => {
+                error!("Failed to create sample: {}", e);
+                Err(e.into())
+            }
+        }
+    }
+}
+```
+
+### Performance Profiling
+
+```rust
+// debug/profiler.rs
+use std::time::Instant;
+use tracing::{info, warn};
+
+pub struct PerformanceProfiler {
+    start_time: Instant,
+    operation_name: String,
+}
+
+impl PerformanceProfiler {
+    pub fn new(operation_name: String) -> Self {
+        info!("Starting operation: {}", operation_name);
+        Self {
+            start_time: Instant::now(),
+            operation_name,
+        }
+    }
+
+    pub fn checkpoint(&self, checkpoint_name: &str) {
+        let elapsed = self.start_time.elapsed();
+        info!(
+            "Operation '{}' checkpoint '{}': {:?}",
+            self.operation_name, checkpoint_name, elapsed
+        );
+    }
+}
+
+impl Drop for PerformanceProfiler {
+    fn drop(&mut self) {
+        let total_time = self.start_time.elapsed();
+        if total_time.as_millis() > 1000 {
+            warn!(
+                "Operation '{}' took longer than expected: {:?}",
+                self.operation_name, total_time
+            );
+        } else {
+            info!(
+                "Operation '{}' completed in: {:?}",
+                self.operation_name, total_time
+            );
+        }
+    }
+}
+
+// Usage
+pub async fn process_samples(samples: Vec<Sample>) -> Result<ProcessingResult> {
+    let _profiler = PerformanceProfiler::new("process_samples".to_string());
+    
+    // Processing logic
+    _profiler.checkpoint("validation_complete");
+    
+    // More processing
+    _profiler.checkpoint("storage_complete");
+    
+    Ok(result)
+}
+```
+
+---
+
+## Contributing Guidelines
+
+### Code Review Checklist
+
+- [ ] **Security**: Input validation, authentication, authorization
+- [ ] **Performance**: Async usage, database queries, memory usage
+- [ ] **Error Handling**: Proper error types, logging, user feedback
+- [ ] **Testing**: Unit tests, integration tests, edge cases
+- [ ] **Documentation**: Function docs, API docs, examples
+- [ ] **Consistency**: Naming conventions, code style, patterns
+
+### Development Commands
+
+```bash
+# Format code
+cargo fmt --all
+
+# Lint code
+cargo clippy --all-targets --all-features -- -D warnings
+
+# Run tests
+cargo test --workspace
+
+# Security audit
+cargo audit
+
+# Generate documentation
+cargo doc --workspace --open
+
+# Check for unused dependencies
+cargo machete
+
+# Run benchmarks
+cargo bench
+
+# Coverage report
+cargo tarpaulin --out Html --output-dir coverage
+```
+
+### Pre-commit Hooks
+
+```bash
+#!/bin/sh
+# .git/hooks/pre-commit
+
+# Format code
+cargo fmt --all --check || {
+    echo "Please run 'cargo fmt --all' to format your code"
+    exit 1
+}
+
+# Lint code
+cargo clippy --all-targets --all-features -- -D warnings || {
+    echo "Please fix clippy warnings"
+    exit 1
+}
+
+# Run tests
+cargo test --workspace || {
+    echo "Tests failed"
+    exit 1
+}
+
+# Security audit
+cargo audit || {
+    echo "Security audit failed"
+    exit 1
+}
+
+echo "All checks passed!"
+```
+
+---
+
+## Best Practices Summary
+
+1. **Always use `#[tokio::main]` for async main functions**
+2. **Implement proper error handling with custom error types**
+3. **Use `tracing` for structured logging**
+4. **Validate all inputs using `validator` crate**
+5. **Follow the repository pattern for database access**
+6. **Use connection pooling for database connections**
+7. **Implement circuit breakers for external service calls**
+8. **Use feature flags for optional functionality**
+9. **Write comprehensive tests for all code paths**
+10. **Profile performance-critical code**
+11. **Use security-focused crates for authentication and authorization**
+12. **Implement proper observability with metrics and tracing**
+
+*Context improved by Giga AI*
+

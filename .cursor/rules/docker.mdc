@@ -1,0 +1,1586 @@
+---
+description: 
+globs: *.yml
+alwaysApply: false
+---
+# Docker Development and Deployment Guide for Laboratory Management System
+
+## Table of Contents
+
+1. [Architecture Overview](mdc:#architecture-overview)
+2. [Environment Setup](mdc:#environment-setup)
+3. [Development Environment](mdc:#development-environment)
+4. [Production Environment](mdc:#production-environment)
+5. [Microservices Configuration](mdc:#microservices-configuration)
+6. [Infrastructure Services](mdc:#infrastructure-services)
+7. [Networking and Service Discovery](mdc:#networking-and-service-discovery)
+8. [Volume Management](mdc:#volume-management)
+9. [Health Checks and Monitoring](mdc:#health-checks-and-monitoring)
+10. [Security Configuration](mdc:#security-configuration)
+11. [Performance Optimization](mdc:#performance-optimization)
+12. [Deployment Strategies](mdc:#deployment-strategies)
+13. [Troubleshooting and Debugging](mdc:#troubleshooting-and-debugging)
+14. [Best Practices](mdc:#best-practices)
+
+---
+
+## Architecture Overview
+
+The Laboratory Management System uses a containerized microservices architecture with Docker and Docker Compose. The system consists of:
+
+### Core Services
+- **API Gateway**: Intelligent routing and load balancing
+- **Authentication Service**: JWT-based authentication and authorization
+- **Sample Service**: Sample tracking and management
+- **Template Service**: Template management and validation
+- **Storage Service**: Enhanced storage with AI features
+- **Sequencing Service**: Sequencing workflow management
+- **Notification Service**: Multi-channel notifications
+- **Event Service**: Event processing and pub/sub
+- **Transaction Service**: Distributed transactions with Saga pattern
+- **RAG Service**: AI-powered document processing
+
+### Infrastructure Services
+- **PostgreSQL**: Primary database with clustering support
+- **Redis**: Caching and session management
+- **Ollama**: Local AI model serving
+- **Nginx**: Reverse proxy and load balancer
+- **Prometheus**: Metrics collection
+- **Grafana**: Monitoring dashboards
+
+---
+
+## Environment Setup
+
+### Prerequisites
+
+```bash
+# Install Docker Desktop
+# Windows: Download from docker.com
+# macOS: Download from docker.com
+# Linux: Use package manager
+
+# Verify installation
+docker --version
+docker-compose --version
+
+# Install additional tools
+docker-compose --version  # Should be 2.0+
+```
+
+### Environment Variables Configuration
+
+Create environment files for different environments:
+
+```bash
+# .env.development
+NODE_ENV=development
+RUST_LOG=debug
+DATABASE_URL=postgres://postgres:postgres@db:5432/lab_manager
+JWT_SECRET=dev-secret-key-change-in-production
+FRONTEND_DEV_PORT=5173
+BACKEND_DEV_PORT=3000
+RAG_SERVICE_PORT=8000
+OLLAMA_PORT=11434
+
+# AI Configuration
+USE_OLLAMA=true
+OLLAMA_MODEL=llama3.2:3b
+LLM_TEMPERATURE=0.7
+MAX_TOKENS=2048
+
+# Service Ports
+AUTH_SERVICE_PORT=8080
+SAMPLE_SERVICE_PORT=8081
+STORAGE_SERVICE_PORT=8082
+TEMPLATE_SERVICE_PORT=8083
+SEQUENCING_SERVICE_PORT=8084
+NOTIFICATION_SERVICE_PORT=8085
+EVENT_SERVICE_PORT=8087
+TRANSACTION_SERVICE_PORT=8088
+API_GATEWAY_PORT=8089
+```
+
+```bash
+# .env.production
+NODE_ENV=production
+RUST_LOG=info
+DATABASE_URL=postgres://tracseq_admin:${POSTGRES_PASSWORD}@postgres-primary:5432/tracseq_prod
+JWT_SECRET=${JWT_SECRET_KEY}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+
+# Security
+BCRYPT_COST=12
+SESSION_TIMEOUT_HOURS=8
+MAX_LOGIN_ATTEMPTS=5
+
+# Performance
+DB_MAX_CONNECTIONS=50
+DB_MIN_CONNECTIONS=10
+MAX_CONCURRENT_JOBS=20
+
+# External Services
+SMTP_HOST=${SMTP_HOST}
+SMTP_USERNAME=${SMTP_USERNAME}
+SMTP_PASSWORD=${SMTP_PASSWORD}
+SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+```
+
+---
+
+## Development Environment
+
+### Quick Start
+
+```bash
+# Clone and start development environment
+git clone <repository>
+cd tracseq2.0
+
+# Start all services
+./scripts/run_full_app.sh
+
+# Or start specific services
+docker-compose up -d db dev frontend-dev
+
+# View logs
+docker-compose logs -f dev
+```
+
+### Development Docker Compose
+
+```yaml
+# docker-compose.yml (Development)
+services:
+  # Development Backend
+  dev:
+    build:
+      context: ./lab_manager
+      dockerfile: Dockerfile.dev
+    command: cargo watch -x "run --bin lab_manager"
+    volumes:
+      - ./lab_manager:/usr/src/app
+      - app_storage:/usr/local/bin/storage
+      - cargo_cache:/usr/local/cargo/registry  # Cache dependencies
+    ports:
+      - "${BACKEND_DEV_PORT:-3000}:3000"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/lab_manager
+      - RUST_LOG=debug
+      - SQLX_OFFLINE=false  # Use online mode for dev
+      - RAG_SERVICE_URL=http://rag-service:8000
+    depends_on:
+      - db
+      - rag-service
+    networks:
+      - lab_network
+
+  # Development Frontend
+  frontend-dev:
+    build:
+      context: ./lab_manager/frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "${FRONTEND_DEV_PORT:-5173}:5173"
+    volumes:
+      - ./lab_manager/frontend:/app
+      - /app/node_modules  # Anonymous volume for node_modules
+    environment:
+      - NODE_ENV=development
+      - BACKEND_URL=http://dev:3000
+      - VITE_API_URL=http://localhost:3000
+      - VITE_RAG_URL=http://localhost:8000
+    depends_on:
+      - dev
+    networks:
+      - lab_network
+
+  # Development Database
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "${DB_EXTERNAL_PORT:-5433}:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=lab_manager
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./lab_manager/migrations:/migrations
+    networks:
+      - lab_network
+
+  # RAG Service for AI Processing
+  rag-service:
+    build:
+      context: ./lab_submission_rag
+      dockerfile: Dockerfile
+    ports:
+      - "${RAG_SERVICE_PORT:-8000}:8000"
+    environment:
+      - POSTGRES_URL=postgres://postgres:postgres@db:5432/lab_manager
+      - USE_OLLAMA=true
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=llama3.2:3b
+    depends_on:
+      - db
+      - ollama
+    volumes:
+      - rag_storage:/app/uploads
+    networks:
+      - lab_network
+
+  # Ollama for Local AI Models
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - lab_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres_dev_data:
+  app_storage:
+  rag_storage:
+  cargo_cache:
+  ollama_data:
+
+networks:
+  lab_network:
+    driver: bridge
+```
+
+### Development Dockerfiles
+
+```dockerfile
+# lab_manager/Dockerfile.dev
+FROM rustlang/rust:nightly-bookworm
+
+WORKDIR /usr/src/app
+
+# Install development dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    postgresql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install development tools
+RUN cargo install cargo-watch
+RUN cargo install sqlx-cli --no-default-features --features rustls,postgres
+
+# Copy source code
+COPY . .
+
+# Development environment configuration
+ENV RUST_LOG=debug
+ENV SQLX_OFFLINE=false
+ENV STORAGE_PATH=/usr/local/bin/storage
+
+# Create storage directory
+RUN mkdir -p /usr/local/bin/storage
+
+EXPOSE 3000
+
+# Use cargo-watch for hot reloading
+CMD ["cargo", "watch", "-x", "run --bin lab_manager"]
+```
+
+```dockerfile
+# lab_manager/frontend/Dockerfile.dev
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy package files
+COPY package*.json pnpm-lock.yaml ./
+
+# Install dependencies
+RUN pnpm install
+
+# Copy source code
+COPY . .
+
+# Development environment
+ENV NODE_ENV=development
+ENV VITE_API_URL=http://localhost:3000
+
+EXPOSE 5173
+
+# Start development server with hot reload
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]
+```
+
+---
+
+## Production Environment
+
+### Production Docker Compose
+
+```yaml
+# deploy/production/docker-compose.production.yml
+services:
+  # API Gateway with Load Balancing
+  api-gateway:
+    build:
+      context: ../../api_gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8089:8089"
+    environment:
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: 8089
+      GATEWAY_DEBUG: false
+      
+      # Service Discovery
+      AUTH_SERVICE_URL: http://auth-service:8080
+      SAMPLE_SERVICE_URL: http://sample-service:8081
+      TEMPLATE_SERVICE_URL: http://template-service:8083
+      
+      # Security
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      RATE_LIMITING_ENABLED: true
+      CIRCUIT_BREAKER_ENABLED: true
+      
+    depends_on:
+      - postgres-primary
+      - redis-primary
+    volumes:
+      - ./logs/gateway:/app/logs
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+
+  # Production Database with Clustering
+  postgres-primary:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: tracseq_prod
+      POSTGRES_USER: tracseq_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./backups:/backups
+      - ./init-scripts:/docker-entrypoint-initdb.d/
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracseq_admin -d tracseq_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Caching and Sessions
+  redis-primary:
+    image: redis:7-alpine
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+    volumes:
+      - redis_primary_data:/data
+    networks:
+      - tracseq-prod-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  postgres_primary_data:
+  redis_primary_data:
+  app_logs:
+  
+networks:
+  tracseq-prod-network:
+    driver: bridge
+```
+
+### Production Dockerfiles
+
+```dockerfile
+# Production Dockerfile with Multi-stage Build
+FROM rustlang/rust:nightly-bookworm as builder
+
+WORKDIR /usr/src/app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace configuration
+COPY Cargo.toml Cargo.lock ./
+
+# Copy service-specific Cargo.toml
+COPY auth_service/Cargo.toml ./auth_service/
+
+# Create dummy source files for dependency caching
+RUN mkdir -p auth_service/src && \
+    echo "fn main() {}" > auth_service/src/main.rs
+
+# Build dependencies (cached layer)
+RUN cargo build --release --bin auth_service
+
+# Remove dummy files
+RUN rm -rf auth_service/src
+
+# Copy actual source code
+COPY auth_service/src ./auth_service/src
+COPY auth_service/migrations ./auth_service/migrations
+
+# Build the application
+RUN touch auth_service/src/main.rs && \
+    cargo build --release --bin auth_service
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy binary from builder
+COPY --from=builder /usr/src/app/target/release/auth_service /usr/local/bin/auth_service
+
+# Create non-root user
+RUN useradd -r -s /bin/false appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+EXPOSE 8080
+
+CMD ["auth_service"]
+```
+
+---
+
+## Microservices Configuration
+
+### Service-Specific Configurations
+
+```yaml
+# Authentication Service
+auth-service:
+  build:
+    context: ../../auth_service
+    dockerfile: Dockerfile
+  environment:
+    PORT: 8080
+    DATABASE_URL: ${DATABASE_URL}
+    JWT_SECRET: ${JWT_SECRET}
+    BCRYPT_COST: 12
+    SESSION_TIMEOUT_HOURS: 8
+    MAX_LOGIN_ATTEMPTS: 5
+    ENABLE_MULTI_TENANCY: true
+  depends_on:
+    - postgres-primary
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+
+# Sample Management Service
+sample-service:
+  build:
+    context: ../../sample_service
+    dockerfile: Dockerfile
+  environment:
+    PORT: 8081
+    DATABASE_URL: ${DATABASE_URL}
+    AUTH_SERVICE_URL: http://auth-service:8080
+    STORAGE_SERVICE_URL: http://storage-service:8082
+    BARCODE_PREFIX: SMPL
+    AUTO_GENERATE_BARCODES: true
+    MAX_BATCH_SIZE: 1000
+    ENABLE_QC_VALIDATION: true
+  depends_on:
+    - postgres-primary
+    - auth-service
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+
+# Enhanced Storage Service
+storage-service:
+  build:
+    context: ../../enhanced_storage_service
+    dockerfile: Dockerfile
+  environment:
+    PORT: 8082
+    DATABASE_URL: ${DATABASE_URL}
+    AUTH_SERVICE_URL: http://auth-service:8080
+    ENABLE_IOT_INTEGRATION: true
+    ENABLE_BLOCKCHAIN_AUDIT: false
+    ENABLE_ANALYTICS: true
+    TEMP_CHECK_INTERVAL_MINUTES: 5
+    ALERT_THRESHOLD_CELSIUS: 2.0
+  depends_on:
+    - postgres-primary
+    - auth-service
+  volumes:
+    - storage_data:/app/storage
+    - ./logs/storage:/app/logs
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+```
+
+### Service Discovery Configuration
+
+```yaml
+# API Gateway Service Discovery
+api-gateway:
+  environment:
+    # Service URLs for discovery
+    AUTH_SERVICE_URL: http://auth-service:8080
+    SAMPLE_SERVICE_URL: http://sample-service:8081
+    STORAGE_SERVICE_URL: http://storage-service:8082
+    TEMPLATE_SERVICE_URL: http://template-service:8083
+    SEQUENCING_SERVICE_URL: http://sequencing-service:8084
+    NOTIFICATION_SERVICE_URL: http://notification-service:8085
+    RAG_SERVICE_URL: http://rag-service:8086
+    EVENT_SERVICE_URL: http://event-service:8087
+    TRANSACTION_SERVICE_URL: http://transaction-service:8088
+    
+    # Load Balancing
+    ENABLE_LOAD_BALANCING: true
+    LOAD_BALANCER_ALGORITHM: round_robin
+    
+    # Circuit Breaker
+    CIRCUIT_BREAKER_ENABLED: true
+    CIRCUIT_BREAKER_THRESHOLD: 5
+    CIRCUIT_BREAKER_TIMEOUT: 60
+```
+
+---
+
+## Infrastructure Services
+
+### PostgreSQL Configuration
+
+```yaml
+# PostgreSQL with High Availability
+postgres-primary:
+  image: postgres:15-alpine
+  environment:
+    POSTGRES_DB: tracseq_prod
+    POSTGRES_USER: tracseq_admin
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    POSTGRES_REPLICATION_USER: replicator
+    POSTGRES_REPLICATION_PASSWORD: ${REPLICATION_PASSWORD}
+  command: >
+    postgres
+    -c max_connections=200
+    -c shared_buffers=256MB
+    -c effective_cache_size=1GB
+    -c maintenance_work_mem=64MB
+    -c checkpoint_completion_target=0.9
+    -c wal_buffers=16MB
+    -c default_statistics_target=100
+    -c random_page_cost=1.1
+    -c effective_io_concurrency=200
+    -c log_min_duration_statement=1000
+    -c log_checkpoints=on
+    -c log_connections=on
+    -c log_disconnections=on
+  volumes:
+    - postgres_primary_data:/var/lib/postgresql/data
+    - ./backups:/backups
+    - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
+  networks:
+    - data_network
+  restart: unless-stopped
+
+# PostgreSQL Read Replica
+postgres-replica:
+  image: postgres:15-alpine
+  environment:
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    POSTGRES_DB: tracseq_prod
+    PGUSER: postgres
+  command: >
+    postgres
+    -c hot_standby=on
+    -c max_connections=100
+  volumes:
+    - postgres_replica_data:/var/lib/postgresql/data
+  depends_on:
+    - postgres-primary
+  networks:
+    - data_network
+```
+
+### Redis Configuration
+
+```yaml
+# Redis Master
+redis-master:
+  image: redis:7-alpine
+  command: >
+    redis-server
+    --appendonly yes
+    --appendfsync everysec
+    --maxmemory 2gb
+    --maxmemory-policy allkeys-lru
+    --save 900 1
+    --save 300 10
+    --save 60 10000
+    --tcp-keepalive 60
+    --timeout 0
+  volumes:
+    - redis_master_data:/data
+    - ./config/redis.conf:/usr/local/etc/redis/redis.conf
+  ports:
+    - "6379:6379"
+  networks:
+    - cache_network
+  restart: unless-stopped
+
+# Redis Sentinel for HA
+redis-sentinel:
+  image: redis:7-alpine
+  command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+  volumes:
+    - ./config/sentinel.conf:/usr/local/etc/redis/sentinel.conf
+  depends_on:
+    - redis-master
+  networks:
+    - cache_network
+  restart: unless-stopped
+```
+
+### Ollama AI Service
+
+```yaml
+# Ollama for Local AI Processing
+ollama:
+  image: ollama/ollama:latest
+  environment:
+    OLLAMA_HOST: 0.0.0.0
+    OLLAMA_ORIGINS: "*"
+    OLLAMA_NUM_PARALLEL: 4
+    OLLAMA_MAX_LOADED_MODELS: 2
+  volumes:
+    - ollama_models:/root/.ollama
+    - ./config/ollama:/root/.config/ollama
+  ports:
+    - "11434:11434"
+  networks:
+    - ai_network
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+    interval: 30s
+    timeout: 10s
+    retries: 5
+    start_period: 60s
+  deploy:
+    resources:
+      limits:
+        memory: 8G
+        cpus: '4.0'
+      reservations:
+        memory: 4G
+        cpus: '2.0'
+```
+
+---
+
+## Networking and Service Discovery
+
+### Network Configuration
+
+```yaml
+networks:
+  # Frontend network
+  frontend_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+  # Backend services network
+  backend_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+  # Database network
+  data_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+
+  # Caching network
+  cache_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16
+
+  # AI services network
+  ai_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.24.0.0/16
+
+  # Monitoring network
+  monitoring_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+```
+
+### Service Discovery with Consul
+
+```yaml
+# Consul for Service Discovery
+consul:
+  image: consul:latest
+  command: >
+    consul agent
+    -server
+    -bootstrap-expect=1
+    -ui
+    -bind=0.0.0.0
+    -client=0.0.0.0
+    -datacenter=tracseq-dc1
+  ports:
+    - "8500:8500"
+    - "8600:8600/udp"
+  volumes:
+    - consul_data:/consul/data
+    - ./config/consul.json:/consul/config/consul.json
+  networks:
+    - backend_network
+  restart: unless-stopped
+
+# Consul Agent for each service
+consul-agent:
+  image: consul:latest
+  command: >
+    consul agent
+    -retry-join=consul
+    -bind=0.0.0.0
+    -client=0.0.0.0
+    -datacenter=tracseq-dc1
+  depends_on:
+    - consul
+  networks:
+    - backend_network
+  restart: unless-stopped
+```
+
+---
+
+## Volume Management
+
+### Volume Configuration
+
+```yaml
+volumes:
+  # Database volumes
+  postgres_primary_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/tracseq/data/postgres-primary
+  
+  postgres_replica_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/tracseq/data/postgres-replica
+
+  # Cache volumes
+  redis_master_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/tracseq/data/redis-master
+
+  # Application volumes
+  app_storage:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/tracseq/storage
+
+  # AI model volumes
+  ollama_models:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/tracseq/models/ollama
+
+  # Log volumes
+  app_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/tracseq/logs
+
+  # Backup volumes
+  backups:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/tracseq/backups
+
+  # Development volumes
+  cargo_cache:
+    driver: local
+    name: tracseq_cargo_cache
+
+  node_modules:
+    driver: local
+    name: tracseq_node_modules
+```
+
+### Volume Backup Strategy
+
+```bash
+#!/bin/bash
+# backup-volumes.sh
+
+BACKUP_DIR="/opt/tracseq/backups/$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$BACKUP_DIR"
+
+# Backup PostgreSQL
+docker-compose exec -T postgres-primary pg_dump -U tracseq_admin tracseq_prod > "$BACKUP_DIR/postgres.sql"
+
+# Backup Redis
+docker-compose exec -T redis-master redis-cli BGSAVE
+docker cp $(docker-compose ps -q redis-master):/data/dump.rdb "$BACKUP_DIR/redis.rdb"
+
+# Backup application storage
+tar -czf "$BACKUP_DIR/app_storage.tar.gz" /opt/tracseq/storage/
+
+# Backup Ollama models
+tar -czf "$BACKUP_DIR/ollama_models.tar.gz" /opt/tracseq/models/ollama/
+
+echo "Backup completed: $BACKUP_DIR"
+```
+
+---
+
+## Health Checks and Monitoring
+
+### Health Check Configuration
+
+```yaml
+# Health check patterns for services
+healthcheck_patterns:
+  # HTTP health checks
+  http_healthcheck: &http_healthcheck
+    test: ["CMD", "curl", "-f", "http://localhost:${PORT}/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+
+  # Database health checks
+  postgres_healthcheck: &postgres_healthcheck
+    test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+    start_period: 20s
+
+  # Redis health checks
+  redis_healthcheck: &redis_healthcheck
+    test: ["CMD", "redis-cli", "ping"]
+    interval: 10s
+    timeout: 3s
+    retries: 3
+    start_period: 10s
+
+# Apply health checks to services
+services:
+  auth-service:
+    <<: *http_healthcheck
+    environment:
+      PORT: 8080
+
+  postgres-primary:
+    <<: *postgres_healthcheck
+    environment:
+      POSTGRES_USER: tracseq_admin
+      POSTGRES_DB: tracseq_prod
+
+  redis-master:
+    <<: *redis_healthcheck
+```
+
+### Monitoring Stack
+
+```yaml
+# Prometheus for Metrics
+prometheus:
+  image: prom/prometheus:latest
+  ports:
+    - "9090:9090"
+  volumes:
+    - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+    - prometheus_data:/prometheus
+  command:
+    - '--config.file=/etc/prometheus/prometheus.yml'
+    - '--storage.tsdb.path=/prometheus'
+    - '--web.console.libraries=/etc/prometheus/console_libraries'
+    - '--web.console.templates=/etc/prometheus/consoles'
+    - '--storage.tsdb.retention.time=200h'
+    - '--web.enable-lifecycle'
+  networks:
+    - monitoring_network
+
+# Grafana for Visualization
+grafana:
+  image: grafana/grafana:latest
+  ports:
+    - "3001:3000"
+  environment:
+    GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+    GF_INSTALL_PLUGINS: grafana-piechart-panel
+  volumes:
+    - grafana_data:/var/lib/grafana
+    - ./config/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+    - ./config/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
+    - ./dashboards:/var/lib/grafana/dashboards
+  networks:
+    - monitoring_network
+
+# Jaeger for Distributed Tracing
+jaeger:
+  image: jaegertracing/all-in-one:latest
+  ports:
+    - "16686:16686"
+    - "14268:14268"
+  environment:
+    COLLECTOR_OTLP_ENABLED: true
+  volumes:
+    - jaeger_data:/tmp
+  networks:
+    - monitoring_network
+```
+
+---
+
+## Security Configuration
+
+### Security Best Practices
+
+```yaml
+# Security configuration
+security:
+  # Network security
+  networks:
+    backend_network:
+      internal: true  # No external access
+    data_network:
+      internal: true  # Database network isolated
+
+  # Container security
+  default_security: &default_security
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+  # User security
+  user_config: &user_config
+    user: "1000:1000"  # Non-root user
+
+# Apply security to services
+services:
+  auth-service:
+    <<: *default_security
+    <<: *user_config
+    environment:
+      # Security environment variables
+      SECURE_COOKIES: true
+      COOKIE_SAME_SITE: strict
+      CORS_ORIGINS: ${ALLOWED_ORIGINS}
+      RATE_LIMIT_ENABLED: true
+      RATE_LIMIT_REQUESTS: 100
+      RATE_LIMIT_WINDOW: 60
+```
+
+### Secrets Management
+
+```yaml
+# Docker Secrets
+secrets:
+  jwt_secret:
+    external: true
+  postgres_password:
+    external: true
+  redis_password:
+    external: true
+
+# Use secrets in services
+services:
+  auth-service:
+    secrets:
+      - jwt_secret
+      - postgres_password
+    environment:
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+```
+
+### SSL/TLS Configuration
+
+```yaml
+# Nginx with SSL termination
+nginx:
+  image: nginx:alpine
+  ports:
+    - "443:443"
+    - "80:80"
+  volumes:
+    - ./config/nginx.conf:/etc/nginx/nginx.conf
+    - ./ssl:/etc/nginx/ssl
+    - ./logs/nginx:/var/log/nginx
+  depends_on:
+    - api-gateway
+  networks:
+    - frontend_network
+    - backend_network
+  restart: unless-stopped
+```
+
+---
+
+## Performance Optimization
+
+### Resource Limits and Reservations
+
+```yaml
+# Performance optimization configuration
+performance:
+  # CPU and memory limits
+  resource_limits: &resource_limits
+    deploy:
+      resources:
+        limits:
+          memory: 1GB
+          cpus: '1.0'
+        reservations:
+          memory: 512MB
+          cpus: '0.5'
+
+  # Database optimization
+  database_config: &database_config
+    deploy:
+      resources:
+        limits:
+          memory: 4GB
+          cpus: '2.0'
+        reservations:
+          memory: 2GB
+          cpus: '1.0'
+
+  # AI service optimization
+  ai_config: &ai_config
+    deploy:
+      resources:
+        limits:
+          memory: 8GB
+          cpus: '4.0'
+        reservations:
+          memory: 4GB
+          cpus: '2.0'
+
+# Apply to services
+services:
+  auth-service:
+    <<: *resource_limits
+
+  postgres-primary:
+    <<: *database_config
+
+  ollama:
+    <<: *ai_config
+```
+
+### Caching Strategy
+
+```yaml
+# Multi-layer caching
+caching:
+  # Application-level cache
+  redis-cache:
+    image: redis:7-alpine
+    command: >
+      redis-server
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+      --save ""
+    networks:
+      - cache_network
+
+  # Database query cache
+  postgres-cache:
+    environment:
+      - shared_buffers=256MB
+      - effective_cache_size=1GB
+      - work_mem=4MB
+
+  # Static asset cache
+  nginx-cache:
+    volumes:
+      - nginx_cache:/var/cache/nginx
+    environment:
+      - NGINX_CACHE_SIZE=1g
+      - NGINX_CACHE_TIME=1h
+```
+
+---
+
+## Deployment Strategies
+
+### Blue-Green Deployment
+
+```bash
+#!/bin/bash
+# blue-green-deploy.sh
+
+BLUE_COMPOSE="docker-compose.blue.yml"
+GREEN_COMPOSE="docker-compose.green.yml"
+CURRENT_ENV=$(cat .current_env 2>/dev/null || echo "blue")
+
+if [ "$CURRENT_ENV" = "blue" ]; then
+    NEW_ENV="green"
+    NEW_COMPOSE=$GREEN_COMPOSE
+else
+    NEW_ENV="blue"
+    NEW_COMPOSE=$BLUE_COMPOSE
+fi
+
+echo "Deploying to $NEW_ENV environment..."
+
+# Deploy new environment
+docker-compose -f $NEW_COMPOSE up -d
+
+# Health check new environment
+./scripts/health-check.sh $NEW_ENV
+
+if [ $? -eq 0 ]; then
+    echo "Health check passed, switching traffic..."
+    
+    # Update load balancer configuration
+    ./scripts/switch-traffic.sh $NEW_ENV
+    
+    # Save current environment
+    echo $NEW_ENV > .current_env
+    
+    # Stop old environment after delay
+    sleep 30
+    if [ "$CURRENT_ENV" = "blue" ]; then
+        docker-compose -f $BLUE_COMPOSE down
+    else
+        docker-compose -f $GREEN_COMPOSE down
+    fi
+    
+    echo "Deployment completed successfully!"
+else
+    echo "Health check failed, rolling back..."
+    docker-compose -f $NEW_COMPOSE down
+    exit 1
+fi
+```
+
+### Rolling Update Strategy
+
+```yaml
+# Rolling update configuration
+services:
+  auth-service:
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 30s
+        order: start-first
+        failure_action: rollback
+        monitor: 60s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+```
+
+### Canary Deployment
+
+```bash
+#!/bin/bash
+# canary-deploy.sh
+
+# Deploy canary version (10% traffic)
+docker-compose -f docker-compose.canary.yml up -d
+
+# Configure load balancer for canary traffic
+./scripts/configure-canary.sh 10
+
+# Monitor metrics
+./scripts/monitor-canary.sh
+
+# If metrics are good, increase traffic
+if [ $? -eq 0 ]; then
+    ./scripts/configure-canary.sh 50
+    sleep 300
+    ./scripts/configure-canary.sh 100
+    
+    # Replace main deployment
+    docker-compose -f docker-compose.yml down
+    docker-compose -f docker-compose.canary.yml up -d
+else
+    echo "Canary deployment failed, rolling back..."
+    ./scripts/configure-canary.sh 0
+    docker-compose -f docker-compose.canary.yml down
+fi
+```
+
+---
+
+## Troubleshooting and Debugging
+
+### Common Issues and Solutions
+
+#### 1. Database Connection Issues
+
+```bash
+# Check database status
+docker-compose ps db
+docker-compose logs db
+
+# Test database connection
+docker-compose exec db pg_isready -U postgres
+
+# Check database configuration
+docker-compose exec db psql -U postgres -c "SHOW config_file;"
+
+# Reset database if needed
+docker-compose down -v
+docker-compose up -d db
+```
+
+#### 2. Service Discovery Problems
+
+```bash
+# Check network connectivity
+docker-compose exec auth-service ping sample-service
+
+# Verify service registration
+docker-compose exec consul consul catalog services
+
+# Check DNS resolution
+docker-compose exec auth-service nslookup sample-service
+```
+
+#### 3. Memory and Performance Issues
+
+```bash
+# Monitor resource usage
+docker stats
+
+# Check service health
+curl http://localhost:8080/health
+curl http://localhost:8081/health
+
+# View detailed logs
+docker-compose logs -f --tail=100 auth-service
+```
+
+#### 4. Volume and Storage Problems
+
+```bash
+# Check volume mounts
+docker-compose exec auth-service df -h
+
+# Verify volume permissions
+docker-compose exec auth-service ls -la /app/storage
+
+# Clean up unused volumes
+docker volume prune
+```
+
+### Debug Mode Configuration
+
+```yaml
+# Debug environment override
+debug:
+  services:
+    auth-service:
+      environment:
+        RUST_LOG: debug
+        RUST_BACKTRACE: full
+        DEBUG_MODE: true
+      volumes:
+        - ./debug-logs:/app/logs
+      ports:
+        - "5005:5005"  # Debug port
+
+    postgres-primary:
+      environment:
+        POSTGRES_LOG_STATEMENT: all
+        POSTGRES_LOG_MIN_DURATION_STATEMENT: 0
+      command: >
+        postgres
+        -c log_statement=all
+        -c log_min_duration_statement=0ms
+```
+
+### Monitoring and Alerting
+
+```yaml
+# Alertmanager configuration
+alertmanager:
+  image: prom/alertmanager:latest
+  ports:
+    - "9093:9093"
+  volumes:
+    - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+  command:
+    - '--config.file=/etc/alertmanager/alertmanager.yml'
+    - '--storage.path=/alertmanager'
+    - '--web.external-url=http://localhost:9093'
+  networks:
+    - monitoring_network
+
+# Alert rules
+alert_rules:
+  - name: service_health
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.instance }} is down"
+
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.8
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+```
+
+---
+
+## Best Practices
+
+### 1. Container Optimization
+
+```dockerfile
+# Multi-stage builds for smaller images
+FROM rust:1.75-slim as builder
+WORKDIR /app
+COPY . .
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/target/release/app /usr/local/bin/app
+USER 1000:1000
+CMD ["app"]
+```
+
+### 2. Security Hardening
+
+```yaml
+# Security best practices
+security_practices:
+  - Use non-root users
+  - Enable read-only containers
+  - Drop unnecessary capabilities
+  - Use secrets management
+  - Enable network segmentation
+  - Implement proper health checks
+  - Use minimal base images
+  - Regular security updates
+```
+
+### 3. Environment Configuration
+
+```bash
+# Environment management
+environments:
+  development:
+    - Hot reload enabled
+    - Debug logging
+    - Local file mounts
+    - Relaxed security
+
+  staging:
+    - Production-like setup
+    - Integration testing
+    - Monitoring enabled
+    - Security hardened
+
+  production:
+    - High availability
+    - Resource limits
+    - Full monitoring
+    - Maximum security
+```
+
+### 4. Operational Excellence
+
+```yaml
+operational_practices:
+  logging:
+    - Centralized logging
+    - Structured logs
+    - Log rotation
+    - Log aggregation
+
+  monitoring:
+    - Health checks
+    - Metrics collection
+    - Alerting rules
+    - Performance monitoring
+
+  backup:
+    - Automated backups
+    - Point-in-time recovery
+    - Backup testing
+    - Disaster recovery
+
+  maintenance:
+    - Regular updates
+    - Security patches
+    - Performance tuning
+    - Capacity planning
+```
+
+### 5. Development Workflow
+
+```bash
+# Recommended development workflow
+workflow:
+  1. Local development with hot reload
+  2. Unit testing in containers
+  3. Integration testing with docker-compose
+  4. Staging deployment
+  5. Production deployment
+  6. Monitoring and maintenance
+```
+
+---
+
+## Quick Reference Commands
+
+```bash
+# Development
+docker-compose up -d                          # Start all services
+docker-compose up -d db dev frontend-dev     # Start specific services
+docker-compose logs -f dev                   # View logs
+docker-compose exec dev bash                 # Access container shell
+
+# Production
+docker-compose -f production.yml up -d       # Start production
+docker-compose -f production.yml scale auth-service=3  # Scale service
+docker-compose -f production.yml restart auth-service  # Restart service
+
+# Maintenance
+docker-compose down -v                        # Stop and remove volumes
+docker system prune -a                       # Clean up Docker
+docker-compose pull                          # Update images
+docker-compose build --no-cache              # Rebuild images
+
+# Debugging
+docker stats                                  # Resource usage
+docker-compose ps                            # Service status
+docker-compose top                           # Process list
+docker inspect <container>                   # Container details
+
+# Backup and Recovery
+./scripts/backup-volumes.sh                  # Backup data
+./scripts/restore-volumes.sh                 # Restore data
+docker-compose exec postgres-primary pg_dump # Database backup
+```
+
+*Context improved by Giga AI*
+
