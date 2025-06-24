@@ -1,10 +1,12 @@
 pub mod auth_integration_tests;
 pub mod auth_tests;
+#[cfg(test)]
 pub mod barcode_service_comprehensive_tests;
 pub mod middleware_tests;
 pub mod modular_assembly_test;
 pub mod shibboleth_auth_tests;
 pub mod shibboleth_integration_tests;
+#[cfg(test)]
 pub mod template_tests;
 
 // Disabled due to compilation errors - can be fixed later

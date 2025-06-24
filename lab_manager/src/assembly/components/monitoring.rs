@@ -129,14 +129,15 @@ impl Alert {
     pub fn new(
         severity: AlertSeverity,
         message: String,
-        source: String,
+        _source: String,
         component: Option<String>,
     ) -> Self {
-        let id = format!("alert_{}", uuid::Uuid::new_v4());
-
         Self {
-            id,
-            alert_type: AlertType::SystemEvent,
+            id: uuid::Uuid::new_v4().to_string(),
+            alert_type: match severity {
+                AlertSeverity::Critical | AlertSeverity::Emergency => AlertType::ComponentFailure,
+                _ => AlertType::SystemEvent,
+            },
             severity,
             message,
             component,
@@ -200,7 +201,7 @@ impl MonitoringComponent {
 
     /// Perform health check on all registered components
     pub async fn perform_health_check(
-        &self,
+        &mut self,
     ) -> Result<HashMap<String, HealthStatus>, ComponentError> {
         if !self.is_initialized {
             return Err(ComponentError::InitializationFailed(
@@ -221,7 +222,7 @@ impl MonitoringComponent {
                     let is_healthy = health_result[idx + 1..].trim().contains("Healthy");
 
                     // Update metrics
-                    let component_status = if is_healthy { "healthy" } else { "unhealthy" };
+                    let _component_status = if is_healthy { "healthy" } else { "unhealthy" };
 
                     self.component_health
                         .insert(component_id.clone(), is_healthy);
@@ -342,24 +343,30 @@ impl MonitoringComponent {
         if let Some(registry) = &self.service_registry {
             let health_results = registry.health_check_all().await?;
 
-            for (component_id, is_healthy) in health_results {
-                let status = if is_healthy {
-                    HealthStatus::Healthy
-                } else {
-                    HealthStatus::Critical
-                };
+            for health_result in health_results {
+                // Parse the health status string (format: "component_id: Healthy")
+                if let Some(idx) = health_result.find(':') {
+                    let component_id = health_result[..idx].trim().to_string();
+                    let is_healthy = health_result[idx + 1..].trim().contains("Healthy");
 
-                let metrics = ComponentMetrics {
-                    component_id: component_id.clone(),
-                    component_name: component_id.clone(), // In real implementation, get actual name
-                    status,
-                    response_time: Duration::from_millis(fastrand::u64(10..500)),
-                    request_count: fastrand::u64(100..10000),
-                    error_count: fastrand::u64(0..100),
-                    custom_metrics: HashMap::new(),
-                };
+                    let status = if is_healthy {
+                        HealthStatus::Healthy
+                    } else {
+                        HealthStatus::Critical
+                    };
 
-                component_metrics.insert(component_id, metrics);
+                    let metrics = ComponentMetrics {
+                        component_id: component_id.clone(),
+                        component_name: component_id.clone(), // In real implementation, get actual name
+                        status,
+                        response_time: Duration::from_millis(fastrand::u64(10..500)),
+                        request_count: fastrand::u64(100..10000),
+                        error_count: fastrand::u64(0..100),
+                        custom_metrics: HashMap::new(),
+                    };
+
+                    component_metrics.insert(component_id, metrics);
+                }
             }
         }
 
@@ -508,7 +515,7 @@ impl MonitoringComponent {
                     let is_healthy = health_result[idx + 1..].trim().contains("Healthy");
 
                     // Update metrics
-                    let component_status = if is_healthy { "healthy" } else { "unhealthy" };
+                    let _component_status = if is_healthy { "healthy" } else { "unhealthy" };
 
                     self.component_health
                         .insert(component_id.clone(), is_healthy);
@@ -546,13 +553,13 @@ impl MonitoringComponent {
                         let component_id = health_result[..idx].trim().to_string();
                         let is_healthy = health_result[idx + 1..].trim().contains("Healthy");
 
-                        let status = if is_healthy {
+                        let _status = if is_healthy {
                             HealthStatus::Healthy
                         } else {
                             HealthStatus::Critical
                         };
 
-                        health_results.insert(component_id, status);
+                        health_results.insert(component_id, _status);
                     }
                 }
             }
@@ -649,7 +656,7 @@ impl Component for MonitoringComponent {
         "System Monitoring & Observability"
     }
 
-    async fn initialize(&mut self, context: &ServiceRegistry) -> Result<(), ComponentError> {
+    async fn initialize(&mut self, _context: &ServiceRegistry) -> Result<(), ComponentError> {
         if self.is_initialized {
             return Ok(());
         }

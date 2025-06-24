@@ -133,7 +133,7 @@ impl Component for StorageComponent {
                 let storage = Arc::new(Storage::new(temp_dir));
                 self.storage = Some(storage);
             }
-            StorageBackend::S3 { bucket, region } => {
+            StorageBackend::S3 { bucket, region: _ } => {
                 // TODO: Implement S3 storage initialization
                 tracing::warn!(
                     "S3 storage backend not yet implemented, using file system fallback"
@@ -178,7 +178,7 @@ impl Component for StorageComponent {
             ));
         }
 
-        if let Some(storage) = &self.storage {
+        if let Some(_storage) = &self.storage {
             // Perform basic health check - ensure we can write/read a test file
             let test_path = "health_check.tmp";
             let test_content = b"health_check";

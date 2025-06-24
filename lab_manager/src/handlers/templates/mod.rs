@@ -73,12 +73,19 @@ pub async fn upload_template(
         template_data.ok_or((StatusCode::BAD_REQUEST, "Missing template data".to_string()))?;
 
     // Save file to storage
-    let file_path = state
+    state
         .storage
         .storage
         .store_file(&original_filename, &file_content)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Construct the file path for database storage
+    let file_path = state
+        .storage
+        .storage
+        .base_path()
+        .join(&original_filename);
 
     // Determine file type from extension
     let file_type = std::path::Path::new(&original_filename)

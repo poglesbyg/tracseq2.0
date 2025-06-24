@@ -5,13 +5,13 @@ pub mod events;
 pub mod handlers;
 pub mod middleware;
 pub mod models;
+pub mod observability;
 pub mod plugins;
 pub mod repositories;
 pub mod router;
 pub mod sample_submission;
 pub mod sequencing;
 pub mod services;
-pub mod storage;
 pub mod validation;
 
 use std::net::SocketAddr;
