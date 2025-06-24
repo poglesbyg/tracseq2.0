@@ -24,20 +24,13 @@ interface RagSubmission {
   metadata?: Record<string, unknown>;
 }
 
-interface FileUploadResponse {
-  success: boolean;
-  submissionId: string;
-  message: string;
-  errors?: string[];
-}
-
 interface RagExtractionResult {
   success: boolean;
   samples: Array<{
     name: string;
     barcode: string;
     location: string;
-    metadata: any;
+    metadata: Record<string, unknown>;
   }>;
   confidence_score: number;
   validation_warnings: string[];
@@ -48,7 +41,7 @@ interface RagExtractionResult {
     confidence_score: number;
     warnings: string[];
     source_document: string;
-    submission?: any;
+    submission?: Record<string, unknown>;
   };
 }
 

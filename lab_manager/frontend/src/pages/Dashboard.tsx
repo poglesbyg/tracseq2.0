@@ -54,18 +54,6 @@ interface ActivityItem {
   details?: Record<string, unknown>;
 }
 
-interface SystemHealth {
-  status: 'healthy' | 'warning' | 'error';
-  services: ServiceStatus[];
-  uptime: number;
-}
-
-interface ServiceStatus {
-  name: string;
-  status: 'online' | 'offline' | 'degraded';
-  responseTime: number;
-}
-
 interface RecentActivity {
   id: string;
   type: string;

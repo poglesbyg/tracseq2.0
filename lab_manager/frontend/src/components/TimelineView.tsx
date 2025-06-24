@@ -42,7 +42,7 @@ const timeRanges = [
   { label: 'All Time', value: Infinity },
 ];
 
-export default function TimelineView({ events, title = 'Timeline', className = '', showFilters = true, onEventClick }: TimelineViewProps) {
+export default function TimelineView({ events, title = 'Timeline', className = '', showFilters = true }: Omit<TimelineViewProps, 'onEventClick'>) {
   const [selectedTimeRange, setSelectedTimeRange] = useState(24); // Default to last 24 hours
   const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([]);
   const [selectedEntityTypes, setSelectedEntityTypes] = useState<string[]>([]);
