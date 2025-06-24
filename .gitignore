@@ -341,8 +341,8 @@ tramp
 
 # Cursor AI IDE
 .cursorrules
-/.cursor
-/.giga
+# /.cursor
+# /.giga
 
 # =============================================================================
 # APPLICATION SPECIFIC
