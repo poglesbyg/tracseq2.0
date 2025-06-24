@@ -213,7 +213,7 @@ pub async fn delete_workflow(
 
     if active_executions > 0 {
         return Err(SequencingError::WorkflowInUse { 
-            workflow_id,
+            workflow_id: workflow_id.to_string(),
             active_executions: active_executions as u32,
         });
     }
@@ -328,7 +328,7 @@ pub async fn get_execution_status(
     .bind(execution_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::ExecutionNotFound { execution_id })?;
+    .ok_or(SequencingError::ExecutionNotFound { execution_id: execution_id.to_string() })?;
 
     // Get step execution details
     let step_executions = sqlx::query_as::<_, WorkflowStepExecution>(
@@ -400,7 +400,8 @@ pub async fn update_step_status(
     .fetch_optional(&state.db_pool.pool)
     .await?
     .ok_or(SequencingError::StepNotFound { 
-        execution_id, 
+        step_id: Uuid::new_v4().to_string(),
+        execution_id: execution_id.to_string(), 
         step_name: step_name.clone() 
     })?;
 
@@ -494,7 +495,7 @@ pub async fn cancel_execution(
     .bind(execution_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::ExecutionNotFound { execution_id })?;
+    .ok_or(SequencingError::ExecutionNotFound { execution_id: execution_id.to_string() })?;
 
     // Cancel all running steps
     sqlx::query(

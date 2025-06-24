@@ -191,6 +191,7 @@ pub async fn prioritize_job(
     if !matches!(job.status, JobStatus::Queued | JobStatus::Validated) {
         return Err(SequencingError::InvalidJobState {
             current_state: job.status.to_string(),
+            expected: "queued or validated".to_string(),
             required_state: "queued or validated".to_string(),
         });
     }

@@ -1,16 +1,16 @@
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    Json,
 };
+use chrono::{DateTime, Utc};
 use serde_json::json;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 use crate::{
+    AppState,
     error::{Result, SequencingError},
     models::*,
-    AppState,
 };
 
 /// Start analysis pipeline for a sequencing job
@@ -20,17 +20,16 @@ pub async fn start_analysis(
     Json(request): Json<StartAnalysisRequest>,
 ) -> Result<Json<serde_json::Value>> {
     // Verify job exists and is in the right state
-    let job = sqlx::query_as::<_, SequencingJob>(
-        "SELECT * FROM sequencing_jobs WHERE id = $1"
-    )
-    .bind(job_id)
-    .fetch_optional(&state.db_pool.pool)
-    .await?
-    .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
+    let job = sqlx::query_as::<_, SequencingJob>("SELECT * FROM sequencing_jobs WHERE id = $1")
+        .bind(job_id)
+        .fetch_optional(&state.db_pool.pool)
+        .await?
+        .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
 
     if job.status != JobStatus::Completed {
         return Err(SequencingError::InvalidJobState {
             current_state: job.status.to_string(),
+            expected: "completed".to_string(),
             required_state: "completed".to_string(),
         });
     }
@@ -44,7 +43,7 @@ pub async fn start_analysis(
             status, created_at, created_by
         ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
         RETURNING *
-        "#
+        "#,
     )
     .bind(analysis_id)
     .bind(job_id)
@@ -58,7 +57,7 @@ pub async fn start_analysis(
 
     // Update job status to indicate analysis started
     sqlx::query(
-        "UPDATE sequencing_jobs SET analysis_status = 'running', updated_at = NOW() WHERE id = $1"
+        "UPDATE sequencing_jobs SET analysis_status = 'running', updated_at = NOW() WHERE id = $1",
     )
     .bind(job_id)
     .execute(&state.db_pool.pool)
@@ -76,30 +75,25 @@ pub async fn get_analysis_status(
     State(state): State<AppState>,
     Path(analysis_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>> {
-    let analysis = sqlx::query_as::<_, AnalysisJob>(
-        "SELECT * FROM analysis_jobs WHERE id = $1"
-    )
-    .bind(analysis_id)
-    .fetch_optional(&state.db_pool.pool)
-    .await?
-    .ok_or(SequencingError::AnalysisNotFound { analysis_id })?;
+    let analysis = sqlx::query_as::<_, AnalysisJob>("SELECT * FROM analysis_jobs WHERE id = $1")
+        .bind(analysis_id)
+        .fetch_optional(&state.db_pool.pool)
+        .await?
+        .ok_or(SequencingError::AnalysisNotFound { analysis_id })?;
 
     // Get quality metrics if available
-    let quality_metrics = sqlx::query_as::<_, QualityMetrics>(
-        "SELECT * FROM quality_metrics WHERE analysis_id = $1"
-    )
-    .bind(analysis_id)
-    .fetch_optional(&state.db_pool.pool)
-    .await?;
+    let quality_metrics =
+        sqlx::query_as::<_, QualityMetrics>("SELECT * FROM quality_metrics WHERE analysis_id = $1")
+            .bind(analysis_id)
+            .fetch_optional(&state.db_pool.pool)
+            .await?;
 
     // Get analysis results if completed
     let results = if analysis.status == AnalysisStatus::Completed {
-        sqlx::query_as::<_, AnalysisResult>(
-            "SELECT * FROM analysis_results WHERE analysis_id = $1"
-        )
-        .bind(analysis_id)
-        .fetch_all(&state.db_pool.pool)
-        .await?
+        sqlx::query_as::<_, AnalysisResult>("SELECT * FROM analysis_results WHERE analysis_id = $1")
+            .bind(analysis_id)
+            .fetch_all(&state.db_pool.pool)
+            .await?
     } else {
         Vec::new()
     };
@@ -139,10 +133,11 @@ pub async fn list_job_analyses(
     }
 
     let where_clause = where_conditions.join(" AND ");
-    
+
     // Get total count
     let total_count: i64 = sqlx::query_scalar(&format!(
-        "SELECT COUNT(*) FROM analysis_jobs WHERE {}", where_clause
+        "SELECT COUNT(*) FROM analysis_jobs WHERE {}",
+        where_clause
     ))
     .bind(job_id)
     .fetch_one(&state.db_pool.pool)
@@ -190,7 +185,7 @@ pub async fn update_analysis_status(
             updated_at = NOW()
         WHERE id = $1
         RETURNING *
-        "#
+        "#,
     )
     .bind(analysis_id)
     .bind(&request.status)
@@ -256,7 +251,7 @@ pub async fn submit_quality_metrics(
             custom_metrics = EXCLUDED.custom_metrics,
             calculated_at = EXCLUDED.calculated_at
         RETURNING *
-        "#
+        "#,
     )
     .bind(Uuid::new_v4())
     .bind(analysis_id)
@@ -301,7 +296,7 @@ pub async fn submit_analysis_results(
                 checksum, description, metadata, created_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
             RETURNING *
-            "#
+            "#,
         )
         .bind(Uuid::new_v4())
         .bind(analysis_id)
@@ -434,11 +429,12 @@ pub async fn get_analysis_pipelines(
     .await?;
 
     // Group by pipeline type
-    let mut grouped_pipelines: std::collections::HashMap<String, Vec<AnalysisPipeline>> = std::collections::HashMap::new();
-    
+    let mut grouped_pipelines: std::collections::HashMap<String, Vec<AnalysisPipeline>> =
+        std::collections::HashMap::new();
+
     for pipeline in pipelines {
         grouped_pipelines
-            .entry(pipeline.pipeline_id.clone())
+            .entry(format!("{:?}", pipeline.pipeline_id))
             .or_insert_with(Vec::new)
             .push(pipeline);
     }
@@ -465,7 +461,7 @@ pub async fn cancel_analysis(
             error_message = 'Analysis cancelled by user request'
         WHERE id = $1 AND status IN ('queued', 'running')
         RETURNING *
-        "#
+        "#,
     )
     .bind(analysis_id)
     .fetch_optional(&state.db_pool.pool)

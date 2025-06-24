@@ -1,9 +1,9 @@
 //! Transaction coordinator for orchestrating distributed transactions across TracSeq services.
 
+use crate::persistence::{DatabaseConfig, SagaPersistenceService};
 use crate::saga::{
-    TransactionContext, TransactionSaga, SagaExecutionResult, SagaError, SagaState, SagaStatus
+    SagaError, SagaExecutionResult, SagaState, SagaStatus, TransactionContext, TransactionSaga,
 };
-use crate::persistence::{SagaPersistenceService, DatabaseConfig};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -17,13 +17,13 @@ use uuid::Uuid;
 pub struct TransactionCoordinator {
     /// Active sagas being managed (in-memory for performance)
     active_sagas: Arc<RwLock<HashMap<Uuid, Arc<RwLock<TransactionSaga>>>>>,
-    
+
     /// Database persistence service
     persistence: Option<Arc<SagaPersistenceService>>,
-    
+
     /// Event client for publishing transaction events
-    event_client: Option<Arc<tracseq_event_service::services::client::EventServiceClient>>,
-    
+    event_client: Option<Arc<event_service::services::client::EventServiceClient>>,
+
     /// Coordinator configuration
     config: CoordinatorConfig,
 }
@@ -33,22 +33,22 @@ pub struct TransactionCoordinator {
 pub struct CoordinatorConfig {
     /// Maximum number of concurrent sagas
     pub max_concurrent_sagas: usize,
-    
+
     /// Default saga timeout in milliseconds
     pub default_timeout_ms: u64,
-    
+
     /// Enable event publishing
     pub enable_events: bool,
-    
+
     /// Event service URL
     pub event_service_url: String,
-    
+
     /// Saga persistence enabled
     pub enable_persistence: bool,
-    
+
     /// Database configuration for persistence
     pub database: DatabaseConfig,
-    
+
     /// Cleanup completed sagas after this duration
     pub cleanup_after_hours: u32,
 }
@@ -72,22 +72,22 @@ impl Default for CoordinatorConfig {
 pub struct TransactionRequest {
     /// Transaction name/identifier
     pub name: String,
-    
+
     /// Transaction type
     pub transaction_type: String,
-    
+
     /// User initiating the transaction
     pub user_id: Option<Uuid>,
-    
+
     /// Correlation ID for tracing
     pub correlation_id: Option<Uuid>,
-    
+
     /// Transaction timeout in milliseconds
     pub timeout_ms: Option<u64>,
-    
+
     /// Transaction metadata
     pub metadata: HashMap<String, serde_json::Value>,
-    
+
     /// Custom context data
     pub context_data: HashMap<String, serde_json::Value>,
 }
@@ -97,31 +97,31 @@ pub struct TransactionRequest {
 pub struct TransactionStatus {
     /// Transaction ID
     pub transaction_id: Uuid,
-    
+
     /// Saga ID
     pub saga_id: Uuid,
-    
+
     /// Current status
     pub status: SagaStatus,
-    
+
     /// Progress percentage (0-100)
     pub progress: f64,
-    
+
     /// Current step being executed
     pub current_step: Option<String>,
-    
+
     /// Completed steps count
     pub completed_steps: u32,
-    
+
     /// Total steps count
     pub total_steps: u32,
-    
+
     /// Started timestamp
     pub started_at: Option<DateTime<Utc>>,
-    
+
     /// Last updated timestamp
     pub updated_at: DateTime<Utc>,
-    
+
     /// Error message if failed
     pub error_message: Option<String>,
 }
@@ -131,10 +131,10 @@ impl TransactionCoordinator {
     pub fn new(config: CoordinatorConfig) -> Self {
         let event_client = if config.enable_events {
             Some(Arc::new(
-                tracseq_event_service::services::client::EventServiceClient::new(
+                event_service::services::client::EventServiceClient::new(
                     &config.event_service_url,
-                    "transaction-service"
-                )
+                    "transaction-service",
+                ),
             ))
         } else {
             None
@@ -152,10 +152,10 @@ impl TransactionCoordinator {
     pub async fn with_persistence(config: CoordinatorConfig) -> Result<Self, anyhow::Error> {
         let event_client = if config.enable_events {
             Some(Arc::new(
-                tracseq_event_service::services::client::EventServiceClient::new(
+                event_service::services::client::EventServiceClient::new(
                     &config.event_service_url,
-                    "transaction-service"
-                )
+                    "transaction-service",
+                ),
             ))
         } else {
             None
@@ -197,16 +197,18 @@ impl TransactionCoordinator {
 
         // Publish transaction started event
         if let Some(event_client) = &self.event_client {
-            let _ = event_client.publish_event(
-                "transaction.started",
-                serde_json::json!({
-                    "transaction_id": transaction_id,
-                    "saga_id": saga_id,
-                    "transaction_type": request.transaction_type,
-                    "user_id": request.user_id,
-                    "started_at": Utc::now()
-                })
-            ).await;
+            let _ = event_client
+                .publish_event(
+                    "transaction.started",
+                    serde_json::json!({
+                        "transaction_id": transaction_id,
+                        "saga_id": saga_id,
+                        "transaction_type": request.transaction_type,
+                        "user_id": request.user_id,
+                        "started_at": Utc::now()
+                    }),
+                )
+                .await;
         }
 
         // Save saga to persistence if enabled
@@ -228,14 +230,14 @@ impl TransactionCoordinator {
         let execution_result = {
             let mut saga_guard = saga_arc.write().await;
             let result = saga_guard.execute().await;
-            
+
             // Update saga state in persistence during execution
             if let Some(persistence) = &self.persistence {
                 if let Err(e) = persistence.update_saga(&*saga_guard).await {
                     tracing::error!("Failed to update saga in persistence: {}", e);
                 }
             }
-            
+
             result
         };
 
@@ -252,24 +254,29 @@ impl TransactionCoordinator {
                 if let Some(persistence) = &self.persistence {
                     if let Some(saga_arc) = saga_arc.try_read() {
                         if let Err(e) = persistence.update_saga(&*saga_arc).await {
-                            tracing::error!("Failed to update completed saga in persistence: {}", e);
+                            tracing::error!(
+                                "Failed to update completed saga in persistence: {}",
+                                e
+                            );
                         }
                     }
                 }
 
                 // Publish transaction completed event
                 if let Some(event_client) = &self.event_client {
-                    let _ = event_client.publish_event(
-                        "transaction.completed",
-                        serde_json::json!({
-                            "transaction_id": transaction_id,
-                            "saga_id": saga_id,
-                            "status": result.status,
-                            "execution_time_ms": result.execution_time_ms,
-                            "compensation_executed": result.compensation_executed,
-                            "completed_at": Utc::now()
-                        })
-                    ).await;
+                    let _ = event_client
+                        .publish_event(
+                            "transaction.completed",
+                            serde_json::json!({
+                                "transaction_id": transaction_id,
+                                "saga_id": saga_id,
+                                "status": result.status,
+                                "execution_time_ms": result.execution_time_ms,
+                                "compensation_executed": result.compensation_executed,
+                                "completed_at": Utc::now()
+                            }),
+                        )
+                        .await;
                 }
             }
             Err(error) => {
@@ -284,16 +291,18 @@ impl TransactionCoordinator {
 
                 // Publish transaction failed event
                 if let Some(event_client) = &self.event_client {
-                    let _ = event_client.publish_event(
-                        "transaction.failed",
-                        serde_json::json!({
-                            "transaction_id": transaction_id,
-                            "saga_id": saga_id,
-                            "error": error.to_string(),
-                            "error_category": error.category(),
-                            "failed_at": Utc::now()
-                        })
-                    ).await;
+                    let _ = event_client
+                        .publish_event(
+                            "transaction.failed",
+                            serde_json::json!({
+                                "transaction_id": transaction_id,
+                                "saga_id": saga_id,
+                                "error": error.to_string(),
+                                "error_category": error.category(),
+                                "failed_at": Utc::now()
+                            }),
+                        )
+                        .await;
                 }
             }
         }
@@ -423,27 +432,29 @@ impl TransactionCoordinator {
     /// Cancel an active transaction
     pub async fn cancel_transaction(&self, saga_id: Uuid) -> Result<(), SagaError> {
         let active_sagas = self.active_sagas.read().await;
-        
+
         if let Some(saga_arc) = active_sagas.get(&saga_id) {
             let mut saga = saga_arc.write().await;
-            
+
             // Check if saga can be cancelled
             if saga.state.status.can_cancel() {
                 saga.state.status = SagaStatus::Cancelled;
                 saga.state.updated_at = Utc::now();
-                
+
                 // Publish cancellation event
                 if let Some(event_client) = &self.event_client {
-                    let _ = event_client.publish_event(
-                        "transaction.cancelled",
-                        serde_json::json!({
-                            "transaction_id": saga.context.transaction_id,
-                            "saga_id": saga_id,
-                            "cancelled_at": Utc::now()
-                        })
-                    ).await;
+                    let _ = event_client
+                        .publish_event(
+                            "transaction.cancelled",
+                            serde_json::json!({
+                                "transaction_id": saga.context.transaction_id,
+                                "saga_id": saga_id,
+                                "cancelled_at": Utc::now()
+                            }),
+                        )
+                        .await;
                 }
-                
+
                 Ok(())
             } else {
                 Err(SagaError::InvalidStateTransition {
@@ -464,7 +475,7 @@ impl TransactionCoordinator {
     pub async fn get_statistics(&self) -> CoordinatorStatistics {
         let active_sagas = self.active_sagas.read().await;
         let in_memory_active = active_sagas.len();
-        
+
         let mut stats = CoordinatorStatistics {
             active_transactions: in_memory_active,
             completed_transactions: 0,
@@ -481,7 +492,7 @@ impl TransactionCoordinator {
                 stats.completed_transactions = db_stats.completed_sagas as usize;
                 stats.failed_transactions = db_stats.failed_sagas as usize;
                 stats.total_transactions = db_stats.total_sagas as usize;
-                
+
                 // Compensated transactions would be included in completed count
                 // This is a simplification - in a real implementation you'd have separate counts
                 stats.compensated_transactions = 0; // Could query specifically for compensated status
@@ -494,7 +505,10 @@ impl TransactionCoordinator {
     /// Clean up old completed sagas
     pub async fn cleanup_old_sagas(&self) -> usize {
         if let Some(persistence) = &self.persistence {
-            match persistence.cleanup_old_sagas(self.config.cleanup_after_hours as i32).await {
+            match persistence
+                .cleanup_old_sagas(self.config.cleanup_after_hours as i32)
+                .await
+            {
                 Ok(deleted_count) => deleted_count as usize,
                 Err(e) => {
                     tracing::error!("Failed to cleanup old sagas: {}", e);
@@ -528,7 +542,7 @@ mod tests {
     async fn test_coordinator_creation() {
         let config = CoordinatorConfig::default();
         let coordinator = TransactionCoordinator::new(config);
-        
+
         let stats = coordinator.get_statistics().await;
         assert_eq!(stats.active_transactions, 0);
         assert_eq!(stats.total_transactions, 0);
@@ -557,7 +571,7 @@ mod tests {
             ..Default::default()
         };
         let coordinator = TransactionCoordinator::new(config);
-        
+
         let transactions = coordinator.list_active_transactions().await;
         assert!(transactions.is_empty());
     }

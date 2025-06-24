@@ -284,7 +284,9 @@ pub async fn send_webhook_notification(
     .bind(webhook_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::WebhookNotFound { webhook_id })?;
+    .ok_or(SequencingError::WebhookNotFound {
+        webhook_id: webhook_id.to_string(),
+    })?;
 
     // Check if event type is supported
     let event_types: Vec<String> =
@@ -600,8 +602,9 @@ async fn send_to_notification_service(
     // This would call the actual notification service API
     state
         .notification_client
-        .send_notification(payload)
+        .send_notification(payload.clone())
         .await
+        .map(|_| serde_json::json!({"status": "sent"}))
         .map_err(|e| SequencingError::IntegrationError {
             service: "notification_service".to_string(),
             message: e.to_string(),
