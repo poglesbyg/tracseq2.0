@@ -1,6 +1,6 @@
 use anyhow::Result;
 use axum::{
-    middleware,
+    middleware as axum_middleware,
     routing::{get, post, put, delete},
     Router,
 };
@@ -22,9 +22,10 @@ mod models;
 mod services;
 mod middleware;
 mod clients;
-mod workflow;
-mod analysis;
-mod scheduling;
+// TODO: Re-enable when modules exist
+// mod workflow;
+// mod analysis; 
+// mod scheduling;
 
 use config::Config;
 use database::DatabasePool;
@@ -127,7 +128,7 @@ fn create_app(state: AppState) -> Router {
         .route("/jobs/:job_id/status", put(handlers::jobs::update_job_status))
         .route("/jobs/:job_id/clone", post(handlers::jobs::clone_job))
         .route("/jobs/:job_id/cancel", post(handlers::jobs::cancel_job))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
         ));
@@ -140,7 +141,7 @@ fn create_app(state: AppState) -> Router {
         .route("/workflows/:workflow_id/pause", post(handlers::workflows::pause_workflow))
         .route("/workflows/:workflow_id/resume", post(handlers::workflows::resume_workflow))
         .route("/workflows/:workflow_id/abort", post(handlers::workflows::abort_workflow))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
         ));
@@ -154,7 +155,7 @@ fn create_app(state: AppState) -> Router {
         .route("/sample-sheets/:sheet_id", delete(handlers::sample_sheets::delete_sample_sheet))
         .route("/sample-sheets/:sheet_id/download", get(handlers::sample_sheets::download_sample_sheet))
         .route("/sample-sheets/:sheet_id/validate", post(handlers::sample_sheets::validate_sample_sheet))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
         ));
@@ -169,7 +170,7 @@ fn create_app(state: AppState) -> Router {
         .route("/runs/:run_id/start", post(handlers::runs::start_run))
         .route("/runs/:run_id/stop", post(handlers::runs::stop_run))
         .route("/runs/:run_id/metrics", get(handlers::runs::get_run_metrics))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
         ));
@@ -182,7 +183,7 @@ fn create_app(state: AppState) -> Router {
         .route("/analysis/jobs", get(handlers::analysis::list_analysis_jobs))
         .route("/analysis/jobs/:job_id", get(handlers::analysis::get_analysis_job))
         .route("/analysis/jobs/:job_id/results", get(handlers::analysis::get_analysis_results))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
         ));
@@ -194,7 +195,7 @@ fn create_app(state: AppState) -> Router {
         .route("/qc/reports/:report_id", get(handlers::quality::get_qc_report))
         .route("/qc/thresholds", get(handlers::quality::get_qc_thresholds))
         .route("/qc/thresholds", put(handlers::quality::update_qc_thresholds))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
         ));
@@ -207,7 +208,7 @@ fn create_app(state: AppState) -> Router {
         .route("/schedule/jobs/:job_id", put(handlers::scheduling::update_scheduled_job))
         .route("/schedule/jobs/:job_id", delete(handlers::scheduling::cancel_scheduled_job))
         .route("/schedule/calendar", get(handlers::scheduling::get_schedule_calendar))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
         ));
@@ -218,7 +219,7 @@ fn create_app(state: AppState) -> Router {
         .route("/integration/templates/sequencing", get(handlers::integration::get_sequencing_templates))
         .route("/integration/notifications/subscribe", post(handlers::integration::subscribe_to_notifications))
         .route("/integration/lims/sync", post(handlers::integration::sync_with_lims))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
         ));
@@ -229,7 +230,7 @@ fn create_app(state: AppState) -> Router {
         .route("/export/runs", get(handlers::export::export_runs))
         .route("/export/metrics", get(handlers::export::export_metrics))
         .route("/export/results", get(handlers::export::export_results))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
         ));
@@ -242,7 +243,7 @@ fn create_app(state: AppState) -> Router {
         .route("/admin/config", put(handlers::admin::update_configuration))
         .route("/admin/cleanup", post(handlers::admin::cleanup_old_data))
         .route("/admin/backup", post(handlers::admin::backup_data))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::admin_middleware,
         ));

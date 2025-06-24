@@ -63,4 +63,28 @@ impl Config {
             },
         })
     }
+
+    pub fn get_platform(&self, platform_id: &str) -> Option<PlatformConfig> {
+        // For now, return a mock platform config
+        // In a real implementation, this would be loaded from configuration
+        match platform_id {
+            "illumina_novaseq" | "illumina_hiseq" | "ion_torrent" | "nanopore" => {
+                Some(PlatformConfig {
+                    id: platform_id.to_string(),
+                    name: platform_id.to_string(),
+                    manufacturer: "Generic".to_string(),
+                    max_concurrent_runs: 2,
+                })
+            }
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlatformConfig {
+    pub id: String,
+    pub name: String,
+    pub manufacturer: String,
+    pub max_concurrent_runs: usize,
 }

@@ -160,25 +160,25 @@ impl IntoResponse for SampleServiceError {
                 (StatusCode::BAD_REQUEST, "validation_error", msg.as_str())
             }
             SampleServiceError::SampleNotFound { .. } => {
-                (StatusCode::NOT_FOUND, "sample_not_found", &self.to_string())
+                (StatusCode::NOT_FOUND, "sample_not_found", "Sample not found")
             }
             SampleServiceError::BarcodeNotFound { .. } => (
                 StatusCode::NOT_FOUND,
                 "barcode_not_found",
-                &self.to_string(),
+                "Barcode not found",
             ),
             SampleServiceError::DuplicateBarcode { .. } => {
-                (StatusCode::CONFLICT, "duplicate_barcode", &self.to_string())
+                (StatusCode::CONFLICT, "duplicate_barcode", "Duplicate barcode")
             }
             SampleServiceError::InvalidWorkflowTransition { .. } => (
                 StatusCode::BAD_REQUEST,
                 "invalid_workflow_transition",
-                &self.to_string(),
+                "Invalid workflow transition",
             ),
             SampleServiceError::TemplateNotFound { .. } => (
                 StatusCode::NOT_FOUND,
                 "template_not_found",
-                &self.to_string(),
+                "Template not found",
             ),
             SampleServiceError::TemplateValidation(msg) => (
                 StatusCode::BAD_REQUEST,

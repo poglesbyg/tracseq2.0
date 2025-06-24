@@ -112,7 +112,7 @@ pub async fn evaluate_quality_metrics(
     let job = sqlx::query_as::<_, SequencingJob>(
         "SELECT * FROM sequencing_jobs WHERE id = $1"
     )
-    .bind(analysis.job_id)
+    .bind(analysis.sequencing_job_id)
     .fetch_one(&state.db_pool.pool)
     .await?;
 
@@ -120,7 +120,7 @@ pub async fn evaluate_quality_metrics(
     let thresholds = sqlx::query_as::<_, QCThreshold>(
         "SELECT * FROM qc_thresholds WHERE platform = $1 AND is_active = true"
     )
-    .bind(&job.platform)
+    .bind(job.platform.as_deref().unwrap_or("unknown"))
     .fetch_all(&state.db_pool.pool)
     .await?;
 
@@ -207,7 +207,7 @@ pub async fn get_quality_summary(
 
             quality_summaries.push(json!({
                 "analysis_id": analysis.id,
-                "pipeline_type": analysis.pipeline_type,
+                "pipeline_id": analysis.pipeline_id,
                 "metrics": metrics,
                 "evaluation": evaluation,
                 "created_at": analysis.created_at
@@ -311,7 +311,7 @@ pub async fn generate_qc_report(
             sj.platform,
             sj.created_at as job_created,
             aj.id as analysis_id,
-            aj.pipeline_type,
+            aj.pipeline_id,
             qm.q30_percentage,
             qm.mean_quality_score,
             qm.gc_content,
@@ -362,11 +362,11 @@ pub async fn generate_qc_report(
             "avg_quality_score": 0.0
         }));
 
-        entry["total_jobs"] = entry["total_jobs"].as_i64().unwrap_or(0) + 1;
+        entry["total_jobs"] = entry["total_jobs"].as_i64().unwrap_or(0) + 1.into();
         if row.overall_status.as_deref() == Some("pass") {
-            entry["passed_jobs"] = entry["passed_jobs"].as_i64().unwrap_or(0) + 1;
+            entry["passed_jobs"] = entry["passed_jobs"].as_i64().unwrap_or(0) + 1.into();
         } else if row.overall_status.as_deref() == Some("fail") {
-            entry["failed_jobs"] = entry["failed_jobs"].as_i64().unwrap_or(0) + 1;
+            entry["failed_jobs"] = entry["failed_jobs"].as_i64().unwrap_or(0) + 1.into();
         }
     }
 

@@ -33,6 +33,42 @@ pub enum SequencingError {
     #[error("Sample sheet not found: {0}")]
     SampleSheetNotFound(String),
 
+    #[error("Platform not found")]
+    PlatformNotFound(String),
+
+    #[error("Analysis not found: {0}")]
+    AnalysisNotFound { analysis_id: String },
+
+    #[error("Quality metrics not found: {0}")]
+    QualityMetricsNotFound { analysis_id: String },
+
+    #[error("Sample sheet in use: {0}")]
+    SampleSheetInUse { sheet_id: String },
+
+    #[error("Export error: {0}")]
+    ExportError { message: String },
+
+    #[error("Invalid job state: {0}")]
+    InvalidJobState { current_state: String, expected: String },
+
+    #[error("Workflow in use: {0}")]
+    WorkflowInUse { workflow_id: String },
+
+    #[error("Workflow validation error: {0}")]
+    WorkflowValidation { message: String },
+
+    #[error("Execution not found: {0}")]
+    ExecutionNotFound { execution_id: String },
+
+    #[error("Step not found: {0}")]
+    StepNotFound { step_id: String, execution_id: String },
+
+    #[error("Integration error: {0}")]
+    IntegrationError { service: String, message: String },
+
+    #[error("Webhook not found")]
+    WebhookNotFound { webhook_id: String },
+
     #[error("Invalid job status transition: from {from} to {to}")]
     InvalidStatusTransition { from: String, to: String },
 
@@ -85,6 +121,18 @@ impl SequencingError {
             SequencingError::RunNotFound(_) => StatusCode::NOT_FOUND,
             SequencingError::WorkflowNotFound(_) => StatusCode::NOT_FOUND,
             SequencingError::SampleSheetNotFound(_) => StatusCode::NOT_FOUND,
+            SequencingError::PlatformNotFound(_) => StatusCode::NOT_FOUND,
+            SequencingError::AnalysisNotFound { .. } => StatusCode::NOT_FOUND,
+            SequencingError::QualityMetricsNotFound { .. } => StatusCode::NOT_FOUND,
+            SequencingError::SampleSheetInUse { .. } => StatusCode::CONFLICT,
+            SequencingError::ExportError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            SequencingError::InvalidJobState { .. } => StatusCode::BAD_REQUEST,
+            SequencingError::WorkflowInUse { .. } => StatusCode::CONFLICT,
+            SequencingError::WorkflowValidation { .. } => StatusCode::BAD_REQUEST,
+            SequencingError::ExecutionNotFound { .. } => StatusCode::NOT_FOUND,
+            SequencingError::StepNotFound { .. } => StatusCode::NOT_FOUND,
+            SequencingError::IntegrationError { .. } => StatusCode::BAD_GATEWAY,
+            SequencingError::WebhookNotFound { .. } => StatusCode::NOT_FOUND,
             SequencingError::InvalidStatusTransition { .. } => StatusCode::BAD_REQUEST,
             SequencingError::ResourceConflict(_) => StatusCode::CONFLICT,
             SequencingError::CapacityExceeded(_) => StatusCode::SERVICE_UNAVAILABLE,

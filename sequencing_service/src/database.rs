@@ -137,7 +137,7 @@ impl DatabasePool {
         sqlx::query(
             r#"
             DO $$ BEGIN
-                CREATE TYPE pipeline_type AS ENUM (
+                CREATE TYPE pipeline_id AS ENUM (
                     'quality_control', 'preprocessing', 'alignment', 'variant_calling',
                     'expression', 'annotation', 'reporting', 'custom'
                 );
@@ -354,7 +354,7 @@ impl DatabasePool {
                 name VARCHAR(255) NOT NULL,
                 description TEXT NOT NULL,
                 version VARCHAR(50) NOT NULL,
-                pipeline_type pipeline_type NOT NULL,
+                pipeline_id pipeline_id NOT NULL,
                 container_image VARCHAR(500),
                 command_template TEXT NOT NULL,
                 input_types TEXT[] NOT NULL,

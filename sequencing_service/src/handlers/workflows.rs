@@ -59,7 +59,7 @@ pub async fn get_workflow(
     .bind(workflow_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::WorkflowNotFound { workflow_id })?;
+    .ok_or(SequencingError::WorkflowNotFound(workflow_id.to_string()))?;
 
     // Get workflow execution history
     let executions = sqlx::query_as::<_, WorkflowExecution>(
@@ -163,7 +163,7 @@ pub async fn update_workflow(
         .bind(workflow_id)
         .fetch_optional(&state.db_pool.pool)
         .await?
-        .ok_or(SequencingError::WorkflowNotFound { workflow_id })?;
+        .ok_or(SequencingError::WorkflowNotFound(workflow_id.to_string()))?;
 
     let workflow = sqlx::query_as::<_, SequencingWorkflow>(
         r#"
@@ -224,7 +224,7 @@ pub async fn delete_workflow(
     .bind(workflow_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::WorkflowNotFound { workflow_id })?;
+    .ok_or(SequencingError::WorkflowNotFound(workflow_id.to_string()))?;
 
     Ok(Json(json!({
         "success": true,
@@ -246,7 +246,7 @@ pub async fn execute_workflow(
     .bind(workflow_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::WorkflowNotFound { workflow_id })?;
+    .ok_or(SequencingError::WorkflowNotFound(workflow_id.to_string()))?;
 
     // Verify job exists if provided
     if let Some(job_id) = request.job_id {
@@ -257,7 +257,7 @@ pub async fn execute_workflow(
             .is_some();
 
         if !job_exists {
-            return Err(SequencingError::JobNotFound { job_id });
+            return Err(SequencingError::JobNotFound(job_id.to_string()));
         }
     }
 

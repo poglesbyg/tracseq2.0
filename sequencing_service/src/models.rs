@@ -28,9 +28,14 @@ pub struct SequencingJob {
     pub metadata: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    // Alias fields for compatibility
+    pub platform: Option<String>,
+    pub job_name: Option<String>,
+    pub started_at: Option<DateTime<Utc>>,
+    pub completed_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
 #[sqlx(type_name = "job_status", rename_all = "snake_case")]
 pub enum JobStatus {
     Draft,
@@ -42,6 +47,22 @@ pub enum JobStatus {
     Failed,
     Cancelled,
     OnHold,
+}
+
+impl std::fmt::Display for JobStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JobStatus::Draft => write!(f, "draft"),
+            JobStatus::Submitted => write!(f, "submitted"),
+            JobStatus::Validated => write!(f, "validated"),
+            JobStatus::Queued => write!(f, "queued"),
+            JobStatus::Running => write!(f, "running"),
+            JobStatus::Completed => write!(f, "completed"),
+            JobStatus::Failed => write!(f, "failed"),
+            JobStatus::Cancelled => write!(f, "cancelled"),
+            JobStatus::OnHold => write!(f, "on_hold"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
@@ -103,6 +124,7 @@ pub struct SampleSheet {
     pub file_path: Option<String>,
     pub validation_errors: Option<serde_json::Value>,
     pub metadata: serde_json::Value,
+    pub samples_data: serde_json::Value,
     pub created_by: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -113,9 +135,11 @@ pub struct SampleSheet {
 pub enum SampleSheetStatus {
     Draft,
     Validating,
+    Validated,
     Valid,
     Invalid,
     InUse,
+    Generated,
     Archived,
 }
 
@@ -197,6 +221,17 @@ pub enum ExecutionStatus {
     Retrying,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
+#[sqlx(type_name = "step_status", rename_all = "snake_case")]
+pub enum StepStatus {
+    Pending,
+    Running,
+    Completed,
+    Failed,
+    Skipped,
+    Retrying,
+}
+
 // ================================
 // Analysis Models
 // ================================
@@ -207,7 +242,7 @@ pub struct AnalysisPipeline {
     pub name: String,
     pub description: String,
     pub version: String,
-    pub pipeline_type: PipelineType,
+    pub pipeline_id: PipelineType,
     pub container_image: Option<String>,
     pub command_template: String,
     pub input_types: Vec<String>,
@@ -220,7 +255,7 @@ pub struct AnalysisPipeline {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "pipeline_type", rename_all = "snake_case")]
+#[sqlx(type_name = "pipeline_id", rename_all = "snake_case")]
 pub enum PipelineType {
     QualityControl,
     Preprocessing,
@@ -248,6 +283,17 @@ pub struct AnalysisJob {
     pub error_message: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+/// Analysis status enumeration
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
+#[sqlx(type_name = "analysis_status", rename_all = "snake_case")]
+pub enum AnalysisStatus {
+    Queued,
+    Running,
+    Completed,
+    Failed,
+    Cancelled,
 }
 
 // ================================

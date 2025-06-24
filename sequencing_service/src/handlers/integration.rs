@@ -95,12 +95,12 @@ pub async fn push_to_notification_service(
     .bind(job_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::JobNotFound { job_id })?;
+    .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
 
     // Prepare notification payload
     let notification_payload = json!({
         "job_id": job.id,
-        "job_name": job.job_name,
+        "job_name": job.job_name.as_deref().unwrap_or("unknown"),
         "status": job.status,
         "platform": job.platform,
         "priority": job.priority,

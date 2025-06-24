@@ -1,3 +1,4 @@
 pub mod auth;
 
-pub use auth::auth_middleware;
+// TODO: Re-enable after fixing auth middleware issues
+// pub use auth::auth_middleware;

@@ -88,7 +88,7 @@ pub async fn get_sample_sheet(
     .bind(sheet_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::SampleSheetNotFound { sheet_id })?;
+    .ok_or(SequencingError::SampleSheetNotFound(sheet_id.to_string()))?;
 
     // Get associated sample entries
     let entries = sqlx::query_as::<_, SampleSheetEntry>(
@@ -196,7 +196,7 @@ pub async fn validate_sample_sheet(
     .bind(sheet_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::SampleSheetNotFound { sheet_id })?;
+    .ok_or(SequencingError::SampleSheetNotFound(sheet_id.to_string()))?;
 
     // Perform comprehensive validation
     let validation_result = perform_sample_sheet_validation(&state, &sample_sheet).await?;
@@ -268,7 +268,7 @@ pub async fn generate_from_job(
     .bind(job_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::JobNotFound { job_id })?;
+    .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
 
     // Get samples associated with the job (this would need to be implemented based on your sample-job relationship)
     let samples = get_job_samples(&state, job_id).await?;
@@ -280,7 +280,7 @@ pub async fn generate_from_job(
     }
 
     // Generate sample sheet data based on platform
-    let sheet_data = generate_platform_specific_sheet(&job.platform, &samples, &request.template_options)?;
+    let sheet_data = generate_platform_specific_sheet(job.platform.as_deref().unwrap_or("unknown"), &samples, &request.template_options)?;
 
     // Create the sample sheet
     let sheet_id = Uuid::new_v4();
@@ -294,8 +294,8 @@ pub async fn generate_from_job(
         "#
     )
     .bind(sheet_id)
-    .bind(format!("SampleSheet_{}", job.job_name))
-    .bind(&job.platform)
+    .bind(format!("SampleSheet_{}", job.job_name.as_deref().unwrap_or("unknown")))
+    .bind(job.platform.as_deref().unwrap_or("unknown"))
     .bind(&sheet_data.run_parameters)
     .bind(&sheet_data.samples)
     .bind(job_id)
@@ -326,7 +326,7 @@ pub async fn update_sample_sheet(
         .bind(sheet_id)
         .fetch_optional(&state.db_pool.pool)
         .await?
-        .ok_or(SequencingError::SampleSheetNotFound { sheet_id })?;
+        .ok_or(SequencingError::SampleSheetNotFound(sheet_id.to_string()))?;
 
     let sample_sheet = sqlx::query_as::<_, SampleSheet>(
         r#"
@@ -421,7 +421,7 @@ pub async fn delete_sample_sheet(
     .bind(sheet_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::SampleSheetNotFound { sheet_id })?;
+    .ok_or(SequencingError::SampleSheetNotFound(sheet_id.to_string()))?;
 
     Ok(Json(json!({
         "success": true,
@@ -442,7 +442,7 @@ pub async fn export_sample_sheet(
     .bind(sheet_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::SampleSheetNotFound { sheet_id })?;
+    .ok_or(SequencingError::SampleSheetNotFound(sheet_id.to_string()))?;
 
     let format = query.format.as_deref().unwrap_or("csv");
     
@@ -546,7 +546,7 @@ async fn perform_sample_sheet_validation(
     }
 
     // Platform-specific validation
-    validate_platform_compatibility(&sample_sheet.platform, &sample_sheet.samples_data, &mut errors, &mut warnings);
+    validate_platform_compatibility(&sample_sheet.platform_id, &sample_sheet.samples_data, &mut errors, &mut warnings);
 
     // Index validation
     validate_index_sequences(&sample_sheet.samples_data, &mut errors, &mut warnings);

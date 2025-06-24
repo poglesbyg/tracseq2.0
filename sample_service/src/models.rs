@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use std::fmt;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -15,6 +16,9 @@ pub enum SampleStatus {
     Completed,
     Failed,
     Discarded,
+    Rejected,
+    Archived,
+    Deleted,
 }
 
 impl SampleStatus {
@@ -34,8 +38,18 @@ impl SampleStatus {
             (InStorage, Failed) => true,
             (InSequencing, Failed) => true,
 
-            // Discard from any state
-            (_, Discarded) => true,
+            // Rejection paths
+            (Pending, Rejected) => true,
+            (Validated, Rejected) => true,
+
+            // Discard from any state (except deleted/archived)
+            (Pending | Validated | InStorage | InSequencing | Completed | Failed | Rejected, Discarded) => true,
+
+            // Archive from completed/failed/discarded
+            (Completed | Failed | Discarded, Archived) => true,
+
+            // Delete from any state (admin action)
+            (_, Deleted) => true,
 
             // Backward transitions (for corrections)
             (Validated, Pending) => true,
@@ -52,13 +66,33 @@ impl SampleStatus {
     pub fn next_statuses(&self) -> Vec<SampleStatus> {
         use SampleStatus::*;
         match self {
-            Pending => vec![Validated, Failed, Discarded],
-            Validated => vec![InStorage, Failed, Discarded, Pending],
-            InStorage => vec![InSequencing, Failed, Discarded, Validated],
-            InSequencing => vec![Completed, Failed, Discarded],
-            Completed => vec![Discarded],
-            Failed => vec![Pending, Discarded],
-            Discarded => vec![],
+            Pending => vec![Validated, Failed, Rejected, Discarded, Deleted],
+            Validated => vec![InStorage, Failed, Rejected, Discarded, Pending, Deleted],
+            InStorage => vec![InSequencing, Failed, Discarded, Validated, Deleted],
+            InSequencing => vec![Completed, Failed, Discarded, Deleted],
+            Completed => vec![Discarded, Archived, Deleted],
+            Failed => vec![Pending, Discarded, Archived, Deleted],
+            Rejected => vec![Pending, Discarded, Deleted],
+            Discarded => vec![Archived, Deleted],
+            Archived => vec![Deleted],
+            Deleted => vec![],
+        }
+    }
+}
+
+impl fmt::Display for SampleStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SampleStatus::Pending => write!(f, "pending"),
+            SampleStatus::Validated => write!(f, "validated"),
+            SampleStatus::InStorage => write!(f, "in_storage"),
+            SampleStatus::InSequencing => write!(f, "in_sequencing"),
+            SampleStatus::Completed => write!(f, "completed"),
+            SampleStatus::Failed => write!(f, "failed"),
+            SampleStatus::Discarded => write!(f, "discarded"),
+            SampleStatus::Rejected => write!(f, "rejected"),
+            SampleStatus::Archived => write!(f, "archived"),
+            SampleStatus::Deleted => write!(f, "deleted"),
         }
     }
 }
@@ -77,10 +111,10 @@ pub struct Sample {
     pub collection_date: Option<DateTime<Utc>>,
     pub collection_location: Option<String>,
     pub collector: Option<String>,
-    pub concentration: Option<rust_decimal::Decimal>,
-    pub volume: Option<rust_decimal::Decimal>,
+    pub concentration: Option<f64>,
+    pub volume: Option<f64>,
     pub unit: Option<String>,
-    pub quality_score: Option<rust_decimal::Decimal>,
+    pub quality_score: Option<f64>,
     pub metadata: serde_json::Value,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -131,6 +165,7 @@ pub struct CreateSampleRequest {
 
     pub metadata: Option<serde_json::Value>,
     pub notes: Option<String>,
+    pub created_by: Option<String>,
 }
 
 /// Sample update request
@@ -226,7 +261,10 @@ pub struct SampleValidationResult {
     pub sample_id: Uuid,
     pub rule_id: Option<i32>,
     pub validation_passed: bool,
+    pub is_valid: bool,
     pub error_message: Option<String>,
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
     pub validated_at: DateTime<Utc>,
     pub validated_by: Option<String>,
 }
@@ -382,6 +420,115 @@ pub struct SampleAuditLog {
     pub performed_by: Option<String>,
     pub performed_at: DateTime<Utc>,
     pub session_id: Option<String>,
-    pub ip_address: Option<std::net::IpAddr>,
+    pub ip_address: Option<String>,
     pub user_agent: Option<String>,
+}
+
+/// List samples query parameters
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ListSamplesQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+    pub status: Option<SampleStatus>,
+    pub sample_type: Option<String>,
+    pub template_id: Option<Uuid>,
+    pub created_after: Option<DateTime<Utc>>,
+    pub created_before: Option<DateTime<Utc>>,
+    pub created_by: Option<String>,
+    pub barcode_prefix: Option<String>,
+    pub search: Option<String>,
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
+    pub sort_by: Option<String>,
+}
+
+/// Update sample status request
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct UpdateSampleStatusRequest {
+    pub new_status: SampleStatus,
+    
+    #[validate(length(max = 500, message = "Reason must be at most 500 characters"))]
+    pub reason: Option<String>,
+    
+    pub metadata: Option<serde_json::Value>,
+    pub notify: Option<bool>,
+}
+
+/// Batch create sample request
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct BatchCreateSampleRequest {
+    #[validate(length(
+        min = 1,
+        max = 1000,
+        message = "Batch must contain between 1 and 1000 samples"
+    ))]
+    pub samples: Vec<CreateSampleRequest>,
+    
+    pub template_id: Option<Uuid>,
+    pub batch_name: Option<String>,
+    pub auto_generate_barcodes: Option<bool>,
+}
+
+/// Batch validate request
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct BatchValidateRequest {
+    #[validate(length(
+        min = 1,
+        max = 1000,
+        message = "Batch must contain between 1 and 1000 samples"
+    ))]
+    pub sample_ids: Vec<Uuid>,
+    
+    pub validation_rules: Option<Vec<String>>,
+    pub force_validation: Option<bool>,
+}
+
+/// Sample history query parameters
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SampleHistoryQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+    pub status: Option<SampleStatus>,
+    pub changed_after: Option<DateTime<Utc>>,
+    pub changed_before: Option<DateTime<Utc>>,
+    pub changed_by: Option<String>,
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
+}
+
+/// Export samples query parameters
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ExportSamplesQuery {
+    pub format: Option<String>,
+    pub status: Option<SampleStatus>,
+    pub sample_type: Option<String>,
+    pub template_id: Option<Uuid>,
+    pub created_after: Option<DateTime<Utc>>,
+    pub created_before: Option<DateTime<Utc>>,
+    pub created_by: Option<String>,
+    pub include_metadata: Option<bool>,
+    pub search: Option<String>,
+}
+
+/// Sample search request
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct SampleSearchRequest {
+    pub filters: SampleSearchFilters,
+    pub sort_by: Option<String>,
+    pub sort_order: Option<String>,
+    pub query: Option<String>,
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
+}
+
+/// Statistics query parameters
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StatisticsQuery {
+    pub date_from: Option<DateTime<Utc>>,
+    pub date_to: Option<DateTime<Utc>>,
+    pub sample_type: Option<String>,
+    pub template_id: Option<Uuid>,
+    pub created_by: Option<String>,
+    pub group_by: Option<String>,
+    pub period_days: Option<i32>,
 }
