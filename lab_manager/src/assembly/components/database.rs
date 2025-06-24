@@ -1,8 +1,6 @@
-use sqlx::{Pool, Postgres, PgPool};
-use sqlx::postgres::PgPoolOptions;
-use tracing::{info, warn, error};
+use sqlx::PgPool;
+use tracing::info;
 use async_trait::async_trait;
-use serde_json;
 use std::any::Any;
 
 use super::super::traits::{

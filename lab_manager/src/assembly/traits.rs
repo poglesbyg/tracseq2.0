@@ -73,7 +73,7 @@ pub trait Configurable: Component {
 /// Central registry for managing component lifecycle and dependencies
 pub struct ServiceRegistry {
     components: HashMap<String, Arc<dyn Component>>,
-    services: HashMap<String, Arc<dyn Any + Send + Sync>>,
+    services: HashMap<String, Arc<dyn Component>>,
     initialization_order: Vec<String>,
 }
 
@@ -133,17 +133,15 @@ impl ServiceRegistry {
     }
 
     /// Get a service by type (simplified implementation)
-    pub fn get_service<T: 'static + Send + Sync>(&self, service_type: &str) -> Option<Arc<T>> {
-        self.services
-            .get(service_type)
-            .and_then(|service| service.clone().downcast().ok())
+    pub fn get_service(&self, service_type: &str) -> Option<Arc<dyn Component>> {
+        self.services.get(service_type).cloned()
     }
 
     /// Register a service provided by a component (simplified implementation)
     pub fn register_service(
         &mut self,
         service_type: &str,
-        component: &Arc<dyn Component + Send + Sync>,
+        component: &Arc<dyn Component>,
     ) -> Result<(), ComponentError> {
         // Simplified service registration - just log for now
         tracing::info!(
@@ -152,10 +150,8 @@ impl ServiceRegistry {
             component.component_id()
         );
 
-        // We're not actually storing the component reference, just tracking that the service exists
-        let service_id = format!("{}-{}", component.component_id(), service_type);
-        let service_arc: Arc<dyn Any + Send + Sync> = Arc::new(service_id);
-        self.services.insert(service_type.to_string(), service_arc);
+        // Store the component as the service provider
+        self.services.insert(service_type.to_string(), component.clone());
 
         Ok(())
     }
@@ -177,17 +173,8 @@ impl ServiceRegistry {
                 // component.initialize(self).await?;
 
                 // Register services provided by this component
-                if let Some(provider) = component
-                    .as_ref()
-                    .as_any()
-                    .downcast_ref::<dyn ServiceProvider>()
-                {
-                    for service_type in provider.provided_services() {
-                        // Register the component itself as the service provider
-                        self.services
-                            .insert(service_type.to_string(), component.clone());
-                    }
-                }
+                // Simplified service registration approach
+                self.services.insert(component_id.clone(), component.clone());
             }
         }
 

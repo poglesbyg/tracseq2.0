@@ -527,3 +527,8 @@ async fn test_barcode_config_variations() {
         assert!(service.validate_barcode(&barcode).is_ok());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::models::storage::BarcodeConfig;
+}
