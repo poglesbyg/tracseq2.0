@@ -10,7 +10,7 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 // Mock components
 jest.mock('../../components/FileUploadModal', () => {
-  return function MockFileUploadModal({ onClose }: any) {
+  return function MockFileUploadModal({ onClose }: { onClose: () => void }) {
     return (
       <div data-testid="file-upload-modal">
         <button onClick={onClose}>Close Modal</button>
@@ -20,7 +20,7 @@ jest.mock('../../components/FileUploadModal', () => {
 });
 
 jest.mock('../../components/SpreadsheetSearchModal', () => {
-  return function MockSpreadsheetSearchModal({ onClose }: any) {
+  return function MockSpreadsheetSearchModal({ onClose }: { onClose: () => void }) {
     return (
       <div data-testid="search-modal">
         <button onClick={onClose}>Close Search</button>
@@ -30,7 +30,7 @@ jest.mock('../../components/SpreadsheetSearchModal', () => {
 });
 
 jest.mock('../../components/SpreadsheetDataViewer', () => {
-  return function MockSpreadsheetDataViewer({ dataset, onClose }: any) {
+  return function MockSpreadsheetDataViewer({ dataset, onClose }: { dataset: { original_filename: string }; onClose: () => void }) {
     return (
       <div data-testid="data-viewer">
         <span>Viewing: {dataset.original_filename}</span>
@@ -116,7 +116,7 @@ describe('Spreadsheets Page', () => {
     mockedAxios.delete.mockResolvedValue({ data: { success: true } });
     
     // Mock window.confirm
-    (globalThis as any).confirm = jest.fn(() => true);
+    (globalThis as unknown as { confirm: typeof window.confirm }).confirm = jest.fn(() => true);
   });
 
   const renderComponent = () => {
