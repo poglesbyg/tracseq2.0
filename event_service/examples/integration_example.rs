@@ -3,18 +3,15 @@
 //! This example demonstrates how to integrate the event service
 //! with other TracSeq microservices.
 
-use tracseq_event_service::{
-    events::{EventHandler, EventContext, SubscriptionConfig},
-    services::{
-        event_bus::RedisEventBus,
-        client::EventServiceClient,
-    },
-};
 use anyhow::Result;
 use async_trait::async_trait;
+use event_service::{
+    events::{EventContext, EventHandler, SubscriptionConfig},
+    services::{client::EventServiceClient, event_bus::RedisEventBus},
+};
 use std::sync::Arc;
+use tokio::time::{Duration, sleep};
 use uuid::Uuid;
-use tokio::time::{sleep, Duration};
 
 /// Example event handler for processing sample events
 struct SampleEventHandler {
@@ -23,7 +20,10 @@ struct SampleEventHandler {
 
 #[async_trait]
 impl EventHandler for SampleEventHandler {
-    async fn handle(&self, context: EventContext) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle(
+        &self,
+        context: EventContext,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         match context.event.event_type.as_str() {
             "sample.created" => {
                 println!("📝 Sample created: Processing sample validation...");
@@ -35,7 +35,7 @@ impl EventHandler for SampleEventHandler {
                 if let Some(payload) = context.event.payload.as_object() {
                     if let (Some(old_status), Some(new_status)) = (
                         payload.get("old_status").and_then(|v| v.as_str()),
-                        payload.get("new_status").and_then(|v| v.as_str())
+                        payload.get("new_status").and_then(|v| v.as_str()),
                     ) {
                         println!("🔄 Sample status changed: {} → {}", old_status, new_status);
                     }
@@ -64,14 +64,17 @@ struct StorageEventHandler {
 
 #[async_trait]
 impl EventHandler for StorageEventHandler {
-    async fn handle(&self, context: EventContext) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn handle(
+        &self,
+        context: EventContext,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         match context.event.event_type.as_str() {
             "storage.temperature_alert" => {
                 println!("🚨 TEMPERATURE ALERT!");
                 if let Some(payload) = context.event.payload.as_object() {
                     if let (Some(zone), Some(temp)) = (
                         payload.get("zone_name").and_then(|v| v.as_str()),
-                        payload.get("current_temperature").and_then(|v| v.as_f64())
+                        payload.get("current_temperature").and_then(|v| v.as_f64()),
                     ) {
                         println!("❄️  Zone: {}, Temperature: {:.1}°C", zone, temp);
                         // Here you would typically send notifications, trigger alerts, etc.
@@ -127,10 +130,9 @@ async fn sample_service_example() -> Result<()> {
         "submitter_id": submitter_id,
         "lab_id": lab_id
     });
-    let result = client.publish_sample_created(
-        &sample_id.to_string(),
-        sample_data,
-    ).await?;
+    let result = client
+        .publish_sample_created(&sample_id.to_string(), sample_data)
+        .await?;
 
     println!("✅ Published sample.created event: {}", result.event_id);
 
@@ -138,22 +140,16 @@ async fn sample_service_example() -> Result<()> {
     sleep(Duration::from_secs(1)).await;
 
     println!("🔄 Updating sample status: Pending → Validated");
-    client.publish_sample_status_changed(
-        &sample_id.to_string(),
-        "Pending",
-        "Validated",
-        None,
-    ).await?;
+    client
+        .publish_sample_status_changed(&sample_id.to_string(), "Pending", "Validated", None)
+        .await?;
 
     sleep(Duration::from_secs(1)).await;
 
     println!("🔄 Updating sample status: Validated → InStorage");
-    client.publish_sample_status_changed(
-        &sample_id.to_string(),
-        "Validated",
-        "InStorage",
-        None,
-    ).await?;
+    client
+        .publish_sample_status_changed(&sample_id.to_string(), "Validated", "InStorage", None)
+        .await?;
 
     Ok(())
 }
@@ -184,12 +180,14 @@ async fn storage_service_example() -> Result<()> {
     sleep(Duration::from_secs(2)).await;
     println!("🚨 Temperature threshold exceeded!");
 
-    client.publish_temperature_alert(
-        "freezer-zone-1",
-        -75.5,  // Current temperature
-        -80.0,  // Target temperature
-        "critical",
-    ).await?;
+    client
+        .publish_temperature_alert(
+            "freezer-zone-1",
+            -75.5, // Current temperature
+            -80.0, // Target temperature
+            "critical",
+        )
+        .await?;
 
     println!("✅ Published storage.temperature_alert event");
 
@@ -200,8 +198,8 @@ async fn storage_service_example() -> Result<()> {
 async fn event_subscriber_example() -> Result<()> {
     println!("📡 === Event Subscriber Example ===");
 
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     // Create event bus
     let event_bus = RedisEventBus::new(&redis_url).await?;
@@ -253,8 +251,10 @@ async fn event_subscriber_example() -> Result<()> {
     loop {
         sleep(Duration::from_secs(5)).await;
         let stats = event_bus.get_stats().await;
-        println!("📊 Stats - Published: {}, Consumed: {}, Failed: {}", 
-                 stats.events_published, stats.events_consumed, stats.events_failed);
+        println!(
+            "📊 Stats - Published: {}, Consumed: {}, Failed: {}",
+            stats.events_published, stats.events_consumed, stats.events_failed
+        );
     }
 }
 
@@ -286,7 +286,9 @@ async fn main() -> Result<()> {
             storage_service_example().await?;
         }
         _ => {
-            println!("Usage: cargo run --example integration_example [sample|storage|subscriber|all]");
+            println!(
+                "Usage: cargo run --example integration_example [sample|storage|subscriber|all]"
+            );
             println!();
             println!("Examples:");
             println!("  sample     - Sample service integration");
@@ -322,4 +324,4 @@ mod tests {
         assert_eq!(handler.name(), "test-storage");
         assert_eq!(handler.event_types(), vec!["storage.*"]);
     }
-} 
+}

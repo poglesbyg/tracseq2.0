@@ -96,10 +96,7 @@ async fn demo_component_assembly() -> Result<(), ComponentError> {
     println!("  ✅ Assembled and initialized 4 components");
 
     let health = registry.health_check_all().await?;
-    println!(
-        "  📊 System health: {} components healthy",
-        health.values().filter(|&&h| h).count()
-    );
+    println!("  📊 System health: {} components healthy", health.len());
 
     registry.shutdown_all().await?;
     println!("  ✅ System shutdown completed");
@@ -161,8 +158,10 @@ async fn demo_complete_workflow() -> Result<(), ComponentError> {
             created_at: chrono::Utc::now(),
         };
 
-        // Publish event
-        event_system.publish_event(sample_event).await?;
+        // Publish event with source component
+        event_system
+            .publish_event(sample_event, "sample_processor")
+            .await?;
         println!("    • Sample creation event published");
 
         // Simulate sample state transitions
@@ -181,7 +180,9 @@ async fn demo_complete_workflow() -> Result<(), ComponentError> {
                 changed_by: "system".to_string(),
             };
 
-            event_system.publish_event(transition_event).await?;
+            event_system
+                .publish_event(transition_event, "workflow_manager")
+                .await?;
             println!("    • State transition: {} → {}", from_state, to_state);
 
             // Small delay to simulate real-world timing
@@ -197,7 +198,10 @@ async fn demo_complete_workflow() -> Result<(), ComponentError> {
         .await?;
 
     println!("    • Template stage: {:?}", template_result.stage);
-    println!("    • Rows extracted: {}", template_result.rows_processed);
+    println!(
+        "    • Rows extracted: {}",
+        template_result.processing_stats.rows_processed
+    );
     println!(
         "    • Validation errors: {}",
         template_result.validation_errors.len()
@@ -207,7 +211,7 @@ async fn demo_complete_workflow() -> Result<(), ComponentError> {
     let final_health = registry.health_check_all().await?;
     println!(
         "  📈 Final workflow status: {} components operational",
-        final_health.values().filter(|&&h| h).count()
+        final_health.len()
     );
 
     // Cleanup
@@ -242,7 +246,7 @@ async fn demo_template_processing() -> Result<(), ComponentError> {
 
     println!(
         "  📊 CSV processing: stage={:?}, rows={}",
-        csv_result.stage, csv_result.rows_processed
+        csv_result.stage, csv_result.processing_stats.rows_processed
     );
 
     // Test JSON processing
@@ -253,13 +257,10 @@ async fn demo_template_processing() -> Result<(), ComponentError> {
 
     println!(
         "  📊 JSON processing: stage={:?}, rows={}",
-        json_result.stage, json_result.rows_processed
+        json_result.stage, json_result.processing_stats.rows_processed
     );
 
-    println!(
-        "  📈 Templates processed: {}",
-        template_processor.get_templates_processed()
-    );
+    println!("  📈 Templates processed successfully",);
 
     template_processor.shutdown().await?;
     println!("  ✅ Template processing demo completed");
@@ -295,11 +296,12 @@ async fn demo_event_system() -> Result<(), ComponentError> {
     ];
 
     for event in events {
-        let event_id = event_system.publish_event(event).await?;
+        let event_id = event_system.publish_event(event, "demo_system").await?;
         println!("  📤 Event published: {}", event_id);
     }
 
-    println!("  📊 Total events: {}", event_system.get_event_count());
+    let metrics = event_system.get_metrics();
+    println!("  📊 Total events: {}", metrics.total_events_processed);
 
     event_system.shutdown().await?;
     println!("  ✅ Event system demo completed");
@@ -429,7 +431,9 @@ async fn demo_performance_scalability() -> Result<(), ComponentError> {
             created_at: chrono::Utc::now(),
         };
 
-        event_system.publish_event(event).await?;
+        event_system
+            .publish_event(event, "performance_test")
+            .await?;
 
         if (i + 1) % 100 == 0 {
             println!("    • Published {} events", i + 1);

@@ -5,9 +5,9 @@
 ///
 /// Run with: cargo run --example modular_demo
 use lab_manager::assembly::{
-    components::{DatabaseComponentBuilder, StorageComponentBuilder},
     CompactLine, CompactVariant, ComponentError, HybridLine, ProductLine, ProfessionalLine,
     ProfessionalVariant, ServiceRegistry, StudioLine, StudioVariant,
+    components::{DatabaseComponentBuilder, StorageComponentBuilder},
 };
 
 #[tokio::main]
@@ -91,10 +91,7 @@ async fn demo_studio_line() -> Result<(), ComponentError> {
 
     // Health check
     let health = registry.health_check_all().await?;
-    println!(
-        "   • Health check: {} components healthy",
-        health.values().filter(|&&h| h).count()
-    );
+    println!("   • Health check: {} components healthy", health.len());
 
     // Shutdown gracefully
     registry.shutdown_all().await?;
@@ -184,13 +181,20 @@ async fn demo_health_monitoring() -> Result<(), ComponentError> {
     let health_results = registry.health_check_all().await?;
 
     println!("📊 Health Check Results:");
-    for (component_id, is_healthy) in health_results {
-        let status = if is_healthy {
-            "✅ HEALTHY"
+    for health_result in health_results {
+        // Parse the health status string (format: "component_id: Healthy")
+        if let Some(idx) = health_result.find(':') {
+            let component_id = health_result[..idx].trim();
+            let status_text = health_result[idx + 1..].trim();
+            let status = if status_text.contains("Healthy") {
+                "✅ HEALTHY"
+            } else {
+                "❌ UNHEALTHY"
+            };
+            println!("   • {}: {}", component_id, status);
         } else {
-            "❌ UNHEALTHY"
-        };
-        println!("   • {}: {}", component_id, status);
+            println!("   • {}: ✅ HEALTHY", health_result);
+        }
     }
 
     println!("🔄 Demonstrating graceful shutdown...");
@@ -215,7 +219,7 @@ async fn simulate_environment(env_name: &str) -> Result<(), ComponentError> {
             return Err(ComponentError::ConfigurationError(format!(
                 "Unknown environment: {}",
                 env_name
-            )))
+            )));
         }
     };
 

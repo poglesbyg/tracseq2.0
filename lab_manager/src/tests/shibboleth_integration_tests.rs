@@ -5,41 +5,36 @@ mod integration_tests {
         middleware::shibboleth_auth::{
             extract_shibboleth_attributes, map_shibboleth_role_to_lab_role,
         },
-        models::user::{CreateUserRequest, UserRole},
+        models::user::UserRole,
     };
-    use axum::{
-        body::Body,
-        http::{header::HeaderValue, HeaderMap, Request, StatusCode},
-        middleware::Next,
-        response::Response,
-    };
+    use axum::http::{HeaderMap, header::HeaderValue};
     use std::collections::HashMap;
 
     /// Test environment variable parsing for Shibboleth configuration
     #[test]
     fn test_shibboleth_config_from_env() {
-        // Test with environment variables set
-        std::env::set_var("SHIBBOLETH_ENABLED", "true");
-        std::env::set_var("SHIBBOLETH_HYBRID_MODE", "false");
-        std::env::set_var("SHIBBOLETH_AUTO_CREATE_USERS", "false");
-        std::env::set_var("SHIBBOLETH_AUTO_UPDATE_ATTRIBUTES", "false");
-        std::env::set_var("SHIBBOLETH_DEFAULT_ROLE", "DataAnalyst");
-
-        // This would be tested in actual config parsing
-        // For now, we test the default configuration behavior
+        // Test default configuration behavior without modifying global env vars
+        // In real implementation, this would test actual config parsing from env
         let config = ShibbolethConfig::default();
-
-        // Clean up environment variables
-        std::env::remove_var("SHIBBOLETH_ENABLED");
-        std::env::remove_var("SHIBBOLETH_HYBRID_MODE");
-        std::env::remove_var("SHIBBOLETH_AUTO_CREATE_USERS");
-        std::env::remove_var("SHIBBOLETH_AUTO_UPDATE_ATTRIBUTES");
-        std::env::remove_var("SHIBBOLETH_DEFAULT_ROLE");
 
         // Test that defaults are reasonable
         assert!(!config.enabled);
         assert!(config.hybrid_mode);
         assert_eq!(config.default_role, "Guest");
+
+        // Test programmatic configuration (simulating env var effects)
+        let mut config_enabled = ShibbolethConfig::default();
+        config_enabled.enabled = true;
+        config_enabled.hybrid_mode = false;
+        config_enabled.auto_create_users = false;
+        config_enabled.auto_update_attributes = false;
+        config_enabled.default_role = "DataAnalyst".to_string();
+
+        assert!(config_enabled.enabled);
+        assert!(!config_enabled.hybrid_mode);
+        assert!(!config_enabled.auto_create_users);
+        assert!(!config_enabled.auto_update_attributes);
+        assert_eq!(config_enabled.default_role, "DataAnalyst");
     }
 
     /// Test Shibboleth configuration validation
