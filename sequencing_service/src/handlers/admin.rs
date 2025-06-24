@@ -318,7 +318,7 @@ pub async fn get_resource_utilization(
     .await?;
 
     // Estimate capacity utilization (simplified)
-    let total_capacity = state.config.sequencing.max_concurrent_jobs as i64;
+    let total_capacity = state.config.sequencing.max_concurrent_runs as i64;
     let current_usage: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM sequencing_jobs WHERE status = 'running'"
     )
@@ -391,10 +391,10 @@ pub async fn update_service_config(
     // This would typically update configuration in a database or config management system
     // For now, we'll just validate the request and return success
     
-    if let Some(max_concurrent) = request.max_concurrent_jobs {
+    if let Some(max_concurrent) = request.max_concurrent_runs {
         if max_concurrent == 0 || max_concurrent > 100 {
             return Err(SequencingError::Validation {
-                message: "max_concurrent_jobs must be between 1 and 100".to_string(),
+                message: "max_concurrent_runs must be between 1 and 100".to_string(),
             });
         }
     }
@@ -427,10 +427,10 @@ pub struct PurgeQuery {
     pub days_old: Option<i64>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 pub struct ServiceConfigUpdate {
-    pub max_concurrent_jobs: Option<u32>,
+    pub max_concurrent_runs: Option<u32>,
     pub default_timeout_hours: Option<u32>,
     pub enable_auto_scheduling: Option<bool>,
-    pub default_priority: Option<JobPriority>,
+    pub default_priority: Option<Priority>,
 }

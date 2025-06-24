@@ -160,7 +160,7 @@ impl NotificationClient {
         self.send_notification(notification).await
     }
 
-    async fn send_notification(&self, notification: serde_json::Value) -> Result<()> {
+    pub async fn send_notification(&self, notification: serde_json::Value) -> Result<()> {
         let url = format!("{}/notifications", self.base_url);
         
         match self.client

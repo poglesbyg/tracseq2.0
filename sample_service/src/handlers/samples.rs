@@ -102,7 +102,7 @@ pub async fn update_status(
 
     let sample = state.sample_service.update_sample_status(
         sample_id,
-        request.status,
+        request.new_status,
         Some("user") // TODO: Extract from authentication context
     ).await?;
 
@@ -195,10 +195,16 @@ pub async fn validate_batch(
             Err(e) => {
                 overall_valid = false;
                 validation_results.push(SampleValidationResult {
+                    id: 0,
                     sample_id,
+                    rule_id: None,
+                    validation_passed: false,
                     is_valid: false,
+                    error_message: Some(e.to_string()),
                     errors: vec![e.to_string()],
                     warnings: vec![],
+                    validated_at: chrono::Utc::now(),
+                    validated_by: None,
                 });
             }
         }
@@ -286,12 +292,16 @@ pub async fn export_samples(
 ) -> SampleResult<impl axum::response::IntoResponse> {
     // Get samples based on filters
     let list_query = ListSamplesQuery {
+        limit: Some(10000),
+        offset: None,
         status: query.status,
         sample_type: query.sample_type,
         template_id: query.template_id,
-        search: query.search,
         created_after: query.created_after,
         created_before: query.created_before,
+        created_by: None,
+        barcode_prefix: None,
+        search: query.search,
         page: None, // Get all samples for export
         page_size: Some(10000), // Reasonable limit for export
         sort_by: Some("created_at".to_string()),
@@ -329,14 +339,22 @@ pub async fn search_samples(
     State(state): State<AppState>,
     Json(request): Json<SampleSearchRequest>,
 ) -> SampleResult<Json<serde_json::Value>> {
+    // Clone values before moving them
+    let search_query = request.query.clone();
+    let filters_applied = request.filters.clone();
+    
     // Build search query
     let list_query = ListSamplesQuery {
+        limit: request.page_size,
+        offset: request.page.map(|p| (p - 1) * request.page_size.unwrap_or(50)),
         status: request.filters.status,
         sample_type: request.filters.sample_type,
         template_id: request.filters.template_id,
-        search: request.query,
         created_after: request.filters.created_after,
         created_before: request.filters.created_before,
+        created_by: request.filters.created_by,
+        barcode_prefix: request.filters.barcode_prefix,
+        search: request.query,
         page: request.page,
         page_size: request.page_size,
         sort_by: request.sort_by,
@@ -347,8 +365,8 @@ pub async fn search_samples(
     Ok(Json(json!({
         "success": true,
         "data": response,
-        "search_query": request.query,
-        "filters_applied": request.filters
+        "search_query": search_query,
+        "filters_applied": filters_applied
     })))
 }
 

@@ -69,9 +69,9 @@ pub async fn get_queue_status(
             "queue_summary": {
                 "total_queued": priority_queue.iter().map(|(_, count, _)| count).sum::<i64>(),
                 "currently_running": running_jobs,
-                "max_concurrent": state.config.sequencing.max_concurrent_jobs,
-                "capacity_utilization": if state.config.sequencing.max_concurrent_jobs > 0 {
-                    (running_jobs as f64 / state.config.sequencing.max_concurrent_jobs as f64 * 100.0).round()
+                "max_concurrent": state.config.sequencing.max_concurrent_runs,
+                "capacity_utilization": if state.config.sequencing.max_concurrent_runs > 0 {
+                    (running_jobs as f64 / state.config.sequencing.max_concurrent_runs as f64 * 100.0).round()
                 } else { 0.0 }
             },
             "priority_breakdown": priority_queue.into_iter().map(|(priority, count, avg_wait)| {
@@ -190,7 +190,7 @@ pub async fn prioritize_job(
     .bind(job_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::JobNotFound { job_id })?;
+    .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
 
     if !matches!(job.status, JobStatus::Queued | JobStatus::Validated) {
         return Err(SequencingError::InvalidJobState {
@@ -238,7 +238,7 @@ pub async fn prioritize_job(
 pub async fn schedule_next_jobs(
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>> {
-    let max_concurrent = state.config.sequencing.max_concurrent_jobs as i64;
+    let max_concurrent = state.config.sequencing.max_concurrent_runs as i64;
     
     // Get current running job count
     let current_running: i64 = sqlx::query_scalar(
@@ -287,7 +287,7 @@ pub async fn schedule_next_jobs(
         let platform_running: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM sequencing_jobs WHERE status = 'running' AND platform = $1"
         )
-        .bind(&job.platform)
+        .bind(job.platform.as_deref().unwrap_or("unknown"))
         .fetch_one(&state.db_pool.pool)
         .await?;
 
@@ -321,8 +321,8 @@ pub async fn schedule_next_jobs(
         )
         .bind(Uuid::new_v4())
         .bind(job.id)
-        .bind(format!("Run_{}", job.job_name))
-        .bind(&job.platform)
+        .bind(format!("Run_{}", job.job_name.as_deref().unwrap_or("unknown")))
+        .bind(job.platform.as_deref().unwrap_or("unknown"))
         .bind(RunStatus::Running)
         .execute(&state.db_pool.pool)
         .await?;
@@ -485,7 +485,7 @@ pub async fn estimate_completion_times(
             let estimation = match job.status {
                 JobStatus::Running => {
                     // Estimate based on current progress and historical data
-                    let avg_duration = get_average_duration_for_platform(&state, &job.platform).await?;
+                    let avg_duration = get_average_duration_for_platform(&state, job.platform.as_deref().unwrap_or("unknown")).await?;
                     let elapsed = Utc::now() - job.started_at.unwrap_or(job.created_at);
                     let estimated_total = avg_duration;
                     let estimated_remaining = estimated_total - elapsed;
@@ -501,7 +501,7 @@ pub async fn estimate_completion_times(
                 JobStatus::Queued | JobStatus::Validated => {
                     // Estimate based on queue position and platform capacity
                     let queue_position = get_queue_position(&state, job_id).await?;
-                    let avg_duration = get_average_duration_for_platform(&state, &job.platform).await?;
+                    let avg_duration = get_average_duration_for_platform(&state, job.platform.as_deref().unwrap_or("unknown")).await?;
                     let estimated_start = Utc::now() + Duration::hours(queue_position * 2); // Rough estimate
                     let estimated_completion = estimated_start + avg_duration;
                     

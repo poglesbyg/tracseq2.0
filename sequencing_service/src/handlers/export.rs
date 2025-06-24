@@ -26,7 +26,7 @@ pub async fn export_job_data(
     .bind(job_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::JobNotFound { job_id })?;
+    .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
 
     let format = query.format.as_deref().unwrap_or("json");
     let include_samples = query.include_samples.unwrap_or(false);
@@ -119,7 +119,7 @@ pub async fn export_job_data(
             "content": exported_content,
             "format": format,
             "job_id": job_id,
-            "filename": format!("job_{}_{}.{}", job.job_name, job_id, format),
+            "filename": format!("job_{}_{}.{}", job.job_name.as_deref().unwrap_or("unknown"), job_id, format),
             "size_bytes": exported_content.len(),
             "exported_at": Utc::now()
         },
@@ -338,7 +338,7 @@ pub async fn export_analysis_results(
             "content": exported_content,
             "format": format,
             "analysis_id": analysis_id,
-            "filename": format!("analysis_{}_{}.{}", analysis.pipeline_type, analysis_id, format),
+            "filename": format!("analysis_{}_{}.{}", analysis.pipeline_id, analysis_id, format),
             "size_bytes": exported_content.len()
         },
         "message": "Analysis results exported successfully"
@@ -505,7 +505,7 @@ async fn export_single_job_for_batch(
     .bind(job_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::JobNotFound { job_id })?;
+    .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
 
     let mut job_data = json!(job);
 
@@ -626,14 +626,14 @@ fn export_batch_as_excel(_data: &serde_json::Value) -> Result<String> {
 
 fn export_analysis_as_csv(data: &serde_json::Value) -> Result<String> {
     let mut csv_content = String::new();
-    csv_content.push_str("analysis_id,pipeline_type,status,created_at,result_count\n");
+    csv_content.push_str("analysis_id,pipeline_id,status,created_at,result_count\n");
     
     if let Some(analysis) = data.get("analysis") {
         let result_count = data.get("result_count").and_then(|v| v.as_i64()).unwrap_or(0);
         let row = format!(
             "{},{},{},{},{}\n",
             analysis.get("id").and_then(|v| v.as_str()).unwrap_or(""),
-            analysis.get("pipeline_type").and_then(|v| v.as_str()).unwrap_or(""),
+            analysis.get("pipeline_id").and_then(|v| v.as_str()).unwrap_or(""),
             analysis.get("status").and_then(|v| v.as_str()).unwrap_or(""),
             analysis.get("created_at").and_then(|v| v.as_str()).unwrap_or(""),
             result_count

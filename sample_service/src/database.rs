@@ -255,7 +255,7 @@ impl DatabasePool {
 
         // Get connection stats
         let pool_info = self.pool.options();
-        let connections = self.pool.num_idle() + self.pool.num_used();
+        let connections = self.pool.size();
         
         // Get database version
         let version_row: (String,) = sqlx::query_as("SELECT version()")
@@ -265,7 +265,7 @@ impl DatabasePool {
         Ok(DatabaseHealth {
             is_healthy: true,
             response_time_ms: start_time.elapsed().as_millis() as u64,
-            active_connections: self.pool.num_used() as u32,
+            active_connections: self.pool.size().saturating_sub(self.pool.num_idle() as u32),
             idle_connections: self.pool.num_idle() as u32,
             max_connections: pool_info.get_max_connections(),
             database_version: Some(version_row.0),

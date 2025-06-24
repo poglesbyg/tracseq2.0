@@ -26,7 +26,7 @@ pub async fn start_analysis(
     .bind(job_id)
     .fetch_optional(&state.db_pool.pool)
     .await?
-    .ok_or(SequencingError::JobNotFound { job_id })?;
+    .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
 
     if job.status != JobStatus::Completed {
         return Err(SequencingError::InvalidJobState {
@@ -40,7 +40,7 @@ pub async fn start_analysis(
     let analysis = sqlx::query_as::<_, AnalysisJob>(
         r#"
         INSERT INTO analysis_jobs (
-            id, job_id, pipeline_type, pipeline_version, parameters,
+            id, job_id, pipeline_id, pipeline_version, parameters,
             status, created_at, created_by
         ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
         RETURNING *
@@ -48,7 +48,7 @@ pub async fn start_analysis(
     )
     .bind(analysis_id)
     .bind(job_id)
-    .bind(&request.pipeline_type)
+    .bind(&request.pipeline_id)
     .bind(&request.pipeline_version)
     .bind(&request.parameters)
     .bind(AnalysisStatus::Queued)
@@ -133,9 +133,9 @@ pub async fn list_job_analyses(
         where_conditions.push(format!("status = ${}", param_count));
     }
 
-    if let Some(pipeline_type) = &query.pipeline_type {
+    if let Some(pipeline_id) = &query.pipeline_id {
         param_count += 1;
-        where_conditions.push(format!("pipeline_type = ${}", param_count));
+        where_conditions.push(format!("pipeline_id = ${}", param_count));
     }
 
     let where_clause = where_conditions.join(" AND ");
@@ -205,14 +205,14 @@ pub async fn update_analysis_status(
         sqlx::query(
             "UPDATE sequencing_jobs SET analysis_status = 'completed', updated_at = NOW() WHERE id = $1"
         )
-        .bind(analysis.job_id)
+        .bind(analysis.sequencing_job_id)
         .execute(&state.db_pool.pool)
         .await?;
     } else if request.status == AnalysisStatus::Failed {
         sqlx::query(
             "UPDATE sequencing_jobs SET analysis_status = 'failed', updated_at = NOW() WHERE id = $1"
         )
-        .bind(analysis.job_id)
+        .bind(analysis.sequencing_job_id)
         .execute(&state.db_pool.pool)
         .await?;
     }
@@ -428,7 +428,7 @@ pub async fn get_analysis_pipelines(
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>> {
     let pipelines = sqlx::query_as::<_, AnalysisPipeline>(
-        "SELECT * FROM analysis_pipelines WHERE is_active = true ORDER BY pipeline_type, version DESC"
+        "SELECT * FROM analysis_pipelines WHERE is_active = true ORDER BY pipeline_id, version DESC"
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
@@ -438,7 +438,7 @@ pub async fn get_analysis_pipelines(
     
     for pipeline in pipelines {
         grouped_pipelines
-            .entry(pipeline.pipeline_type.clone())
+            .entry(pipeline.pipeline_id.clone())
             .or_insert_with(Vec::new)
             .push(pipeline);
     }
@@ -476,7 +476,7 @@ pub async fn cancel_analysis(
     sqlx::query(
         "UPDATE sequencing_jobs SET analysis_status = 'cancelled', updated_at = NOW() WHERE id = $1"
     )
-    .bind(analysis.job_id)
+    .bind(analysis.sequencing_job_id)
     .execute(&state.db_pool.pool)
     .await?;
 
@@ -490,7 +490,7 @@ pub async fn cancel_analysis(
 /// Request and response structures
 #[derive(serde::Deserialize)]
 pub struct StartAnalysisRequest {
-    pub pipeline_type: String,
+    pub pipeline_id: String,
     pub pipeline_version: String,
     pub parameters: serde_json::Value,
     pub created_by: Option<String>,
@@ -535,7 +535,7 @@ pub struct AnalysisListQuery {
     pub page: Option<i64>,
     pub page_size: Option<i64>,
     pub status: Option<AnalysisStatus>,
-    pub pipeline_type: Option<String>,
+    pub pipeline_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]

@@ -52,7 +52,9 @@ impl SampleServiceImpl {
 
         // Validate template if provided
         if let Some(template_id) = request.template_id {
-            self.validate_template_compatibility(template_id, &request.metadata).await?;
+            if let Some(ref metadata) = request.metadata {
+                self.validate_template_compatibility(template_id, metadata).await?;
+            }
         }
 
         let sample_id = Uuid::new_v4();
@@ -218,14 +220,8 @@ impl SampleServiceImpl {
         params.push(Box::new(page_size));
         params.push(Box::new(offset));
 
-        let mut query_builder = sqlx::query_as::<_, Sample>(&select_query);
-        for param in params {
-            // This is a simplified approach - in a real implementation,
-            // you'd need to handle the dynamic parameters more carefully
-        }
-
-        // For now, let's use a simpler approach
-        let samples = sqlx::query_as::<_, Sample>(
+        // For now, let's use a simpler approach with explicit types
+        let samples = sqlx::query_as::<sqlx::Postgres, Sample>(
             "SELECT * FROM samples ORDER BY created_at DESC LIMIT $1 OFFSET $2"
         )
         .bind(page_size)
@@ -339,7 +335,7 @@ impl SampleServiceImpl {
             "UPDATE samples SET status = $2, updated_at = $3, updated_by = $4 WHERE id = $1 RETURNING *"
         )
         .bind(sample_id)
-        .bind(new_status)
+        .bind(&new_status)
         .bind(now)
         .bind(updated_by)
         .fetch_one(&self.db_pool.pool)
@@ -364,10 +360,16 @@ impl SampleServiceImpl {
     pub async fn validate_sample(&self, sample_id: Uuid) -> SampleResult<SampleValidationResult> {
         let sample = self.get_sample(sample_id).await?;
         let mut validation_result = SampleValidationResult {
+            id: 0, // Will be set when saved to database
             sample_id,
+            rule_id: None,
+            validation_passed: true,
             is_valid: true,
+            error_message: None,
             errors: Vec::new(),
             warnings: Vec::new(),
+            validated_at: Utc::now(),
+            validated_by: None,
         };
 
         // Basic validations
@@ -388,10 +390,10 @@ impl SampleServiceImpl {
 
         // Validate concentration and volume if provided
         if let (Some(concentration), Some(volume)) = (sample.concentration, sample.volume) {
-            if concentration <= rust_decimal::Decimal::ZERO {
+            if concentration <= 0.0 {
                 validation_result.warnings.push("Concentration should be greater than 0".to_string());
             }
-            if volume <= rust_decimal::Decimal::ZERO {
+            if volume <= 0.0 {
                 validation_result.warnings.push("Volume should be greater than 0".to_string());
             }
         }
@@ -570,6 +572,10 @@ impl SampleServiceImpl {
             ],
             SampleStatus::Rejected => vec![
                 SampleStatus::Pending, // Allow retry after fixing issues
+                SampleStatus::Deleted,
+            ],
+            SampleStatus::Discarded => vec![
+                SampleStatus::Archived,
                 SampleStatus::Deleted,
             ],
             SampleStatus::Archived => vec![], // No transitions from archived

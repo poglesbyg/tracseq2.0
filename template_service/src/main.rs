@@ -1,6 +1,5 @@
 use anyhow::Result;
 use axum::{
-    middleware,
     routing::{get, post, put, delete},
     Router,
 };
@@ -9,7 +8,6 @@ use tower::ServiceBuilder;
 use tower_http::{
     cors::CorsLayer,
     trace::TraceLayer,
-    compression::CompressionLayer,
 };
 use tracing::{info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -20,7 +18,7 @@ mod error;
 mod handlers;
 mod models;
 mod services;
-mod middleware as template_middleware;
+mod middleware;
 mod clients;
 
 use config::Config;
@@ -54,8 +52,8 @@ async fn main() -> Result<()> {
     info!("Database migrations completed");
 
     // Initialize external service clients
-    let auth_client = AuthClient::new(config.auth_service_url.clone());
-    let sample_client = SampleClient::new(config.sample_service_url.clone());
+    let auth_client = AuthClient::new(config.services.auth_service_url.clone());
+    let sample_client = SampleClient::new(config.services.sample_service_url.clone());
 
     // Initialize template service
     let template_service = TemplateServiceImpl::new(
@@ -114,9 +112,9 @@ fn create_app(state: AppState) -> Router {
         .route("/templates/:template_id", put(handlers::templates::update_template))
         .route("/templates/:template_id", delete(handlers::templates::delete_template))
         .route("/templates/:template_id/clone", post(handlers::templates::clone_template))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum::middleware::from_fn_with_state(
             state.clone(),
-            template_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // File upload/download routes
@@ -125,9 +123,9 @@ fn create_app(state: AppState) -> Router {
         .route("/templates/:template_id/download", get(handlers::files::download_template))
         .route("/templates/:template_id/export", get(handlers::files::export_template))
         .route("/templates/import", post(handlers::files::import_templates))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum::middleware::from_fn_with_state(
             state.clone(),
-            template_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Template versioning routes
@@ -137,9 +135,9 @@ fn create_app(state: AppState) -> Router {
         .route("/templates/:template_id/versions/:version", get(handlers::versions::get_version))
         .route("/templates/:template_id/versions/:version", delete(handlers::versions::delete_version))
         .route("/templates/:template_id/versions/:version/restore", post(handlers::versions::restore_version))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum::middleware::from_fn_with_state(
             state.clone(),
-            template_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Form builder routes
@@ -148,9 +146,9 @@ fn create_app(state: AppState) -> Router {
         .route("/forms/:template_id/validate", post(handlers::forms::validate_form_data))
         .route("/forms/:template_id/preview", get(handlers::forms::preview_form))
         .route("/forms/:template_id/render", post(handlers::forms::render_form))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum::middleware::from_fn_with_state(
             state.clone(),
-            template_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Field management routes
@@ -161,9 +159,9 @@ fn create_app(state: AppState) -> Router {
         .route("/templates/:template_id/fields/:field_id", put(handlers::fields::update_field))
         .route("/templates/:template_id/fields/:field_id", delete(handlers::fields::delete_field))
         .route("/templates/:template_id/fields/reorder", post(handlers::fields::reorder_fields))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum::middleware::from_fn_with_state(
             state.clone(),
-            template_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Validation routes
@@ -173,9 +171,9 @@ fn create_app(state: AppState) -> Router {
         .route("/templates/:template_id/validation/:rule_id", put(handlers::validation::update_validation_rule))
         .route("/templates/:template_id/validation/:rule_id", delete(handlers::validation::delete_validation_rule))
         .route("/templates/:template_id/validate-data", post(handlers::validation::validate_template_data))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum::middleware::from_fn_with_state(
             state.clone(),
-            template_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Template integration routes (with sample service)
@@ -183,9 +181,9 @@ fn create_app(state: AppState) -> Router {
         .route("/integration/samples/create", post(handlers::integration::create_sample_from_template))
         .route("/integration/samples/validate", post(handlers::integration::validate_sample_data))
         .route("/integration/templates/for-samples", get(handlers::integration::get_templates_for_samples))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum::middleware::from_fn_with_state(
             state.clone(),
-            template_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Schema routes for template structure management
@@ -194,9 +192,9 @@ fn create_app(state: AppState) -> Router {
         .route("/schemas/:schema_name", get(handlers::schemas::get_schema))
         .route("/templates/:template_id/schema", get(handlers::schemas::get_template_schema))
         .route("/templates/:template_id/schema/validate", post(handlers::schemas::validate_template_schema))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum::middleware::from_fn_with_state(
             state.clone(),
-            template_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Admin routes (require admin privileges)
@@ -206,9 +204,9 @@ fn create_app(state: AppState) -> Router {
         .route("/admin/templates/migrate", post(handlers::admin::migrate_templates))
         .route("/admin/usage", get(handlers::admin::get_usage_statistics))
         .route("/admin/validation/test", post(handlers::admin::test_validation_rules))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum::middleware::from_fn_with_state(
             state.clone(),
-            template_middleware::admin_middleware,
+            crate::middleware::admin_middleware,
         ));
 
     // Combine all routes
@@ -226,7 +224,6 @@ fn create_app(state: AppState) -> Router {
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
-                .layer(CompressionLayer::new())
                 .layer(CorsLayer::permissive()) // Configure CORS as needed
         )
         .with_state(state)

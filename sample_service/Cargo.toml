@@ -1,7 +1,7 @@
 [package]
 name = "sample_service"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Lab Management Team"]
 description = "Sample management microservice for laboratory information system"
 
@@ -47,6 +47,12 @@ once_cell = "1.19"
 
 # Decimal numbers
 rust_decimal = { version = "1.33", features = ["serde"] }
+
+# Async trait support
+async-trait = "0.1"
+
+# Random number generation
+rand = "0.8"
 
 [dev-dependencies]
 tokio-test = "0.4"
