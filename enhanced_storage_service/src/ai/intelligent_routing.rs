@@ -70,14 +70,18 @@ impl SampleRoutingModel {
         // Generate optimization insights
         let insights = self.generate_optimization_insights(&primary_location, request);
 
+        let estimated_placement_time = self.estimate_placement_time(&routing_path);
+        let energy_impact = self.calculate_energy_impact(&routing_path);
+        let optimization_score = self.calculate_optimization_score(&primary_location, request);
+
         Ok(RoutingResult {
             request_id: request.request_id,
             primary_location,
             alternative_locations,
             routing_path,
-            estimated_placement_time: self.estimate_placement_time(&routing_path),
-            energy_impact: self.calculate_energy_impact(&routing_path),
-            optimization_score: self.calculate_optimization_score(&primary_location, request),
+            estimated_placement_time,
+            energy_impact,
+            optimization_score,
             insights,
             generated_at: Utc::now(),
         })

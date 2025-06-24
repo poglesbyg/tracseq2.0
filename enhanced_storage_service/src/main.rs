@@ -1,10 +1,9 @@
 use anyhow::Result;
 use axum::{
-    middleware,
     routing::{get, post, put, delete},
     Router,
 };
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 use tower::ServiceBuilder;
 use tower_http::{
     cors::CorsLayer,
@@ -82,8 +81,8 @@ async fn main() -> Result<()> {
         storage_service,
         config: config.clone(),
         db_pool,
-        ai_platform,
-        integration_hub,
+        ai_platform: Arc::new(ai_platform),
+        integration_hub: Arc::new(integration_hub),
     };
 
     // Build the application router
@@ -100,12 +99,13 @@ async fn main() -> Result<()> {
 }
 
 /// Application state shared across handlers - Phase 3 Enhanced
+#[derive(Clone)]
 pub struct AppState {
     pub storage_service: EnhancedStorageService,
     pub config: Config,
     pub db_pool: DatabasePool,
-    pub ai_platform: ai::AIPlatform, // Phase 2: AI Platform
-    pub integration_hub: integrations::IntegrationHub, // Phase 3: Enterprise Integrations
+    pub ai_platform: Arc<ai::AIPlatform>, // Phase 2: AI Platform
+    pub integration_hub: Arc<integrations::IntegrationHub>, // Phase 3: Enterprise Integrations
 }
 
 /// Create the application router with all routes and middleware

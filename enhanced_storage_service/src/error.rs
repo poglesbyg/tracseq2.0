@@ -72,6 +72,9 @@ pub enum StorageError {
 
     #[error("Sensor not found: {0}")]
     SensorNotFound(String),
+
+    #[error("Not found: {0}")]
+    NotFound(String),
 }
 
 impl IntoResponse for StorageError {
@@ -147,6 +150,9 @@ impl IntoResponse for StorageError {
             }
             StorageError::SensorNotFound(ref _id) => {
                 (StatusCode::NOT_FOUND, "Sensor not found")
+            }
+            StorageError::NotFound(ref _msg) => {
+                (StatusCode::NOT_FOUND, "Not found")
             }
         };
 

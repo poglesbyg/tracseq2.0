@@ -196,10 +196,14 @@ pub async fn get_system_logs(
 
     let response = PaginatedResponse {
         data: logs,
-        total: 2,
-        page,
-        per_page,
-        total_pages: 1,
+        pagination: PaginationInfo {
+            page,
+            per_page,
+            total_pages: 1,
+            total_items: 2,
+            has_next: false,
+            has_prev: false,
+        },
     };
 
     Ok(Json(ApiResponse::success(response)))
@@ -335,8 +339,8 @@ pub async fn cleanup_old_data(
     }
 
     let response = CleanupResponse {
-        cleanup_categories: cleanup_results,
         total_records_removed: cleanup_results.values().sum(),
+        cleanup_categories: cleanup_results,
         disk_space_freed_mb: 1250.5,
         cleanup_duration_seconds: 45,
         performed_at: Utc::now(),

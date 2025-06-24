@@ -85,7 +85,7 @@ impl AnomalyDetectionModel {
         }
 
         // Consolidate overlapping anomalies
-        let consolidated_anomalies = self.consolidate_anomalies(detected_anomalies);
+        let consolidated_anomalies = self.consolidate_anomalies(detected_anomalies.clone());
 
         // Calculate overall system health score
         let system_health_score = self.calculate_system_health_score(&consolidated_anomalies, data);

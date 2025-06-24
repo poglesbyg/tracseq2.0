@@ -670,22 +670,224 @@ pub struct IntegrationMetrics {
 // Additional structures would be defined here...
 // This is a comprehensive foundation for the enterprise integration system
 
-pub type LIMSSyncResult = serde_json::Value;
-pub type LIMSWorkflowStatus = serde_json::Value;
-pub type WorkflowStep = serde_json::Value;
-pub type ERPRequisitionResult = serde_json::Value;
-pub type ERPBudgetStatus = serde_json::Value;
-pub type BudgetCategory = serde_json::Value;
-pub type BudgetTransaction = serde_json::Value;
-pub type BudgetForecast = serde_json::Value;
-pub type CloudUploadResult = serde_json::Value;
-pub type CloudProviderResult = serde_json::Value;
-pub type CloudStorageAnalytics = serde_json::Value;
-pub type CloudStorageByProvider = serde_json::Value;
-pub type CloudDataTransfer = serde_json::Value;
-pub type CloudBackupStatus = serde_json::Value;
-pub type CloudCostOptimization = serde_json::Value;
-pub type CloudComplianceStatus = serde_json::Value;
-pub type IntegrationHealthReport = serde_json::Value;
-pub type IntegrationHealthDetail = serde_json::Value;
-pub type IntegrationConfigResult = serde_json::Value; 
+// Response structure definitions
+#[derive(Debug, Serialize)]
+pub struct LIMSSyncResult {
+    pub sample_id: Uuid,
+    pub lims_id: String,
+    pub sync_status: String,
+    pub sync_timestamp: DateTime<Utc>,
+    pub warnings: Vec<String>,
+    pub errors: Vec<String>,
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LIMSWorkflowStatus {
+    pub workflow_id: String,
+    pub workflow_name: String,
+    pub status: String,
+    pub progress_percentage: f64,
+    pub started_at: DateTime<Utc>,
+    pub estimated_completion: DateTime<Utc>,
+    pub current_step: String,
+    pub steps: Vec<WorkflowStep>,
+    pub samples_processed: Vec<Uuid>,
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WorkflowStep {
+    pub step_id: String,
+    pub step_name: String,
+    pub status: String,
+    pub started_at: Option<DateTime<Utc>>,
+    pub completed_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ERPRequisitionResult {
+    pub requisition_id: String,
+    pub erp_reference: String,
+    pub status: String,
+    pub approval_workflow_id: Option<String>,
+    pub estimated_approval_date: DateTime<Utc>,
+    pub total_amount: f64,
+    pub currency: String,
+    pub submitted_at: DateTime<Utc>,
+    pub next_approver: Option<String>,
+    pub approval_level: i32,
+    pub tracking_url: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ERPBudgetStatus {
+    pub department: String,
+    pub fiscal_year: u32,
+    pub total_budget: f64,
+    pub allocated_budget: f64,
+    pub spent_to_date: f64,
+    pub committed_amount: f64,
+    pub available_budget: f64,
+    pub budget_utilization_percentage: f64,
+    pub categories: Vec<BudgetCategory>,
+    pub recent_transactions: Vec<BudgetTransaction>,
+    pub forecast: BudgetForecast,
+    pub last_updated: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BudgetCategory {
+    pub category: String,
+    pub budgeted: f64,
+    pub spent: f64,
+    pub committed: f64,
+    pub available: f64,
+    pub utilization_percentage: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BudgetTransaction {
+    pub transaction_id: String,
+    pub date: DateTime<Utc>,
+    pub description: String,
+    pub amount: f64,
+    pub category: String,
+    pub vendor: String,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BudgetForecast {
+    pub projected_year_end_spend: f64,
+    pub confidence_level: f64,
+    pub variance_from_budget: f64,
+    pub risk_level: String,
+    pub recommendations: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudUploadResult {
+    pub upload_id: Uuid,
+    pub file_name: String,
+    pub cloud_providers: Vec<CloudProviderResult>,
+    pub total_size_bytes: u64,
+    pub upload_duration_ms: u64,
+    pub redundancy_level: String,
+    pub encryption_enabled: bool,
+    pub compression_ratio: f64,
+    pub uploaded_at: DateTime<Utc>,
+    pub retention_policy: String,
+    pub access_tier: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudProviderResult {
+    pub provider: String,
+    pub success: bool,
+    pub url: String,
+    pub backup_location: bool,
+    pub storage_class: String,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudStorageAnalytics {
+    pub time_period: String,
+    pub total_storage_gb: f64,
+    pub total_files: i64,
+    pub storage_by_provider: Vec<CloudStorageByProvider>,
+    pub data_transfer: CloudDataTransfer,
+    pub backup_status: CloudBackupStatus,
+    pub cost_optimization: CloudCostOptimization,
+    pub compliance_status: CloudComplianceStatus,
+    pub generated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudStorageByProvider {
+    pub provider: String,
+    pub storage_gb: f64,
+    pub files_count: i64,
+    pub cost_usd: f64,
+    pub average_access_time_ms: i32,
+    pub availability_percentage: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudDataTransfer {
+    pub ingress_gb: f64,
+    pub egress_gb: f64,
+    pub cross_region_transfer_gb: f64,
+    pub cdn_usage_gb: f64,
+    pub transfer_cost_usd: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudBackupStatus {
+    pub total_backups: i64,
+    pub successful_backups: i64,
+    pub failed_backups: i64,
+    pub backup_success_rate: f64,
+    pub average_backup_time_minutes: f64,
+    pub latest_backup: DateTime<Utc>,
+    pub backup_storage_gb: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudCostOptimization {
+    pub current_monthly_cost_usd: f64,
+    pub projected_monthly_cost_usd: f64,
+    pub potential_savings_usd: f64,
+    pub optimization_recommendations: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudComplianceStatus {
+    pub gdpr_compliant: bool,
+    pub hipaa_compliant: bool,
+    pub soc2_compliant: bool,
+    pub data_residency_compliant: bool,
+    pub encryption_at_rest: bool,
+    pub encryption_in_transit: bool,
+    pub access_logs_enabled: bool,
+    pub compliance_score: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct IntegrationHealthReport {
+    pub overall_health_score: f64,
+    pub total_integrations: i32,
+    pub healthy_integrations: i32,
+    pub warning_integrations: i32,
+    pub critical_integrations: i32,
+    pub integration_details: Vec<IntegrationHealthDetail>,
+    pub system_recommendations: Vec<String>,
+    pub generated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct IntegrationHealthDetail {
+    pub name: String,
+    pub health_status: String,
+    pub response_time_ms: i32,
+    pub error_rate: f64,
+    pub uptime_percentage: f64,
+    pub last_successful_operation: DateTime<Utc>,
+    pub issues: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct IntegrationConfigResult {
+    pub configuration_id: Uuid,
+    pub integration_name: String,
+    pub settings_applied: usize,
+    pub validation_status: String,
+    pub restart_required: bool,
+    pub configuration_backup_id: Option<Uuid>,
+    pub applied_at: DateTime<Utc>,
+    pub applied_by: String,
+    pub changes_summary: Vec<String>,
+    pub rollback_available: bool,
+    pub next_health_check: DateTime<Utc>,
+} 
