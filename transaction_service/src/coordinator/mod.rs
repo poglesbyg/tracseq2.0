@@ -2,10 +2,9 @@
 
 #[cfg(feature = "database-persistence")]
 use crate::persistence::{DatabaseConfig, SagaPersistenceService};
-use crate::saga::{
-    SagaError, SagaExecutionResult, SagaState, SagaStatus, TransactionContext, TransactionSaga,
-};
+use crate::saga::{SagaError, SagaExecutionResult, SagaStatus, TransactionSaga};
 use anyhow::Result;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -13,18 +12,117 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
+/// Trait for saga persistence operations
+#[async_trait]
+pub trait SagaPersistence: Send + Sync {
+    async fn save_saga(&self, saga: &TransactionSaga) -> Result<()>;
+    async fn update_saga(&self, saga: &TransactionSaga) -> Result<()>;
+    async fn get_saga_status(&self, saga_id: Uuid) -> Result<Option<SagaStatusRecord>>;
+    async fn list_active_sagas(&self) -> Result<Vec<SagaStatusRecord>>;
+    async fn get_statistics(&self) -> Result<PersistenceStatistics>;
+    async fn cleanup_old_sagas(&self, cleanup_after_hours: i32) -> Result<u32>;
+}
+
+/// Database-backed persistence implementation
+#[cfg(feature = "database-persistence")]
+pub struct DatabasePersistence {
+    service: SagaPersistenceService,
+}
+
+#[cfg(feature = "database-persistence")]
+#[async_trait]
+impl SagaPersistence for DatabasePersistence {
+    async fn save_saga(&self, saga: &TransactionSaga) -> Result<()> {
+        self.service.save_saga(saga).await
+    }
+
+    async fn update_saga(&self, saga: &TransactionSaga) -> Result<()> {
+        self.service.update_saga(saga).await
+    }
+
+    async fn get_saga_status(&self, saga_id: Uuid) -> Result<Option<SagaStatusRecord>> {
+        self.service.get_saga_status(saga_id).await
+    }
+
+    async fn list_active_sagas(&self) -> Result<Vec<SagaStatusRecord>> {
+        self.service.list_active_sagas().await
+    }
+
+    async fn get_statistics(&self) -> Result<PersistenceStatistics> {
+        self.service.get_statistics().await
+    }
+
+    async fn cleanup_old_sagas(&self, cleanup_after_hours: i32) -> Result<u32> {
+        self.service.cleanup_old_sagas(cleanup_after_hours).await
+    }
+}
+
+/// No-op persistence implementation for when database persistence is disabled
+pub struct NoOpPersistence;
+
+#[async_trait]
+impl SagaPersistence for NoOpPersistence {
+    async fn save_saga(&self, _saga: &TransactionSaga) -> Result<()> {
+        Ok(())
+    }
+
+    async fn update_saga(&self, _saga: &TransactionSaga) -> Result<()> {
+        Ok(())
+    }
+
+    async fn get_saga_status(&self, _saga_id: Uuid) -> Result<Option<SagaStatusRecord>> {
+        Ok(None)
+    }
+
+    async fn list_active_sagas(&self) -> Result<Vec<SagaStatusRecord>> {
+        Ok(vec![])
+    }
+
+    async fn get_statistics(&self) -> Result<PersistenceStatistics> {
+        Ok(PersistenceStatistics {
+            total_sagas: 0,
+            active_sagas: 0,
+            completed_sagas: 0,
+            failed_sagas: 0,
+        })
+    }
+
+    async fn cleanup_old_sagas(&self, _cleanup_after_hours: i32) -> Result<u32> {
+        Ok(0)
+    }
+}
+
+/// Saga status record for persistence queries
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SagaStatusRecord {
+    pub id: Uuid,
+    pub transaction_id: Uuid,
+    pub status: String,
+    pub progress_percentage: Option<f64>,
+    pub current_step: Option<String>,
+    pub completed_steps: i32,
+    pub total_steps: i32,
+    pub started_at: Option<DateTime<Utc>>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Persistence statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersistenceStatistics {
+    pub total_sagas: i64,
+    pub active_sagas: i64,
+    pub completed_sagas: i64,
+    pub failed_sagas: i64,
+}
+
 /// Transaction coordinator that manages saga execution
 #[derive(Clone)]
 pub struct TransactionCoordinator {
     /// Active sagas being managed (in-memory for performance)
     active_sagas: Arc<RwLock<HashMap<Uuid, Arc<RwLock<TransactionSaga>>>>>,
 
-    /// Database persistence service
-    #[cfg(feature = "database-persistence")]
-    persistence: Option<Arc<SagaPersistenceService>>,
-    
-    #[cfg(not(feature = "database-persistence"))]
-    persistence: Option<Arc<()>>,
+    /// Persistence service
+    persistence: Option<Arc<dyn SagaPersistence>>,
 
     /// Event client for publishing transaction events
     event_client: Option<Arc<event_service::services::client::EventServiceClient>>,
@@ -54,7 +152,7 @@ pub struct CoordinatorConfig {
     /// Database configuration for persistence
     #[cfg(feature = "database-persistence")]
     pub database: DatabaseConfig,
-    
+
     #[cfg(not(feature = "database-persistence"))]
     pub database: (),
 
@@ -138,6 +236,28 @@ pub struct TransactionStatus {
     pub error_message: Option<String>,
 }
 
+/// Coordinator statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoordinatorStatistics {
+    /// Number of active transactions
+    pub active_transactions: usize,
+
+    /// Number of completed transactions
+    pub completed_transactions: usize,
+
+    /// Number of failed transactions
+    pub failed_transactions: usize,
+
+    /// Number of compensated transactions
+    pub compensated_transactions: usize,
+
+    /// Total transactions processed
+    pub total_transactions: usize,
+
+    /// Average execution time in milliseconds
+    pub average_execution_time_ms: f64,
+}
+
 impl TransactionCoordinator {
     /// Create a new transaction coordinator
     pub fn new(config: CoordinatorConfig) -> Self {
@@ -152,9 +272,15 @@ impl TransactionCoordinator {
             None
         };
 
+        let persistence = if config.enable_persistence {
+            Some(Arc::new(NoOpPersistence) as Arc<dyn SagaPersistence>)
+        } else {
+            None
+        };
+
         Self {
             active_sagas: Arc::new(RwLock::new(HashMap::new())),
-            persistence: None, // Will be initialized separately
+            persistence,
             event_client,
             config,
         }
@@ -173,16 +299,22 @@ impl TransactionCoordinator {
             None
         };
 
-        #[cfg(feature = "database-persistence")]
         let persistence = if config.enable_persistence {
-            let persistence_service = SagaPersistenceService::new(config.database.clone()).await?;
-            Some(Arc::new(persistence_service))
+            #[cfg(feature = "database-persistence")]
+            {
+                let persistence_service =
+                    SagaPersistenceService::new(config.database.clone()).await?;
+                Some(Arc::new(DatabasePersistence {
+                    service: persistence_service,
+                }) as Arc<dyn SagaPersistence>)
+            }
+            #[cfg(not(feature = "database-persistence"))]
+            {
+                Some(Arc::new(NoOpPersistence) as Arc<dyn SagaPersistence>)
+            }
         } else {
             None
         };
-        
-        #[cfg(not(feature = "database-persistence"))]
-        let persistence = None;
 
         Ok(Self {
             active_sagas: Arc::new(RwLock::new(HashMap::new())),
@@ -445,10 +577,10 @@ impl TransactionCoordinator {
         transactions
     }
 
-    /// Cancel an active transaction
+    /// Cancel a transaction by saga ID
     pub async fn cancel_transaction(&self, saga_id: Uuid) -> Result<(), SagaError> {
+        // Try to find and cancel the saga in active transactions
         let active_sagas = self.active_sagas.read().await;
-
         if let Some(saga_arc) = active_sagas.get(&saga_id) {
             let mut saga = saga_arc.write().await;
 
@@ -456,6 +588,7 @@ impl TransactionCoordinator {
             if saga.state.status.can_cancel() {
                 saga.state.status = SagaStatus::Cancelled;
                 saga.state.updated_at = Utc::now();
+                saga.updated_at = Utc::now();
 
                 // Publish cancellation event
                 if let Some(event_client) = &self.event_client {
@@ -471,20 +604,27 @@ impl TransactionCoordinator {
                         .await;
                 }
 
-                Ok(())
+                // Update persistence if available
+                if let Some(persistence) = &self.persistence {
+                    if let Err(e) = persistence.update_saga(&*saga).await {
+                        tracing::error!("Failed to update cancelled saga in persistence: {}", e);
+                    }
+                }
+
+                return Ok(());
             } else {
-                Err(SagaError::InvalidStateTransition {
-                    saga_id,
-                    from: saga.state.status.to_string(),
-                    to: "Cancelled".to_string(),
-                })
+                return Err(SagaError::Generic {
+                    message: format!(
+                        "Saga {} cannot be cancelled in current state: {}",
+                        saga_id, saga.state.status
+                    ),
+                });
             }
-        } else {
-            Err(SagaError::ResourceNotFound {
-                resource_type: "saga".to_string(),
-                resource_id: saga_id.to_string(),
-            })
         }
+
+        Err(SagaError::Generic {
+            message: format!("Saga {} not found", saga_id),
+        })
     }
 
     /// Get coordinator statistics
@@ -536,17 +676,6 @@ impl TransactionCoordinator {
             0
         }
     }
-}
-
-/// Coordinator statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CoordinatorStatistics {
-    pub active_transactions: usize,
-    pub completed_transactions: usize,
-    pub failed_transactions: usize,
-    pub compensated_transactions: usize,
-    pub total_transactions: usize,
-    pub average_execution_time_ms: f64,
 }
 
 #[cfg(test)]
