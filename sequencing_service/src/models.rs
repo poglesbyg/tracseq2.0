@@ -556,3 +556,270 @@ impl Priority {
         }
     }
 }
+
+// ================================
+// Export and Reporting Models
+// ================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct AnalysisResult {
+    pub id: Uuid,
+    pub analysis_id: Uuid,
+    pub result_type: String,
+    pub result_data: serde_json::Value,
+    pub file_path: Option<String>,
+    pub status: String,
+    pub quality_score: Option<f64>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct BatchExport {
+    pub id: Uuid,
+    pub export_type: String,
+    pub job_ids: serde_json::Value,
+    pub format: String,
+    pub status: String,
+    pub file_size: Option<i64>,
+    pub successful_count: Option<i32>,
+    pub failed_count: Option<i32>,
+    pub created_at: DateTime<Utc>,
+    pub created_by: Option<String>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub export_options: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ComprehensiveReport {
+    pub id: Uuid,
+    pub report_type: String,
+    pub start_date: DateTime<Utc>,
+    pub end_date: DateTime<Utc>,
+    pub platform_filter: Option<String>,
+    pub status: String,
+    pub file_size: Option<i64>,
+    pub content: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub created_by: Option<String>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub parameters: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ExportLog {
+    pub id: Uuid,
+    pub export_type: String,
+    pub job_id: Option<Uuid>,
+    pub analysis_id: Option<Uuid>,
+    pub format: String,
+    pub file_size: i64,
+    pub exported_at: DateTime<Utc>,
+    pub exported_by: Option<String>,
+    pub export_options: serde_json::Value,
+}
+
+// ================================
+// Integration Models
+// ================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct IntegrationWebhook {
+    pub id: Uuid,
+    pub name: String,
+    pub url: String,
+    pub event_types: serde_json::Value,
+    pub is_active: bool,
+    pub secret_key: Option<String>,
+    pub timeout_seconds: i32,
+    pub retry_attempts: i32,
+    pub retry_count: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct WebhookDelivery {
+    pub id: Uuid,
+    pub webhook_id: Uuid,
+    pub event_type: String,
+    pub payload: serde_json::Value,
+    pub status: String,
+    pub response_code: Option<i32>,
+    pub response_body: Option<String>,
+    pub retry_count: i32,
+    pub delivered_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct IntegrationLog {
+    pub id: Uuid,
+    pub integration_type: String,
+    pub operation: String,
+    pub status: String,
+    pub request_data: serde_json::Value,
+    pub response_data: Option<serde_json::Value>,
+    pub error_message: Option<String>,
+    pub duration_ms: Option<i32>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LIMSSync {
+    pub id: Uuid,
+    pub sync_type: String,
+    pub sync_direction: String,
+    pub job_ids: serde_json::Value,
+    pub lims_system: String,
+    pub status: String,
+    pub records_processed: Option<i32>,
+    pub records_failed: Option<i32>,
+    pub error_details: Option<serde_json::Value>,
+    pub started_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub initiated_by: Option<String>,
+}
+
+// ================================
+// Quality Control Extended Models
+// ================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct QCThreshold {
+    pub id: Uuid,
+    pub metric_type: String,
+    pub platform_id: String,
+    pub entity_type: QualityEntityType,
+    pub threshold_min: Option<f64>,
+    pub threshold_max: Option<f64>,
+    pub warning_min: Option<f64>,
+    pub warning_max: Option<f64>,
+    pub threshold_type: String,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct QCEvaluation {
+    pub id: Uuid,
+    pub entity_type: QualityEntityType,
+    pub entity_id: Uuid,
+    pub evaluation_type: String,
+    pub overall_status: QualityStatus,
+    pub metric_results: serde_json::Value,
+    pub recommendations: serde_json::Value,
+    pub evaluated_at: DateTime<Utc>,
+    pub evaluated_by: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct QCReport {
+    pub id: Uuid,
+    pub entity_type: QualityEntityType,
+    pub entity_id: Uuid,
+    pub report_type: String,
+    pub status: QualityStatus,
+    pub summary: serde_json::Value,
+    pub detailed_metrics: serde_json::Value,
+    pub generated_at: DateTime<Utc>,
+    pub file_path: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct QCAlert {
+    pub id: Uuid,
+    pub entity_type: QualityEntityType,
+    pub entity_id: Uuid,
+    pub alert_type: String,
+    pub severity: String,
+    pub message: String,
+    pub metric_name: String,
+    pub metric_value: f64,
+    pub threshold_value: f64,
+    pub is_acknowledged: bool,
+    pub acknowledged_by: Option<String>,
+    pub acknowledged_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+// ================================
+// Sample Sheet Extended Models
+// ================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct SampleSheetValidation {
+    pub id: Uuid,
+    pub sample_sheet_id: Uuid,
+    pub validation_type: String,
+    pub status: String,
+    pub errors: serde_json::Value,
+    pub warnings: serde_json::Value,
+    pub validated_at: DateTime<Utc>,
+    pub validated_by: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+// ================================
+// Enhanced Workflow Models
+// ================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct SequencingWorkflow {
+    pub id: Uuid,
+    pub name: String,
+    pub description: String,
+    pub version: String,
+    pub workflow_type: WorkflowType,
+    pub platform_compatibility: serde_json::Value,
+    pub steps: serde_json::Value,
+    pub parameters: serde_json::Value,
+    pub estimated_duration_minutes: Option<i32>,
+    pub is_active: bool,
+    pub created_by: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct WorkflowStepExecution {
+    pub id: Uuid,
+    pub execution_id: Uuid,
+    pub step_name: String,
+    pub step_order: i32,
+    pub status: StepStatus,
+    pub started_at: Option<DateTime<Utc>>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub error_message: Option<String>,
+    pub retry_count: i32,
+    pub outputs: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct WorkflowTemplate {
+    pub id: Uuid,
+    pub name: String,
+    pub description: String,
+    pub category: String,
+    pub workflow_type: WorkflowType,
+    pub platform_ids: serde_json::Value,
+    pub template_data: serde_json::Value,
+    pub default_parameters: serde_json::Value,
+    pub is_system_template: bool,
+    pub usage_count: i32,
+    pub created_by: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+// ================================
+// Type Aliases for Compatibility
+// ================================
+
+// Alias for JobPriority -> Priority
+pub type JobPriority = Priority;
