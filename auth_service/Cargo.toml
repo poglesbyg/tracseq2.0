@@ -61,7 +61,7 @@ tower = { version = "0.4", features = ["util", "timeout", "load-shed", "limit"] 
 tower-http = { version = "0.5", features = ["fs", "trace", "cors", "timeout"] }
 
 # Database testing
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
 
 # Test utilities
 criterion = { version = "0.5", features = ["html_reports"] }
