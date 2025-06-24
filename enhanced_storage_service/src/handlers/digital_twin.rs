@@ -224,10 +224,14 @@ pub async fn list_models(
 
     let response = PaginatedResponse {
         data: models,
-        total: 2,
-        page: query.page.unwrap_or(1),
-        per_page: query.per_page.unwrap_or(50),
-        total_pages: 1,
+        pagination: PaginationInfo {
+            page: query.page.unwrap_or(1),
+            per_page: query.per_page.unwrap_or(50),
+            total_pages: 1,
+            total_items: 2,
+            has_next: false,
+            has_prev: false,
+        },
     };
 
     Ok(Json(ApiResponse::success(response)))

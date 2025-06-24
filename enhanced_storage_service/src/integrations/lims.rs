@@ -4,7 +4,7 @@
 /// management systems including sample tracking, workflow management, and
 /// data synchronization capabilities.
 
-use super::{Integration, IntegrationError, IntegrationStatus, ConnectionTest, HealthStatus, ConnectionStatus};
+use super::{Integration, IntegrationError, IntegrationStatus, ConnectionTest, HealthStatus, ConnectionStatus, IntegrationCapabilities, DataQuery, IntegrationData, LoadResult, LoadStatus, LoadError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
@@ -300,7 +300,11 @@ impl Integration for LIMSIntegration {
             name: "LIMS Integration".to_string(),
             health,
             last_sync: self.last_health_check,
+            next_sync: Some(Utc::now() + chrono::Duration::minutes(15)),
+            error_rate: 0.02, // Mock value - would be calculated from metrics
+            throughput_per_hour: 240.0, // Mock value - would be calculated from metrics
             connection_status,
+            recent_errors: vec![],
         })
     }
 
@@ -314,6 +318,8 @@ impl Integration for LIMSIntegration {
                     success: true,
                     response_time_ms: response_time,
                     error_message: None,
+                    capabilities_verified: vec!["samples".to_string(), "workflows".to_string()],
+                    version_info: Some(system_info.version),
                 })
             }
             Err(e) => {
@@ -322,8 +328,86 @@ impl Integration for LIMSIntegration {
                     success: false,
                     response_time_ms: response_time,
                     error_message: Some(e.to_string()),
+                    capabilities_verified: vec![],
+                    version_info: None,
                 })
             }
+        }
+    }
+
+    async fn extract_data(&self, query: &DataQuery) -> Result<IntegrationData, IntegrationError> {
+        // Convert generic query to LIMS-specific query
+        let lims_query = LIMSSampleQuery {
+            project_id: query.filters.get("project_id").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            status: query.filters.get("status").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            limit: query.limit,
+            offset: query.offset,
+        };
+
+        let samples = self.get_samples(&lims_query).await?;
+        
+        Ok(IntegrationData {
+            entity_type: "samples".to_string(),
+            records: samples.into_iter().map(|s| serde_json::to_value(s).unwrap()).collect(),
+            metadata: std::collections::HashMap::new(),
+            total_count: None,
+            schema_version: "1.0".to_string(),
+        })
+    }
+
+    async fn load_data(&self, data: &IntegrationData) -> Result<LoadResult, IntegrationError> {
+        let mut successful_loads = 0;
+        let mut failed_loads = 0;
+        let mut errors = Vec::new();
+
+        for record in &data.records {
+            match serde_json::from_value::<LIMSSampleSync>(record.clone()) {
+                Ok(sample) => {
+                    match self.sync_sample(&sample).await {
+                        Ok(_) => successful_loads += 1,
+                        Err(e) => {
+                            failed_loads += 1;
+                            errors.push(e.to_string());
+                        }
+                    }
+                }
+                Err(e) => {
+                    failed_loads += 1;
+                    errors.push(format!("Failed to parse sample data: {}", e));
+                }
+            }
+        }
+
+        Ok(LoadResult {
+            records_processed: successful_loads + failed_loads,
+            records_succeeded: successful_loads,
+            records_failed: failed_loads,
+            execution_time_ms: 0, // Would be calculated in real implementation
+            status: if failed_loads == 0 { 
+                LoadStatus::Success 
+            } else if successful_loads > 0 { 
+                LoadStatus::PartialSuccess 
+            } else { 
+                LoadStatus::Failed 
+            },
+            errors: errors.into_iter().map(|e| LoadError {
+                record_id: None,
+                error_code: "SYNC_ERROR".to_string(),
+                error_message: e,
+                field_errors: vec![],
+            }).collect(),
+        })
+    }
+
+    fn get_capabilities(&self) -> IntegrationCapabilities {
+        IntegrationCapabilities {
+            supports_real_time_sync: false,
+            supports_bulk_operations: true,
+            supports_webhooks: self.config.enable_webhooks,
+            max_batch_size: self.config.batch_size,
+            supported_entities: vec!["samples".to_string(), "workflows".to_string()],
+            supported_operations: vec!["read".to_string(), "write".to_string(), "sync".to_string()],
+            authentication_methods: vec!["username_password".to_string(), "api_key".to_string()],
         }
     }
 }

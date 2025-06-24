@@ -41,9 +41,10 @@ impl IoTService {
     pub async fn new(config: IoTConfig) -> Result<Self> {
         info!("Initializing IoT Service");
 
+        let enabled = config.enabled;
         let service = Self { config };
 
-        if config.enabled {
+        if enabled {
             info!("IoT integration enabled - starting services");
             // In a real implementation, would initialize:
             // - MQTT client connections

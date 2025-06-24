@@ -348,8 +348,8 @@ fn calculate_maintenance_prediction(
     }
 
     Ok(MaintenancePrediction {
-        maintenance_items,
         total_estimated_cost: maintenance_items.iter().map(|m| m.estimated_cost).sum(),
+        maintenance_items,
         generated_at: Utc::now(),
     })
 }

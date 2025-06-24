@@ -34,11 +34,11 @@ pub async fn automated_placement(
         sample_id: Some(sample_id),
         robot_id: request.robot_id.clone(),
         status: "queued".to_string(),
+        estimated_duration_minutes: estimate_placement_duration(&request),
         priority: request.priority.unwrap_or("normal".to_string()),
         location_id: request.target_location_id,
         position: request.target_position,
         instructions: request.instructions,
-        estimated_duration_minutes: estimate_placement_duration(&request),
         created_at: Utc::now(),
         started_at: None,
         completed_at: None,
@@ -74,11 +74,11 @@ pub async fn automated_retrieval(
         sample_id: Some(sample_id),
         robot_id: request.robot_id.clone(),
         status: "queued".to_string(),
+        estimated_duration_minutes: estimate_retrieval_duration(&request),
         priority: request.priority.unwrap_or("normal".to_string()),
         location_id: None,
         position: None,
         instructions: request.instructions,
-        estimated_duration_minutes: estimate_retrieval_duration(&request),
         created_at: Utc::now(),
         started_at: None,
         completed_at: None,
@@ -168,13 +168,13 @@ pub async fn schedule_task(
         task_type: request.task_type.clone(),
         schedule_type: request.schedule_type.clone(),
         scheduled_time: request.scheduled_time,
+        next_execution: calculate_next_execution(&request),
         recurrence_pattern: request.recurrence_pattern,
         robot_id: request.robot_id,
         parameters: request.parameters,
         status: "scheduled".to_string(),
         created_at: Utc::now(),
         last_execution: None,
-        next_execution: calculate_next_execution(&request),
         execution_count: 0,
         failure_count: 0,
         enabled: true,
@@ -394,10 +394,14 @@ async fn get_available_robots(state: &AppState, query: &RobotListQuery) -> Stora
 
     Ok(PaginatedResponse {
         data: robots,
-        total: 1,
-        page: query.page.unwrap_or(1),
-        per_page: query.per_page.unwrap_or(50),
-        total_pages: 1,
+        pagination: PaginationInfo {
+            page: query.page.unwrap_or(1),
+            per_page: query.per_page.unwrap_or(50),
+            total_pages: 1,
+            total_items: 1,
+            has_next: false,
+            has_prev: false,
+        },
     })
 }
 
@@ -516,10 +520,14 @@ async fn get_automation_jobs(state: &AppState, query: &JobListQuery) -> StorageR
 
     Ok(PaginatedResponse {
         data: jobs,
-        total: 1,
-        page: query.page.unwrap_or(1),
-        per_page: query.per_page.unwrap_or(50),
-        total_pages: 1,
+        pagination: PaginationInfo {
+            page: query.page.unwrap_or(1),
+            per_page: query.per_page.unwrap_or(50),
+            total_pages: 1,
+            total_items: 1,
+            has_next: false,
+            has_prev: false,
+        },
     })
 }
 
@@ -589,10 +597,14 @@ async fn get_automation_workflows(state: &AppState, query: &WorkflowListQuery) -
 
     Ok(PaginatedResponse {
         data: workflows,
-        total: 1,
-        page: query.page.unwrap_or(1),
-        per_page: query.per_page.unwrap_or(50),
-        total_pages: 1,
+        pagination: PaginationInfo {
+            page: query.page.unwrap_or(1),
+            per_page: query.per_page.unwrap_or(50),
+            total_pages: 1,
+            total_items: 1,
+            has_next: false,
+            has_prev: false,
+        },
     })
 }
 
@@ -672,10 +684,14 @@ async fn get_maintenance_tasks(state: &AppState, query: &MaintenanceQuery) -> St
 
     Ok(PaginatedResponse {
         data: tasks,
-        total: 1,
-        page: query.page.unwrap_or(1),
-        per_page: query.per_page.unwrap_or(50),
-        total_pages: 1,
+        pagination: PaginationInfo {
+            page: query.page.unwrap_or(1),
+            per_page: query.per_page.unwrap_or(50),
+            total_pages: 1,
+            total_items: 1,
+            has_next: false,
+            has_prev: false,
+        },
     })
 }
 

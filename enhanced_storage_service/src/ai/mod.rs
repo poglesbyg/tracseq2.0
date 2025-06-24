@@ -50,7 +50,6 @@ impl Default for AIConfig {
 }
 
 /// AI Platform Manager
-#[derive(Debug)]
 pub struct AIPlatform {
     config: AIConfig,
     models: HashMap<String, Box<dyn AIModel>>,
@@ -122,7 +121,7 @@ impl AIPlatform {
         let model = self.models.get_mut(model_name)
             .ok_or_else(|| AIError::ModelNotFound(model_name.to_string()))?;
 
-        model.update(data).await
+        model.update(data)
     }
 }
 

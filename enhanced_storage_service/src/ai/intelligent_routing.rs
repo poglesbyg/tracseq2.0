@@ -2,7 +2,7 @@
 ///
 /// This module implements AI-powered algorithms for optimal sample placement
 /// and storage location routing in laboratory storage systems.
-use super::{AIError, AIInput, AIModel, AIOutput};
+use super::{AIError, AIInput, AIModel, AIOutput, TrainingData, UpdateData};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -70,14 +70,18 @@ impl SampleRoutingModel {
         // Generate optimization insights
         let insights = self.generate_optimization_insights(&primary_location, request);
 
+        let estimated_placement_time = self.estimate_placement_time(&routing_path);
+        let energy_impact = self.calculate_energy_impact(&routing_path);
+        let optimization_score = self.calculate_optimization_score(&primary_location, request);
+
         Ok(RoutingResult {
             request_id: request.request_id,
             primary_location,
             alternative_locations,
             routing_path,
-            estimated_placement_time: self.estimate_placement_time(&routing_path),
-            energy_impact: self.calculate_energy_impact(&routing_path),
-            optimization_score: self.calculate_optimization_score(&primary_location, request),
+            estimated_placement_time,
+            energy_impact,
+            optimization_score,
             insights,
             generated_at: Utc::now(),
         })
@@ -340,13 +344,29 @@ impl AIModel for SampleRoutingModel {
             confidence: 0.9, // High confidence for deterministic algorithm
             model_version: self.model_version.clone(),
             inference_time_ms: inference_time,
+            metadata: std::collections::HashMap::new(),
             generated_at: Utc::now(),
         })
+    }
+
+    fn train(&mut self, _data: &TrainingData) -> Result<(), AIError> {
+        // In a real implementation, this would train the model with new data
+        Ok(())
+    }
+
+    fn update(&mut self, _data: &UpdateData) -> Result<(), AIError> {
+        // In a real implementation, this would update the model with new data
+        Ok(())
     }
 
     fn save(&self, _path: &str) -> Result<(), AIError> {
         // In a real implementation, this would serialize the model to disk
         Ok(())
+    }
+
+    fn load(_path: &str) -> Result<Self, AIError> where Self: Sized {
+        // In a real implementation, this would load the model from disk
+        Ok(Self::new())
     }
 }
 

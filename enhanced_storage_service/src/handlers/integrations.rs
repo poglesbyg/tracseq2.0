@@ -15,7 +15,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Utc, Duration, Datelike};
 use tracing::{info, error, warn};
 
 use crate::{
@@ -130,7 +130,7 @@ pub async fn sync_sample_to_lims(
     // Simulate LIMS sync operation
     let sync_result = LIMSSyncResult {
         sample_id: request.sample_id,
-        lims_id: format!("LIMS-{}", Uuid::new_v4().to_simple().to_string()[..8].to_uppercase()),
+        lims_id: format!("LIMS-{}", Uuid::new_v4().simple().to_string()[..8].to_uppercase()),
         sync_status: "success".to_string(),
         sync_timestamp: Utc::now(),
         warnings: vec![],
@@ -184,7 +184,7 @@ pub async fn get_lims_workflow_status(
                 completed_at: None,
             },
         ],
-        samples_processed: vec![request.sample_id],
+        samples_processed: vec![Uuid::new_v4()], // Mock sample ID
         metadata: json!({
             "operator": "lab_tech_001",
             "equipment_used": ["PCR_001", "SEQUENCER_002"],
@@ -204,10 +204,10 @@ pub async fn create_erp_purchase_requisition(
     info!("Creating ERP purchase requisition");
 
     let requisition_result = ERPRequisitionResult {
-        requisition_id: format!("REQ-{}", Uuid::new_v4().to_simple().to_string()[..8].to_uppercase()),
+        requisition_id: format!("REQ-{}", Uuid::new_v4().simple().to_string()[..8].to_uppercase()),
         erp_reference: format!("ERP-PR-{}", Utc::now().format("%Y%m%d%H%M%S")),
         status: "submitted".to_string(),
-        approval_workflow_id: Some(format!("WF-{}", Uuid::new_v4().to_simple().to_string()[..6].to_uppercase())),
+        approval_workflow_id: Some(format!("WF-{}", Uuid::new_v4().simple().to_string()[..6].to_uppercase())),
         estimated_approval_date: Utc::now() + Duration::days(3),
         total_amount: request.items.iter().map(|item| item.estimated_cost).sum(),
         currency: "USD".to_string(),
@@ -550,14 +550,18 @@ pub async fn configure_integration_settings(
     let config_result = IntegrationConfigResult {
         configuration_id: Uuid::new_v4(),
         integration_name: request.integration_name.clone(),
-        settings_applied: request.settings.keys().len(),
+        settings_applied: if let serde_json::Value::Object(map) = &request.settings {
+            map.keys().len()
+        } else {
+            0
+        },
         validation_status: "passed".to_string(),
         restart_required: request.restart_required.unwrap_or(false),
         configuration_backup_id: Some(Uuid::new_v4()),
         applied_at: Utc::now(),
         applied_by: request.applied_by,
         changes_summary: vec![
-            format!("Updated {} configuration parameters", request.settings.keys().len()),
+            format!("Updated {} configuration parameters", if let serde_json::Value::Object(map) = &request.settings { map.keys().len() } else { 0 }),
             "Connection timeout increased to 60 seconds".to_string(),
             "Retry policy updated to 3 attempts with exponential backoff".to_string(),
             "Logging level set to INFO".to_string(),
@@ -666,22 +670,224 @@ pub struct IntegrationMetrics {
 // Additional structures would be defined here...
 // This is a comprehensive foundation for the enterprise integration system
 
-pub type LIMSSyncResult = serde_json::Value;
-pub type LIMSWorkflowStatus = serde_json::Value;
-pub type WorkflowStep = serde_json::Value;
-pub type ERPRequisitionResult = serde_json::Value;
-pub type ERPBudgetStatus = serde_json::Value;
-pub type BudgetCategory = serde_json::Value;
-pub type BudgetTransaction = serde_json::Value;
-pub type BudgetForecast = serde_json::Value;
-pub type CloudUploadResult = serde_json::Value;
-pub type CloudProviderResult = serde_json::Value;
-pub type CloudStorageAnalytics = serde_json::Value;
-pub type CloudStorageByProvider = serde_json::Value;
-pub type CloudDataTransfer = serde_json::Value;
-pub type CloudBackupStatus = serde_json::Value;
-pub type CloudCostOptimization = serde_json::Value;
-pub type CloudComplianceStatus = serde_json::Value;
-pub type IntegrationHealthReport = serde_json::Value;
-pub type IntegrationHealthDetail = serde_json::Value;
-pub type IntegrationConfigResult = serde_json::Value; 
+// Response structure definitions
+#[derive(Debug, Serialize)]
+pub struct LIMSSyncResult {
+    pub sample_id: Uuid,
+    pub lims_id: String,
+    pub sync_status: String,
+    pub sync_timestamp: DateTime<Utc>,
+    pub warnings: Vec<String>,
+    pub errors: Vec<String>,
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LIMSWorkflowStatus {
+    pub workflow_id: String,
+    pub workflow_name: String,
+    pub status: String,
+    pub progress_percentage: f64,
+    pub started_at: DateTime<Utc>,
+    pub estimated_completion: DateTime<Utc>,
+    pub current_step: String,
+    pub steps: Vec<WorkflowStep>,
+    pub samples_processed: Vec<Uuid>,
+    pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WorkflowStep {
+    pub step_id: String,
+    pub step_name: String,
+    pub status: String,
+    pub started_at: Option<DateTime<Utc>>,
+    pub completed_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ERPRequisitionResult {
+    pub requisition_id: String,
+    pub erp_reference: String,
+    pub status: String,
+    pub approval_workflow_id: Option<String>,
+    pub estimated_approval_date: DateTime<Utc>,
+    pub total_amount: f64,
+    pub currency: String,
+    pub submitted_at: DateTime<Utc>,
+    pub next_approver: Option<String>,
+    pub approval_level: i32,
+    pub tracking_url: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ERPBudgetStatus {
+    pub department: String,
+    pub fiscal_year: u32,
+    pub total_budget: f64,
+    pub allocated_budget: f64,
+    pub spent_to_date: f64,
+    pub committed_amount: f64,
+    pub available_budget: f64,
+    pub budget_utilization_percentage: f64,
+    pub categories: Vec<BudgetCategory>,
+    pub recent_transactions: Vec<BudgetTransaction>,
+    pub forecast: BudgetForecast,
+    pub last_updated: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BudgetCategory {
+    pub category: String,
+    pub budgeted: f64,
+    pub spent: f64,
+    pub committed: f64,
+    pub available: f64,
+    pub utilization_percentage: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BudgetTransaction {
+    pub transaction_id: String,
+    pub date: DateTime<Utc>,
+    pub description: String,
+    pub amount: f64,
+    pub category: String,
+    pub vendor: String,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BudgetForecast {
+    pub projected_year_end_spend: f64,
+    pub confidence_level: f64,
+    pub variance_from_budget: f64,
+    pub risk_level: String,
+    pub recommendations: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudUploadResult {
+    pub upload_id: Uuid,
+    pub file_name: String,
+    pub cloud_providers: Vec<CloudProviderResult>,
+    pub total_size_bytes: u64,
+    pub upload_duration_ms: u64,
+    pub redundancy_level: String,
+    pub encryption_enabled: bool,
+    pub compression_ratio: f64,
+    pub uploaded_at: DateTime<Utc>,
+    pub retention_policy: String,
+    pub access_tier: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudProviderResult {
+    pub provider: String,
+    pub success: bool,
+    pub url: String,
+    pub backup_location: bool,
+    pub storage_class: String,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudStorageAnalytics {
+    pub time_period: String,
+    pub total_storage_gb: f64,
+    pub total_files: i64,
+    pub storage_by_provider: Vec<CloudStorageByProvider>,
+    pub data_transfer: CloudDataTransfer,
+    pub backup_status: CloudBackupStatus,
+    pub cost_optimization: CloudCostOptimization,
+    pub compliance_status: CloudComplianceStatus,
+    pub generated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudStorageByProvider {
+    pub provider: String,
+    pub storage_gb: f64,
+    pub files_count: i64,
+    pub cost_usd: f64,
+    pub average_access_time_ms: i32,
+    pub availability_percentage: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudDataTransfer {
+    pub ingress_gb: f64,
+    pub egress_gb: f64,
+    pub cross_region_transfer_gb: f64,
+    pub cdn_usage_gb: f64,
+    pub transfer_cost_usd: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudBackupStatus {
+    pub total_backups: i64,
+    pub successful_backups: i64,
+    pub failed_backups: i64,
+    pub backup_success_rate: f64,
+    pub average_backup_time_minutes: f64,
+    pub latest_backup: DateTime<Utc>,
+    pub backup_storage_gb: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudCostOptimization {
+    pub current_monthly_cost_usd: f64,
+    pub projected_monthly_cost_usd: f64,
+    pub potential_savings_usd: f64,
+    pub optimization_recommendations: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloudComplianceStatus {
+    pub gdpr_compliant: bool,
+    pub hipaa_compliant: bool,
+    pub soc2_compliant: bool,
+    pub data_residency_compliant: bool,
+    pub encryption_at_rest: bool,
+    pub encryption_in_transit: bool,
+    pub access_logs_enabled: bool,
+    pub compliance_score: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct IntegrationHealthReport {
+    pub overall_health_score: f64,
+    pub total_integrations: i32,
+    pub healthy_integrations: i32,
+    pub warning_integrations: i32,
+    pub critical_integrations: i32,
+    pub integration_details: Vec<IntegrationHealthDetail>,
+    pub system_recommendations: Vec<String>,
+    pub generated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct IntegrationHealthDetail {
+    pub name: String,
+    pub health_status: String,
+    pub response_time_ms: i32,
+    pub error_rate: f64,
+    pub uptime_percentage: f64,
+    pub last_successful_operation: DateTime<Utc>,
+    pub issues: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct IntegrationConfigResult {
+    pub configuration_id: Uuid,
+    pub integration_name: String,
+    pub settings_applied: usize,
+    pub validation_status: String,
+    pub restart_required: bool,
+    pub configuration_backup_id: Option<Uuid>,
+    pub applied_at: DateTime<Utc>,
+    pub applied_by: String,
+    pub changes_summary: Vec<String>,
+    pub rollback_available: bool,
+    pub next_health_check: DateTime<Utc>,
+} 
