@@ -106,7 +106,7 @@ impl From<validator::ValidationErrors> for SampleServiceError {
             .field_errors()
             .iter()
             .flat_map(|(field, field_errors)| {
-                field_errors.iter().map(|error| {
+                field_errors.iter().map(move |error| {
                     format!(
                         "{}: {}",
                         field,

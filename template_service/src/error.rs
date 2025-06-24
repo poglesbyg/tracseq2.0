@@ -183,7 +183,7 @@ impl From<validator::ValidationErrors> for TemplateServiceError {
             .field_errors()
             .iter()
             .flat_map(|(field, field_errors)| {
-                field_errors.iter().map(|error| {
+                field_errors.iter().map(move |error| {
                     format!(
                         "{}: {}",
                         field,
@@ -246,35 +246,35 @@ impl IntoResponse for TemplateServiceError {
             TemplateServiceError::TemplateNotFound { .. } => (
                 StatusCode::NOT_FOUND,
                 "template_not_found",
-                &self.to_string(),
+                "Template not found",
             ),
             TemplateServiceError::FieldNotFound { .. } => {
-                (StatusCode::NOT_FOUND, "field_not_found", &self.to_string())
+                (StatusCode::NOT_FOUND, "field_not_found", "Field not found")
             }
             TemplateServiceError::ValidationRuleNotFound { .. } => (
                 StatusCode::NOT_FOUND,
                 "validation_rule_not_found",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::TemplateVersionNotFound { .. } => (
                 StatusCode::NOT_FOUND,
                 "template_version_not_found",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::DuplicateTemplateName { .. } => (
                 StatusCode::CONFLICT,
                 "duplicate_template_name",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::InvalidStatusTransition { .. } => (
                 StatusCode::BAD_REQUEST,
                 "invalid_status_transition",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::FieldValidationFailed { .. } => (
                 StatusCode::BAD_REQUEST,
                 "field_validation_failed",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::FormValidation(msg) => (
                 StatusCode::BAD_REQUEST,
@@ -295,25 +295,25 @@ impl IntoResponse for TemplateServiceError {
                 (StatusCode::BAD_REQUEST, "file_upload_error", msg.as_str())
             }
             TemplateServiceError::FileNotFound { .. } => {
-                (StatusCode::NOT_FOUND, "file_not_found", &self.to_string())
+                (StatusCode::NOT_FOUND, "file_not_found", "Error message")
             }
             TemplateServiceError::InvalidFileFormat { .. } => (
                 StatusCode::BAD_REQUEST,
                 "invalid_file_format",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::FileTooLarge { .. } => (
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "file_too_large",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::VersionConflict { .. } => {
-                (StatusCode::CONFLICT, "version_conflict", &self.to_string())
+                (StatusCode::CONFLICT, "version_conflict", "Error message")
             }
             TemplateServiceError::MaxVersionsExceeded { .. } => (
                 StatusCode::BAD_REQUEST,
                 "max_versions_exceeded",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::DependencyError(msg) => {
                 (StatusCode::BAD_REQUEST, "dependency_error", msg.as_str())
@@ -360,7 +360,7 @@ impl IntoResponse for TemplateServiceError {
             TemplateServiceError::ConcurrentModification { .. } => (
                 StatusCode::CONFLICT,
                 "concurrent_modification",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::ResourceLimit(msg) => (
                 StatusCode::TOO_MANY_REQUESTS,
@@ -370,27 +370,27 @@ impl IntoResponse for TemplateServiceError {
             TemplateServiceError::FeatureNotEnabled { .. } => (
                 StatusCode::FORBIDDEN,
                 "feature_not_enabled",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::TemplateQuotaExceeded { .. } => (
                 StatusCode::TOO_MANY_REQUESTS,
                 "template_quota_exceeded",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::FieldLimitExceeded { .. } => (
                 StatusCode::BAD_REQUEST,
                 "field_limit_exceeded",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::ValidationRuleLimitExceeded { .. } => (
                 StatusCode::BAD_REQUEST,
                 "validation_rule_limit_exceeded",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::InvalidFieldTypeTransition { .. } => (
                 StatusCode::BAD_REQUEST,
                 "invalid_field_type_transition",
-                &self.to_string(),
+                "Error message",
             ),
             TemplateServiceError::CircularDependency => (
                 StatusCode::BAD_REQUEST,

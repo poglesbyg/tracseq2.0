@@ -1,7 +1,6 @@
 use axum::{
-    routing::{get, post, put, delete},
+    routing::{get, post, put},
     Router,
-    middleware,
 };
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -86,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(compliance_service.clone())
         
         // Middleware
-        .layer(middleware::from_fn(crate::middleware::auth_middleware))
+        .layer(axum::middleware::from_fn(crate::middleware::auth_middleware))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http());
 

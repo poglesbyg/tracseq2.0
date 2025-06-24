@@ -1,6 +1,5 @@
 use anyhow::Result;
 use axum::{
-    middleware,
     routing::{get, post, put, delete},
     Router,
 };
@@ -9,7 +8,6 @@ use tower::ServiceBuilder;
 use tower_http::{
     cors::CorsLayer,
     trace::TraceLayer,
-    compression::CompressionLayer,
 };
 use tracing::{info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -116,72 +114,39 @@ fn create_app(state: AppState) -> Router {
         .route("/samples/:sample_id/validate", post(handlers::samples::validate_sample))
         .route("/samples/:sample_id/status", put(handlers::samples::update_status))
         .route("/samples/barcode/:barcode", get(handlers::samples::get_sample_by_barcode))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum::middleware::from_fn_with_state(
             state.clone(),
-            sample_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
     // Batch operations
     let batch_routes = Router::new()
         .route("/samples/batch", post(handlers::samples::create_batch_samples))
         .route("/samples/batch/validate", post(handlers::samples::validate_batch))
-        .layer(middleware::from_fn_with_state(
+        .layer(axum::middleware::from_fn_with_state(
             state.clone(),
-            sample_middleware::auth_middleware,
+            crate::middleware::auth_middleware,
         ));
 
-    // Barcode operations
-    let barcode_routes = Router::new()
-        .route("/barcodes/generate", post(handlers::barcodes::generate_barcode))
-        .route("/barcodes/validate", post(handlers::barcodes::validate_barcode))
-        .route("/barcodes/scan", post(handlers::barcodes::scan_barcode))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            sample_middleware::auth_middleware,
-        ));
-
-    // Workflow routes
-    let workflow_routes = Router::new()
-        .route("/workflow/transitions", get(handlers::workflow::get_valid_transitions))
-        .route("/workflow/history/:sample_id", get(handlers::workflow::get_sample_history))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            sample_middleware::auth_middleware,
-        ));
-
-    // Template integration routes
-    let template_routes = Router::new()
-        .route("/templates", get(handlers::templates::list_templates))
-        .route("/templates/:template_id/samples", post(handlers::templates::create_sample_from_template))
-        .route("/templates/:template_id/validate", post(handlers::templates::validate_template_data))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            sample_middleware::auth_middleware,
-        ));
-
-    // Admin routes (require admin privileges)
-    let admin_routes = Router::new()
-        .route("/admin/samples/stats", get(handlers::admin::get_sample_statistics))
-        .route("/admin/samples/cleanup", post(handlers::admin::cleanup_samples))
-        .route("/admin/workflow/status", get(handlers::admin::get_workflow_status))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            sample_middleware::admin_middleware,
-        ));
+    // TODO: Implement additional handlers
+    // let barcode_routes = Router::new();
+    // let workflow_routes = Router::new();
+    // let template_routes = Router::new();
+    // let admin_routes = Router::new();
 
     // Combine all routes
     Router::new()
         .merge(health_routes)
         .merge(sample_routes)
         .merge(batch_routes)
-        .merge(barcode_routes)
-        .merge(workflow_routes)
-        .merge(template_routes)
-        .merge(admin_routes)
+        // TODO: Add additional routes when handlers are implemented
+        // .merge(barcode_routes)
+        // .merge(workflow_routes)
+        // .merge(template_routes)
+        // .merge(admin_routes)
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
-                .layer(CompressionLayer::new())
                 .layer(CorsLayer::permissive()) // Configure CORS as needed
         )
         .with_state(state)
