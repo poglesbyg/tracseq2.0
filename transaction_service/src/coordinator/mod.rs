@@ -1,5 +1,6 @@
 //! Transaction coordinator for orchestrating distributed transactions across TracSeq services.
 
+#[cfg(feature = "database-persistence")]
 use crate::persistence::{DatabaseConfig, SagaPersistenceService};
 use crate::saga::{
     SagaError, SagaExecutionResult, SagaState, SagaStatus, TransactionContext, TransactionSaga,
@@ -19,7 +20,11 @@ pub struct TransactionCoordinator {
     active_sagas: Arc<RwLock<HashMap<Uuid, Arc<RwLock<TransactionSaga>>>>>,
 
     /// Database persistence service
+    #[cfg(feature = "database-persistence")]
     persistence: Option<Arc<SagaPersistenceService>>,
+    
+    #[cfg(not(feature = "database-persistence"))]
+    persistence: Option<Arc<()>>,
 
     /// Event client for publishing transaction events
     event_client: Option<Arc<event_service::services::client::EventServiceClient>>,
@@ -47,7 +52,11 @@ pub struct CoordinatorConfig {
     pub enable_persistence: bool,
 
     /// Database configuration for persistence
+    #[cfg(feature = "database-persistence")]
     pub database: DatabaseConfig,
+    
+    #[cfg(not(feature = "database-persistence"))]
+    pub database: (),
 
     /// Cleanup completed sagas after this duration
     pub cleanup_after_hours: u32,
@@ -61,7 +70,10 @@ impl Default for CoordinatorConfig {
             enable_events: true,
             event_service_url: "http://localhost:8087".to_string(),
             enable_persistence: true,
+            #[cfg(feature = "database-persistence")]
             database: DatabaseConfig::default(),
+            #[cfg(not(feature = "database-persistence"))]
+            database: (),
             cleanup_after_hours: 24,
         }
     }
@@ -161,12 +173,16 @@ impl TransactionCoordinator {
             None
         };
 
+        #[cfg(feature = "database-persistence")]
         let persistence = if config.enable_persistence {
             let persistence_service = SagaPersistenceService::new(config.database.clone()).await?;
             Some(Arc::new(persistence_service))
         } else {
             None
         };
+        
+        #[cfg(not(feature = "database-persistence"))]
+        let persistence = None;
 
         Ok(Self {
             active_sagas: Arc::new(RwLock::new(HashMap::new())),

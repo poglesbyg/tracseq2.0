@@ -4,6 +4,7 @@ mod saga;
 mod coordinator;
 mod models;
 mod services;
+#[cfg(feature = "database-persistence")]
 mod persistence;
 mod workflows;
 
@@ -100,24 +101,29 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn load_config() -> CoordinatorConfig {
-    use persistence::DatabaseConfig;
-    
-    let database_config = DatabaseConfig {
-        connection_string: std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgresql://tracseq:tracseq@localhost:5432/tracseq_transactions".to_string()),
-        max_connections: std::env::var("DB_MAX_CONNECTIONS")
-            .unwrap_or_else(|_| "20".to_string())
-            .parse()
-            .unwrap_or(20),
-        min_connections: std::env::var("DB_MIN_CONNECTIONS")
-            .unwrap_or_else(|_| "5".to_string())
-            .parse()
-            .unwrap_or(5),
-        connection_timeout_seconds: std::env::var("DB_CONNECTION_TIMEOUT_SECONDS")
-            .unwrap_or_else(|_| "30".to_string())
-            .parse()
-            .unwrap_or(30),
+    #[cfg(feature = "database-persistence")]
+    let database_config = {
+        use persistence::DatabaseConfig;
+        DatabaseConfig {
+            connection_string: std::env::var("DATABASE_URL")
+                .unwrap_or_else(|_| "postgresql://tracseq:tracseq@localhost:5432/tracseq_transactions".to_string()),
+            max_connections: std::env::var("DB_MAX_CONNECTIONS")
+                .unwrap_or_else(|_| "20".to_string())
+                .parse()
+                .unwrap_or(20),
+            min_connections: std::env::var("DB_MIN_CONNECTIONS")
+                .unwrap_or_else(|_| "5".to_string())
+                .parse()
+                .unwrap_or(5),
+            connection_timeout_seconds: std::env::var("DB_CONNECTION_TIMEOUT_SECONDS")
+                .unwrap_or_else(|_| "30".to_string())
+                .parse()
+                .unwrap_or(30),
+        }
     };
+    
+    #[cfg(not(feature = "database-persistence"))]
+    let database_config = (); // Placeholder when database persistence is disabled
 
     CoordinatorConfig {
         max_concurrent_sagas: std::env::var("MAX_CONCURRENT_SAGAS")
