@@ -5,6 +5,10 @@ edition = "2024"
 authors = ["Lab Management Team"]
 description = "Enhanced storage management service with IoT integration, predictive analytics, and digital twin technology"
 
+[lib]
+name = "enhanced_storage_service"
+path = "src/lib.rs"
+
 [dependencies]
 # Web framework
 axum = "0.7"
@@ -47,6 +51,7 @@ reqwest = { version = "0.11", features = ["json"] }
 
 # Utilities
 lazy_static = "1.4"
+fastrand = "2.0"  # Add fastrand for generating test data
 
 # IoT and sensor integration (simplified for initial deployment)
 # rumqttc = "0.24"  # MQTT client for IoT devices
@@ -109,6 +114,15 @@ async-trait = "0.1"
 tokio-test = "0.4"
 mockito = "1.4"
 tempfile = "3.8"
+# Additional test dependencies for comprehensive testing
+serial_test = "3.0"  # For sequential test execution when needed
+wiremock = "0.6"     # For HTTP mocking
+fake = { version = "2.9", features = ["derive", "chrono", "uuid"] }  # For generating test data
+proptest = "1.4"     # For property-based testing
+criterion = { version = "0.5", features = ["html_reports"] }  # For benchmarking
+test-log = "0.2"     # For test logging
+env_logger = "0.10"  # For logging during tests
+once_cell = "1.19"   # For static test setup
 
 [[bin]]
 name = "enhanced_storage_service"
