@@ -175,19 +175,20 @@ pub async fn generate_analytics_report(
     }
 
     // Save report to database
-    sqlx::query!(
+    let report_types_json = serde_json::to_value(&report_data.report_types)?;
+    sqlx::query(
         r#"
         INSERT INTO analytics_reports (id, report_types, period_start, period_end, data, generated_at, generated_by)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         "#,
-        report_data.id,
-        &report_data.report_types,
-        request.period_start,
-        request.period_end,
-        &report_data.data,
-        report_data.generated_at,
-        request.generated_by.as_deref()
     )
+    .bind(report_data.id)
+    .bind(&report_types_json)
+    .bind(request.period_start)
+    .bind(request.period_end)
+    .bind(&report_data.data)
+    .bind(report_data.generated_at)
+    .bind(request.generated_by.as_deref())
     .execute(&state.storage_service.db.pool)
     .await?;
 
@@ -202,8 +203,7 @@ async fn get_location_historical_data(
 ) -> StorageResult<Vec<HistoricalDataPoint>> {
     let start_date = Utc::now() - Duration::days(days_back as i64);
     
-    let data = sqlx::query_as!(
-        HistoricalDataPoint,
+    let data = sqlx::query_as::<_, HistoricalDataPoint>(
         r#"
         SELECT 
             DATE(created_at) as date,
@@ -214,9 +214,9 @@ async fn get_location_historical_data(
         GROUP BY DATE(created_at)
         ORDER BY date
         "#,
-        location_id,
-        start_date
     )
+    .bind(location_id)
+    .bind(start_date)
     .fetch_all(&state.storage_service.db.pool)
     .await?;
 
@@ -229,8 +229,7 @@ async fn get_system_historical_data(
 ) -> StorageResult<Vec<HistoricalDataPoint>> {
     let start_date = Utc::now() - Duration::days(days_back as i64);
     
-    let data = sqlx::query_as!(
-        HistoricalDataPoint,
+    let data = sqlx::query_as::<_, HistoricalDataPoint>(
         r#"
         SELECT 
             DATE(created_at) as date,
@@ -241,8 +240,8 @@ async fn get_system_historical_data(
         GROUP BY DATE(created_at)
         ORDER BY date
         "#,
-        start_date
     )
+    .bind(start_date)
     .fetch_all(&state.storage_service.db.pool)
     .await?;
 
@@ -293,8 +292,7 @@ async fn get_equipment_health_data(
     state: &AppState,
     equipment_type: &str,
 ) -> StorageResult<Vec<EquipmentHealthData>> {
-    let equipment_data = sqlx::query_as!(
-        EquipmentHealthData,
+    let equipment_data = sqlx::query_as::<_, EquipmentHealthData>(
         r#"
         SELECT 
             id,
@@ -307,8 +305,8 @@ async fn get_equipment_health_data(
         WHERE ($1 = 'all' OR equipment_type = $1)
         AND status = 'active'
         "#,
-        equipment_type
     )
+    .bind(equipment_type)
     .fetch_all(&state.storage_service.db.pool)
     .await
     .unwrap_or_default();
@@ -384,8 +382,7 @@ async fn get_energy_consumption_data(
 ) -> StorageResult<Vec<EnergyDataPoint>> {
     let start_date = Utc::now() - Duration::days(analysis_period as i64);
     
-    let data = sqlx::query_as!(
-        EnergyDataPoint,
+    let data = sqlx::query_as::<_, EnergyDataPoint>(
         r#"
         SELECT 
             DATE(timestamp) as date,
@@ -397,8 +394,8 @@ async fn get_energy_consumption_data(
         GROUP BY DATE(timestamp)
         ORDER BY date
         "#,
-        start_date
     )
+    .bind(start_date)
     .fetch_all(&state.storage_service.db.pool)
     .await
     .unwrap_or_default();
@@ -645,7 +642,7 @@ pub struct AnalyticsReportRequest {
 }
 
 // Data structures
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct HistoricalDataPoint {
     pub date: chrono::NaiveDate,
     pub sample_count: i32,
@@ -662,7 +659,7 @@ pub struct CapacityPrediction {
     pub recommendations: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct EquipmentHealthData {
     pub id: Uuid,
     pub equipment_type: String,
@@ -689,7 +686,7 @@ pub struct MaintenanceItem {
     pub description: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct EnergyDataPoint {
     pub date: chrono::NaiveDate,
     pub avg_power_kw: f64,

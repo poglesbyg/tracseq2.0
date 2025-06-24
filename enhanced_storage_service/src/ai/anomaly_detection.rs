@@ -706,8 +706,4 @@ pub enum AnomalyAlgorithm {
     MachineLearning,
 }
 
-impl From<serde_json::Error> for AIError {
-    fn from(error: serde_json::Error) -> Self {
-        AIError::InvalidInput(error.to_string())
-    }
-}
+
