@@ -15,7 +15,7 @@ mod error;
 mod models;
 mod services;
 mod handlers;
-mod middleware as custom_middleware;
+mod middleware;
 
 use config::Config;
 use database::create_pool;
@@ -86,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(compliance_service.clone())
         
         // Middleware
-        .layer(middleware::from_fn(custom_middleware::auth_middleware))
+        .layer(middleware::from_fn(crate::middleware::auth_middleware))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http());
 
