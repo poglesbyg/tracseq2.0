@@ -56,7 +56,7 @@ interface Template {
   name: string;
   description: string;
   created_at: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
 }
 
 interface Sample {
@@ -67,7 +67,7 @@ interface Sample {
   status: string;
   created_at: string;
   updated_at: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
 }
 
 interface SequencingJob {
@@ -77,7 +77,7 @@ interface SequencingJob {
   sample_sheet_path: string;
   created_at: string;
   updated_at: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
 }
 
 export default function Dashboard() {

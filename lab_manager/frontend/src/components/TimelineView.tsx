@@ -12,7 +12,7 @@ interface TimelineEvent {
     name: string;
     type: 'sample' | 'job' | 'template' | 'user';
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 interface TimelineViewProps {

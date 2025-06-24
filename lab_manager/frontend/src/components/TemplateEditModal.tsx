@@ -7,13 +7,13 @@ interface Template {
   name: string;
   description?: string;
   created_at: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 interface UpdateTemplate {
   name?: string;
   description?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 interface TemplateEditModalProps {
@@ -40,7 +40,7 @@ export default function TemplateEditModal({ template, onClose }: TemplateEditMod
       queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
       onClose();
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Failed to update template:', error);
       setErrors({ general: 'Failed to update template. Please try again.' });
     },
@@ -159,11 +159,11 @@ export default function TemplateEditModal({ template, onClose }: TemplateEditMod
               </div>
               <div className="flex justify-between">
                 <dt className="text-gray-500">File Type:</dt>
-                <dd className="text-gray-900">{template.metadata?.file_type || 'Unknown'}</dd>
+                <dd className="text-gray-900">{(template.metadata?.file_type as string) || 'Unknown'}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-gray-500">Original File:</dt>
-                <dd className="text-gray-900 text-xs">{template.metadata?.originalFileName || 'Unknown'}</dd>
+                <dd className="text-gray-900 text-xs">{(template.metadata?.originalFileName as string) || 'Unknown'}</dd>
               </div>
             </dl>
           </div>

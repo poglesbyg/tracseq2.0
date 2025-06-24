@@ -16,7 +16,7 @@ interface SearchResult {
   id: string;
   dataset_id: string;
   row_number: number;
-  row_data: Record<string, any>;
+  row_data: Record<string, unknown>;
   search_text?: string;
   created_at: string;
   original_filename: string;
