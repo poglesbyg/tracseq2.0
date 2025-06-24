@@ -9,10 +9,10 @@ interface SheetData {
   total_columns: number;
 }
 
-interface SpreadsheetData {
-  sheet_names: string[];
-  sheets: SheetData[];
-}
+  interface SpreadsheetData {
+    sheet_names: string[];
+    sheets: SheetData[];
+  }
 
 interface Template {
   id: string;
@@ -22,12 +22,12 @@ interface Template {
   metadata: Record<string, any>;
 }
 
-interface SpreadsheetViewerProps {
-  template: Template;
-  data: SpreadsheetData;
-  onClose: () => void;
-  onCreateSamples?: (template: Template, data: SpreadsheetData) => void;
-}
+  interface SpreadsheetViewerProps {
+    template: Template;
+    data: SpreadsheetData;
+    onClose: () => void;
+    onCreateSamples?: (template: Template, data: SpreadsheetData) => void;
+  }
 
 export default function SpreadsheetViewer({ template, data, onClose, onCreateSamples }: SpreadsheetViewerProps) {
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);

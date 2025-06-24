@@ -8,20 +8,9 @@ import {
   DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 
-interface SpreadsheetSearchModalProps {
-  onClose: () => void;
-}
-
 interface SearchResult {
   id: string;
-  dataset_id: string;
-  row_number: number;
-  row_data: Record<string, any>;
-  search_text?: string;
-  created_at: string;
-  original_filename: string;
-  file_type: string;
-  dataset_filename: string;
+  [key: string]: string | number | boolean | null;
 }
 
 interface SearchResponse {
@@ -44,6 +33,12 @@ interface AvailableFilters {
   projects: string[];
   all_columns: string[];
   column_values: Record<string, string[]>;
+}
+
+interface SpreadsheetSearchModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectResult: (result: SearchResult) => void;
 }
 
 export default function SpreadsheetSearchModal({ onClose }: SpreadsheetSearchModalProps) {
@@ -453,7 +448,7 @@ export default function SpreadsheetSearchModal({ onClose }: SpreadsheetSearchMod
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900">
                           <div className="space-y-1">
-                            {Object.entries(record.row_data).slice(0, 4).map(([key, value]) => (
+                            {Object.entries(record).slice(0, 4).map(([key, value]) => (
                               <div key={key} className="flex">
                                 <span className="font-medium text-gray-600 w-24 flex-shrink-0">
                                   {key}:
@@ -463,9 +458,9 @@ export default function SpreadsheetSearchModal({ onClose }: SpreadsheetSearchMod
                                 </span>
                               </div>
                             ))}
-                            {Object.keys(record.row_data).length > 4 && (
+                            {Object.keys(record).length > 4 && (
                               <div className="text-xs text-gray-500">
-                                +{Object.keys(record.row_data).length - 4} more fields
+                                +{Object.keys(record).length - 4} more fields
                               </div>
                             )}
                           </div>

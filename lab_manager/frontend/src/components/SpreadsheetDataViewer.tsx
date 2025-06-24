@@ -95,6 +95,16 @@ interface SavedView {
   rowsPerPage: number;
 }
 
+interface SpreadsheetRecord {
+  [key: string]: string | number | boolean | null;
+}
+
+interface SpreadsheetDataViewerProps {
+  data: SpreadsheetRecord[];
+  columns: string[];
+  onCellEdit?: (rowIndex: number, columnName: string, value: string | number | boolean | null) => void;
+}
+
 export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetDataViewerProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');

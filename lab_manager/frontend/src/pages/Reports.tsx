@@ -43,6 +43,43 @@ interface ColumnInfo {
   is_primary_key: boolean;
 }
 
+interface ReportConfig {
+  id: string;
+  name: string;
+  type: 'sample' | 'template' | 'system' | 'custom';
+  parameters: ReportParameter[];
+  schedule?: ReportSchedule;
+  metadata?: Record<string, unknown>;
+}
+
+interface ReportParameter {
+  name: string;
+  type: 'string' | 'number' | 'date' | 'boolean' | 'select';
+  required: boolean;
+  defaultValue?: string | number | boolean | null;
+  options?: string[];
+}
+
+interface ReportSchedule {
+  frequency: 'daily' | 'weekly' | 'monthly';
+  time: string;
+  enabled: boolean;
+}
+
+interface GeneratedReport {
+  id: string;
+  configId: string;
+  generatedAt: string;
+  status: 'generating' | 'completed' | 'failed';
+  data: ReportData[];
+  fileUrl?: string;
+  errors?: string[];
+}
+
+interface ReportData {
+  [key: string]: string | number | boolean | null;
+}
+
 export default function Reports() {
   const [sqlQuery, setSqlQuery] = useState('SELECT * FROM samples LIMIT 10;');
   const [activeTab, setActiveTab] = useState<'editor' | 'templates' | 'schema'>('editor');

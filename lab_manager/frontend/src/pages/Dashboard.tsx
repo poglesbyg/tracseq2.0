@@ -41,6 +41,29 @@ interface DashboardStats {
     count: number;
     avgWaitTime: number;
   }[];
+  pendingSamples: number;
+  completedSamples: number;
+  recentActivity: ActivityItem[];
+}
+
+interface ActivityItem {
+  id: string;
+  action: string;
+  timestamp: string;
+  user: string;
+  details?: Record<string, unknown>;
+}
+
+interface SystemHealth {
+  status: 'healthy' | 'warning' | 'error';
+  services: ServiceStatus[];
+  uptime: number;
+}
+
+interface ServiceStatus {
+  name: string;
+  status: 'online' | 'offline' | 'degraded';
+  responseTime: number;
 }
 
 interface RecentActivity {
@@ -279,12 +302,18 @@ export default function Dashboard() {
       last30d: 0,
     },
     bottlenecks: stats.bottlenecks || [],
+    pendingSamples: stats.pendingSamples,
+    completedSamples: stats.completedSamples,
+    recentActivity: stats.recentActivity,
   } : {
     totalSamples: 0,
     byStatus: {},
     averageProcessingTime: { validation: 0, storage: 0, sequencing: 0, overall: 0 },
     recentThroughput: { last24h: 0, last7d: 0, last30d: 0 },
     bottlenecks: [],
+    pendingSamples: 0,
+    completedSamples: 0,
+    recentActivity: [],
   };
 
   return (

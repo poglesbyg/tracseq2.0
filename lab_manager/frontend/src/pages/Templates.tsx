@@ -6,13 +6,13 @@ import SpreadsheetViewer from '../components/SpreadsheetViewer';
 import BatchSampleCreation from '../components/BatchSampleCreation';
 import TemplateEditModal from '../components/TemplateEditModal';
 
-interface Template {
-  id: string;
-  name: string;
-  description?: string;
-  created_at: string;
-  metadata: Record<string, any>;
-}
+  interface Template {
+    id: string;
+    name: string;
+    description?: string;
+    created_at: string;
+    metadata: Record<string, unknown>;
+  }
 
 interface SheetData {
   name: string;
@@ -27,21 +27,21 @@ interface SpreadsheetData {
   sheets: SheetData[];
 }
 
-interface ParsedTemplateResponse {
-  template: Template;
-  data: SpreadsheetData;
-}
+  interface ParsedTemplateResponse {
+    template: Template;
+    data: SpreadsheetData;
+  }
 
 export default function Templates() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [viewingTemplate, setViewingTemplate] = useState<ParsedTemplateResponse | null>(null);
-  const [deletingTemplate, setDeletingTemplate] = useState<Template | null>(null);
-  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+      const [deletingTemplate, setDeletingTemplate] = useState<Template | null>(null);
+    const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [creatingFromTemplate, setCreatingFromTemplate] = useState<ParsedTemplateResponse | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: templates, isLoading } = useQuery<Template[]>({
+      const { data: templates, isLoading } = useQuery<Template[]>({
     queryKey: ['templates'],
     queryFn: async () => {
       const response = await axios.get('/api/templates');
@@ -114,11 +114,11 @@ export default function Templates() {
     viewTemplateMutation.mutate(templateId);
   };
 
-  const handleEditTemplate = (template: Template) => {
+      const handleEditTemplate = (template: Template) => {
     setEditingTemplate(template);
   };
 
-  const handleDeleteTemplate = async (template: Template) => {
+      const handleDeleteTemplate = async (template: Template) => {
     setDeletingTemplate(template);
   };
 
@@ -132,7 +132,7 @@ export default function Templates() {
     setDeletingTemplate(null);
   };
 
-  const handleCreateSamples = (template: Template, data: SpreadsheetData) => {
+      const handleCreateSamples = (template: Template, data: SpreadsheetData) => {
     setCreatingFromTemplate({ template, data });
     setViewingTemplate(null);
   };
@@ -268,7 +268,7 @@ export default function Templates() {
                         {template.description || '-'}
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                        {new Date(template.created_at).toLocaleDateString()}
+                                                  {new Date(template.created_at).toLocaleDateString()}
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                         <div className="flex space-x-2">

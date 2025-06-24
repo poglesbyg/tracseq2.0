@@ -14,14 +14,21 @@ import {
 
 interface RagSubmission {
   id: string;
-  submission_id: string;
-  submitter_name: string;
-  submitter_email: string;
-  sample_type: string;
-  sample_name: string;
-  confidence_score: number;
-  created_at: string;
-  status: string;
+  filename: string;
+  status: 'uploaded' | 'processing' | 'completed' | 'failed';
+  uploadedAt: string;
+  processedAt?: string;
+  confidence?: number;
+  extractedSamples: number;
+  errors?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+interface FileUploadResponse {
+  success: boolean;
+  submissionId: string;
+  message: string;
+  errors?: string[];
 }
 
 interface RagExtractionResult {
@@ -271,27 +278,17 @@ export default function RagSubmissions() {
                 <div key={submission.id} className="border border-gray-200 rounded-md p-4 hover:bg-gray-50">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h3 className="text-sm font-medium text-gray-900">{submission.sample_name}</h3>
+                      <h3 className="text-sm font-medium text-gray-900">{submission.filename}</h3>
                       <p className="text-xs text-gray-500 mt-1">
-                        Submitted by: {submission.submitter_name} ({submission.submitter_email})
+                        Uploaded: {new Date(submission.uploadedAt).toLocaleDateString()}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Sample Type: {submission.sample_type}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Created: {new Date(submission.created_at).toLocaleDateString()}
+                        Status: {submission.status}
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getConfidenceColor(submission.confidence_score)}`}>
-                        {(submission.confidence_score * 100).toFixed(1)}%
-                      </span>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        submission.status === 'completed' ? 'bg-green-100 text-green-800' : 
-                        submission.status === 'failed' ? 'bg-red-100 text-red-800' : 
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {submission.status}
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getConfidenceColor(submission.confidence || 0)}`}>
+                        {(submission.confidence || 0 * 100).toFixed(1)}%
                       </span>
                     </div>
                   </div>
