@@ -72,7 +72,7 @@ pub struct UpdateLibraryRequest {
     pub metadata: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
 #[sqlx(type_name = "library_status", rename_all = "lowercase")]
 pub enum LibraryStatus {
     Pending,
@@ -231,7 +231,7 @@ pub struct CreateQCMetricRequest {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
 #[sqlx(type_name = "qc_status", rename_all = "lowercase")]
 pub enum QCStatus {
     Pass,

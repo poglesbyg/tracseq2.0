@@ -24,8 +24,7 @@ impl LibraryService {
         let id = Uuid::new_v4();
         let now = Utc::now();
 
-        let library = sqlx::query_as!(
-            Library,
+        let library = sqlx::query_as::<_, Library>(
             r#"
             INSERT INTO libraries (
                 id, name, sample_id, library_type, concentration, volume,
@@ -37,26 +36,25 @@ impl LibraryService {
             RETURNING id, name, sample_id, library_type, concentration, volume,
                       fragment_size_min, fragment_size_max, preparation_protocol_id,
                       preparation_date, barcode, adapter_sequence, 
-                      quality_score, status as "status: LibraryStatus", metadata,
-                      created_at, updated_at
+                      quality_score, status, metadata, created_at, updated_at
             "#,
-            id,
-            request.name,
-            request.sample_id,
-            request.library_type,
-            request.concentration,
-            request.volume,
-            request.fragment_size_min,
-            request.fragment_size_max,
-            request.preparation_protocol_id,
-            request.preparation_date,
-            request.barcode,
-            request.adapter_sequence,
-            request.metadata,
-            LibraryStatus::Pending as LibraryStatus,
-            now,
-            now
         )
+        .bind(id)
+        .bind(&request.name)
+        .bind(request.sample_id)
+        .bind(&request.library_type)
+        .bind(request.concentration)
+        .bind(request.volume)
+        .bind(request.fragment_size_min)
+        .bind(request.fragment_size_max)
+        .bind(request.preparation_protocol_id)
+        .bind(request.preparation_date)
+        .bind(&request.barcode)
+        .bind(&request.adapter_sequence)
+        .bind(&request.metadata)
+        .bind("pending")
+        .bind(now)
+        .bind(now)
         .fetch_one(&self.pool)
         .await?;
 
@@ -65,18 +63,17 @@ impl LibraryService {
     }
 
     pub async fn get_library(&self, id: Uuid) -> Result<Library> {
-        let library = sqlx::query_as!(
-            Library,
+        let library = sqlx::query_as::<_, Library>(
             r#"
             SELECT id, name, sample_id, library_type, concentration, volume,
                    fragment_size_min, fragment_size_max, preparation_protocol_id,
                    preparation_date, barcode, adapter_sequence, quality_score,
-                   status as "status: LibraryStatus", metadata, created_at, updated_at
+                   status, metadata, created_at, updated_at
             FROM libraries
             WHERE id = $1
             "#,
-            id
         )
+        .bind(id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or(ServiceError::LibraryNotFound { id })?;
@@ -86,36 +83,34 @@ impl LibraryService {
 
     pub async fn list_libraries(&self, sample_id: Option<Uuid>, status: Option<LibraryStatus>) -> Result<Vec<Library>> {
         let libraries = if let Some(sample_id) = sample_id {
-            sqlx::query_as!(
-                Library,
+            sqlx::query_as::<_, Library>(
                 r#"
                 SELECT id, name, sample_id, library_type, concentration, volume,
                        fragment_size_min, fragment_size_max, preparation_protocol_id,
                        preparation_date, barcode, adapter_sequence, quality_score,
-                       status as "status: LibraryStatus", metadata, created_at, updated_at
+                       status, metadata, created_at, updated_at
                 FROM libraries
                 WHERE sample_id = $1 AND ($2::text IS NULL OR status = $2)
                 ORDER BY created_at DESC
                 "#,
-                sample_id,
-                status.as_ref().map(|s| format!("{:?}", s).to_lowercase())
             )
+            .bind(sample_id)
+            .bind(status.as_ref().map(|s| format!("{:?}", s).to_lowercase()))
             .fetch_all(&self.pool)
             .await?
         } else {
-            sqlx::query_as!(
-                Library,
+            sqlx::query_as::<_, Library>(
                 r#"
                 SELECT id, name, sample_id, library_type, concentration, volume,
                        fragment_size_min, fragment_size_max, preparation_protocol_id,
                        preparation_date, barcode, adapter_sequence, quality_score,
-                       status as "status: LibraryStatus", metadata, created_at, updated_at
+                       status, metadata, created_at, updated_at
                 FROM libraries
                 WHERE ($1::text IS NULL OR status = $1)
                 ORDER BY created_at DESC
                 "#,
-                status.as_ref().map(|s| format!("{:?}", s).to_lowercase())
             )
+            .bind(status.as_ref().map(|s| format!("{:?}", s).to_lowercase()))
             .fetch_all(&self.pool)
             .await?
         };
@@ -133,8 +128,7 @@ impl LibraryService {
 
         let now = Utc::now();
 
-        let library = sqlx::query_as!(
-            Library,
+        let library = sqlx::query_as::<_, Library>(
             r#"
             UPDATE libraries
             SET name = COALESCE($2, name),
@@ -154,23 +148,23 @@ impl LibraryService {
             RETURNING id, name, sample_id, library_type, concentration, volume,
                       fragment_size_min, fragment_size_max, preparation_protocol_id,
                       preparation_date, barcode, adapter_sequence, quality_score,
-                      status as "status: LibraryStatus", metadata, created_at, updated_at
+                      status, metadata, created_at, updated_at
             "#,
-            id,
-            request.name,
-            request.library_type,
-            request.concentration,
-            request.volume,
-            request.fragment_size_min,
-            request.fragment_size_max,
-            request.preparation_protocol_id,
-            request.preparation_date,
-            request.barcode,
-            request.adapter_sequence,
-            request.status as Option<LibraryStatus>,
-            request.metadata,
-            now
         )
+        .bind(id)
+        .bind(&request.name)
+        .bind(&request.library_type)
+        .bind(request.concentration)
+        .bind(request.volume)
+        .bind(request.fragment_size_min)
+        .bind(request.fragment_size_max)
+        .bind(request.preparation_protocol_id)
+        .bind(request.preparation_date)
+        .bind(&request.barcode)
+        .bind(&request.adapter_sequence)
+        .bind(request.status.as_ref().map(|s| format!("{:?}", s).to_lowercase()))
+        .bind(&request.metadata)
+        .bind(now)
         .fetch_one(&self.pool)
         .await?;
 
@@ -179,7 +173,8 @@ impl LibraryService {
     }
 
     pub async fn delete_library(&self, id: Uuid) -> Result<()> {
-        let result = sqlx::query!("DELETE FROM libraries WHERE id = $1", id)
+        let result = sqlx::query("DELETE FROM libraries WHERE id = $1")
+            .bind(id)
             .execute(&self.pool)
             .await?;
 
