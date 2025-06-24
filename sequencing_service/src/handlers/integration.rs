@@ -22,7 +22,8 @@ pub async fn sync_with_sample_service(
     let mut success_count = 0;
     let mut error_count = 0;
 
-    for sample_id in request.sample_ids {
+    let sample_count = request.sample_ids.len();
+    for sample_id in &request.sample_ids {
         match sync_single_sample(&state, sample_id).await {
             Ok(result) => {
                 sync_results.push(json!({
@@ -57,7 +58,7 @@ pub async fn sync_with_sample_service(
     .bind("sync_samples")
     .bind(json!({
         "sync_results": sync_results,
-        "requested_samples": request.sample_ids.len()
+        "requested_samples": sample_count
     }))
     .bind(success_count)
     .bind(error_count)
@@ -562,11 +563,11 @@ pub async fn test_integration_connectivity(
 }
 
 /// Helper functions
-async fn sync_single_sample(state: &AppState, sample_id: Uuid) -> Result<serde_json::Value> {
+async fn sync_single_sample(state: &AppState, sample_id: &Uuid) -> Result<serde_json::Value> {
     // This would call the actual sample service API
     // For now, we'll simulate the call
     
-    if let Ok(response) = state.sample_client.get_sample(sample_id).await {
+    if let Ok(response) = state.sample_client.get_sample(*sample_id).await {
         Ok(json!({
             "sample_id": sample_id,
             "sync_status": "completed",

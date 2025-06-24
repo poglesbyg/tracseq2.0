@@ -283,6 +283,8 @@ pub struct AnalysisJob {
     pub error_message: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    // Compatibility field
+    pub pipeline_type: Option<String>,
 }
 
 /// Analysis status enumeration

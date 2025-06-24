@@ -36,34 +36,34 @@ pub enum SequencingError {
     #[error("Platform not found")]
     PlatformNotFound(String),
 
-    #[error("Analysis not found: {0}")]
+    #[error("Analysis not found")]
     AnalysisNotFound { analysis_id: String },
 
-    #[error("Quality metrics not found: {0}")]
+    #[error("Quality metrics not found")]
     QualityMetricsNotFound { analysis_id: String },
 
-    #[error("Sample sheet in use: {0}")]
-    SampleSheetInUse { sheet_id: String },
+    #[error("Sample sheet in use")]
+    SampleSheetInUse { sheet_id: String, active_jobs: u32 },
 
-    #[error("Export error: {0}")]
+    #[error("Export error")]
     ExportError { message: String },
 
-    #[error("Invalid job state: {0}")]
-    InvalidJobState { current_state: String, expected: String },
+    #[error("Invalid job state")]
+    InvalidJobState { current_state: String, expected: String, required_state: String },
 
-    #[error("Workflow in use: {0}")]
-    WorkflowInUse { workflow_id: String },
+    #[error("Workflow in use")]
+    WorkflowInUse { workflow_id: String, active_executions: u32 },
 
-    #[error("Workflow validation error: {0}")]
+    #[error("Workflow validation error")]
     WorkflowValidation { message: String },
 
-    #[error("Execution not found: {0}")]
+    #[error("Execution not found")]
     ExecutionNotFound { execution_id: String },
 
-    #[error("Step not found: {0}")]
-    StepNotFound { step_id: String, execution_id: String },
+    #[error("Step not found")]
+    StepNotFound { step_id: String, execution_id: String, step_name: String },
 
-    #[error("Integration error: {0}")]
+    #[error("Integration error")]
     IntegrationError { service: String, message: String },
 
     #[error("Webhook not found")]

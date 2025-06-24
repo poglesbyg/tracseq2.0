@@ -427,10 +427,10 @@ pub struct PurgeQuery {
     pub days_old: Option<i64>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 pub struct ServiceConfigUpdate {
     pub max_concurrent_runs: Option<u32>,
     pub default_timeout_hours: Option<u32>,
     pub enable_auto_scheduling: Option<bool>,
-    pub default_priority: Option<JobPriority>,
+    pub default_priority: Option<Priority>,
 }
