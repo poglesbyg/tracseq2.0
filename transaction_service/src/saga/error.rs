@@ -157,6 +157,7 @@ impl ErrorSeverity {
 }
 
 /// Convert from common error types
+#[cfg(feature = "database-persistence")]
 impl From<sqlx::Error> for SagaError {
     fn from(err: sqlx::Error) -> Self {
         SagaError::DatabaseError {

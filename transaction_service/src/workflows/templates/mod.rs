@@ -414,10 +414,10 @@ impl TemplateManager {
             // Update average duration
             if let Some(avg_duration) = metadata.average_duration_minutes {
                 metadata.average_duration_minutes = Some(
-                    ((avg_duration as f64 * (metadata.usage_count - 1) as f64)
+                    (((avg_duration as f64 * (metadata.usage_count - 1) as f64)
                         + duration_minutes as f64)
-                        / metadata.usage_count as f64,
-                ) as u32;
+                        / metadata.usage_count as f64) as u32
+                );
             } else {
                 metadata.average_duration_minutes = Some(duration_minutes);
             }
