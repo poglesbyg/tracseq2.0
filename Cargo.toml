@@ -14,6 +14,10 @@ members = [
     "qaqc_service",
     "library_details_service"
 ]
+exclude = [
+    "circuit-breaker-lib",
+    "config-service"
+]
 resolver = "2"
 
 [workspace.package]

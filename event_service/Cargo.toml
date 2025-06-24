@@ -1,5 +1,5 @@
 [package]
-name = "tracseq-event-service"
+name = "event_service"
 version = "0.1.0"
 edition = "2024"
 authors = ["TracSeq Team <dev@tracseq.com>"]
@@ -86,11 +86,11 @@ version = "0.36"
 optional = true
 
 [lib]
-name = "tracseq_event_service"
+name = "event_service"
 path = "src/lib.rs"
 
 [[bin]]
-name = "event-service"
+name = "event_service"
 path = "src/main.rs"
 
 [profile.release]

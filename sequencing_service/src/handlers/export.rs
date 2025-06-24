@@ -1,16 +1,16 @@
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    Json,
 };
+use chrono::{DateTime, Utc};
 use serde_json::json;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 use crate::{
+    AppState,
     error::{Result, SequencingError},
     models::*,
-    AppState,
 };
 
 /// Export job data in various formats
@@ -20,13 +20,11 @@ pub async fn export_job_data(
     Query(query): Query<ExportJobQuery>,
 ) -> Result<Json<serde_json::Value>> {
     // Get job details
-    let job = sqlx::query_as::<_, SequencingJob>(
-        "SELECT * FROM sequencing_jobs WHERE id = $1"
-    )
-    .bind(job_id)
-    .fetch_optional(&state.db_pool.pool)
-    .await?
-    .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
+    let job = sqlx::query_as::<_, SequencingJob>("SELECT * FROM sequencing_jobs WHERE id = $1")
+        .bind(job_id)
+        .fetch_optional(&state.db_pool.pool)
+        .await?
+        .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
 
     let format = query.format.as_deref().unwrap_or("json");
     let include_samples = query.include_samples.unwrap_or(false);
@@ -52,7 +50,7 @@ pub async fn export_job_data(
 
     if include_analyses {
         let analyses = sqlx::query_as::<_, AnalysisJob>(
-            "SELECT * FROM analysis_jobs WHERE job_id = $1 ORDER BY created_at DESC"
+            "SELECT * FROM analysis_jobs WHERE job_id = $1 ORDER BY created_at DESC",
         )
         .bind(job_id)
         .fetch_all(&state.db_pool.pool)
@@ -63,7 +61,7 @@ pub async fn export_job_data(
             let mut quality_data = Vec::new();
             for analysis in &analyses {
                 if let Ok(Some(metrics)) = sqlx::query_as::<_, QualityMetrics>(
-                    "SELECT * FROM quality_metrics WHERE analysis_id = $1"
+                    "SELECT * FROM quality_metrics WHERE analysis_id = $1",
                 )
                 .bind(analysis.id)
                 .fetch_optional(&state.db_pool.pool)
@@ -85,9 +83,12 @@ pub async fn export_job_data(
         "csv" => export_job_as_csv(&export_data)?,
         "excel" => export_job_as_excel(&export_data)?,
         "xml" => export_as_xml(&export_data)?,
-        _ => return Err(SequencingError::Validation {
-            message: format!("Unsupported export format: {}", format),
-        }),
+        _ => {
+            return Err(SequencingError::Validation(format!(
+                "Unsupported export format: {}",
+                format
+            )));
+        }
     };
 
     // Log export operation
@@ -97,7 +98,7 @@ pub async fn export_job_data(
             id, export_type, job_id, format, file_size,
             exported_at, exported_by, export_options
         ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
-        "#
+        "#,
     )
     .bind(Uuid::new_v4())
     .bind("job_data")
@@ -133,15 +134,15 @@ pub async fn export_batch_jobs(
     Json(request): Json<BatchExportRequest>,
 ) -> Result<Json<serde_json::Value>> {
     if request.job_ids.is_empty() {
-        return Err(SequencingError::Validation {
-            message: "At least one job ID must be provided".to_string(),
-        });
+        return Err(SequencingError::Validation(
+            "At least one job ID must be provided".to_string(),
+        ));
     }
 
     if request.job_ids.len() > 100 {
-        return Err(SequencingError::Validation {
-            message: "Maximum 100 jobs can be exported in a single batch".to_string(),
-        });
+        return Err(SequencingError::Validation(
+            "Maximum 100 jobs can be exported in a single batch".to_string(),
+        ));
     }
 
     let export_id = Uuid::new_v4();
@@ -155,7 +156,7 @@ pub async fn export_batch_jobs(
             created_at, created_by, export_options
         ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
         RETURNING *
-        "#
+        "#,
     )
     .bind(export_id)
     .bind("batch_jobs")
@@ -202,9 +203,12 @@ pub async fn export_batch_jobs(
         "json" => export_as_json(&combined_data)?,
         "csv" => export_batch_as_csv(&combined_data)?,
         "excel" => export_batch_as_excel(&combined_data)?,
-        _ => return Err(SequencingError::Validation {
-            message: format!("Unsupported batch export format: {}", format),
-        }),
+        _ => {
+            return Err(SequencingError::Validation(format!(
+                "Unsupported batch export format: {}",
+                format
+            )));
+        }
     };
 
     // Compress if requested
@@ -221,7 +225,7 @@ pub async fn export_batch_jobs(
         SET status = $2, completed_at = NOW(), file_size = $3,
             successful_count = $4, failed_count = $5
         WHERE id = $1
-        "#
+        "#,
     )
     .bind(export_id)
     .bind("completed")
@@ -266,17 +270,15 @@ pub async fn export_analysis_results(
     Query(query): Query<ExportAnalysisQuery>,
 ) -> Result<Json<serde_json::Value>> {
     // Get analysis details
-    let analysis = sqlx::query_as::<_, AnalysisJob>(
-        "SELECT * FROM analysis_jobs WHERE id = $1"
-    )
-    .bind(analysis_id)
-    .fetch_optional(&state.db_pool.pool)
-    .await?
-    .ok_or(SequencingError::AnalysisNotFound { analysis_id })?;
+    let analysis = sqlx::query_as::<_, AnalysisJob>("SELECT * FROM analysis_jobs WHERE id = $1")
+        .bind(analysis_id)
+        .fetch_optional(&state.db_pool.pool)
+        .await?
+        .ok_or(SequencingError::AnalysisNotFound { analysis_id })?;
 
     // Get analysis results
     let results = sqlx::query_as::<_, AnalysisResult>(
-        "SELECT * FROM analysis_results WHERE analysis_id = $1 ORDER BY created_at"
+        "SELECT * FROM analysis_results WHERE analysis_id = $1 ORDER BY created_at",
     )
     .bind(analysis_id)
     .fetch_all(&state.db_pool.pool)
@@ -284,12 +286,10 @@ pub async fn export_analysis_results(
 
     // Get quality metrics if requested
     let quality_metrics = if query.include_quality_metrics.unwrap_or(true) {
-        sqlx::query_as::<_, QualityMetrics>(
-            "SELECT * FROM quality_metrics WHERE analysis_id = $1"
-        )
-        .bind(analysis_id)
-        .fetch_optional(&state.db_pool.pool)
-        .await?
+        sqlx::query_as::<_, QualityMetrics>("SELECT * FROM quality_metrics WHERE analysis_id = $1")
+            .bind(analysis_id)
+            .fetch_optional(&state.db_pool.pool)
+            .await?
     } else {
         None
     };
@@ -306,9 +306,12 @@ pub async fn export_analysis_results(
     let exported_content = match format {
         "json" => export_as_json(&export_data)?,
         "csv" => export_analysis_as_csv(&export_data)?,
-        _ => return Err(SequencingError::Validation {
-            message: format!("Unsupported analysis export format: {}", format),
-        }),
+        _ => {
+            return Err(SequencingError::Validation(format!(
+                "Unsupported analysis export format: {}",
+                format
+            )));
+        }
     };
 
     // Log export
@@ -318,7 +321,7 @@ pub async fn export_analysis_results(
             id, export_type, analysis_id, format, file_size,
             exported_at, exported_by, export_options
         ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
-        "#
+        "#,
     )
     .bind(Uuid::new_v4())
     .bind("analysis_results")
@@ -351,7 +354,9 @@ pub async fn generate_comprehensive_report(
     Json(request): Json<GenerateReportRequest>,
 ) -> Result<Json<serde_json::Value>> {
     let report_id = Uuid::new_v4();
-    let start_date = request.start_date.unwrap_or_else(|| Utc::now() - chrono::Duration::days(30));
+    let start_date = request
+        .start_date
+        .unwrap_or_else(|| Utc::now() - chrono::Duration::days(30));
     let end_date = request.end_date.unwrap_or_else(Utc::now);
 
     // Create report record
@@ -362,7 +367,7 @@ pub async fn generate_comprehensive_report(
             status, created_at, created_by, parameters
         ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8)
         RETURNING *
-        "#
+        "#,
     )
     .bind(report_id)
     .bind(&request.report_type)
@@ -377,13 +382,36 @@ pub async fn generate_comprehensive_report(
 
     // Generate report data based on type
     let report_data = match request.report_type.as_str() {
-        "jobs_summary" => generate_jobs_summary_report(&state, start_date, end_date, request.platform_filter.as_deref()).await?,
-        "quality_analysis" => generate_quality_analysis_report(&state, start_date, end_date, request.platform_filter.as_deref()).await?,
-        "platform_utilization" => generate_platform_utilization_report(&state, start_date, end_date).await?,
-        "performance_metrics" => generate_performance_metrics_report(&state, start_date, end_date).await?,
-        _ => return Err(SequencingError::Validation {
-            message: format!("Unsupported report type: {}", request.report_type),
-        }),
+        "jobs_summary" => {
+            generate_jobs_summary_report(
+                &state,
+                start_date,
+                end_date,
+                request.platform_filter.as_deref(),
+            )
+            .await?
+        }
+        "quality_analysis" => {
+            generate_quality_analysis_report(
+                &state,
+                start_date,
+                end_date,
+                request.platform_filter.as_deref(),
+            )
+            .await?
+        }
+        "platform_utilization" => {
+            generate_platform_utilization_report(&state, start_date, end_date).await?
+        }
+        "performance_metrics" => {
+            generate_performance_metrics_report(&state, start_date, end_date).await?
+        }
+        _ => {
+            return Err(SequencingError::Validation(format!(
+                "Unsupported report type: {}",
+                request.report_type
+            )));
+        }
     };
 
     // Format report
@@ -393,9 +421,12 @@ pub async fn generate_comprehensive_report(
         "pdf" => generate_pdf_report(&report_data)?,
         "html" => generate_html_report(&report_data)?,
         "csv" => export_report_as_csv(&report_data)?,
-        _ => return Err(SequencingError::Validation {
-            message: format!("Unsupported report format: {}", format),
-        }),
+        _ => {
+            return Err(SequencingError::Validation(format!(
+                "Unsupported report format: {}",
+                format
+            )));
+        }
     };
 
     // Update report record
@@ -404,7 +435,7 @@ pub async fn generate_comprehensive_report(
         UPDATE comprehensive_reports 
         SET status = $2, completed_at = NOW(), file_size = $3, content = $4
         WHERE id = $1
-        "#
+        "#,
     )
     .bind(report_id)
     .bind("completed")
@@ -436,7 +467,7 @@ pub async fn get_export_history(
     let offset = (page - 1) * page_size;
 
     let mut where_conditions = Vec::new();
-    
+
     if let Some(export_type) = &query.export_type {
         where_conditions.push(format!("export_type = '{}'", export_type));
     }
@@ -453,7 +484,8 @@ pub async fn get_export_history(
 
     // Get total count
     let total_count: i64 = sqlx::query_scalar(&format!(
-        "SELECT COUNT(*) FROM export_logs {}", where_clause
+        "SELECT COUNT(*) FROM export_logs {}",
+        where_clause
     ))
     .fetch_one(&state.db_pool.pool)
     .await?;
@@ -499,13 +531,11 @@ async fn export_single_job_for_batch(
     job_id: Uuid,
     request: &BatchExportRequest,
 ) -> Result<serde_json::Value> {
-    let job = sqlx::query_as::<_, SequencingJob>(
-        "SELECT * FROM sequencing_jobs WHERE id = $1"
-    )
-    .bind(job_id)
-    .fetch_optional(&state.db_pool.pool)
-    .await?
-    .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
+    let job = sqlx::query_as::<_, SequencingJob>("SELECT * FROM sequencing_jobs WHERE id = $1")
+        .bind(job_id)
+        .fetch_optional(&state.db_pool.pool)
+        .await?
+        .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
 
     let mut job_data = json!(job);
 
@@ -515,12 +545,11 @@ async fn export_single_job_for_batch(
     }
 
     if request.include_analyses.unwrap_or(true) {
-        let analyses = sqlx::query_as::<_, AnalysisJob>(
-            "SELECT * FROM analysis_jobs WHERE job_id = $1"
-        )
-        .bind(job_id)
-        .fetch_all(&state.db_pool.pool)
-        .await?;
+        let analyses =
+            sqlx::query_as::<_, AnalysisJob>("SELECT * FROM analysis_jobs WHERE job_id = $1")
+                .bind(job_id)
+                .fetch_all(&state.db_pool.pool)
+                .await?;
         job_data["analyses"] = json!(analyses);
     }
 
@@ -535,10 +564,10 @@ fn export_as_json(data: &serde_json::Value) -> Result<String> {
 
 fn export_job_as_csv(data: &serde_json::Value) -> Result<String> {
     let mut csv_content = String::new();
-    
+
     // Add headers
     csv_content.push_str("job_id,job_name,platform,status,priority,created_at,updated_at\n");
-    
+
     // Add job data
     if let Some(job) = data.get("job") {
         let row = format!(
@@ -553,7 +582,7 @@ fn export_job_as_csv(data: &serde_json::Value) -> Result<String> {
         );
         csv_content.push_str(&row);
     }
-    
+
     Ok(csv_content)
 }
 
@@ -573,7 +602,7 @@ fn export_as_xml(data: &serde_json::Value) -> Result<String> {
     xml_content.push_str(&json_to_xml(data, 2));
     xml_content.push_str("  </data>\n");
     xml_content.push_str("</export>");
-    
+
     Ok(xml_content)
 }
 
@@ -600,7 +629,7 @@ fn json_to_xml(value: &serde_json::Value, indent: usize) -> String {
 fn export_batch_as_csv(data: &serde_json::Value) -> Result<String> {
     let mut csv_content = String::new();
     csv_content.push_str("job_id,job_name,platform,status,priority,created_at\n");
-    
+
     if let Some(jobs) = data.get("jobs").and_then(|j| j.as_array()) {
         for job in jobs {
             let row = format!(
@@ -615,7 +644,7 @@ fn export_batch_as_csv(data: &serde_json::Value) -> Result<String> {
             csv_content.push_str(&row);
         }
     }
-    
+
     Ok(csv_content)
 }
 
@@ -627,20 +656,32 @@ fn export_batch_as_excel(_data: &serde_json::Value) -> Result<String> {
 fn export_analysis_as_csv(data: &serde_json::Value) -> Result<String> {
     let mut csv_content = String::new();
     csv_content.push_str("analysis_id,pipeline_id,status,created_at,result_count\n");
-    
+
     if let Some(analysis) = data.get("analysis") {
-        let result_count = data.get("result_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let result_count = data
+            .get("result_count")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
         let row = format!(
             "{},{},{},{},{}\n",
             analysis.get("id").and_then(|v| v.as_str()).unwrap_or(""),
-            analysis.get("pipeline_id").and_then(|v| v.as_str()).unwrap_or(""),
-            analysis.get("status").and_then(|v| v.as_str()).unwrap_or(""),
-            analysis.get("created_at").and_then(|v| v.as_str()).unwrap_or(""),
+            analysis
+                .get("pipeline_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or(""),
+            analysis
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or(""),
+            analysis
+                .get("created_at")
+                .and_then(|v| v.as_str())
+                .unwrap_or(""),
             result_count
         );
         csv_content.push_str(&row);
     }
-    
+
     Ok(csv_content)
 }
 
@@ -655,19 +696,19 @@ async fn generate_jobs_summary_report(
     end_date: DateTime<Utc>,
     platform_filter: Option<&str>,
 ) -> Result<serde_json::Value> {
-    let mut where_conditions = vec![
-        format!("created_at BETWEEN '{}' AND '{}'", start_date, end_date)
-    ];
-    
+    let mut where_conditions = vec![format!(
+        "created_at BETWEEN '{}' AND '{}'",
+        start_date, end_date
+    )];
+
     if let Some(platform) = platform_filter {
         where_conditions.push(format!("platform = '{}'", platform));
     }
 
     let where_clause = where_conditions.join(" AND ");
 
-    let summary = sqlx::query!(
-        &format!(
-            r#"
+    let summary = sqlx::query!(&format!(
+        r#"
             SELECT 
                 COUNT(*) as total_jobs,
                 COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_jobs,
@@ -676,9 +717,8 @@ async fn generate_jobs_summary_report(
             FROM sequencing_jobs 
             WHERE {}
             "#,
-            where_clause
-        )
-    )
+        where_clause
+    ))
     .fetch_one(&state.db_pool.pool)
     .await?;
 
@@ -769,7 +809,10 @@ fn generate_html_report(data: &serde_json::Value) -> Result<String> {
     let mut html = String::new();
     html.push_str("<!DOCTYPE html><html><head><title>Sequencing Report</title></head><body>");
     html.push_str("<h1>Sequencing Service Report</h1>");
-    html.push_str(&format!("<pre>{}</pre>", serde_json::to_string_pretty(data).unwrap_or_default()));
+    html.push_str(&format!(
+        "<pre>{}</pre>",
+        serde_json::to_string_pretty(data).unwrap_or_default()
+    ));
     html.push_str("</body></html>");
     Ok(html)
 }

@@ -1,16 +1,16 @@
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    Json,
 };
+use chrono::{DateTime, Utc};
 use serde_json::json;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 use crate::{
+    AppState,
     error::{Result, SequencingError},
     models::*,
-    AppState,
 };
 
 /// Sync jobs with sample service
@@ -51,7 +51,7 @@ pub async fn sync_with_sample_service(
             id, integration_type, operation, details, 
             success_count, error_count, created_at, initiated_by
         ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
-        "#
+        "#,
     )
     .bind(Uuid::new_v4())
     .bind("sample_service")
@@ -90,13 +90,11 @@ pub async fn push_to_notification_service(
     Json(request): Json<NotificationPushRequest>,
 ) -> Result<Json<serde_json::Value>> {
     // Get job details
-    let job = sqlx::query_as::<_, SequencingJob>(
-        "SELECT * FROM sequencing_jobs WHERE id = $1"
-    )
-    .bind(job_id)
-    .fetch_optional(&state.db_pool.pool)
-    .await?
-    .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
+    let job = sqlx::query_as::<_, SequencingJob>("SELECT * FROM sequencing_jobs WHERE id = $1")
+        .bind(job_id)
+        .fetch_optional(&state.db_pool.pool)
+        .await?
+        .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
 
     // Prepare notification payload
     let notification_payload = json!({
@@ -125,7 +123,7 @@ pub async fn push_to_notification_service(
                     id, integration_type, operation, job_id, details,
                     success_count, error_count, created_at, initiated_by
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
-                "#
+                "#,
             )
             .bind(Uuid::new_v4())
             .bind("notification_service")
@@ -160,7 +158,7 @@ pub async fn push_to_notification_service(
                     id, integration_type, operation, job_id, details,
                     success_count, error_count, created_at, initiated_by
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
-                "#
+                "#,
             )
             .bind(Uuid::new_v4())
             .bind("notification_service")
@@ -190,7 +188,7 @@ pub async fn register_webhook(
     Json(request): Json<RegisterWebhookRequest>,
 ) -> Result<Json<serde_json::Value>> {
     let webhook_id = Uuid::new_v4();
-    
+
     let webhook = sqlx::query_as::<_, IntegrationWebhook>(
         r#"
         INSERT INTO integration_webhooks (
@@ -199,7 +197,7 @@ pub async fn register_webhook(
             created_at, created_by
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9)
         RETURNING *
-        "#
+        "#,
     )
     .bind(webhook_id)
     .bind(&request.name)
@@ -230,7 +228,7 @@ pub async fn list_webhooks(
     let offset = (page - 1) * page_size;
 
     let mut where_conditions = Vec::new();
-    
+
     if let Some(is_active) = query.is_active {
         where_conditions.push(format!("is_active = {}", is_active));
     }
@@ -243,7 +241,8 @@ pub async fn list_webhooks(
 
     // Get total count
     let total_count: i64 = sqlx::query_scalar(&format!(
-        "SELECT COUNT(*) FROM integration_webhooks {}", where_clause
+        "SELECT COUNT(*) FROM integration_webhooks {}",
+        where_clause
     ))
     .fetch_one(&state.db_pool.pool)
     .await?;
@@ -280,7 +279,7 @@ pub async fn send_webhook_notification(
 ) -> Result<Json<serde_json::Value>> {
     // Get webhook details
     let webhook = sqlx::query_as::<_, IntegrationWebhook>(
-        "SELECT * FROM integration_webhooks WHERE id = $1 AND is_active = true"
+        "SELECT * FROM integration_webhooks WHERE id = $1 AND is_active = true",
     )
     .bind(webhook_id)
     .fetch_optional(&state.db_pool.pool)
@@ -288,13 +287,14 @@ pub async fn send_webhook_notification(
     .ok_or(SequencingError::WebhookNotFound { webhook_id })?;
 
     // Check if event type is supported
-    let event_types: Vec<String> = serde_json::from_value(webhook.event_types.clone())
-        .unwrap_or_default();
-    
+    let event_types: Vec<String> =
+        serde_json::from_value(webhook.event_types.clone()).unwrap_or_default();
+
     if !event_types.contains(&request.event_type) {
-        return Err(SequencingError::Validation {
-            message: format!("Event type '{}' not supported by this webhook", request.event_type),
-        });
+        return Err(SequencingError::Validation(format!(
+            "Event type '{}' not supported by this webhook",
+            request.event_type
+        )));
     }
 
     // Prepare webhook payload
@@ -318,7 +318,7 @@ pub async fn send_webhook_notification(
             response_body, delivered_at, retry_count
         ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
         RETURNING *
-        "#
+        "#,
     )
     .bind(delivery_id)
     .bind(webhook_id)
@@ -369,7 +369,7 @@ pub async fn get_integration_logs(
     let offset = (page - 1) * page_size;
 
     let mut where_conditions = Vec::new();
-    
+
     if let Some(integration_type) = &query.integration_type {
         where_conditions.push(format!("integration_type = '{}'", integration_type));
     }
@@ -390,7 +390,8 @@ pub async fn get_integration_logs(
 
     // Get total count
     let total_count: i64 = sqlx::query_scalar(&format!(
-        "SELECT COUNT(*) FROM integration_logs {}", where_clause
+        "SELECT COUNT(*) FROM integration_logs {}",
+        where_clause
     ))
     .fetch_one(&state.db_pool.pool)
     .await?;
@@ -425,7 +426,7 @@ pub async fn sync_with_lims(
     Json(request): Json<LIMSSyncRequest>,
 ) -> Result<Json<serde_json::Value>> {
     let sync_id = Uuid::new_v4();
-    
+
     // Start sync operation
     let sync_record = sqlx::query_as::<_, LIMSSync>(
         r#"
@@ -434,7 +435,7 @@ pub async fn sync_with_lims(
             job_ids, status, started_at, initiated_by
         ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
         RETURNING *
-        "#
+        "#,
     )
     .bind(sync_id)
     .bind(&request.lims_system)
@@ -451,9 +452,10 @@ pub async fn sync_with_lims(
         "job_status" => sync_job_status_to_lims(&state, &request).await,
         "sample_data" => sync_sample_data_from_lims(&state, &request).await,
         "results" => sync_results_to_lims(&state, &request).await,
-        _ => Err(SequencingError::Validation {
-            message: format!("Unsupported sync type: {}", request.sync_type),
-        }),
+        _ => Err(SequencingError::Validation(format!(
+            "Unsupported sync type: {}",
+            request.sync_type
+        ))),
     };
 
     // Update sync record with results
@@ -467,7 +469,7 @@ pub async fn sync_with_lims(
         UPDATE lims_syncs 
         SET status = $2, completed_at = NOW(), error_message = $3
         WHERE id = $1
-        "#
+        "#,
     )
     .bind(sync_id)
     .bind(status)
@@ -528,7 +530,7 @@ pub async fn test_integration_connectivity(
             id, integration_type, operation, details,
             success_count, error_count, created_at, initiated_by
         ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
-        "#
+        "#,
     )
     .bind(Uuid::new_v4())
     .bind("connectivity_test")
@@ -537,8 +539,18 @@ pub async fn test_integration_connectivity(
         "test_results": test_results,
         "services_tested": request.services
     }))
-    .bind(test_results.iter().filter(|r| r.status == "healthy").count() as i32)
-    .bind(test_results.iter().filter(|r| r.status != "healthy").count() as i32)
+    .bind(
+        test_results
+            .iter()
+            .filter(|r| r.status == "healthy")
+            .count() as i32,
+    )
+    .bind(
+        test_results
+            .iter()
+            .filter(|r| r.status != "healthy")
+            .count() as i32,
+    )
     .bind(request.initiated_by.as_deref())
     .execute(&state.db_pool.pool)
     .await?;
@@ -566,7 +578,7 @@ pub async fn test_integration_connectivity(
 async fn sync_single_sample(state: &AppState, sample_id: &Uuid) -> Result<serde_json::Value> {
     // This would call the actual sample service API
     // For now, we'll simulate the call
-    
+
     if let Ok(response) = state.sample_client.get_sample(*sample_id).await {
         Ok(json!({
             "sample_id": sample_id,
@@ -586,19 +598,27 @@ async fn send_to_notification_service(
     payload: &serde_json::Value,
 ) -> Result<serde_json::Value> {
     // This would call the actual notification service API
-    state.notification_client.send_notification(payload).await
+    state
+        .notification_client
+        .send_notification(payload)
+        .await
         .map_err(|e| SequencingError::IntegrationError {
             service: "notification_service".to_string(),
             message: e.to_string(),
         })
 }
 
-async fn deliver_webhook(webhook: &IntegrationWebhook, payload: &serde_json::Value) -> WebhookDeliveryResult {
+async fn deliver_webhook(
+    webhook: &IntegrationWebhook,
+    payload: &serde_json::Value,
+) -> WebhookDeliveryResult {
     // Simulate webhook delivery
     // In a real implementation, this would make an HTTP request to the webhook URL
-    
+
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(webhook.timeout_seconds as u64))
+        .timeout(std::time::Duration::from_secs(
+            webhook.timeout_seconds as u64,
+        ))
         .build()
         .unwrap();
 
@@ -613,7 +633,7 @@ async fn deliver_webhook(webhook: &IntegrationWebhook, payload: &serde_json::Val
         Ok(response) => {
             let status_code = response.status().as_u16();
             let response_body = response.text().await.unwrap_or_default();
-            
+
             WebhookDeliveryResult {
                 success: status_code >= 200 && status_code < 300,
                 status_code: Some(status_code as i32),
@@ -628,22 +648,27 @@ async fn deliver_webhook(webhook: &IntegrationWebhook, payload: &serde_json::Val
     }
 }
 
-async fn schedule_webhook_retry(state: &AppState, delivery_id: Uuid, retry_attempt: i32) -> Result<()> {
+async fn schedule_webhook_retry(
+    state: &AppState,
+    delivery_id: Uuid,
+    retry_attempt: i32,
+) -> Result<()> {
     // In a real implementation, this would schedule a retry using a job queue
     // For now, we'll just log the retry attempt
-    
-    sqlx::query(
-        "UPDATE webhook_deliveries SET retry_count = $2 WHERE id = $1"
-    )
-    .bind(delivery_id)
-    .bind(retry_attempt)
-    .execute(&state.db_pool.pool)
-    .await?;
+
+    sqlx::query("UPDATE webhook_deliveries SET retry_count = $2 WHERE id = $1")
+        .bind(delivery_id)
+        .bind(retry_attempt)
+        .execute(&state.db_pool.pool)
+        .await?;
 
     Ok(())
 }
 
-async fn sync_job_status_to_lims(state: &AppState, request: &LIMSSyncRequest) -> Result<serde_json::Value> {
+async fn sync_job_status_to_lims(
+    state: &AppState,
+    request: &LIMSSyncRequest,
+) -> Result<serde_json::Value> {
     // Simulate LIMS sync
     Ok(json!({
         "synced_jobs": request.job_ids.len(),
@@ -652,7 +677,10 @@ async fn sync_job_status_to_lims(state: &AppState, request: &LIMSSyncRequest) ->
     }))
 }
 
-async fn sync_sample_data_from_lims(state: &AppState, request: &LIMSSyncRequest) -> Result<serde_json::Value> {
+async fn sync_sample_data_from_lims(
+    state: &AppState,
+    request: &LIMSSyncRequest,
+) -> Result<serde_json::Value> {
     // Simulate LIMS sync
     Ok(json!({
         "synced_samples": request.job_ids.len() * 5, // Assume 5 samples per job
@@ -661,7 +689,10 @@ async fn sync_sample_data_from_lims(state: &AppState, request: &LIMSSyncRequest)
     }))
 }
 
-async fn sync_results_to_lims(state: &AppState, request: &LIMSSyncRequest) -> Result<serde_json::Value> {
+async fn sync_results_to_lims(
+    state: &AppState,
+    request: &LIMSSyncRequest,
+) -> Result<serde_json::Value> {
     // Simulate LIMS sync
     Ok(json!({
         "synced_results": request.job_ids.len(),
@@ -672,7 +703,7 @@ async fn sync_results_to_lims(state: &AppState, request: &LIMSSyncRequest) -> Re
 
 async fn test_sample_service_connectivity(state: &AppState) -> TestResult {
     let start_time = std::time::Instant::now();
-    
+
     match state.sample_client.health_check().await {
         Ok(_) => TestResult {
             service: "sample_service".to_string(),
@@ -691,7 +722,7 @@ async fn test_sample_service_connectivity(state: &AppState) -> TestResult {
 
 async fn test_notification_service_connectivity(state: &AppState) -> TestResult {
     let start_time = std::time::Instant::now();
-    
+
     match state.notification_client.health_check().await {
         Ok(_) => TestResult {
             service: "notification_service".to_string(),
@@ -710,7 +741,7 @@ async fn test_notification_service_connectivity(state: &AppState) -> TestResult 
 
 async fn test_storage_service_connectivity(state: &AppState) -> TestResult {
     let start_time = std::time::Instant::now();
-    
+
     match state.storage_client.health_check().await {
         Ok(_) => TestResult {
             service: "storage_service".to_string(),
@@ -729,7 +760,7 @@ async fn test_storage_service_connectivity(state: &AppState) -> TestResult {
 
 async fn test_auth_service_connectivity(state: &AppState) -> TestResult {
     let start_time = std::time::Instant::now();
-    
+
     match state.auth_client.health_check().await {
         Ok(_) => TestResult {
             service: "auth_service".to_string(),
@@ -783,7 +814,7 @@ pub struct WebhookNotificationRequest {
 #[derive(serde::Deserialize)]
 pub struct LIMSSyncRequest {
     pub lims_system: String,
-    pub sync_type: String, // "job_status", "sample_data", "results"
+    pub sync_type: String,      // "job_status", "sample_data", "results"
     pub sync_direction: String, // "to_lims", "from_lims", "bidirectional"
     pub job_ids: Vec<Uuid>,
     pub initiated_by: Option<String>,

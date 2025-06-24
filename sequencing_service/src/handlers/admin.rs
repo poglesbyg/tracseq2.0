@@ -1,16 +1,16 @@
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    Json,
 };
+use chrono::{DateTime, Utc};
 use serde_json::json;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 use crate::{
+    AppState,
     error::{Result, SequencingError},
     models::*,
-    AppState,
 };
 
 /// Get system statistics for administrators
@@ -23,20 +23,20 @@ pub async fn get_system_statistics(
         .await?;
 
     let jobs_by_status = sqlx::query_as::<_, (String, i64)>(
-        "SELECT status::text, COUNT(*) FROM sequencing_jobs GROUP BY status"
+        "SELECT status::text, COUNT(*) FROM sequencing_jobs GROUP BY status",
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
 
     let jobs_by_platform = sqlx::query_as::<_, (String, i64)>(
-        "SELECT platform, COUNT(*) FROM sequencing_jobs GROUP BY platform"
+        "SELECT platform, COUNT(*) FROM sequencing_jobs GROUP BY platform",
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
 
     // Get recent activity (last 7 days)
     let recent_jobs: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM sequencing_jobs WHERE created_at > NOW() - INTERVAL '7 days'"
+        "SELECT COUNT(*) FROM sequencing_jobs WHERE created_at > NOW() - INTERVAL '7 days'",
     )
     .fetch_one(&state.db_pool.pool)
     .await?;
@@ -53,17 +53,16 @@ pub async fn get_system_statistics(
         .await?;
 
     let active_runs: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM sequencing_runs WHERE status IN ('running', 'queued')"
+        "SELECT COUNT(*) FROM sequencing_runs WHERE status IN ('running', 'queued')",
     )
     .fetch_one(&state.db_pool.pool)
     .await?;
 
     // Get workflow statistics
-    let active_workflows: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM sequencing_workflows WHERE status = 'active'"
-    )
-    .fetch_one(&state.db_pool.pool)
-    .await?;
+    let active_workflows: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM sequencing_workflows WHERE status = 'active'")
+            .fetch_one(&state.db_pool.pool)
+            .await?;
 
     // Calculate performance metrics
     let avg_processing_time: Option<f64> = sqlx::query_scalar(
@@ -74,7 +73,7 @@ pub async fn get_system_statistics(
         AND started_at IS NOT NULL 
         AND completed_at IS NOT NULL
         AND completed_at > NOW() - INTERVAL '30 days'
-        "#
+        "#,
     )
     .fetch_optional(&state.db_pool.pool)
     .await?
@@ -118,7 +117,7 @@ pub async fn get_job_analytics(
         WHERE created_at > $1
         GROUP BY DATE(created_at)
         ORDER BY date
-        "#
+        "#,
     )
     .bind(start_date)
     .fetch_all(&state.db_pool.pool)
@@ -137,7 +136,7 @@ pub async fn get_job_analytics(
         FROM sequencing_jobs 
         WHERE created_at > $1
         GROUP BY outcome
-        "#
+        "#,
     )
     .bind(start_date)
     .fetch_all(&state.db_pool.pool)
@@ -187,9 +186,7 @@ pub async fn get_job_analytics(
 }
 
 /// Get system health information
-pub async fn get_system_health(
-    State(state): State<AppState>,
-) -> Result<Json<serde_json::Value>> {
+pub async fn get_system_health(State(state): State<AppState>) -> Result<Json<serde_json::Value>> {
     // Check database connectivity
     let db_health = match sqlx::query("SELECT 1").fetch_one(&state.db_pool.pool).await {
         Ok(_) => "healthy",
@@ -203,7 +200,7 @@ pub async fn get_system_health(
         WHERE status = 'running' 
         AND started_at IS NOT NULL 
         AND started_at < NOW() - INTERVAL '48 hours'
-        "#
+        "#,
     )
     .fetch_one(&state.db_pool.pool)
     .await
@@ -219,7 +216,7 @@ pub async fn get_system_health(
 
     // Check queue depth
     let queue_depth: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM sequencing_jobs WHERE status IN ('queued', 'validated')"
+        "SELECT COUNT(*) FROM sequencing_jobs WHERE status IN ('queued', 'validated')",
     )
     .fetch_one(&state.db_pool.pool)
     .await
@@ -250,9 +247,7 @@ pub async fn get_system_health(
 }
 
 /// Force cleanup of stuck jobs
-pub async fn cleanup_stuck_jobs(
-    State(state): State<AppState>,
-) -> Result<Json<serde_json::Value>> {
+pub async fn cleanup_stuck_jobs(State(state): State<AppState>) -> Result<Json<serde_json::Value>> {
     let updated_jobs = sqlx::query(
         r#"
         UPDATE sequencing_jobs 
@@ -263,7 +258,7 @@ pub async fn cleanup_stuck_jobs(
         AND started_at IS NOT NULL 
         AND started_at < NOW() - INTERVAL '48 hours'
         RETURNING id
-        "#
+        "#,
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
@@ -292,7 +287,7 @@ pub async fn get_resource_utilization(
             COUNT(CASE WHEN status IN ('running', 'queued') THEN 1 END) as active_jobs
         FROM sequencing_jobs 
         GROUP BY platform
-        "#
+        "#,
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
@@ -312,18 +307,17 @@ pub async fn get_resource_utilization(
                 WHEN 'normal' THEN 4
                 WHEN 'low' THEN 5
             END
-        "#
+        "#,
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
 
     // Estimate capacity utilization (simplified)
     let total_capacity = state.config.sequencing.max_concurrent_runs as i64;
-    let current_usage: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM sequencing_jobs WHERE status = 'running'"
-    )
-    .fetch_one(&state.db_pool.pool)
-    .await?;
+    let current_usage: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM sequencing_jobs WHERE status = 'running'")
+            .fetch_one(&state.db_pool.pool)
+            .await?;
 
     let utilization_percentage = if total_capacity > 0 {
         (current_usage as f64 / total_capacity as f64 * 100.0).round()
@@ -358,14 +352,14 @@ pub async fn purge_old_jobs(
     Query(query): Query<PurgeQuery>,
 ) -> Result<Json<serde_json::Value>> {
     let days_old = query.days_old.unwrap_or(90);
-    
+
     let purged_jobs = sqlx::query(
         r#"
         DELETE FROM sequencing_jobs 
         WHERE status IN ('completed', 'failed', 'cancelled')
         AND updated_at < NOW() - INTERVAL $1 DAY
         RETURNING id
-        "#
+        "#,
     )
     .bind(days_old)
     .fetch_all(&state.db_pool.pool)
@@ -390,20 +384,21 @@ pub async fn update_service_config(
 ) -> Result<Json<serde_json::Value>> {
     // This would typically update configuration in a database or config management system
     // For now, we'll just validate the request and return success
-    
+
     if let Some(max_concurrent) = request.max_concurrent_runs {
         if max_concurrent == 0 || max_concurrent > 100 {
-            return Err(SequencingError::Validation {
-                message: "max_concurrent_runs must be between 1 and 100".to_string(),
-            });
+            return Err(SequencingError::Validation(
+                "max_concurrent_runs must be between 1 and 100".to_string(),
+            ));
         }
     }
 
     if let Some(default_timeout) = request.default_timeout_hours {
-        if default_timeout == 0 || default_timeout > 168 { // Max 1 week
-            return Err(SequencingError::Validation {
-                message: "default_timeout_hours must be between 1 and 168".to_string(),
-            });
+        if default_timeout == 0 || default_timeout > 168 {
+            // Max 1 week
+            return Err(SequencingError::Validation(
+                "default_timeout_hours must be between 1 and 168".to_string(),
+            ));
         }
     }
 

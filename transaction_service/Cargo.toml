@@ -1,5 +1,5 @@
 [package]
-name = "tracseq-transaction-service"
+name = "transaction_service"
 version = "0.1.0"
 edition = "2024"
 authors = ["TracSeq Team <dev@tracseq.com>"]
@@ -90,7 +90,7 @@ etcd-coordination = ["etcd-rs"]
 event-integration = []
 
 [[bin]]
-name = "transaction-service"
+name = "transaction_service"
 path = "src/main.rs"
 
 [profile.release]

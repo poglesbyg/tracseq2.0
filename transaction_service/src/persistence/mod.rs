@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Postgres};
 use uuid::Uuid;
 
-use crate::saga::{TransactionSaga, SagaState, SagaStatus};
+use crate::saga::{SagaState, SagaStatus, TransactionSaga};
 
 pub use models::*;
 pub use repository::SagaRepository;
@@ -26,7 +26,8 @@ pub struct DatabaseConfig {
 impl Default for DatabaseConfig {
     fn default() -> Self {
         Self {
-            connection_string: "postgresql://tracseq:tracseq@localhost:5432/tracseq_transactions".to_string(),
+            connection_string: "postgresql://tracseq:tracseq@localhost:5432/tracseq_transactions"
+                .to_string(),
             max_connections: 20,
             min_connections: 5,
             connection_timeout_seconds: 30,
@@ -47,7 +48,9 @@ impl SagaPersistenceService {
         let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(config.max_connections)
             .min_connections(config.min_connections)
-            .acquire_timeout(std::time::Duration::from_secs(config.connection_timeout_seconds))
+            .acquire_timeout(std::time::Duration::from_secs(
+                config.connection_timeout_seconds,
+            ))
             .connect(&config.connection_string)
             .await?;
 
@@ -96,13 +99,26 @@ impl SagaPersistenceService {
         self.repository.cleanup_old_sagas(older_than_hours).await
     }
 
+    /// Get database statistics for monitoring
+    pub async fn get_statistics(&self) -> Result<DatabaseStatistics> {
+        let active_sagas = self.repository.count_active_sagas().await? as u64;
+        let completed_sagas = self.repository.count_completed_sagas().await? as u64;
+        let failed_sagas = self.repository.count_failed_sagas().await? as u64;
+        let total_sagas = self.repository.count_total_sagas().await? as u64;
+
+        Ok(DatabaseStatistics {
+            active_sagas,
+            completed_sagas,
+            failed_sagas,
+            total_sagas,
+        })
+    }
+
     /// Perform database health check
     pub async fn health_check(&self) -> Result<DatabaseHealth> {
         let start_time = std::time::Instant::now();
-        
-        let result = sqlx::query("SELECT 1 as test")
-            .fetch_one(&self.pool)
-            .await;
+
+        let result = sqlx::query("SELECT 1 as test").fetch_one(&self.pool).await;
 
         let response_time_ms = start_time.elapsed().as_millis() as u64;
 
@@ -114,22 +130,20 @@ impl SagaPersistenceService {
                 Ok(DatabaseHealth {
                     is_connected: true,
                     response_time_ms,
-                    active_connections: pool_status - idle_connections,
-                    idle_connections,
+                    active_connections: pool_status.saturating_sub(idle_connections as u32),
+                    idle_connections: idle_connections as u32,
                     max_connections: pool_status,
                     error_message: None,
                 })
             }
-            Err(e) => {
-                Ok(DatabaseHealth {
-                    is_connected: false,
-                    response_time_ms,
-                    active_connections: 0,
-                    idle_connections: 0,
-                    max_connections: 0,
-                    error_message: Some(e.to_string()),
-                })
-            }
+            Err(e) => Ok(DatabaseHealth {
+                is_connected: false,
+                response_time_ms,
+                active_connections: 0,
+                idle_connections: 0,
+                max_connections: 0,
+                error_message: Some(e.to_string()),
+            }),
         }
     }
 }
@@ -143,4 +157,13 @@ pub struct DatabaseHealth {
     pub idle_connections: u32,
     pub max_connections: u32,
     pub error_message: Option<String>,
+}
+
+/// Database statistics for monitoring
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatabaseStatistics {
+    pub active_sagas: u64,
+    pub completed_sagas: u64,
+    pub failed_sagas: u64,
+    pub total_sagas: u64,
 }

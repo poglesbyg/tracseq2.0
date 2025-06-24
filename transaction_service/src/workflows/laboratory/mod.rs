@@ -8,12 +8,12 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::saga::{
-    step::{SagaStep, StepResult, StepStatus},
-    compensation::{SagaCompensation, CompensationResult, CompensationStatus},
     TransactionContext,
+    compensation::{CompensationResult, CompensationStatus, CompensationStep},
+    step::{SagaStep, StepResult, StepStatus},
 };
-use crate::workflows::{WorkflowPriority, RiskLevel};
 use crate::workflows::rag_integration::RagServiceClient;
+use crate::workflows::{RiskLevel, WorkflowPriority};
 
 /// Laboratory workflow step type
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,6 +44,7 @@ pub struct WorkflowStepDefinition {
 }
 
 /// Enhanced laboratory workflow step with RAG integration
+#[derive(Debug)]
 pub struct EnhancedLaboratoryStep {
     step_definition: WorkflowStepDefinition,
     rag_client: RagServiceClient,
@@ -52,10 +53,7 @@ pub struct EnhancedLaboratoryStep {
 
 impl EnhancedLaboratoryStep {
     /// Create a new enhanced laboratory step
-    pub fn new(
-        step_definition: WorkflowStepDefinition,
-        rag_client: RagServiceClient,
-    ) -> Self {
+    pub fn new(step_definition: WorkflowStepDefinition, rag_client: RagServiceClient) -> Self {
         Self {
             step_definition,
             rag_client,
@@ -66,7 +64,10 @@ impl EnhancedLaboratoryStep {
 
 #[async_trait]
 impl SagaStep for EnhancedLaboratoryStep {
-    async fn execute(&mut self, context: &TransactionContext) -> Result<StepResult> {
+    async fn execute(
+        &self,
+        context: &TransactionContext,
+    ) -> Result<StepResult, crate::saga::SagaError> {
         let step_name = self.step_definition.step_name.clone();
         let execution_id = Uuid::new_v4();
         let started_at = Utc::now();
@@ -86,7 +87,11 @@ impl SagaStep for EnhancedLaboratoryStep {
 
         Ok(StepResult {
             step_name,
-            status: if success { StepStatus::Completed } else { StepStatus::Failed },
+            status: if success {
+                StepStatus::Completed
+            } else {
+                StepStatus::Failed
+            },
             execution_id,
             started_at,
             completed_at: Some(Utc::now()),
@@ -99,9 +104,14 @@ impl SagaStep for EnhancedLaboratoryStep {
             error_message: None,
         })
     }
+
+    fn name(&self) -> &str {
+        &self.step_definition.step_name
+    }
 }
 
 /// Enhanced laboratory compensation step
+#[derive(Debug)]
 pub struct EnhancedLaboratoryCompensation {
     step_definition: WorkflowStepDefinition,
 }
@@ -113,8 +123,11 @@ impl EnhancedLaboratoryCompensation {
 }
 
 #[async_trait]
-impl SagaCompensation for EnhancedLaboratoryCompensation {
-    async fn compensate(&mut self, context: &TransactionContext) -> Result<CompensationResult> {
+impl CompensationStep for EnhancedLaboratoryCompensation {
+    async fn compensate(
+        &self,
+        context: &TransactionContext,
+    ) -> Result<CompensationResult, crate::saga::SagaError> {
         let step_name = self.step_definition.step_name.clone();
         let execution_id = Uuid::new_v4();
         let started_at = Utc::now();
@@ -132,5 +145,9 @@ impl SagaCompensation for EnhancedLaboratoryCompensation {
             metadata: HashMap::new(),
             error_message: None,
         })
+    }
+
+    fn name(&self) -> &str {
+        &self.step_definition.step_name
     }
 }

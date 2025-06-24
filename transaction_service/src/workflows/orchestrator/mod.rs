@@ -9,10 +9,13 @@ use uuid::Uuid;
 
 use crate::coordinator::{TransactionCoordinator, TransactionRequest};
 use crate::saga::{SagaBuilder, TransactionContext, TransactionSaga};
-use crate::workflows::{WorkflowConfig, WorkflowPriority, RiskLevel};
+use crate::workflows::laboratory::{
+    EnhancedLaboratoryCompensation, EnhancedLaboratoryStep, WorkflowStepDefinition,
+    WorkflowStepType,
+};
 use crate::workflows::rag_integration::RagServiceClient;
-use crate::workflows::laboratory::{WorkflowStepDefinition, WorkflowStepType, EnhancedLaboratoryStep, EnhancedLaboratoryCompensation};
 use crate::workflows::templates::LaboratoryWorkflowTemplate;
+use crate::workflows::{RiskLevel, WorkflowConfig, WorkflowPriority};
 
 /// Enhanced workflow service
 #[derive(Clone)]
@@ -72,8 +75,15 @@ pub struct ProtocolDocument {
 #[serde(tag = "type", content = "data")]
 pub enum DocumentContent {
     Text(String),
-    Reference { url: String, format: String },
-    File { filename: String, file_path: String, mime_type: String },
+    Reference {
+        url: String,
+        format: String,
+    },
+    File {
+        filename: String,
+        file_path: String,
+        mime_type: String,
+    },
 }
 
 /// AI processing preferences
@@ -260,13 +270,18 @@ impl EnhancedWorkflowService {
         &self,
         request: EnhancedWorkflowRequest,
     ) -> Result<EnhancedWorkflowResult> {
-        tracing::info!("Executing enhanced laboratory workflow: {}", request.workflow_type);
+        tracing::info!(
+            "Executing enhanced laboratory workflow: {}",
+            request.workflow_type
+        );
 
         // Generate workflow template
         let workflow_template = self.get_or_generate_workflow_template(&request).await?;
 
         // Create executable saga from template
-        let saga = self.create_saga_from_template(&workflow_template, &request).await?;
+        let saga = self
+            .create_saga_from_template(&workflow_template, &request)
+            .await?;
 
         // Execute the workflow
         let execution_result = self
@@ -301,7 +316,10 @@ impl EnhancedWorkflowService {
         let generated_docs = vec![GeneratedDocument {
             document_type: "execution_report".to_string(),
             document_id: format!("report_{}", Uuid::new_v4()),
-            content: format!("Workflow execution completed for sample {}", request.sample_data.sample_id),
+            content: format!(
+                "Workflow execution completed for sample {}",
+                request.sample_data.sample_id
+            ),
             generated_at: Utc::now(),
             ai_confidence: 0.95,
         }];
@@ -354,7 +372,10 @@ impl EnhancedWorkflowService {
             ],
             estimated_duration_minutes: 90,
             required_equipment: vec!["pipettes".to_string(), "centrifuge".to_string()],
-            quality_checkpoints: vec!["integrity_check".to_string(), "quality_assessment".to_string()],
+            quality_checkpoints: vec![
+                "integrity_check".to_string(),
+                "quality_assessment".to_string(),
+            ],
             ai_generated: true,
             confidence_score: 0.8,
         })
@@ -370,6 +391,8 @@ impl EnhancedWorkflowService {
             user_id: request.transaction_request.user_id,
             correlation_id: request.transaction_request.correlation_id,
             metadata: request.transaction_request.metadata.clone(),
+            timeout_ms: template.estimated_duration_minutes as u64 * 60 * 1000,
+            created_at: Utc::now(),
         };
 
         let mut saga_builder = SagaBuilder::new(&template.name)
@@ -378,14 +401,12 @@ impl EnhancedWorkflowService {
 
         // Convert template steps to saga steps
         for step in &template.steps {
-            saga_builder = saga_builder.add_step(
-                &step.step_name,
-                Box::new(EnhancedLaboratoryStep::new(
+            saga_builder = saga_builder
+                .add_step(EnhancedLaboratoryStep::new(
                     step.clone(),
                     self.rag_client.clone(),
-                )),
-                Box::new(EnhancedLaboratoryCompensation::new(step.clone())),
-            );
+                ))
+                .add_compensation(EnhancedLaboratoryCompensation::new(step.clone()));
         }
 
         Ok(saga_builder.build())

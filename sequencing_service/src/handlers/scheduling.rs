@@ -1,22 +1,20 @@
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    Json,
 };
+use chrono::{DateTime, Duration, Utc};
 use serde_json::json;
 use uuid::Uuid;
-use chrono::{DateTime, Utc, Duration};
 
 use crate::{
+    AppState,
     error::{Result, SequencingError},
     models::*,
-    AppState,
 };
 
 /// Get current scheduling queue status
-pub async fn get_queue_status(
-    State(state): State<AppState>,
-) -> Result<Json<serde_json::Value>> {
+pub async fn get_queue_status(State(state): State<AppState>) -> Result<Json<serde_json::Value>> {
     // Get queue statistics by priority
     let priority_queue = sqlx::query_as::<_, (String, i64, f64)>(
         r#"
@@ -35,7 +33,7 @@ pub async fn get_queue_status(
                 WHEN 'normal' THEN 4
                 WHEN 'low' THEN 5
             END
-        "#
+        "#,
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
@@ -48,17 +46,16 @@ pub async fn get_queue_status(
         WHERE status IN ('queued', 'validated')
         GROUP BY platform
         ORDER BY job_count DESC
-        "#
+        "#,
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
 
     // Get currently running jobs
-    let running_jobs: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM sequencing_jobs WHERE status = 'running'"
-    )
-    .fetch_one(&state.db_pool.pool)
-    .await?;
+    let running_jobs: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM sequencing_jobs WHERE status = 'running'")
+            .fetch_one(&state.db_pool.pool)
+            .await?;
 
     // Get estimated wait times
     let next_available_slot = calculate_next_available_slot(&state).await?;
@@ -113,7 +110,8 @@ pub async fn get_detailed_queue(
 
     // Get total count
     let total_count: i64 = sqlx::query_scalar(&format!(
-        "SELECT COUNT(*) FROM sequencing_jobs WHERE {}", where_clause
+        "SELECT COUNT(*) FROM sequencing_jobs WHERE {}",
+        where_clause
     ))
     .fetch_one(&state.db_pool.pool)
     .await?;
@@ -184,13 +182,11 @@ pub async fn prioritize_job(
     Json(request): Json<PriorityUpdateRequest>,
 ) -> Result<Json<serde_json::Value>> {
     // Verify job exists and is in queue
-    let job = sqlx::query_as::<_, SequencingJob>(
-        "SELECT * FROM sequencing_jobs WHERE id = $1"
-    )
-    .bind(job_id)
-    .fetch_optional(&state.db_pool.pool)
-    .await?
-    .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
+    let job = sqlx::query_as::<_, SequencingJob>("SELECT * FROM sequencing_jobs WHERE id = $1")
+        .bind(job_id)
+        .fetch_optional(&state.db_pool.pool)
+        .await?
+        .ok_or(SequencingError::JobNotFound(job_id.to_string()))?;
 
     if !matches!(job.status, JobStatus::Queued | JobStatus::Validated) {
         return Err(SequencingError::InvalidJobState {
@@ -206,7 +202,7 @@ pub async fn prioritize_job(
         SET priority = $2, updated_at = NOW()
         WHERE id = $1
         RETURNING *
-        "#
+        "#,
     )
     .bind(job_id)
     .bind(&request.new_priority)
@@ -235,17 +231,14 @@ pub async fn prioritize_job(
 }
 
 /// Schedule next available jobs based on capacity and priority
-pub async fn schedule_next_jobs(
-    State(state): State<AppState>,
-) -> Result<Json<serde_json::Value>> {
+pub async fn schedule_next_jobs(State(state): State<AppState>) -> Result<Json<serde_json::Value>> {
     let max_concurrent = state.config.sequencing.max_concurrent_runs as i64;
-    
+
     // Get current running job count
-    let current_running: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM sequencing_jobs WHERE status = 'running'"
-    )
-    .fetch_one(&state.db_pool.pool)
-    .await?;
+    let current_running: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM sequencing_jobs WHERE status = 'running'")
+            .fetch_one(&state.db_pool.pool)
+            .await?;
 
     let available_slots = max_concurrent - current_running;
 
@@ -274,7 +267,7 @@ pub async fn schedule_next_jobs(
             END,
             created_at ASC
         LIMIT $1
-        "#
+        "#,
     )
     .bind(available_slots)
     .fetch_all(&state.db_pool.pool)
@@ -285,7 +278,7 @@ pub async fn schedule_next_jobs(
     for job in jobs_to_schedule {
         // Check platform capacity (simplified - could be more sophisticated)
         let platform_running: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM sequencing_jobs WHERE status = 'running' AND platform = $1"
+            "SELECT COUNT(*) FROM sequencing_jobs WHERE status = 'running' AND platform = $1",
         )
         .bind(job.platform.as_deref().unwrap_or("unknown"))
         .fetch_one(&state.db_pool.pool)
@@ -303,7 +296,7 @@ pub async fn schedule_next_jobs(
             SET status = 'running', started_at = NOW(), updated_at = NOW()
             WHERE id = $1
             RETURNING *
-            "#
+            "#,
         )
         .bind(job.id)
         .fetch_one(&state.db_pool.pool)
@@ -317,11 +310,14 @@ pub async fn schedule_next_jobs(
             INSERT INTO sequencing_runs (
                 id, job_id, run_name, platform, status, started_at, created_at
             ) VALUES ($1, $2, $3, $4, 'running', NOW(), NOW())
-            "#
+            "#,
         )
         .bind(Uuid::new_v4())
         .bind(job.id)
-        .bind(format!("Run_{}", job.job_name.as_deref().unwrap_or("unknown")))
+        .bind(format!(
+            "Run_{}",
+            job.job_name.as_deref().unwrap_or("unknown")
+        ))
         .bind(job.platform.as_deref().unwrap_or("unknown"))
         .bind(RunStatus::Running)
         .execute(&state.db_pool.pool)
@@ -343,14 +339,14 @@ pub async fn get_scheduling_recommendations(
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>> {
     // Analyze queue patterns and provide recommendations
-    
+
     // Check for old queued jobs
     let old_jobs: i64 = sqlx::query_scalar(
         r#"
         SELECT COUNT(*) FROM sequencing_jobs 
         WHERE status IN ('queued', 'validated')
         AND created_at < NOW() - INTERVAL '24 hours'
-        "#
+        "#,
     )
     .fetch_one(&state.db_pool.pool)
     .await?;
@@ -363,7 +359,7 @@ pub async fn get_scheduling_recommendations(
         WHERE status IN ('queued', 'validated')
         GROUP BY priority
         HAVING COUNT(*) > 10
-        "#
+        "#,
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
@@ -379,7 +375,7 @@ pub async fn get_scheduling_recommendations(
         WHERE status IN ('queued', 'validated', 'running')
         GROUP BY platform
         HAVING COUNT(*) > 5
-        "#
+        "#,
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
@@ -440,7 +436,7 @@ pub async fn toggle_scheduling(
 ) -> Result<Json<serde_json::Value>> {
     // This would typically update a configuration flag
     // For now, we'll simulate by returning the requested state
-    
+
     let action = if request.enable_scheduling {
         "enabled"
     } else {
@@ -464,32 +460,34 @@ pub async fn estimate_completion_times(
     Query(query): Query<EstimationQuery>,
 ) -> Result<Json<serde_json::Value>> {
     let job_ids = query.job_ids.unwrap_or_default();
-    
+
     if job_ids.is_empty() {
-        return Err(SequencingError::Validation {
-            message: "At least one job_id must be provided".to_string(),
-        });
+        return Err(SequencingError::Validation(
+            "At least one job_id must be provided".to_string(),
+        ));
     }
 
     let mut estimations = Vec::new();
 
     for job_id in job_ids {
-        let job = sqlx::query_as::<_, SequencingJob>(
-            "SELECT * FROM sequencing_jobs WHERE id = $1"
-        )
-        .bind(job_id)
-        .fetch_optional(&state.db_pool.pool)
-        .await?;
+        let job = sqlx::query_as::<_, SequencingJob>("SELECT * FROM sequencing_jobs WHERE id = $1")
+            .bind(job_id)
+            .fetch_optional(&state.db_pool.pool)
+            .await?;
 
         if let Some(job) = job {
             let estimation = match job.status {
                 JobStatus::Running => {
                     // Estimate based on current progress and historical data
-                    let avg_duration = get_average_duration_for_platform(&state, job.platform.as_deref().unwrap_or("unknown")).await?;
+                    let avg_duration = get_average_duration_for_platform(
+                        &state,
+                        job.platform.as_deref().unwrap_or("unknown"),
+                    )
+                    .await?;
                     let elapsed = Utc::now() - job.started_at.unwrap_or(job.created_at);
                     let estimated_total = avg_duration;
                     let estimated_remaining = estimated_total - elapsed;
-                    
+
                     json!({
                         "job_id": job_id,
                         "status": "running",
@@ -501,10 +499,14 @@ pub async fn estimate_completion_times(
                 JobStatus::Queued | JobStatus::Validated => {
                     // Estimate based on queue position and platform capacity
                     let queue_position = get_queue_position(&state, job_id).await?;
-                    let avg_duration = get_average_duration_for_platform(&state, job.platform.as_deref().unwrap_or("unknown")).await?;
+                    let avg_duration = get_average_duration_for_platform(
+                        &state,
+                        job.platform.as_deref().unwrap_or("unknown"),
+                    )
+                    .await?;
                     let estimated_start = Utc::now() + Duration::hours(queue_position * 2); // Rough estimate
                     let estimated_completion = estimated_start + avg_duration;
-                    
+
                     json!({
                         "job_id": job_id,
                         "status": "queued",
@@ -552,7 +554,7 @@ pub async fn estimate_completion_times(
 /// Helper functions
 async fn calculate_next_available_slot(state: &AppState) -> Result<DateTime<Utc>> {
     let running_jobs = sqlx::query_as::<_, SequencingJob>(
-        "SELECT * FROM sequencing_jobs WHERE status = 'running' ORDER BY started_at ASC"
+        "SELECT * FROM sequencing_jobs WHERE status = 'running' ORDER BY started_at ASC",
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
@@ -582,7 +584,7 @@ async fn get_average_duration_for_platform(state: &AppState, platform: &str) -> 
         AND started_at IS NOT NULL 
         AND completed_at IS NOT NULL
         AND completed_at > NOW() - INTERVAL '30 days'
-        "#
+        "#,
     )
     .bind(platform)
     .fetch_optional(&state.db_pool.pool)
@@ -613,7 +615,7 @@ async fn get_queue_position(state: &AppState, job_id: Uuid) -> Result<i64> {
             WHERE status IN ('queued', 'validated')
         )
         SELECT position FROM ranked_jobs WHERE id = $1
-        "#
+        "#,
     )
     .bind(job_id)
     .fetch_optional(&state.db_pool.pool)
