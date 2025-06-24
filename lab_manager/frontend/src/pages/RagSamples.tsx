@@ -24,27 +24,37 @@ import {
 interface RagSample {
   id: string;
   name: string;
-  barcode: string;
-  location: string;
-  status: 'Pending' | 'Validated' | 'InStorage' | 'InSequencing' | 'Completed';
-  created_at: string;
-  updated_at: string;
-  metadata: {
-    // RAG-specific metadata
-    rag_submission_id?: string;
-    source_document?: string;
-    confidence_score?: number;
-    extraction_method?: 'ai_rag' | 'manual';
-    submitter_name?: string;
-    submitter_email?: string;
-    processing_time?: number;
-    validation_warnings?: string[];
-    extraction_warnings?: string[];
-    // Standard sample metadata
-    sample_type?: string;
-    template_name?: string;
-    [key: string]: any;
-  };
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  confidence: number;
+  extractedData: Record<string, unknown>;
+  sourceDocument: string;
+  processingTime: number;
+  errors?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+interface RagProcessingResult {
+  sampleId: string;
+  success: boolean;
+  confidence: number;
+  extractedFields: ExtractedField[];
+  warnings: string[];
+  errors: string[];
+}
+
+interface ExtractedField {
+  name: string;
+  value: string | number | boolean | null;
+  confidence: number;
+  source: string;
+}
+
+interface SearchFilters {
+  status?: string;
+  confidenceMin?: number;
+  confidenceMax?: number;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 interface RagSubmissionDetail {

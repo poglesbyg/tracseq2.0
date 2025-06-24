@@ -8,9 +8,9 @@ interface ApiConfig {
   retryDelay: number;
 }
 
-interface ApiResponse<T = any> {
+interface ApiResponse<T = unknown> {
   data: T;
-  status: number;
+  success: boolean;
   message?: string;
   errors?: string[];
 }
@@ -138,6 +138,23 @@ class ApiClient {
 
   public async delete<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     const response = await this.client.delete(url, config);
+    return response.data;
+  }
+
+  public async upload<T>(url: string, file: File, onProgress?: (progress: number) => void): Promise<T> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const config: AxiosRequestConfig = {
+      onUploadProgress: (event) => {
+        if (onProgress && event.total) {
+          const progress = Math.round((event.loaded * 100) / event.total);
+          onProgress(progress);
+        }
+      },
+    };
+
+    const response = await this.client.post(url, formData, config);
     return response.data;
   }
 }

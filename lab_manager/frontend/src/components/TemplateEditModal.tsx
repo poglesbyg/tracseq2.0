@@ -2,12 +2,20 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 
-interface Template {
-  id: string;
+  interface Template {
+    id: string;
+    name: string;
+    description?: string;
+    created_at: string;
+    fields: TemplateField[];
+    metadata?: Record<string, unknown>;
+  }
+
+interface TemplateField {
   name: string;
-  description?: string;
-  created_at: string;
-  metadata: Record<string, any>;
+  type: string;
+  required: boolean;
+  defaultValue?: string | number | boolean | null;
 }
 
 interface UpdateTemplate {
@@ -17,14 +25,20 @@ interface UpdateTemplate {
 }
 
 interface TemplateEditModalProps {
-  template: Template;
+  isOpen: boolean;
   onClose: () => void;
+  template: Template | null;
+  onSave: (template: Template) => void;
 }
 
 export default function TemplateEditModal({ template, onClose }: TemplateEditModalProps) {
-  const [formData, setFormData] = useState({
-    name: template.name,
-    description: template.description || '',
+  const [formData, setFormData] = useState<Template>({
+    id: template?.id || '',
+    name: template?.name || '',
+    description: template?.description || '',
+    created_at: template?.created_at || '',
+    fields: template?.fields || [],
+    metadata: template?.metadata || {},
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -32,7 +46,7 @@ export default function TemplateEditModal({ template, onClose }: TemplateEditMod
 
   const updateMutation = useMutation({
     mutationFn: async (updates: UpdateTemplate) => {
-      const response = await axios.put(`/api/templates/${template.id}`, updates);
+      const response = await axios.put(`/api/templates/${template?.id}`, updates);
       return response.data;
     },
     onSuccess: () => {
@@ -66,10 +80,11 @@ export default function TemplateEditModal({ template, onClose }: TemplateEditMod
 
     // Only send changed fields
     const updates: UpdateTemplate = {};
-    if (formData.name !== template.name) updates.name = formData.name;
-    if (formData.description !== (template.description || '')) {
+    if (formData.name !== template?.name) updates.name = formData.name;
+    if (formData.description !== (template?.description || '')) {
       updates.description = formData.description || undefined;
     }
+    if (formData.metadata !== template?.metadata) updates.metadata = formData.metadata;
 
     // If no changes, just close the modal
     if (Object.keys(updates).length === 0) {
@@ -151,20 +166,20 @@ export default function TemplateEditModal({ template, onClose }: TemplateEditMod
             <dl className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <dt className="text-gray-500">ID:</dt>
-                <dd className="text-gray-900 font-mono text-xs">{template.id}</dd>
+                <dd className="text-gray-900 font-mono text-xs">{template?.id}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-gray-500">Created:</dt>
-                <dd className="text-gray-900">{new Date(template.created_at).toLocaleDateString()}</dd>
+                <dd className="text-gray-900">{new Date(template?.created_at || '').toLocaleDateString()}</dd>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-500">File Type:</dt>
-                <dd className="text-gray-900">{template.metadata?.file_type || 'Unknown'}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-500">Original File:</dt>
-                <dd className="text-gray-900 text-xs">{template.metadata?.originalFileName || 'Unknown'}</dd>
-              </div>
+                              <div className="flex justify-between">
+                  <dt className="text-gray-500">File Type:</dt>
+                  <dd className="text-gray-900">{typeof template?.metadata?.file_type === 'string' ? template.metadata.file_type : 'Unknown'}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">Original File:</dt>
+                  <dd className="text-gray-900 text-xs">{typeof template?.metadata?.originalFileName === 'string' ? template.metadata.originalFileName : 'Unknown'}</dd>
+                </div>
             </dl>
           </div>
         </form>
