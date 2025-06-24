@@ -19,7 +19,7 @@ interface Template {
   name: string;
   description?: string;
   created_at: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
   interface SpreadsheetViewerProps {

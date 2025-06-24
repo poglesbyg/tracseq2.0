@@ -21,7 +21,7 @@ interface TemplateField {
 interface UpdateTemplate {
   name?: string;
   description?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 interface TemplateEditModalProps {
@@ -54,7 +54,7 @@ export default function TemplateEditModal({ template, onClose }: TemplateEditMod
       queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
       onClose();
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Failed to update template:', error);
       setErrors({ general: 'Failed to update template. Please try again.' });
     },
@@ -170,16 +170,16 @@ export default function TemplateEditModal({ template, onClose }: TemplateEditMod
               </div>
               <div className="flex justify-between">
                 <dt className="text-gray-500">Created:</dt>
-                <dd className="text-gray-900">{new Date(template?.created_at || '').toLocaleDateString()}</dd>
+                <dd className="text-gray-900">{template?.created_at ? new Date(template.created_at).toLocaleDateString() : 'N/A'}</dd>
               </div>
-                              <div className="flex justify-between">
-                  <dt className="text-gray-500">File Type:</dt>
-                  <dd className="text-gray-900">{typeof template?.metadata?.file_type === 'string' ? template.metadata.file_type : 'Unknown'}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-500">Original File:</dt>
-                  <dd className="text-gray-900 text-xs">{typeof template?.metadata?.originalFileName === 'string' ? template.metadata.originalFileName : 'Unknown'}</dd>
-                </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-500">File Type:</dt>
+                <dd className="text-gray-900">{typeof template?.metadata?.file_type === 'string' ? template.metadata.file_type : 'Unknown'}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-500">Original File:</dt>
+                <dd className="text-gray-900 text-xs">{typeof template?.metadata?.originalFileName === 'string' ? template.metadata.originalFileName : 'Unknown'}</dd>
+              </div>
             </dl>
           </div>
         </form>

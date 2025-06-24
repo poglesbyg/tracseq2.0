@@ -10,7 +10,14 @@ import {
 
 interface SearchResult {
   id: string;
-  [key: string]: string | number | boolean | null;
+  dataset_id: string;
+  row_number: number;
+  row_data: Record<string, unknown>;
+  search_text?: string;
+  created_at: string;
+  original_filename: string;
+  file_type: string;
+  dataset_filename: string;
 }
 
 interface SearchResponse {

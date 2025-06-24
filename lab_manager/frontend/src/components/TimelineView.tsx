@@ -6,7 +6,12 @@ interface TimelineEvent {
   title: string;
   description: string;
   timestamp: string;
-  type: 'info' | 'warning' | 'error' | 'success';
+  type: string;
+  entity: {
+    id: string;
+    name: string;
+    type: 'sample' | 'job' | 'template' | 'user';
+  };
   metadata?: Record<string, unknown>;
 }
 

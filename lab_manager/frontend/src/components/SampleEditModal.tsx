@@ -10,7 +10,7 @@ interface Sample {
   status: 'Pending' | 'Validated' | 'InStorage' | 'InSequencing' | 'Completed';
   created_at: string;
   updated_at: string;
-  metadata?: Record<string, unknown>;
+  metadata: Record<string, unknown>;
 }
 
 interface UpdateSample {
@@ -18,7 +18,7 @@ interface UpdateSample {
   barcode?: string;
   location?: string;
   status?: 'Pending' | 'Validated' | 'InStorage' | 'InSequencing' | 'Completed';
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 interface SampleEditModalProps {
@@ -61,7 +61,7 @@ export default function SampleEditModal({ isOpen, onClose, sample, onSave }: Sam
       queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
       onClose();
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Failed to update sample:', error);
       setErrors({ general: 'Failed to update sample. Please try again.' });
     },
@@ -201,7 +201,7 @@ export default function SampleEditModal({ isOpen, onClose, sample, onSave }: Sam
             <select
               id="status"
               value={formData.status}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({...formData, status: e.target.value as 'Pending' | 'Validated' | 'InStorage' | 'InSequencing' | 'Completed'})}
+              onChange={(e) => handleInputChange('status', e.target.value as Sample['status'])}
               className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             >
               {statusOptions.map((option) => (
