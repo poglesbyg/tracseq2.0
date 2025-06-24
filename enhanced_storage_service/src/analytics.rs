@@ -58,9 +58,10 @@ impl AnalyticsService {
     pub async fn new(db: DatabasePool, config: AnalyticsConfig) -> Result<Self> {
         info!("Initializing Analytics Service");
 
+        let enabled = config.enabled;
         let service = Self { db, config };
 
-        if config.enabled {
+        if enabled {
             info!("Analytics enabled - initializing ML models");
             // In a real implementation, would:
             // - Load trained models from disk

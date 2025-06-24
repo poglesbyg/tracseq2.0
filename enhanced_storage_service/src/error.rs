@@ -66,6 +66,15 @@ pub enum StorageError {
 
     #[error("Internal server error: {0}")]
     Internal(String),
+
+    #[error("Alert not found: {0}")]
+    AlertNotFound(String),
+
+    #[error("Sensor not found: {0}")]
+    SensorNotFound(String),
+
+    #[error("Not found: {0}")]
+    NotFound(String),
 }
 
 impl IntoResponse for StorageError {
@@ -135,6 +144,15 @@ impl IntoResponse for StorageError {
             StorageError::Internal(ref msg) => {
                 tracing::error!("Internal error: {}", msg);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+            }
+            StorageError::AlertNotFound(ref _id) => {
+                (StatusCode::NOT_FOUND, "Alert not found")
+            }
+            StorageError::SensorNotFound(ref _id) => {
+                (StatusCode::NOT_FOUND, "Sensor not found")
+            }
+            StorageError::NotFound(ref _msg) => {
+                (StatusCode::NOT_FOUND, "Not found")
             }
         };
 

@@ -46,10 +46,14 @@ pub async fn list_sensors(
 
     let response = PaginatedResponse {
         data: sensors,
-        total: 1,
-        page,
-        per_page,
-        total_pages: 1,
+        pagination: PaginationInfo {
+            page,
+            per_page,
+            total_pages: 1,
+            total_items: 1,
+            has_next: false,
+            has_prev: false,
+        },
     };
 
     Ok(Json(ApiResponse::success(response)))
@@ -198,10 +202,14 @@ pub async fn get_alerts(
 
     let response = PaginatedResponse {
         data: alerts,
-        total: 1,
-        page,
-        per_page,
-        total_pages: 1,
+        pagination: PaginationInfo {
+            page,
+            per_page,
+            total_pages: 1,
+            total_items: 1,
+            has_next: false,
+            has_prev: false,
+        },
     };
 
     Ok(Json(ApiResponse::success(response)))
@@ -456,10 +464,14 @@ pub async fn get_alerts(
 
     let response = PaginatedResponse {
         data: alerts,
-        total: total_count as i32,
-        page,
-        per_page,
-        total_pages: ((total_count as f64) / (per_page as f64)).ceil() as i32,
+        pagination: PaginationInfo {
+            page,
+            per_page,
+            total_pages: ((total_count as f64) / (per_page as f64)).ceil() as i32,
+            total_items: total_count,
+            has_next: page < ((total_count as f64) / (per_page as f64)).ceil() as i32,
+            has_prev: page > 1,
+        },
     };
 
     Ok(Json(ApiResponse::success(response)))

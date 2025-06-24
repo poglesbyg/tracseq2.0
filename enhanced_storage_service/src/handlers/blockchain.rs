@@ -250,10 +250,14 @@ async fn get_blockchain_transactions(state: &AppState, query: &TransactionListQu
 
     Ok(PaginatedResponse {
         data: transactions,
-        total: 1,
-        page: query.page.unwrap_or(1),
-        per_page: query.per_page.unwrap_or(50),
-        total_pages: 1,
+        pagination: PaginationInfo {
+            page: query.page.unwrap_or(1),
+            per_page: query.per_page.unwrap_or(50),
+            total_pages: 1,
+            total_items: 1,
+            has_next: false,
+            has_prev: false,
+        },
     })
 }
 
@@ -305,10 +309,14 @@ async fn get_blockchain_blocks(state: &AppState, query: &BlockListQuery) -> Stor
 
     Ok(PaginatedResponse {
         data: blocks,
-        total: 1,
-        page: query.page.unwrap_or(1),
-        per_page: query.per_page.unwrap_or(50),
-        total_pages: 1,
+        pagination: PaginationInfo {
+            page: query.page.unwrap_or(1),
+            per_page: query.per_page.unwrap_or(50),
+            total_pages: 1,
+            total_items: 1,
+            has_next: false,
+            has_prev: false,
+        },
     })
 }
 
@@ -475,10 +483,14 @@ async fn search_audit_records(state: &AppState, query: &AuditSearchQuery) -> Sto
 
     Ok(PaginatedResponse {
         data: entries,
-        total: 1,
-        page: query.page.unwrap_or(1),
-        per_page: query.per_page.unwrap_or(50),
-        total_pages: 1,
+        pagination: PaginationInfo {
+            page: query.page.unwrap_or(1),
+            per_page: query.per_page.unwrap_or(50),
+            total_pages: 1,
+            total_items: 1,
+            has_next: false,
+            has_prev: false,
+        },
     })
 }
 
