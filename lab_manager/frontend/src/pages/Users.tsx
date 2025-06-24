@@ -187,7 +187,8 @@ export default function Users() {
     try {
       setError('');
       const token = localStorage.getItem('auth_token');
-      const { password: _password, ...updateData } = formData;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...updateData } = formData;
       
       const response = await fetch(
         `${import.meta.env.VITE_API_URL || ''}/api/users/${selectedUser.id}`,
@@ -283,6 +284,8 @@ export default function Users() {
     };
     return colorMap[status];
   };
+
+
 
   // Check permissions
   if (!hasPermission('users', 'read')) {

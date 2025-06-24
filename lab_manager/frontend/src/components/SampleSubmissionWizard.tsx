@@ -198,7 +198,7 @@ export default function SampleSubmissionWizard({ onSuccess, onClose }: SampleSub
           </div>
         );
 
-      case 3:
+      case 3: {
         const selectedTemplate = templates?.find((t) => t.id === Number(formData.template_id));
         const selectedLocation = storageLocations?.find((l) => l.id === Number(formData.storage_location_id));
         const displayBarcode = formData.barcode || `LAB-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
@@ -234,6 +234,7 @@ export default function SampleSubmissionWizard({ onSuccess, onClose }: SampleSub
             </div>
           </div>
         );
+      }
 
       default:
         return null;

@@ -3,16 +3,16 @@ import { useState, useMemo } from 'react';
 
 interface TimelineEvent {
   id: string;
-  type: 'created' | 'validated' | 'stored' | 'sequencing_started' | 'completed' | 'failed' | 'status_change';
   title: string;
   description: string;
   timestamp: string;
+  type: string;
   entity: {
     id: string;
     name: string;
     type: 'sample' | 'job' | 'template' | 'user';
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 interface TimelineViewProps {
@@ -20,6 +20,7 @@ interface TimelineViewProps {
   title?: string;
   className?: string;
   showFilters?: boolean;
+  onEventClick?: (event: TimelineEvent) => void;
 }
 
 const eventTypeColors = {
@@ -41,7 +42,7 @@ const timeRanges = [
   { label: 'All Time', value: Infinity },
 ];
 
-export default function TimelineView({ events, title = 'Timeline', className = '', showFilters = true }: TimelineViewProps) {
+export default function TimelineView({ events, title = 'Timeline', className = '', showFilters = true }: Omit<TimelineViewProps, 'onEventClick'>) {
   const [selectedTimeRange, setSelectedTimeRange] = useState(24); // Default to last 24 hours
   const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([]);
   const [selectedEntityTypes, setSelectedEntityTypes] = useState<string[]>([]);

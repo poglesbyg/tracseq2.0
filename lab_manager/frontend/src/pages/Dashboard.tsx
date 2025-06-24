@@ -41,6 +41,17 @@ interface DashboardStats {
     count: number;
     avgWaitTime: number;
   }[];
+  pendingSamples: number;
+  completedSamples: number;
+  recentActivity: ActivityItem[];
+}
+
+interface ActivityItem {
+  id: string;
+  action: string;
+  timestamp: string;
+  user: string;
+  details?: Record<string, unknown>;
 }
 
 interface RecentActivity {
@@ -56,7 +67,7 @@ interface Template {
   name: string;
   description: string;
   created_at: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
 }
 
 interface Sample {
@@ -67,7 +78,7 @@ interface Sample {
   status: string;
   created_at: string;
   updated_at: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
 }
 
 interface SequencingJob {
@@ -77,7 +88,7 @@ interface SequencingJob {
   sample_sheet_path: string;
   created_at: string;
   updated_at: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
 }
 
 export default function Dashboard() {
@@ -279,12 +290,18 @@ export default function Dashboard() {
       last30d: 0,
     },
     bottlenecks: stats.bottlenecks || [],
+    pendingSamples: stats.pendingSamples,
+    completedSamples: stats.completedSamples,
+    recentActivity: stats.recentActivity,
   } : {
     totalSamples: 0,
     byStatus: {},
     averageProcessingTime: { validation: 0, storage: 0, sequencing: 0, overall: 0 },
     recentThroughput: { last24h: 0, last7d: 0, last30d: 0 },
     bottlenecks: [],
+    pendingSamples: 0,
+    completedSamples: 0,
+    recentActivity: [],
   };
 
   return (

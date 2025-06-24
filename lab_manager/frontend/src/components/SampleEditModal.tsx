@@ -10,7 +10,7 @@ interface Sample {
   status: 'Pending' | 'Validated' | 'InStorage' | 'InSequencing' | 'Completed';
   created_at: string;
   updated_at: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
 }
 
 interface UpdateSample {
@@ -18,12 +18,14 @@ interface UpdateSample {
   barcode?: string;
   location?: string;
   status?: 'Pending' | 'Validated' | 'InStorage' | 'InSequencing' | 'Completed';
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 interface SampleEditModalProps {
-  sample: Sample;
+  isOpen: boolean;
   onClose: () => void;
+  sample: Sample | null;
+  onSave: (sample: Sample) => void;
 }
 
 const statusOptions = [
@@ -34,12 +36,16 @@ const statusOptions = [
   { value: 'Completed', label: 'Completed', color: 'green' },
 ];
 
-export default function SampleEditModal({ sample, onClose }: SampleEditModalProps) {
-  const [formData, setFormData] = useState({
-    name: sample.name,
-    barcode: sample.barcode,
-    location: sample.location,
-    status: sample.status,
+export default function SampleEditModal({ onClose, sample }: Omit<SampleEditModalProps, 'isOpen' | 'onSave'>) {
+  const [formData, setFormData] = useState<Sample>({
+    id: sample?.id || '',
+    name: sample?.name || '',
+    barcode: sample?.barcode || '',
+    location: sample?.location || '',
+    status: sample?.status || 'Pending',
+    created_at: sample?.created_at || '',
+    updated_at: sample?.updated_at || '',
+    metadata: sample?.metadata || {},
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -47,7 +53,7 @@ export default function SampleEditModal({ sample, onClose }: SampleEditModalProp
 
   const updateMutation = useMutation({
     mutationFn: async (updates: UpdateSample) => {
-      const response = await axios.put(`/api/samples/${sample.id}`, updates);
+      const response = await axios.put(`/api/samples/${sample?.id}`, updates);
       return response.data;
     },
     onSuccess: () => {
@@ -55,7 +61,7 @@ export default function SampleEditModal({ sample, onClose }: SampleEditModalProp
       queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
       onClose();
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Failed to update sample:', error);
       setErrors({ general: 'Failed to update sample. Please try again.' });
     },
@@ -80,7 +86,7 @@ export default function SampleEditModal({ sample, onClose }: SampleEditModalProp
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -89,10 +95,10 @@ export default function SampleEditModal({ sample, onClose }: SampleEditModalProp
 
     // Only send changed fields
     const updates: UpdateSample = {};
-    if (formData.name !== sample.name) updates.name = formData.name;
-    if (formData.barcode !== sample.barcode) updates.barcode = formData.barcode;
-    if (formData.location !== sample.location) updates.location = formData.location;
-    if (formData.status !== sample.status) updates.status = formData.status;
+    if (formData.name !== sample?.name) updates.name = formData.name;
+    if (formData.barcode !== sample?.barcode) updates.barcode = formData.barcode;
+    if (formData.location !== sample?.location) updates.location = formData.location;
+    if (formData.status !== sample?.status) updates.status = formData.status;
 
     // If no changes, just close the modal
     if (Object.keys(updates).length === 0) {
@@ -110,8 +116,6 @@ export default function SampleEditModal({ sample, onClose }: SampleEditModalProp
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
-
-
 
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
@@ -132,7 +136,7 @@ export default function SampleEditModal({ sample, onClose }: SampleEditModalProp
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
+        <form onSubmit={handleSubmit} id="sample-edit-form" className="px-6 py-4 space-y-4">
           {errors.general && (
             <div className="rounded-md bg-red-50 p-4">
               <div className="text-sm text-red-700">{errors.general}</div>
@@ -147,7 +151,7 @@ export default function SampleEditModal({ sample, onClose }: SampleEditModalProp
               type="text"
               id="name"
               value={formData.name}
-              onChange={(e) => handleInputChange('name', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, name: e.target.value})}
               className={`w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${
                 errors.name ? 'border-red-300' : ''
               }`}
@@ -164,7 +168,7 @@ export default function SampleEditModal({ sample, onClose }: SampleEditModalProp
               type="text"
               id="barcode"
               value={formData.barcode}
-              onChange={(e) => handleInputChange('barcode', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, barcode: e.target.value})}
               className={`w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${
                 errors.barcode ? 'border-red-300' : ''
               }`}
@@ -181,7 +185,7 @@ export default function SampleEditModal({ sample, onClose }: SampleEditModalProp
               type="text"
               id="location"
               value={formData.location}
-              onChange={(e) => handleInputChange('location', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, location: e.target.value})}
               className={`w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${
                 errors.location ? 'border-red-300' : ''
               }`}
@@ -197,7 +201,7 @@ export default function SampleEditModal({ sample, onClose }: SampleEditModalProp
             <select
               id="status"
               value={formData.status}
-              onChange={(e) => handleInputChange('status', e.target.value as any)}
+              onChange={(e) => handleInputChange('status', e.target.value as Sample['status'])}
               className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             >
               {statusOptions.map((option) => (
@@ -211,20 +215,20 @@ export default function SampleEditModal({ sample, onClose }: SampleEditModalProp
           {/* Sample Info */}
           <div className="border-t border-gray-200 pt-4">
             <h4 className="text-sm font-medium text-gray-900 mb-2">Sample Information</h4>
-            <dl className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-gray-500">ID:</dt>
-                <dd className="text-gray-900 font-mono text-xs">{sample.id}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-500">Created:</dt>
-                <dd className="text-gray-900">{new Date(sample.created_at).toLocaleDateString()}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-500">Last Updated:</dt>
-                <dd className="text-gray-900">{new Date(sample.updated_at).toLocaleDateString()}</dd>
-              </div>
-            </dl>
+                          <dl className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">ID:</dt>
+                  <dd className="text-gray-900 font-mono text-xs">{sample?.id}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">Created:</dt>
+                  <dd className="text-gray-900">{sample?.created_at ? new Date(sample.created_at).toLocaleDateString() : 'N/A'}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">Last Updated:</dt>
+                  <dd className="text-gray-900">{sample?.updated_at ? new Date(sample.updated_at).toLocaleDateString() : 'N/A'}</dd>
+                </div>
+              </dl>
           </div>
         </form>
 
@@ -239,7 +243,7 @@ export default function SampleEditModal({ sample, onClose }: SampleEditModalProp
           </button>
           <button
             type="submit"
-            onClick={handleSubmit}
+            form="sample-edit-form"
             disabled={updateMutation.isPending}
             className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >

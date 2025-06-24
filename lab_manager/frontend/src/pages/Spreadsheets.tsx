@@ -15,23 +15,23 @@ import FileUploadModal from '../components/FileUploadModal';
 import SpreadsheetSearchModal from '../components/SpreadsheetSearchModal';
 import SpreadsheetDataViewer from '../components/SpreadsheetDataViewer';
 
-interface SpreadsheetDataset {
-  id: string;
-  filename: string;
-  original_filename: string;
-  file_type: string;
-  file_size: number;
-  sheet_name?: string;
-  total_rows: number;
-  total_columns: number;
-  column_headers: string[];
-  upload_status: 'processing' | 'completed' | 'failed';
-  error_message?: string;
-  uploaded_by?: string;
-  created_at: string;
-  updated_at: string;
-  metadata: any;
-}
+  interface SpreadsheetDataset {
+    id: string;
+    filename: string;
+    original_filename: string;
+    file_type: string;
+    file_size: number;
+    sheet_name?: string;
+    total_rows: number;
+    total_columns: number;
+    column_headers: string[];
+    upload_status: 'processing' | 'completed' | 'failed';
+    error_message?: string;
+    uploaded_by?: string;
+    created_at: string;
+    updated_at: string;
+    metadata: Record<string, unknown>;
+  }
 
 export default function Spreadsheets() {
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -59,7 +59,7 @@ export default function Spreadsheets() {
   });
 
   const handleDelete = async (dataset: SpreadsheetDataset) => {
-    if (window.confirm(`Are you sure you want to delete "${dataset.original_filename}"? This action cannot be undone.`)) {
+          if (window.confirm(`Are you sure you want to delete "${dataset.original_filename}"? This action cannot be undone.`)) {
       try {
         await deleteDatasetMutation.mutateAsync(dataset.id);
       } catch (error) {

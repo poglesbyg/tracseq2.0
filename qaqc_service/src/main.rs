@@ -12,14 +12,13 @@ mod config;
 mod database;
 mod error;
 mod models;
+
 mod services;
 mod handlers;
 mod middleware;
 
 use config::Config;
 use database::create_pool;
-use handlers::{qc_workflows, quality_metrics, compliance, reports};
-use services::{QaqcService, QualityMetricsService, ComplianceService};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -41,15 +40,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Run database migrations
     database::run_migrations(&pool).await?;
     
-    // Initialize services
-    let qaqc_service = Arc::new(QaqcService::new(pool.clone()));
-    let metrics_service = Arc::new(QualityMetricsService::new(pool.clone()));
-    let compliance_service = Arc::new(ComplianceService::new(pool.clone()));
-    
     // Build application router
     let app = Router::new()
-        .route("/health", get(health_check))
-        
+        .route("/health", get(health_check))        
         // QC Workflow endpoints
         .route("/api/v1/qc/workflows", get(qc_workflows::list_workflows))
         .route("/api/v1/qc/workflows", post(qc_workflows::create_workflow))
@@ -86,6 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         
         // Middleware
         .layer(axum::middleware::from_fn(crate::middleware::auth_middleware))
+
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http());
 

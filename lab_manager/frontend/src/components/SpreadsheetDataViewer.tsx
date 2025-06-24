@@ -95,6 +95,16 @@ interface SavedView {
   rowsPerPage: number;
 }
 
+interface SpreadsheetRecord {
+  [key: string]: string | number | boolean | null;
+}
+
+interface SpreadsheetDataViewerProps {
+  data: SpreadsheetRecord[];
+  columns: string[];
+  onCellEdit?: (rowIndex: number, columnName: string, value: string | number | boolean | null) => void;
+}
+
 export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetDataViewerProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
@@ -130,6 +140,80 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
     }, 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  // Print functionality (defined early for use in keyboard shortcuts)
+  const handlePrint = useCallback(() => {
+    if (!dataResponse) return;
+    
+    // Get column headers directly
+    const headers = (() => {
+      // Check if dataset has valid column headers
+      if (dataset.column_headers && Array.isArray(dataset.column_headers) && dataset.column_headers.length > 0) {
+        return dataset.column_headers;
+      }
+      
+      // Extract from first row of data if available
+      if (dataResponse && dataResponse.records && dataResponse.records.length > 0) {
+        const firstRecord = dataResponse.records[0];
+        if (firstRecord.row_data && typeof firstRecord.row_data === 'object') {
+          return Object.keys(firstRecord.row_data);
+        }
+      }
+      
+      return [];
+    })();
+    
+    const currentVisibleColumns = headers.filter(header => !hiddenColumns.has(header));
+    const currentSortedRecords = dataResponse.records || [];
+    
+    const printContent = `
+      <html>
+        <head>
+          <title>${dataset.original_filename}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; font-weight: bold; }
+            .header { margin-bottom: 20px; }
+            .info { color: #666; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${dataset.original_filename}</h1>
+            <div class="info">
+              Generated on ${new Date().toLocaleString()} | 
+              ${dataResponse.total_count.toLocaleString()} total rows | 
+              ${currentVisibleColumns.length} visible columns
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                ${currentVisibleColumns.map(header => `<th>${header}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${currentSortedRecords.slice(0, 100).map(record => `
+                <tr>
+                  ${currentVisibleColumns.map(header => `<td>${String(record.row_data[header] || '')}</td>`).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          ${currentSortedRecords.length > 100 ? '<p><em>Showing first 100 rows only</em></p>' : ''}
+        </body>
+      </html>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  }, [dataResponse, dataset, hiddenColumns]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -168,7 +252,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
 
     document.addEventListener('keydown', handleKeyboard);
     return () => document.removeEventListener('keydown', handleKeyboard);
-  }, [showKeyboardShortcuts, showSaveViewDialog, fullScreen, onClose]);
+  }, [showKeyboardShortcuts, showSaveViewDialog, fullScreen, onClose, handlePrint]);
 
   // Auto-refresh
   useEffect(() => {
@@ -582,59 +666,6 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
 
   const deleteView = (viewId: string) => {
     setSavedViews(prev => prev.filter(view => view.id !== viewId));
-  };
-
-  // Print functionality
-  const handlePrint = () => {
-    if (!dataResponse) return;
-    
-    const printContent = `
-      <html>
-        <head>
-          <title>${dataset.original_filename}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; font-weight: bold; }
-            .header { margin-bottom: 20px; }
-            .info { color: #666; font-size: 14px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>${dataset.original_filename}</h1>
-            <div class="info">
-              Generated on ${new Date().toLocaleString()} | 
-              ${dataResponse.total_count.toLocaleString()} total rows | 
-              ${visibleColumns.length} visible columns
-            </div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                ${visibleColumns.map(header => `<th>${header}</th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>
-              ${sortedRecords.slice(0, 100).map(record => `
-                <tr>
-                  ${visibleColumns.map(header => `<td>${String(record.row_data[header] || '')}</td>`).join('')}
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          ${sortedRecords.length > 100 ? '<p><em>Showing first 100 rows only</em></p>' : ''}
-        </body>
-      </html>
-    `;
-    
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.print();
-    }
   };
 
   // Utility functions
@@ -1713,7 +1744,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
                     /* Card View */
                     <div className="p-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {sortedRecords.map((record, _recordIndex) => (
+                        {sortedRecords.map((record) => (
                           <div 
                             key={record.id}
                             className={`bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200 ${

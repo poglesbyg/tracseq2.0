@@ -306,7 +306,7 @@ export const calculateProcessingMetrics = (samples: { status: string; created_at
   };
 };
 
-const calculateAverageStageTime = (_samples: any[], stage: string): number => {
+const calculateAverageStageTime = (_samples: { status: string; created_at: string }[], stage: string): number => {
   // Mock implementation - would calculate from actual timestamp data
   const mockTimes: Record<string, number> = {
     validation: 4, // 4 hours
@@ -335,6 +335,10 @@ const identifyBottlenecks = (byStatus: Record<string, number>): ProcessMetrics['
   return bottlenecks.sort((a, b) => b.avgWaitTime - a.avgWaitTime);
 };
 
+interface ProcessedData {
+  [key: string]: string | number | boolean | null;
+}
+
 // Export utility functions for common use cases
 export const processUtils = {
   formatRelativeTime,
@@ -348,4 +352,8 @@ export const processUtils = {
   groupEventsByDate,
   filterEventsByTimeRange,
   calculateProcessingMetrics,
+  processData: (data: ProcessedData[]): ProcessedData[] => {
+    // Implementation of processData method
+    return data; // Placeholder return, actual implementation needed
+  },
 };
