@@ -586,8 +586,4 @@ pub struct FailurePattern {
     pub time_to_failure_days: Vec<i32>,
 }
 
-impl From<serde_json::Error> for AIError {
-    fn from(error: serde_json::Error) -> Self {
-        AIError::InvalidInput(error.to_string())
-    }
-}
+
