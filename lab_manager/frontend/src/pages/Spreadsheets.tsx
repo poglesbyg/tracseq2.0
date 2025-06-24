@@ -388,13 +388,28 @@ export default function Spreadsheets() {
 
       {showSearchModal && (
         <SpreadsheetSearchModal
+          isOpen={showSearchModal}
           onClose={() => setShowSearchModal(false)}
+          onSelectResult={(result) => {
+            console.log('Selected result:', result);
+            setShowSearchModal(false);
+          }}
         />
       )}
 
       {viewingDataset && (
         <SpreadsheetDataViewer
-          dataset={viewingDataset}
+          dataset={{
+            id: viewingDataset.id,
+            original_filename: viewingDataset.original_filename,
+            file_type: viewingDataset.file_type,
+            total_rows: viewingDataset.total_rows,
+            total_columns: viewingDataset.total_columns,
+            column_headers: viewingDataset.column_headers,
+            created_at: viewingDataset.created_at,
+            uploaded_by: viewingDataset.uploaded_by,
+            sheet_name: viewingDataset.sheet_name,
+          }}
           onClose={() => setViewingDataset(null)}
         />
       )}

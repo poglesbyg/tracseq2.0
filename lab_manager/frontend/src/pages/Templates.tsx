@@ -11,8 +11,16 @@ import TemplateEditModal from '../components/TemplateEditModal';
     name: string;
     description?: string;
     created_at: string;
+    fields?: TemplateField[];
     metadata: Record<string, unknown>;
   }
+
+interface TemplateField {
+  name: string;
+  type: string;
+  required: boolean;
+  defaultValue?: string | number | boolean | null;
+}
 
 interface SheetData {
   name: string;
@@ -60,6 +68,7 @@ export default function Templates() {
         description: `Uploaded spreadsheet: ${file.name}`,
         file_path: "", // Backend will set this
         file_type: "", // Backend will set this  
+        fields: [], // Initialize with empty fields array
         metadata: {
           originalFileName: file.name,
           fileSize: file.size,
@@ -317,8 +326,13 @@ export default function Templates() {
       {/* Template Edit Modal */}
       {editingTemplate && (
         <TemplateEditModal
-          template={editingTemplate}
+          isOpen={!!editingTemplate}
+          template={editingTemplate ? { ...editingTemplate, fields: editingTemplate.fields || [] } : null}
           onClose={() => setEditingTemplate(null)}
+          onSave={() => {
+            queryClient.invalidateQueries({ queryKey: ['templates'] });
+            setEditingTemplate(null);
+          }}
         />
       )}
 

@@ -273,10 +273,10 @@ describe('SpreadsheetDataViewer', () => {
   describe('Export Functionality', () => {
     beforeEach(() => {
       // Mock URL.createObjectURL and related functions
-      (globalThis as any).URL = {
+      (globalThis as unknown as { URL: typeof URL }).URL = {
         createObjectURL: jest.fn(() => 'mock-blob-url'),
         revokeObjectURL: jest.fn(),
-      };
+      } as unknown as typeof URL;
       
       // Mock document.createElement for download link
       const mockAnchor = {
@@ -284,7 +284,7 @@ describe('SpreadsheetDataViewer', () => {
         download: '',
         click: jest.fn(),
       };
-      jest.spyOn(document, 'createElement').mockReturnValue(mockAnchor as any);
+      jest.spyOn(document, 'createElement').mockReturnValue(mockAnchor as unknown as HTMLAnchorElement);
     });
 
     it('shows export dropdown on hover', async () => {
