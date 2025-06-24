@@ -1,7 +1,7 @@
 [package]
 name = "transaction_service"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 authors = ["TracSeq Team <dev@tracseq.com>"]
 description = "Distributed transaction management service using Saga pattern for TracSeq 2.0"
 license = "MIT"
@@ -11,7 +11,7 @@ keywords = ["distributed-transactions", "saga", "microservices", "consistency", 
 # Web Framework
 axum = { version = "0.7", features = ["macros", "json", "ws"] }
 tower = { version = "0.4", features = ["full"] }
-tower-http = { version = "0.5", features = ["cors", "trace"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-gzip"] }
 hyper = { version = "1.0", features = ["full"] }
 
 # Async Runtime
@@ -88,6 +88,7 @@ default = ["redis-state", "event-integration"]
 redis-state = []
 etcd-coordination = ["etcd-rs"]
 event-integration = []
+database-persistence = []
 
 [[bin]]
 name = "transaction_service"

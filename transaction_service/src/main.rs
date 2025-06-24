@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Starting TracSeq Transaction Service...");
 
     let config = load_config();
-    let coordinator = match TransactionCoordinator::with_persistence(config).await {
+    let coordinator = match TransactionCoordinator::with_persistence(config.clone()).await {
         Ok(coordinator) => Arc::new(coordinator),
         Err(e) => {
             error!("Failed to initialize transaction coordinator with persistence: {}", e);

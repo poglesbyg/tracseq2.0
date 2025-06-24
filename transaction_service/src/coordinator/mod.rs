@@ -252,7 +252,7 @@ impl TransactionCoordinator {
             Ok(result) => {
                 // Final saga state update in persistence
                 if let Some(persistence) = &self.persistence {
-                    if let Some(saga_arc) = saga_arc.try_read() {
+                    if let Ok(saga_arc) = saga_arc.try_read() {
                         if let Err(e) = persistence.update_saga(&*saga_arc).await {
                             tracing::error!(
                                 "Failed to update completed saga in persistence: {}",
@@ -282,7 +282,7 @@ impl TransactionCoordinator {
             Err(error) => {
                 // Final saga state update in persistence for failed saga
                 if let Some(persistence) = &self.persistence {
-                    if let Some(saga_arc) = saga_arc.try_read() {
+                    if let Ok(saga_arc) = saga_arc.try_read() {
                         if let Err(e) = persistence.update_saga(&*saga_arc).await {
                             tracing::error!("Failed to update failed saga in persistence: {}", e);
                         }

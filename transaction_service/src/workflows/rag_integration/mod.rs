@@ -10,6 +10,7 @@ use crate::workflows::{RiskLevel, WorkflowPriority};
 
 /// RAG service client for workflow intelligence
 #[derive(Clone)]
+#[derive(Debug)]
 pub struct RagServiceClient {
     base_url: String,
     client: Client,

@@ -96,10 +96,12 @@ impl SagaStep for EnhancedLaboratoryStep {
             started_at,
             completed_at: Some(Utc::now()),
             retry_count: 0,
-            output_data: serde_json::json!({
-                "success": success,
-                "step_type": self.step_definition.step_type
-            }),
+            output_data: {
+                let mut data = HashMap::new();
+                data.insert("success".to_string(), serde_json::Value::Bool(success));
+                data.insert("step_type".to_string(), serde_json::to_value(&self.step_definition.step_type).unwrap_or(serde_json::Value::Null));
+                data
+            },
             metadata: HashMap::new(),
             error_message: None,
         })
@@ -141,7 +143,11 @@ impl CompensationStep for EnhancedLaboratoryCompensation {
             started_at,
             completed_at: Some(Utc::now()),
             retry_count: 0,
-            output_data: serde_json::json!({"compensated": true}),
+            output_data: {
+                let mut data = HashMap::new();
+                data.insert("compensated".to_string(), serde_json::Value::Bool(true));
+                data
+            },
             metadata: HashMap::new(),
             error_message: None,
         })
