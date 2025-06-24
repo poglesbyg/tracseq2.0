@@ -13,7 +13,7 @@ import {
 
 interface ReportResult {
   columns: string[];
-  rows: Record<string, any>[];
+  rows: Record<string, unknown>[];
   row_count: number;
   execution_time_ms: number;
   query: string;
@@ -43,42 +43,7 @@ interface ColumnInfo {
   is_primary_key: boolean;
 }
 
-interface ReportConfig {
-  id: string;
-  name: string;
-  type: 'sample' | 'template' | 'system' | 'custom';
-  parameters: ReportParameter[];
-  schedule?: ReportSchedule;
-  metadata?: Record<string, unknown>;
-}
 
-interface ReportParameter {
-  name: string;
-  type: 'string' | 'number' | 'date' | 'boolean' | 'select';
-  required: boolean;
-  defaultValue?: string | number | boolean | null;
-  options?: string[];
-}
-
-interface ReportSchedule {
-  frequency: 'daily' | 'weekly' | 'monthly';
-  time: string;
-  enabled: boolean;
-}
-
-interface GeneratedReport {
-  id: string;
-  configId: string;
-  generatedAt: string;
-  status: 'generating' | 'completed' | 'failed';
-  data: ReportData[];
-  fileUrl?: string;
-  errors?: string[];
-}
-
-interface ReportData {
-  [key: string]: string | number | boolean | null;
-}
 
 export default function Reports() {
   const [sqlQuery, setSqlQuery] = useState('SELECT * FROM samples LIMIT 10;');
@@ -114,8 +79,12 @@ export default function Reports() {
       setReportResult(data);
       setError(null);
     },
-    onError: (error: any) => {
-      setError(error.response?.data || 'An error occurred while executing the query');
+    onError: (error: unknown) => {
+      const errorMessage = error && typeof error === 'object' && 'response' in error && 
+                          error.response && typeof error.response === 'object' && 'data' in error.response 
+                          ? (error.response.data as string) 
+                          : 'An error occurred while executing the query';
+      setError(errorMessage);
       setReportResult(null);
     },
   });
@@ -419,7 +388,7 @@ export default function Reports() {
   );
 }
 
-function formatCellValue(value: any): string {
+function formatCellValue(value: unknown): string {
   if (value === null || value === undefined) {
     return '';
   }

@@ -89,12 +89,15 @@ class ApiClient {
     );
   }
 
-  private shouldRetry(error: any): boolean {
+  private shouldRetry(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) return false;
+    const axiosError = error as { code?: string; response?: { status?: number; data?: { retryable?: boolean } } };
+    
     return (
-      error.code === 'NETWORK_ERROR' ||
-      error.code === 'TIMEOUT' ||
-      (error.response?.status >= 500 && error.response?.status < 600) ||
-      error.response?.data?.retryable === true
+      axiosError.code === 'NETWORK_ERROR' ||
+      axiosError.code === 'TIMEOUT' ||
+      (axiosError.response?.status && axiosError.response.status >= 500 && axiosError.response.status < 600) ||
+      axiosError.response?.data?.retryable === true
     );
   }
 
@@ -102,19 +105,43 @@ class ApiClient {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  private formatError(error: any): ApiError {
-    if (error.response?.data?.error) {
-      return error.response.data.error;
+  private formatError(error: unknown): ApiError {
+    if (typeof error === 'object' && error !== null) {
+      const axiosError = error as { 
+        response?: { 
+          data?: { error?: ApiError }; 
+          status?: number; 
+        }; 
+        message?: string; 
+        config?: { url?: string }; 
+      };
+      
+      if (axiosError.response?.data?.error) {
+        return axiosError.response.data.error;
+      }
+
+      return {
+        error_id: crypto.randomUUID(),
+        error_code: 'CLIENT_ERROR',
+        message: axiosError.message || 'An unexpected error occurred',
+        severity: 'Medium',
+        context: {
+          status: axiosError.response?.status?.toString() || 'unknown',
+          url: axiosError.config?.url || 'unknown',
+        },
+        retryable: false,
+        timestamp: new Date().toISOString(),
+      };
     }
 
     return {
       error_id: crypto.randomUUID(),
       error_code: 'CLIENT_ERROR',
-      message: error.message || 'An unexpected error occurred',
+      message: 'An unexpected error occurred',
       severity: 'Medium',
       context: {
-        status: error.response?.status?.toString() || 'unknown',
-        url: error.config?.url || 'unknown',
+        status: 'unknown',
+        url: 'unknown',
       },
       retryable: false,
       timestamp: new Date().toISOString(),
@@ -126,12 +153,12 @@ class ApiClient {
     return response.data;
   }
 
-  public async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  public async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     const response = await this.client.post(url, data, config);
     return response.data;
   }
 
-  public async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  public async put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     const response = await this.client.put(url, data, config);
     return response.data;
   }

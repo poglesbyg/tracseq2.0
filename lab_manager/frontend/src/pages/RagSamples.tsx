@@ -1,60 +1,51 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import {
+  BeakerIcon,
   DocumentTextIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
   SparklesIcon,
   EyeIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  MagnifyingGlassIcon,
-  ArrowLeftIcon,
-  BeakerIcon,
-  CalendarIcon,
-  UserIcon,
-  ChartBarIcon,
-  DocumentIcon,
-  FunnelIcon,
-  XMarkIcon,
-  InformationCircleIcon,
   ChevronRightIcon,
+  XMarkIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  ChartBarIcon,
+  ArrowLeftIcon,
+  DocumentIcon,
+  UserIcon,
+  CalendarIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline';
+
+// Type definitions
+interface ExtractedDataSection {
+  [key: string]: string | number | boolean | null | ExtractedDataSection | ExtractedDataSection[];
+}
 
 interface RagSample {
   id: string;
   name: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  confidence: number;
-  extractedData: Record<string, unknown>;
-  sourceDocument: string;
-  processingTime: number;
-  errors?: string[];
-  metadata?: Record<string, unknown>;
-}
-
-interface RagProcessingResult {
-  sampleId: string;
-  success: boolean;
-  confidence: number;
-  extractedFields: ExtractedField[];
-  warnings: string[];
-  errors: string[];
-}
-
-interface ExtractedField {
-  name: string;
-  value: string | number | boolean | null;
-  confidence: number;
-  source: string;
-}
-
-interface SearchFilters {
-  status?: string;
-  confidenceMin?: number;
-  confidenceMax?: number;
-  dateFrom?: string;
-  dateTo?: string;
+  barcode: string;
+  location: string;
+  status: string;
+  created_at: string;
+  metadata?: {
+    confidence_score?: number;
+    processing_time?: number;
+    source_document?: string;
+    submitter_name?: string;
+    submitter_email?: string;
+    rag_submission_id?: string;
+    extraction_method?: string;
+    sample_type?: string;
+    validation_warnings?: string[];
+    extraction_warnings?: string[];
+    [key: string]: unknown;
+  };
 }
 
 interface RagSubmissionDetail {
@@ -69,14 +60,14 @@ interface RagSubmissionDetail {
   status: string;
   samples_created: number;
   extracted_data?: {
-    administrative_info?: any;
-    source_material?: any;
-    pooling_info?: any;
-    sequence_generation?: any;
-    container_info?: any;
-    informatics_info?: any;
-    sample_details?: any;
-    [key: string]: any;
+    administrative_info?: ExtractedDataSection;
+    source_material?: ExtractedDataSection;
+    pooling_info?: ExtractedDataSection;
+    sequence_generation?: ExtractedDataSection;
+    container_info?: ExtractedDataSection;
+    informatics_info?: ExtractedDataSection;
+    sample_details?: ExtractedDataSection;
+    [key: string]: ExtractedDataSection | undefined;
   };
 }
 
@@ -173,7 +164,7 @@ export default function RagSamples() {
     setConfidenceFilter('');
   };
 
-  const renderExtractedDataSection = (title: string, data: any) => {
+  const renderExtractedDataSection = (title: string, data: ExtractedDataSection | undefined) => {
     if (!data || typeof data !== 'object') return null;
 
     return (

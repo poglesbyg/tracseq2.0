@@ -36,7 +36,7 @@ const statusOptions = [
   { value: 'Completed', label: 'Completed', color: 'green' },
 ];
 
-export default function SampleEditModal({ isOpen, onClose, sample, onSave }: SampleEditModalProps) {
+export default function SampleEditModal({ onClose, sample }: Omit<SampleEditModalProps, 'isOpen' | 'onSave'>) {
   const [formData, setFormData] = useState<Sample>({
     id: sample?.id || '',
     name: sample?.name || '',
@@ -136,7 +136,7 @@ export default function SampleEditModal({ isOpen, onClose, sample, onSave }: Sam
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
+        <form onSubmit={handleSubmit} id="sample-edit-form" className="px-6 py-4 space-y-4">
           {errors.general && (
             <div className="rounded-md bg-red-50 p-4">
               <div className="text-sm text-red-700">{errors.general}</div>
@@ -243,7 +243,7 @@ export default function SampleEditModal({ isOpen, onClose, sample, onSave }: Sam
           </button>
           <button
             type="submit"
-            onClick={handleSubmit}
+            form="sample-edit-form"
             disabled={updateMutation.isPending}
             className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >

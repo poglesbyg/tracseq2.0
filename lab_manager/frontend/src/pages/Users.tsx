@@ -187,7 +187,8 @@ export default function Users() {
     try {
       setError('');
       const token = localStorage.getItem('auth_token');
-      const { password: _password, ...updateData } = formData;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...updateData } = formData;
       
       const response = await fetch(
         `${import.meta.env.VITE_API_URL || ''}/api/users/${selectedUser.id}`,
@@ -284,31 +285,7 @@ export default function Users() {
     return colorMap[status];
   };
 
-  const resetPassword = async (userId: string) => {
-    try {
-      const tempPassword = Math.random().toString(36).slice(-8);
-      await fetch(
-        `${import.meta.env.VITE_API_URL || ''}/api/users/${userId}/reset-password`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ password: tempPassword }),
-        }
-      );
-      
-      setUsers(users.map(user => 
-        user.id === userId ? { ...user, temp_password: tempPassword } : user
-      ));
-      
-      alert(`Password reset. New temporary password: ${tempPassword}`);
-    } catch (error) {
-      console.error('Failed to reset password:', error);
-      alert('Failed to reset password');
-    }
-  };
+
 
   // Check permissions
   if (!hasPermission('users', 'read')) {
