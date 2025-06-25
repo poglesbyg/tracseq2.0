@@ -28,7 +28,10 @@ async fn test_register_sensor_success() {
         sensor_id: TestDataFactory::sensor_id(),
         sensor_type: "temperature".to_string(),
         location_id: Some(location.id),
-        calibration_data: Some(serde_json::json!({
+        battery_level: Some(90),
+        signal_strength: Some(85),
+        firmware_version: Some("1.2.3".to_string()),
+        configuration: Some(serde_json::json!({
             "accuracy": 0.95,
             "offset": 0.1
         })),
@@ -68,14 +71,25 @@ async fn test_list_sensors() {
             sensor_id: format!("SENSOR_{}", i),
             sensor_type: if i % 2 == 0 { "temperature" } else { "humidity" }.to_string(),
             location_id: None,
-            calibration_data: Some(serde_json::json!({"test": true})),
+            battery_level: Some(95),
+            signal_strength: Some(80),
+            firmware_version: Some("1.0.0".to_string()),
+            configuration: Some(serde_json::json!({"test": true})),
         };
 
         let result = register_sensor(State(app_state.clone()), Json(sensor_request)).await;
         assert!(result.is_ok(), "Sensor registration should succeed");
     }
 
-    let result = list_sensors(State(app_state)).await;
+    let query = SensorListQuery {
+        page: Some(1),
+        per_page: Some(10),
+        sensor_type: None,
+        status: None,
+        location_id: None,
+    };
+
+    let result = list_sensors(State(app_state), Query(query)).await;
 
     assert!(result.is_ok(), "List sensors should succeed");
     let response = result.unwrap();
@@ -84,7 +98,7 @@ async fn test_list_sensors() {
     TestAssertions::assert_api_response_success(&api_response);
     let sensors = api_response.data.unwrap();
 
-    assert!(sensors.len() >= sensors_to_create);
+    assert!(sensors.data.len() >= sensors_to_create);
 
     test_db.cleanup().await.unwrap();
 }
@@ -103,29 +117,26 @@ async fn test_record_sensor_reading_success() {
         sensor_id: TestDataFactory::sensor_id(),
         sensor_type: "temperature".to_string(),
         location_id: None,
-        calibration_data: None,
+        battery_level: Some(90),
+        signal_strength: Some(85),
+        firmware_version: None,
+        configuration: None,
     };
 
     let sensor_result = register_sensor(State(app_state.clone()), Json(sensor_request.clone())).await;
     let sensor = sensor_result.unwrap().0.data.unwrap();
 
-    // Record sensor reading
-    let reading_request = SensorReading {
-        sensor_id: sensor.sensor_id.clone(),
-        readings: vec![
-            SensorReadingValue {
-                reading_type: "temperature".to_string(),
-                value: -20.5,
-                unit: "celsius".to_string(),
-                quality_score: Some(0.98),
-            },
-        ],
-        timestamp: chrono::Utc::now(),
+    // Record sensor reading using the correct request type
+    let reading_request = RecordReadingRequest {
+        value: -20.5,
+        unit: Some("celsius".to_string()),
+        timestamp: Some(chrono::Utc::now()),
+        metadata: Some(serde_json::json!({"quality": "good"})),
     };
 
     let result = record_sensor_reading(
         State(app_state), 
-        Path(sensor.id), 
+        Path(sensor.sensor_id.to_string()), 
         Json(reading_request)
     ).await;
 
@@ -134,7 +145,9 @@ async fn test_record_sensor_reading_success() {
     let api_response = response.0;
 
     TestAssertions::assert_api_response_success(&api_response);
-    assert!(api_response.data.unwrap().contains("recorded successfully"));
+    let reading = api_response.data.unwrap();
+    assert_eq!(reading.value, -20.5);
+    assert_eq!(reading.unit, "celsius");
 
     test_db.cleanup().await.unwrap();
 }
@@ -153,7 +166,10 @@ async fn test_get_sensor_data() {
         sensor_id: TestDataFactory::sensor_id(),
         sensor_type: "temperature".to_string(),
         location_id: None,
-        calibration_data: None,
+        battery_level: Some(90),
+        signal_strength: Some(85),
+        firmware_version: None,
+        configuration: None,
     };
 
     let sensor_result = register_sensor(State(app_state.clone()), Json(sensor_request.clone())).await;
@@ -161,36 +177,28 @@ async fn test_get_sensor_data() {
 
     // Record multiple readings
     for i in 0..3 {
-        let reading_request = SensorReading {
-            sensor_id: sensor.sensor_id.clone(),
-            readings: vec![
-                SensorReadingValue {
-                    reading_type: "temperature".to_string(),
-                    value: -20.0 + (i as f64 * 0.1),
-                    unit: "celsius".to_string(),
-                    quality_score: Some(0.98),
-                },
-            ],
-            timestamp: chrono::Utc::now(),
+        let reading_request = RecordReadingRequest {
+            value: -20.0 + (i as f64 * 0.1),
+            unit: Some("celsius".to_string()),
+            timestamp: Some(chrono::Utc::now()),
+            metadata: Some(serde_json::json!({"sequence": i})),
         };
 
         let result = record_sensor_reading(
             State(app_state.clone()), 
-            Path(sensor.id), 
+            Path(sensor.sensor_id.to_string()), 
             Json(reading_request)
         ).await;
         assert!(result.is_ok(), "Record sensor reading should succeed");
     }
 
-    // Get sensor data
+    // Get sensor data using correct query structure
     let query = SensorDataQuery {
-        start_time: Some(chrono::Utc::now() - chrono::Duration::hours(1)),
-        end_time: Some(chrono::Utc::now()),
-        reading_type: Some("temperature".to_string()),
+        hours_back: Some(24),
         limit: Some(10),
     };
 
-    let result = get_sensor_data(State(app_state), Path(sensor.id), Query(query)).await;
+    let result = get_sensor_data(State(app_state), Path(sensor.sensor_id.to_string()), Query(query)).await;
 
     assert!(result.is_ok(), "Get sensor data should succeed");
     let response = result.unwrap();
@@ -199,12 +207,11 @@ async fn test_get_sensor_data() {
     TestAssertions::assert_api_response_success(&api_response);
     let sensor_data = api_response.data.unwrap();
 
-    assert!(sensor_data.len() >= 3);
+    assert!(sensor_data.readings.len() >= 3);
     
-    for data_point in &sensor_data {
-        assert_eq!(data_point.reading_type, "temperature");
-        assert_eq!(data_point.unit, "celsius");
-        assert!(data_point.value >= -20.5 && data_point.value <= -19.5);
+    for reading in &sensor_data.readings {
+        assert_eq!(reading.unit, "celsius");
+        assert!(reading.value >= -20.5 && reading.value <= -19.5);
     }
 
     test_db.cleanup().await.unwrap();
@@ -219,7 +226,15 @@ async fn test_get_alerts() {
         .await
         .unwrap();
 
-    let result = get_alerts(State(app_state)).await;
+    let query = AlertQuery {
+        page: Some(1),
+        per_page: Some(10),
+        sensor_id: None,
+        severity: None,
+        resolved: Some(false),
+    };
+
+    let result = get_alerts(State(app_state), Query(query)).await;
 
     assert!(result.is_ok(), "Get alerts should succeed");
     let response = result.unwrap();
@@ -229,7 +244,7 @@ async fn test_get_alerts() {
     let alerts = api_response.data.unwrap();
 
     // Initially should be empty or contain any default alerts
-    assert!(alerts.len() >= 0);
+    assert!(alerts.data.len() >= 0);
 
     test_db.cleanup().await.unwrap();
 }
@@ -257,21 +272,4 @@ async fn test_sensor_health_check() {
     assert!(health_status.active_sensors <= health_status.total_sensors);
 
     test_db.cleanup().await.unwrap();
-}
-
-// Helper structs for test requests (these would normally be in the models)
-#[derive(serde::Serialize, serde::Deserialize)]
-struct RegisterSensorRequest {
-    sensor_id: String,
-    sensor_type: String,
-    location_id: Option<Uuid>,
-    calibration_data: Option<serde_json::Value>,
-}
-
-#[derive(serde::Deserialize)]
-struct SensorDataQuery {
-    start_time: Option<chrono::DateTime<chrono::Utc>>,
-    end_time: Option<chrono::DateTime<chrono::Utc>>,
-    reading_type: Option<String>,
-    limit: Option<i32>,
 } 

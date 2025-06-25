@@ -215,10 +215,6 @@ pub async fn get_alerts(
     Ok(Json(ApiResponse::success(response)))
 }
 
-
-
-
-
 /// Update sensor configuration
 /// PUT /iot/sensors/:sensor_id
 pub async fn update_sensor(
@@ -545,7 +541,7 @@ pub struct SensorListQuery {
     pub location_id: Option<Uuid>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterSensorRequest {
     pub sensor_id: String,
     pub sensor_type: String,
@@ -556,20 +552,20 @@ pub struct RegisterSensorRequest {
     pub configuration: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct UpdateSensorRequest {
     pub location_id: Option<Uuid>,
     pub status: Option<String>,
     pub configuration: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct SensorDataQuery {
     pub hours_back: Option<i32>,
     pub limit: Option<i32>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordReadingRequest {
     pub value: f64,
     pub unit: Option<String>,
@@ -577,7 +573,7 @@ pub struct RecordReadingRequest {
     pub metadata: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct AlertQuery {
     pub page: Option<i32>,
     pub per_page: Option<i32>,

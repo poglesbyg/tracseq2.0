@@ -297,7 +297,7 @@ pub async fn retrieve_sample(
 }
 
 // Helper struct for capacity information
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CapacityInfo {
     pub location_id: Uuid,
     pub max_capacity: i32,
