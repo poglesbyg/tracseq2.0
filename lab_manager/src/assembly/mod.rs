@@ -4,11 +4,11 @@ use std::sync::Arc;
 use crate::{
     config::AppConfig,
     models::{spreadsheet::SpreadsheetDataManager, user::UserManager},
-    repositories::PostgresRepositoryFactory,
+    repositories::{PostgresRepositoryFactory, storage_repository::PostgresStorageRepository},
     sample_submission::SampleSubmissionManager,
     sequencing::SequencingManager,
-    services::{auth_service::AuthService, spreadsheet_service::SpreadsheetService},
-    storage::Storage,
+    services::{auth_service::AuthService, spreadsheet_service::SpreadsheetService, storage_management_service::StorageManagementService, barcode_service::BarcodeService},
+    services::storage_service::{LocalStorageService, StorageService},
 };
 
 // Local simplified type definitions to avoid workspace import issues
@@ -95,6 +95,7 @@ pub struct AppComponents {
     pub user_manager: crate::models::user::UserManager,
     pub auth_service: crate::services::auth_service::AuthService,
     pub spreadsheet_service: crate::services::spreadsheet_service::SpreadsheetService,
+    pub storage_management_service: Arc<StorageManagementService<PostgresStorageRepository>>,
     pub observability: ObservabilityComponent,
 }
 
@@ -105,7 +106,7 @@ pub struct DatabaseComponent {
 
 #[derive(Debug, Clone)]
 pub struct StorageComponent {
-    pub storage: Arc<crate::storage::Storage>,
+    pub storage: Arc<LocalStorageService>,
 }
 
 #[derive(Debug, Clone)]

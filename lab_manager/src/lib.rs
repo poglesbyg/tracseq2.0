@@ -14,7 +14,6 @@ pub mod router;
 pub mod sample_submission;
 pub mod sequencing;
 pub mod services;
-pub mod storage;
 pub mod validation;
 
 // Re-export main component types for convenience

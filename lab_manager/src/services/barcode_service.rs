@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use crate::models::storage::{BarcodeConfig, StorageValidationError};
 
 /// Barcode generation service for laboratory sample tracking
+#[derive(Debug)]
 pub struct BarcodeService {
     config: BarcodeConfig,
     used_barcodes: HashSet<String>, // In production, this would be handled by database

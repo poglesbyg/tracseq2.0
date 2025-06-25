@@ -16,6 +16,7 @@ pub trait StorageRepository: Send + Sync {
     ) -> Result<StorageLocation, sqlx::Error>;
     async fn get_storage_location(&self, id: i32) -> Result<Option<StorageLocation>, sqlx::Error>;
     async fn get_all_storage_locations(&self) -> Result<Vec<StorageLocation>, sqlx::Error>;
+    async fn list_storage_locations(&self) -> Result<Vec<StorageLocation>, sqlx::Error>;
     async fn get_storage_locations_by_temperature(
         &self,
         temp_zone: TemperatureZone,
@@ -144,6 +145,7 @@ pub struct CreateMovementHistory {
 }
 
 /// PostgreSQL implementation of storage repository
+#[derive(Debug)]
 pub struct PostgresStorageRepository {
     pool: PgPool,
 }
@@ -190,6 +192,11 @@ impl StorageRepository for PostgresStorageRepository {
         )
         .fetch_all(&self.pool)
         .await
+    }
+
+    async fn list_storage_locations(&self) -> Result<Vec<StorageLocation>, sqlx::Error> {
+        // Alias for get_all_storage_locations to match service interface
+        self.get_all_storage_locations().await
     }
 
     async fn get_storage_locations_by_temperature(
