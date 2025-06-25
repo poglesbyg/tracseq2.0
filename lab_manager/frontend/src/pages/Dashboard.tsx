@@ -310,7 +310,7 @@ export default function Dashboard() {
       <div className="mb-8">
         <div className="md:flex md:items-center md:justify-between">
           <div className="flex-1 min-w-0">
-            <h1 className="text-3xl font-bold leading-tight text-gray-900">Dashboard</h1>
+            <h1 className="text-3xl font-bold leading-tight text-gray-900" data-testid="dashboard-title">Dashboard</h1>
             <p className="mt-2 text-sm text-gray-600">
               Welcome to TracSeq 2.0 Laboratory Management System
             </p>

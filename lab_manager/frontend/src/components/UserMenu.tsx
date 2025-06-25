@@ -73,6 +73,7 @@ export const UserMenu: React.FC = () => {
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded="false"
         aria-haspopup="true"
+        data-testid="user-menu"
       >
         <span className="sr-only">Open user menu</span>
         <div className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
@@ -147,6 +148,7 @@ export const UserMenu: React.FC = () => {
             <button
               onClick={handleLogout}
               className="flex w-full items-center px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
+              data-testid="logout-button"
             >
               <ArrowRightOnRectangleIcon className="mr-3 h-4 w-4 text-red-400" />
               Sign out

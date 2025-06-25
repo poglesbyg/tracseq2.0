@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import Layout from './components/Layout';
@@ -6,7 +6,8 @@ import { ChatBot } from './components/ChatBot';
 import { ChatBotFloat } from './components/ChatBotFloat';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
-import { LoginModal } from './auth/LoginModal';
+import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import Templates from './pages/Templates';
 import Samples from './pages/Samples';
@@ -28,39 +29,134 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Router>
-          <ProtectedRoute fallback={<LoginModal isOpen={true} onClose={() => {}} />}>
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/templates" element={<Templates />} />
-                <Route path="/samples" element={<Samples />} />
-                <Route path="/rag-submissions" element={<RagSubmissions />} />
-                <Route path="/rag-samples" element={<RagSamples />} />
-                <Route path="/sequencing" element={<Sequencing />} />
-                <Route path="/spreadsheets" element={<Spreadsheets />} />
-                <Route path="/storage" element={<Storage />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route 
-                  path="/users" 
-                  element={
-                    <ProtectedRoute requireRoles="lab_administrator">
-                      <Users />
-                    </ProtectedRoute>
-                  } 
-                />
-              </Routes>
-              
-              {/* RAG Chatbot */}
-              {!isChatOpen && (
-                <ChatBotFloat onClick={() => setIsChatOpen(true)} />
-              )}
-              <ChatBot 
-                isOpen={isChatOpen} 
-                onToggle={() => setIsChatOpen(!isChatOpen)} 
-              />
-            </Layout>
-          </ProtectedRoute>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            
+            {/* Protected routes */}
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Dashboard />
+                  {/* RAG Chatbot */}
+                  {!isChatOpen && (
+                    <ChatBotFloat onClick={() => setIsChatOpen(true)} />
+                  )}
+                  <ChatBot 
+                    isOpen={isChatOpen} 
+                    onToggle={() => setIsChatOpen(!isChatOpen)} 
+                  />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/templates" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Templates />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/samples" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Samples />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/rag-submissions" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RagSubmissions />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/rag-samples" element={
+              <ProtectedRoute>
+                <Layout>
+                  <RagSamples />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/sequencing" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Sequencing />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/spreadsheets" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Spreadsheets />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/storage" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Storage />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/reports" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Reports />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Profile />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/users" element={
+              <ProtectedRoute requireRoles="lab_administrator">
+                <Layout>
+                  <Users />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            {/* Redirect root to dashboard */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            
+            {/* Catch all route - redirect to dashboard */}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
         </Router>
       </AuthProvider>
     </QueryClientProvider>

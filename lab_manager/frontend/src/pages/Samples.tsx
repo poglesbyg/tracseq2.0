@@ -38,6 +38,7 @@ export default function Samples() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [timeFilter, setTimeFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'table' | 'process'>('table');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
 
 
@@ -76,6 +77,12 @@ export default function Samples() {
 
   // Filter samples based on current filters
   const filteredSamples = samples?.filter(sample => {
+    // Search filter
+    if (searchQuery && !sample.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
+        !sample.barcode.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    
     // Status filter
     if (statusFilter !== 'all' && sample.status !== statusFilter) return false;
     
@@ -168,6 +175,7 @@ export default function Samples() {
             type="button"
             onClick={() => setShowWizard(true)}
             className="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:w-auto"
+            data-testid="create-sample-button"
           >
             Add Sample
           </button>
@@ -197,9 +205,21 @@ export default function Samples() {
         ))}
       </div>
 
-      {/* Filters and View Controls */}
+      {/* Search and Filters */}
       <div className="mt-8 bg-white shadow rounded-lg">
         <div className="px-6 py-4 border-b border-gray-200">
+          {/* Search Bar */}
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search samples by name or barcode..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              data-testid="search-input"
+            />
+          </div>
+          
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
@@ -212,6 +232,7 @@ export default function Samples() {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                data-testid="status-filter"
               >
                 <option value="all">All Status</option>
                 <option value="Pending">Pending</option>
@@ -359,7 +380,7 @@ export default function Samples() {
             <div className="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
               <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
                 <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-                  <table className="min-w-full divide-y divide-gray-300">
+                  <table className="min-w-full divide-y divide-gray-300" data-testid="sample-list">
                     <thead className="bg-gray-50">
                       <tr>
                         <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">

@@ -178,6 +178,22 @@ pub struct AuthClaims {
     pub jti: Uuid,      // JWT ID (session ID)
 }
 
+/// User registration request (self-registration)
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct RegisterRequest {
+    #[validate(email(message = "Invalid email format"))]
+    pub email: String,
+    #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
+    pub password: String,
+    #[validate(length(min = 1, message = "First name is required"))]
+    pub first_name: String,
+    #[validate(length(min = 1, message = "Last name is required"))]
+    pub last_name: String,
+    pub department: Option<String>,
+    pub position: Option<String>,
+    pub lab_affiliation: Option<String>,
+}
+
 /// Login request
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct LoginRequest {

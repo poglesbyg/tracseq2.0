@@ -27,17 +27,17 @@ export default function Layout({ children }: LayoutProps) {
   const { hasRole } = useAuth();
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: HomeIcon },
-    { name: 'AI Submissions', href: '/rag-submissions', icon: SparklesIcon },
-    { name: 'AI Samples', href: '/rag-samples', icon: CpuChipIcon },
-    { name: 'Templates', href: '/templates', icon: DocumentIcon },
-    { name: 'Samples', href: '/samples', icon: BeakerIcon },
-    { name: 'Sequencing', href: '/sequencing', icon: QueueListIcon },
-    { name: 'Spreadsheets', href: '/spreadsheets', icon: TableCellsIcon },
-    { name: 'Storage', href: '/storage', icon: MapPinIcon },
-    { name: 'Reports', href: '/reports', icon: ChartBarIcon },
+    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, testId: 'nav-dashboard' },
+    { name: 'AI Submissions', href: '/rag-submissions', icon: SparklesIcon, testId: 'nav-rag-submissions' },
+    { name: 'AI Samples', href: '/rag-samples', icon: CpuChipIcon, testId: 'nav-rag-samples' },
+    { name: 'Templates', href: '/templates', icon: DocumentIcon, testId: 'nav-templates' },
+    { name: 'Samples', href: '/samples', icon: BeakerIcon, testId: 'nav-samples' },
+    { name: 'Sequencing', href: '/sequencing', icon: QueueListIcon, testId: 'nav-sequencing' },
+    { name: 'Spreadsheets', href: '/spreadsheets', icon: TableCellsIcon, testId: 'nav-spreadsheets' },
+    { name: 'Storage', href: '/storage', icon: MapPinIcon, testId: 'nav-storage' },
+    { name: 'Reports', href: '/reports', icon: ChartBarIcon, testId: 'nav-reports' },
     // Only show Users for administrators
-    ...(hasRole('lab_administrator') ? [{ name: 'Users', href: '/users', icon: UsersIcon }] : []),
+    ...(hasRole('lab_administrator') ? [{ name: 'Users', href: '/users', icon: UsersIcon, testId: 'nav-users' }] : []),
   ];
 
   return (
@@ -73,6 +73,7 @@ export default function Layout({ children }: LayoutProps) {
                           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       } sidebar-nav-item`}
                       onClick={() => setSidebarOpen(false)}
+                      data-testid={item.testId}
                     >
                       <item.icon
                         className={`${
@@ -119,6 +120,7 @@ export default function Layout({ children }: LayoutProps) {
                         ? 'bg-indigo-50 text-indigo-700 border-r-4 border-indigo-700'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     } sidebar-nav-item group`}
+                    data-testid={item.testId}
                   >
                     <item.icon
                       className={`${
