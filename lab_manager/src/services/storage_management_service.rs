@@ -13,6 +13,7 @@ use crate::repositories::storage_repository::{
 use crate::services::barcode_service::BarcodeService;
 
 /// Storage management service for biological sample storage operations
+#[derive(Debug)]
 pub struct StorageManagementService<R: StorageRepository> {
     storage_repo: Arc<R>,
     barcode_service: Arc<RwLock<BarcodeService>>,
@@ -358,6 +359,14 @@ impl<R: StorageRepository> StorageManagementService<R> {
     ) -> Result<StorageLocation, StorageManagementError> {
         self.storage_repo
             .update_storage_location(location_id, updates)
+            .await
+            .map_err(StorageManagementError::DatabaseError)
+    }
+
+    /// List all storage locations
+    pub async fn list_storage_locations(&self) -> Result<Vec<StorageLocation>, StorageManagementError> {
+        self.storage_repo
+            .list_storage_locations()
             .await
             .map_err(StorageManagementError::DatabaseError)
     }

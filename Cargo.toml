@@ -6,7 +6,7 @@ members = [
 
 [workspace.package]
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 repository = "https://github.com/poglesbyg/tracseq2.0"
 
@@ -22,4 +22,18 @@ thiserror = "1.0"
 
 # Add resolver configuration for better module resolution
 [workspace.lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(docsrs)'] } 
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(docsrs)'] }
+
+# Size and memory optimizations for release builds
+[profile.release]
+opt-level = "s"          # Optimize for size
+lto = true               # Enable link-time optimization
+codegen-units = 1        # Reduce parallel code generation for smaller binaries
+panic = "abort"          # Reduce binary size by removing unwinding code
+strip = true             # Strip debug symbols
+
+# Additional optimization profile for ultra-small builds
+[profile.release-small]
+inherits = "release"
+opt-level = "z"          # Optimize aggressively for size
+lto = "fat"              # Full LTO for maximum size reduction 

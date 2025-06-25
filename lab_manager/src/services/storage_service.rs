@@ -56,6 +56,7 @@ pub struct StorageStats {
 }
 
 /// Local filesystem storage implementation
+#[derive(Debug)]
 pub struct LocalStorageService {
     base_path: PathBuf,
     max_file_size: u64,

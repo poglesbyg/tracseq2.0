@@ -358,13 +358,11 @@ async fn validate_path_parameters(path: &str) -> Result<(), Response> {
         }
 
         // Validate UUID parameters
-        if segment.len() == 36 && segment.contains('-') {
-            if InputSanitizer::validate_uuid(segment).is_err() {
-                return Err(create_validation_error_response(
-                    ValidationErrorType::InvalidPathParameter,
-                    format!("Invalid UUID format: {}", segment),
-                ));
-            }
+        if segment.len() == 36 && segment.contains('-') && InputSanitizer::validate_uuid(segment).is_err() {
+            return Err(create_validation_error_response(
+                ValidationErrorType::InvalidPathParameter,
+                format!("Invalid UUID format: {}", segment),
+            ));
         }
 
         // Check for overly long segments
