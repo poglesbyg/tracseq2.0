@@ -24,7 +24,7 @@ async-trait = "0.1"
 rand = "0.8"
 
 # Database
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json", "migrate"], optional = true }
+sqlx = { workspace = true, optional = true }
 uuid = { version = "1.6", features = ["v4", "serde"] }
 
 # Connection pooling
@@ -88,7 +88,7 @@ tower = { version = "0.4", features = ["util", "timeout", "load-shed", "limit"] 
 tower-http = { version = "0.5", features = ["fs", "trace", "cors", "timeout"] }
 
 # Database testing
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+sqlx = { workspace = true }
 
 # Distributed system testing
 wiremock = "0.6"

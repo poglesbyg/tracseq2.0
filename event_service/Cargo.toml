@@ -34,7 +34,7 @@ config = "0.14"
 dotenvy = "0.15"
 
 # Database (for event persistence and replay)
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json"] }
+sqlx = { workspace = true }
 uuid = { version = "1.6", features = ["v4", "serde"] }
 
 # Time handling

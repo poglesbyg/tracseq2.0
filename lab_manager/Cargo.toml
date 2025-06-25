@@ -38,7 +38,7 @@ anyhow = "1.0"
 thiserror = "1.0"
 
 # Project-specific dependencies
-sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "json", "chrono", "macros", "migrate"] }
+sqlx = { workspace = true }
 axum = { version = "0.7.9", features = ["multipart"] }
 tower-http = { version = "0.5", features = ["fs", "cors"] }
 calamine = "0.22"
