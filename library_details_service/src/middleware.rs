@@ -1,7 +1,8 @@
 use axum::{
-    http::{Request, StatusCode},
+    http::StatusCode,
     middleware::Next,
     response::Response,
+    extract::Request as AxumRequest,
 };
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
@@ -14,9 +15,9 @@ pub struct Claims {
     pub roles: Vec<String>,
 }
 
-pub async fn auth_middleware<B>(
-    request: Request<B>,
-    next: Next<B>,
+pub async fn auth_middleware(
+    request: AxumRequest,
+    next: Next,
 ) -> Result<Response, StatusCode> {
     let headers = request.headers();
     // Extract the Authorization header
