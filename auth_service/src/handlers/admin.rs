@@ -1,12 +1,10 @@
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 use serde_json::json;
 use sqlx::Row;
 
-use crate::{
-    AppState,
-    error::AuthError,
-    models::*,
-};
+use crate::{error::AuthError, models::*};
+
+use crate::AppState;
 
 /// List all users (admin only)
 #[allow(dead_code)]
@@ -14,30 +12,30 @@ pub async fn list_users(
     State(state): State<AppState>,
     _admin_user: User, // Injected by admin middleware
 ) -> Result<Json<serde_json::Value>, AuthError> {
-    let users = sqlx::query_as::<_, User>(
-        "SELECT * FROM users ORDER BY created_at DESC LIMIT 100"
-    )
-    .fetch_all(&state.db_pool.pool)
-    .await?;
+    let users = sqlx::query_as::<_, User>("SELECT * FROM users ORDER BY created_at DESC LIMIT 100")
+        .fetch_all(&state.db_pool.pool)
+        .await?;
 
     let user_data: Vec<serde_json::Value> = users
         .into_iter()
-        .map(|user| json!({
-            "id": user.id,
-            "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "role": user.role,
-            "status": user.status,
-            "email_verified": user.email_verified,
-            "failed_login_attempts": user.failed_login_attempts,
-            "locked_until": user.locked_until,
-            "last_login_at": user.last_login_at,
-            "created_at": user.created_at,
-            "department": user.department,
-            "position": user.position,
-            "lab_affiliation": user.lab_affiliation
-        }))
+        .map(|user| {
+            json!({
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": user.role,
+                "status": user.status,
+                "email_verified": user.email_verified,
+                "failed_login_attempts": user.failed_login_attempts,
+                "locked_until": user.locked_until,
+                "last_login_at": user.last_login_at,
+                "created_at": user.created_at,
+                "department": user.department,
+                "position": user.position,
+                "lab_affiliation": user.lab_affiliation
+            })
+        })
         .collect();
 
     Ok(Json(json!({
@@ -110,12 +108,11 @@ pub async fn disable_user(
     axum::extract::Path(user_id): axum::extract::Path<uuid::Uuid>,
     _admin_user: User, // Injected by admin middleware
 ) -> Result<Json<serde_json::Value>, AuthError> {
-    let result = sqlx::query(
-        "UPDATE users SET status = 'inactive', updated_at = NOW() WHERE id = $1"
-    )
-    .bind(user_id)
-    .execute(&state.db_pool.pool)
-    .await?;
+    let result =
+        sqlx::query("UPDATE users SET status = 'inactive', updated_at = NOW() WHERE id = $1")
+            .bind(user_id)
+            .execute(&state.db_pool.pool)
+            .await?;
 
     if result.rows_affected() == 0 {
         return Err(AuthError::UserNotFound);
@@ -140,12 +137,11 @@ pub async fn enable_user(
     axum::extract::Path(user_id): axum::extract::Path<uuid::Uuid>,
     _admin_user: User, // Injected by admin middleware
 ) -> Result<Json<serde_json::Value>, AuthError> {
-    let result = sqlx::query(
-        "UPDATE users SET status = 'active', updated_at = NOW() WHERE id = $1"
-    )
-    .bind(user_id)
-    .execute(&state.db_pool.pool)
-    .await?;
+    let result =
+        sqlx::query("UPDATE users SET status = 'active', updated_at = NOW() WHERE id = $1")
+            .bind(user_id)
+            .execute(&state.db_pool.pool)
+            .await?;
 
     if result.rows_affected() == 0 {
         return Err(AuthError::UserNotFound);
@@ -174,7 +170,7 @@ pub async fn list_sessions(
         WHERE s.expires_at > NOW()
         ORDER BY s.last_used_at DESC
         LIMIT 100
-        "#
+        "#,
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
@@ -215,29 +211,31 @@ pub async fn get_audit_log(
         FROM security_audit_log
         ORDER BY timestamp DESC
         LIMIT 100
-        "#
+        "#,
     )
     .fetch_all(&state.db_pool.pool)
     .await?;
 
     let log_data: Vec<serde_json::Value> = logs
         .into_iter()
-        .map(|row| json!({
-            "id": row.get::<i32, _>("id"),
-            "event_id": row.get::<uuid::Uuid, _>("event_id"),
-            "event_type": row.get::<String, _>("event_type"),
-            "user_id": row.get::<Option<uuid::Uuid>, _>("user_id"),
-            "user_email": row.get::<Option<String>, _>("user_email"),
-            "ip_address": row.get::<Option<String>, _>("ip_address"),
-            "user_agent": row.get::<Option<String>, _>("user_agent"),
-            "details": row.get::<Option<serde_json::Value>, _>("details"),
-            "severity": row.get::<String, _>("severity"),
-            "timestamp": row.get::<chrono::DateTime<chrono::Utc>, _>("timestamp")
-        }))
+        .map(|row| {
+            json!({
+                "id": row.get::<i32, _>("id"),
+                "event_id": row.get::<uuid::Uuid, _>("event_id"),
+                "event_type": row.get::<String, _>("event_type"),
+                "user_id": row.get::<Option<uuid::Uuid>, _>("user_id"),
+                "user_email": row.get::<Option<String>, _>("user_email"),
+                "ip_address": row.get::<Option<String>, _>("ip_address"),
+                "user_agent": row.get::<Option<String>, _>("user_agent"),
+                "details": row.get::<Option<serde_json::Value>, _>("details"),
+                "severity": row.get::<String, _>("severity"),
+                "timestamp": row.get::<chrono::DateTime<chrono::Utc>, _>("timestamp")
+            })
+        })
         .collect();
 
     Ok(Json(json!({
         "success": true,
         "data": log_data
     })))
-} 
+}

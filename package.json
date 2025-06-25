@@ -16,12 +16,14 @@
     "fix": "pnpm -r fix",
     "test": "pnpm -r test",
     "test:web": "pnpm test --filter @app/web",
-    "test:api": "pnpm test --filter @app/api", 
+    "test:api": "pnpm test --filter @app/api",
     "test:db": "pnpm test --filter @app/db",
     "clean": "pnpm -r clean",
     "install:all": "pnpm install -r"
   },
   "devDependencies": {
+    "@playwright/test": "^1.53.1",
+    "@types/node": "^24.0.4",
     "typescript": "~5.8.3"
   },
   "engines": {
@@ -29,4 +31,4 @@
     "pnpm": ">=8.0.0"
   },
   "packageManager": "pnpm@10.12.2"
-} 
+}

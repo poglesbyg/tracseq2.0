@@ -90,6 +90,10 @@ argon2 = "0.5"
 futures = "0.3"
 tokio = { version = "1.36", features = ["test-util", "rt-multi-thread", "macros"] }
 
+[lib]
+name = "auth_service"
+path = "src/lib.rs"
+
 [[bin]]
 name = "auth_service"
 path = "src/main.rs" 

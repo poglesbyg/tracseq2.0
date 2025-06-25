@@ -1,13 +1,9 @@
-use auth_service::{
-    handlers::auth::*,
-    models::*,
-    test_utils::*,
-    AuthError,
-};
 use crate::test_utils::*;
-use axum::{http::StatusCode, Json};
+use auth_service::{AuthError, models::*};
+use axum::{Json, http::StatusCode};
 use serde_json::json;
 use serial_test::serial;
+use validator::Validate;
 
 #[test_with_auth_db]
 async fn test_register_success(test_db: &mut TestDatabase) {
@@ -15,10 +11,7 @@ async fn test_register_success(test_db: &mut TestDatabase) {
     let request = UserFactory::create_valid_register_request();
     let email = request.email.clone();
 
-    let result = register(
-        axum::extract::State(app_state),
-        Json(request),
-    ).await;
+    let result = register(axum::extract::State(app_state), Json(request)).await;
 
     assert!(result.is_ok());
     let response = result.unwrap();
@@ -26,13 +19,11 @@ async fn test_register_success(test_db: &mut TestDatabase) {
     assert!(response.0["user_id"].is_string());
 
     // Verify user exists in database
-    let user = sqlx::query_as::<_, User>(
-        "SELECT * FROM users WHERE email = $1"
-    )
-    .bind(&email)
-    .fetch_one(&test_db.pool)
-    .await
-    .expect("User should exist");
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
+        .bind(&email)
+        .fetch_one(&test_db.pool)
+        .await
+        .expect("User should exist");
 
     test_db.track_user(user.id);
     assert_eq!(user.email, email);
@@ -44,14 +35,11 @@ async fn test_register_validation_failure(test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
     let request = UserFactory::create_invalid_register_request();
 
-    let result = register(
-        axum::extract::State(app_state),
-        Json(request),
-    ).await;
+    let result = register(axum::extract::State(app_state), Json(request)).await;
 
     assert!(result.is_err());
     match result.unwrap_err() {
-        AuthError::Validation(_) => {}, // Expected
+        AuthError::Validation(_) => {} // Expected
         other => panic!("Expected validation error, got: {:?}", other),
     }
 }
@@ -60,7 +48,7 @@ async fn test_register_validation_failure(test_db: &mut TestDatabase) {
 async fn test_register_duplicate_email(test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
     let auth_service = &app_state.auth_service;
-    
+
     // Create first user
     let user = UserFactory::create_test_user(auth_service).await;
     test_db.track_user(user.id);
@@ -71,14 +59,11 @@ async fn test_register_duplicate_email(test_db: &mut TestDatabase) {
         ..UserFactory::create_valid_register_request()
     };
 
-    let result = register(
-        axum::extract::State(app_state),
-        Json(request),
-    ).await;
+    let result = register(axum::extract::State(app_state), Json(request)).await;
 
     assert!(result.is_err());
     match result.unwrap_err() {
-        AuthError::UserAlreadyExists => {}, // Expected
+        AuthError::UserAlreadyExists => {} // Expected
         other => panic!("Expected UserAlreadyExists error, got: {:?}", other),
     }
 }
@@ -86,7 +71,7 @@ async fn test_register_duplicate_email(test_db: &mut TestDatabase) {
 #[test_with_auth_db]
 async fn test_login_success(test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
-    
+
     // Create test user
     let user = UserFactory::create_test_user(&app_state.auth_service).await;
     test_db.track_user(user.id);
@@ -113,18 +98,15 @@ async fn test_login_invalid_credentials(test_db: &mut TestDatabase) {
 async fn test_login_validation_failure(test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
     let request = LoginRequest {
-        email: "".to_string(), // Invalid
+        email: "".to_string(),    // Invalid
         password: "".to_string(), // Invalid
     };
 
-    let result = login(
-        axum::extract::State(app_state),
-        Json(request),
-    ).await;
+    let result = login(axum::extract::State(app_state), Json(request)).await;
 
     assert!(result.is_err());
     match result.unwrap_err() {
-        AuthError::Validation(_) => {}, // Expected
+        AuthError::Validation(_) => {} // Expected
         other => panic!("Expected validation error, got: {:?}", other),
     }
 }
@@ -133,15 +115,12 @@ async fn test_login_validation_failure(test_db: &mut TestDatabase) {
 async fn test_get_current_user_success(test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
     let auth_service = &app_state.auth_service;
-    
+
     // Create test user
     let user = UserFactory::create_test_user(auth_service).await;
     test_db.track_user(user.id);
 
-    let result = get_current_user(
-        axum::extract::State(app_state),
-        user.clone(),
-    ).await;
+    let result = get_current_user(axum::extract::State(app_state), user.clone()).await;
 
     assert!(result.is_ok());
     let response = result.unwrap();
@@ -151,7 +130,7 @@ async fn test_get_current_user_success(test_db: &mut TestDatabase) {
 #[test_with_auth_db]
 async fn test_change_password_success(test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
-    
+
     let user = UserFactory::create_test_user(&app_state.auth_service).await;
     test_db.track_user(user.id);
 
@@ -165,14 +144,17 @@ async fn test_change_password_success(test_db: &mut TestDatabase) {
     assert!(result.is_ok());
     let response = result.unwrap();
     assert_eq!(response.0["success"], true);
-    assert_eq!(response.0["message"], "Password changed successfully. Please log in again.");
+    assert_eq!(
+        response.0["message"],
+        "Password changed successfully. Please log in again."
+    );
 }
 
 #[test_with_auth_db]
 async fn test_change_password_wrong_current(test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
     let auth_service = &app_state.auth_service;
-    
+
     // Create test user
     let user = UserFactory::create_test_user(auth_service).await;
     test_db.track_user(user.id);
@@ -182,15 +164,11 @@ async fn test_change_password_wrong_current(test_db: &mut TestDatabase) {
         new_password: "NewSecurePassword456!".to_string(),
     };
 
-    let result = change_password(
-        axum::extract::State(app_state),
-        Json(request),
-        user,
-    ).await;
+    let result = change_password(axum::extract::State(app_state), Json(request), user).await;
 
     assert!(result.is_err());
     match result.unwrap_err() {
-        AuthError::InvalidCredentials => {}, // Expected
+        AuthError::InvalidCredentials => {} // Expected
         other => panic!("Expected InvalidCredentials error, got: {:?}", other),
     }
 }
@@ -199,7 +177,7 @@ async fn test_change_password_wrong_current(test_db: &mut TestDatabase) {
 async fn test_forgot_password_success(test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
     let auth_service = &app_state.auth_service;
-    
+
     // Create test user
     let user = UserFactory::create_test_user(auth_service).await;
     test_db.track_user(user.id);
@@ -208,15 +186,17 @@ async fn test_forgot_password_success(test_db: &mut TestDatabase) {
         email: user.email.clone(),
     };
 
-    let result = forgot_password(
-        axum::extract::State(app_state),
-        Json(request),
-    ).await;
+    let result = forgot_password(axum::extract::State(app_state), Json(request)).await;
 
     assert!(result.is_ok());
     let response = result.unwrap();
     assert_eq!(response.0["success"], true);
-    assert!(response.0["message"].as_str().unwrap().contains("password reset instructions"));
+    assert!(
+        response.0["message"]
+            .as_str()
+            .unwrap()
+            .contains("password reset instructions")
+    );
 }
 
 #[test_with_auth_db]
@@ -227,10 +207,7 @@ async fn test_forgot_password_nonexistent_user(test_db: &mut TestDatabase) {
         email: "nonexistent@example.com".to_string(),
     };
 
-    let result = forgot_password(
-        axum::extract::State(app_state),
-        Json(request),
-    ).await;
+    let result = forgot_password(axum::extract::State(app_state), Json(request)).await;
 
     // Should still return success for security (don't reveal if user exists)
     assert!(result.is_ok());
@@ -242,7 +219,7 @@ async fn test_forgot_password_nonexistent_user(test_db: &mut TestDatabase) {
 async fn test_get_sessions_success(test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
     let auth_service = &app_service.auth_service;
-    
+
     // Create test user
     let user = UserFactory::create_test_user(auth_service).await;
     test_db.track_user(user.id);
@@ -260,10 +237,7 @@ async fn test_get_sessions_success(test_db: &mut TestDatabase) {
     .await
     .expect("Failed to create test session");
 
-    let result = get_sessions(
-        axum::extract::State(app_state),
-        user,
-    ).await;
+    let result = get_sessions(axum::extract::State(app_state), user).await;
 
     assert!(result.is_ok());
     let response = result.unwrap();
@@ -277,7 +251,7 @@ async fn test_get_sessions_success(test_db: &mut TestDatabase) {
 async fn test_revoke_session_success(test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
     let auth_service = &app_state.auth_service;
-    
+
     // Create test user
     let user = UserFactory::create_test_user(auth_service).await;
     test_db.track_user(user.id);
@@ -299,7 +273,8 @@ async fn test_revoke_session_success(test_db: &mut TestDatabase) {
         axum::extract::State(app_state),
         axum::extract::Path(session_id),
         user,
-    ).await;
+    )
+    .await;
 
     assert!(result.is_ok());
     let response = result.unwrap();
@@ -307,14 +282,12 @@ async fn test_revoke_session_success(test_db: &mut TestDatabase) {
     assert_eq!(response.0["message"], "Session revoked successfully");
 
     // Verify session was revoked
-    let revoked: bool = sqlx::query_scalar(
-        "SELECT revoked FROM user_sessions WHERE id = $1"
-    )
-    .bind(session_id)
-    .fetch_one(&test_db.pool)
-    .await
-    .expect("Session should still exist");
-    
+    let revoked: bool = sqlx::query_scalar("SELECT revoked FROM user_sessions WHERE id = $1")
+        .bind(session_id)
+        .fetch_one(&test_db.pool)
+        .await
+        .expect("Session should still exist");
+
     assert!(revoked);
 }
 
@@ -322,7 +295,7 @@ async fn test_revoke_session_success(test_db: &mut TestDatabase) {
 async fn test_revoke_nonexistent_session(test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
     let auth_service = &app_state.auth_service;
-    
+
     // Create test user
     let user = UserFactory::create_test_user(auth_service).await;
     test_db.track_user(user.id);
@@ -333,11 +306,12 @@ async fn test_revoke_nonexistent_session(test_db: &mut TestDatabase) {
         axum::extract::State(app_state),
         axum::extract::Path(nonexistent_session_id),
         user,
-    ).await;
+    )
+    .await;
 
     assert!(result.is_err());
     match result.unwrap_err() {
-        AuthError::SessionNotFound => {}, // Expected
+        AuthError::SessionNotFound => {} // Expected
         other => panic!("Expected SessionNotFound error, got: {:?}", other),
     }
 }
@@ -361,10 +335,7 @@ async fn test_logout_success() {
 
     let request = LogoutRequest { session_id };
 
-    let result = logout(
-        axum::extract::State(app_state.clone()),
-        Json(request),
-    ).await;
+    let result = logout(axum::extract::State(app_state.clone()), Json(request)).await;
 
     assert!(result.is_ok());
     let response = result.unwrap();
@@ -372,14 +343,12 @@ async fn test_logout_success() {
     assert_eq!(response.0["message"], "Logged out successfully");
 
     // Verify session was revoked
-    let revoked: bool = sqlx::query_scalar(
-        "SELECT revoked FROM user_sessions WHERE id = $1"
-    )
-    .bind(session_id)
-    .fetch_one(&app_state.db_pool.pool)
-    .await
-    .expect("Session should still exist");
-    
+    let revoked: bool = sqlx::query_scalar("SELECT revoked FROM user_sessions WHERE id = $1")
+        .bind(session_id)
+        .fetch_one(&app_state.db_pool.pool)
+        .await
+        .expect("Session should still exist");
+
     assert!(revoked);
 
     // Cleanup
@@ -401,7 +370,7 @@ mod property_tests {
             email in "([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}|invalid_email_format)"
         ) {
             let is_valid_format = email.contains("@") && email.contains(".") && !email.starts_with("invalid");
-            
+
             let request = RegisterRequest {
                 first_name: "Test".to_string(),
                 last_name: "User".to_string(),
@@ -413,7 +382,7 @@ mod property_tests {
             };
 
             let validation_result = request.validate();
-            
+
             if is_valid_format {
                 prop_assert!(validation_result.is_ok(), "Valid email should pass validation: {}", email);
             } else {
@@ -424,7 +393,7 @@ mod property_tests {
         #[test]
         fn test_password_strength_property(password in "[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\",./<>?]{0,20}") {
             let is_strong = password.len() >= 8;
-            
+
             let request = RegisterRequest {
                 first_name: "Test".to_string(),
                 last_name: "User".to_string(),
@@ -436,10 +405,10 @@ mod property_tests {
             };
 
             let validation_result = request.validate();
-            
+
             if is_strong {
                 // Strong passwords should pass validation (assuming other fields are valid)
-                prop_assert!(validation_result.is_ok() || 
+                prop_assert!(validation_result.is_ok() ||
                            validation_result.as_ref().err().unwrap().to_string().contains("email"),
                            "Strong password should pass validation: {}", password);
             } else {
@@ -448,4 +417,4 @@ mod property_tests {
             }
         }
     }
-} 
+}

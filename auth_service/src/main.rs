@@ -1,28 +1,15 @@
 use anyhow::Result;
-use axum::{
-    routing::get,
-    Router,
-};
+use axum::{Router, routing::get};
 use std::net::SocketAddr;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod config;
-mod database;
-mod error;
-mod handlers;
-mod models;
-mod services;
-mod middleware;
-
-use config::Config;
-use database::DatabasePool;
-use services::AuthServiceImpl;
+use auth_service::{AppState, AuthServiceImpl, Config, DatabasePool};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     println!("AUTH SERVICE: Starting main function");
-    
+
     // Initialize tracing
     println!("AUTH SERVICE: Initializing tracing");
     tracing_subscriber::registry()
@@ -51,7 +38,10 @@ async fn main() -> Result<()> {
     info!("Configuration loaded successfully");
 
     // Setup database connection
-    println!("AUTH SERVICE: Setting up database connection to: {}", config.database_url);
+    println!(
+        "AUTH SERVICE: Setting up database connection to: {}",
+        config.database_url
+    );
     let db_pool = match DatabasePool::new(&config.database_url).await {
         Ok(pool) => {
             println!("AUTH SERVICE: Database connection established");
@@ -125,19 +115,10 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Application state shared across handlers
-#[derive(Clone)]
-pub struct AppState {
-    pub auth_service: AuthServiceImpl,
-    pub config: Config,
-    pub db_pool: DatabasePool,
-}
-
 /// Create the application router with all routes and middleware
 fn create_app(_state: AppState) -> Router {
     // Simplified router for testing
-    Router::new()
-        .route("/health", get(|| async { "OK" }))
+    Router::new().route("/health", get(|| async { "OK" }))
 }
 
 /*
@@ -207,4 +188,4 @@ fn create_app_full(state: AppState) -> Router {
         )
         .with_state(state)
 }
-*/ 
+*/

@@ -440,3 +440,9 @@ id_ed25519
 .giga/
 .cursor/
 .cursorrules
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
