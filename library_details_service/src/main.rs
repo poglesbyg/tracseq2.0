@@ -1,8 +1,9 @@
 use axum::{
     routing::{get, post, put, delete},
-    Router, Server,
+    Router,
 };
 use std::sync::Arc;
+use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -105,9 +106,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = format!("{}:{}", config.host, config.port);
     tracing::info!("Library Details service listening on {}", addr);
     
-    Server::bind(&addr.parse()?)
-        .serve(app.into_make_service())
-        .await?;
+    let listener = TcpListener::bind(&addr).await?;
+    axum::serve(listener, app).await?;
     
     Ok(())
 }
