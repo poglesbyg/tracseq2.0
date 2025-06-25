@@ -97,7 +97,7 @@ pub fn storage_routes() -> Router<AppComponents> {
     Router::new()
         .route(
             "/api/storage/locations",
-            get(storage::list_storage_locations),
+            get(storage::get_storage_locations),
         )
         .route(
             "/api/storage/locations",

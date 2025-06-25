@@ -137,7 +137,7 @@ pub struct RepositoriesComponent {
 pub struct ComponentBuilder {
     pub config: AppConfig,
     database_pool: Option<PgPool>,
-    storage: Option<Arc<Storage>>,
+    storage: Option<Arc<LocalStorageService>>,
     sample_manager: Option<Arc<SampleSubmissionManager>>,
     sequencing_manager: Option<Arc<SequencingManager>>,
     repository_factory: Option<Arc<PostgresRepositoryFactory>>,
@@ -184,7 +184,11 @@ impl ComponentBuilder {
             .await
             .map_err(AssemblyError::StorageSetup)?;
 
-        let storage = Arc::new(Storage::new(self.config.storage.base_path.clone()));
+        let storage = Arc::new(LocalStorageService::new(
+            self.config.storage.base_path.clone(),
+            50 * 1024 * 1024, // 50MB max file size
+            vec!["csv".to_string(), "xlsx".to_string(), "xls".to_string(), "txt".to_string()],
+        ));
         self.storage = Some(storage);
         Ok(self)
     }
@@ -305,6 +309,11 @@ impl ComponentBuilder {
             .spreadsheet_service
             .ok_or(AssemblyError::MissingComponent("Spreadsheet Service"))?;
 
+        // Create storage management service
+        let storage_repo = Arc::new(PostgresStorageRepository::new(database_pool.clone()));
+        let barcode_service = Arc::new(tokio::sync::RwLock::new(BarcodeService::with_default_config()));
+        let storage_management_service = Arc::new(StorageManagementService::new(storage_repo, barcode_service));
+
         // Create observability component
         let observability = ObservabilityComponent {
             metrics: Arc::new(MetricsCollector::new()),
@@ -330,6 +339,7 @@ impl ComponentBuilder {
             user_manager,
             auth_service,
             spreadsheet_service,
+            storage_management_service,
             observability,
         })
     }
@@ -378,7 +388,11 @@ impl CustomAssembly {
     /// Create components for API-only mode (no storage operations)
     pub async fn api_only(config: AppConfig) -> Result<AppComponents, AssemblyError> {
         // Create minimal storage that doesn't write to disk
-        let storage = Arc::new(Storage::new(std::env::temp_dir()));
+        let storage = Arc::new(LocalStorageService::new(
+            std::env::temp_dir(),
+            50 * 1024 * 1024, // 50MB max file size
+            vec!["csv".to_string(), "xlsx".to_string(), "xls".to_string(), "txt".to_string()],
+        ));
 
         let components = ComponentBuilder::new(config)
             .with_database()
@@ -401,6 +415,7 @@ impl CustomAssembly {
             user_manager: components.user_manager,
             auth_service: components.auth_service,
             spreadsheet_service: components.spreadsheet_service,
+            storage_management_service: components.storage_management_service,
             observability: components.observability,
         })
     }
@@ -411,7 +426,11 @@ impl CustomAssembly {
             .await
             .map_err(AssemblyError::StorageSetup)?;
 
-        let storage = Arc::new(Storage::new(config.storage.base_path));
+        let storage = Arc::new(LocalStorageService::new(
+            config.storage.base_path,
+            50 * 1024 * 1024, // 50MB max file size
+            vec!["csv".to_string(), "xlsx".to_string(), "xls".to_string(), "txt".to_string()],
+        ));
         Ok(StorageComponent { storage })
     }
 }

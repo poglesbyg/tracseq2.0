@@ -10,7 +10,7 @@ use crate::{
     assembly::AppComponents,
     models::template::{CreateTemplate, ParsedTemplateResponse, TemplateResponse, UpdateTemplate},
     repositories::{Repository, RepositoryFactory},
-    services::template_service::TemplateService,
+    services::{template_service::TemplateService, storage_service::StorageService},
 };
 
 // Re-export types for handlers/mod.rs

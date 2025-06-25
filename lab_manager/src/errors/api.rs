@@ -1,4 +1,10 @@
 use crate::errors::{ComponentError, ErrorSeverity};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
+use serde_json::json;
 
 /// API-specific errors
 #[derive(Debug, thiserror::Error)]
@@ -11,8 +17,8 @@ pub enum ApiError {
     Unauthorized,
     #[error("Access forbidden")]
     Forbidden,
-    #[error("Resource not found")]
-    NotFound,
+    #[error("Resource not found: {0}")]
+    NotFound(String),
     #[error("Rate limit exceeded")]
     RateLimited,
     #[error("Too many requests: {0}")]
@@ -31,6 +37,41 @@ pub enum ApiError {
     InternalError,
 }
 
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        let error_code = self.error_code();
+        let severity = format!("{:?}", self.severity()).to_lowercase();
+        let retryable = self.is_retryable();
+        
+        let (status, error_message) = match self {
+            ApiError::InvalidRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "Authentication required".to_string()),
+            ApiError::Forbidden => (StatusCode::FORBIDDEN, "Access forbidden".to_string()),
+            ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
+            ApiError::RateLimited => (StatusCode::TOO_MANY_REQUESTS, "Rate limit exceeded".to_string()),
+            ApiError::TooManyRequests(msg) => (StatusCode::TOO_MANY_REQUESTS, msg),
+            ApiError::ValidationError(msg) => (StatusCode::BAD_REQUEST, msg),
+            ApiError::DatabaseError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Database error: {}", msg)),
+            ApiError::Conflict(msg) => (StatusCode::CONFLICT, msg),
+            ApiError::ServiceUnavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg),
+            ApiError::InternalServerError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            ApiError::InternalError => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string()),
+        };
+
+        let body = Json(json!({
+            "error": {
+                "code": error_code,
+                "message": error_message,
+                "severity": severity,
+                "retryable": retryable
+            }
+        }));
+
+        (status, body).into_response()
+    }
+}
+
 impl ComponentError for ApiError {
     fn error_code(&self) -> &'static str {
         match self {
@@ -38,7 +79,7 @@ impl ComponentError for ApiError {
             Self::BadRequest(_) => "API_BAD_REQUEST",
             Self::Unauthorized => "API_UNAUTHORIZED",
             Self::Forbidden => "API_FORBIDDEN",
-            Self::NotFound => "API_NOT_FOUND",
+            Self::NotFound(_) => "API_NOT_FOUND",
             Self::RateLimited => "API_RATE_LIMITED",
             Self::TooManyRequests(_) => "API_TOO_MANY_REQUESTS",
             Self::ValidationError(_) => "API_VALIDATION_ERROR",
@@ -55,7 +96,7 @@ impl ComponentError for ApiError {
             Self::InvalidRequest(_) => ErrorSeverity::Low,
             Self::BadRequest(_) => ErrorSeverity::Low,
             Self::Unauthorized | Self::Forbidden => ErrorSeverity::Medium,
-            Self::NotFound => ErrorSeverity::Low,
+            Self::NotFound(_) => ErrorSeverity::Low,
             Self::RateLimited => ErrorSeverity::Medium,
             Self::TooManyRequests(_) => ErrorSeverity::Medium,
             Self::ValidationError(_) => ErrorSeverity::Low,
