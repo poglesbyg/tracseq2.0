@@ -9,7 +9,13 @@ use enhanced_storage_service::{
     database::DatabasePool,
     services::EnhancedStorageService,
     AppState,
+    models::*,
+    test_utils::*,
 };
+use axum::{http::StatusCode, Router};
+use axum_test::TestServer;
+use fake::{Fake, Faker};
+use serde_json::Value;
 
 // Global test database pool to avoid connection exhaustion
 static TEST_DB_POOL: Lazy<Arc<Mutex<Option<DatabasePool>>>> = 
@@ -19,6 +25,10 @@ static TEST_DB_POOL: Lazy<Arc<Mutex<Option<DatabasePool>>>> =
 pub struct TestDatabase {
     pub pool: DatabasePool,
     pub database_name: String,
+    pub cleanup_containers: Vec<Uuid>,
+    pub cleanup_locations: Vec<Uuid>,
+    pub cleanup_sensors: Vec<Uuid>,
+    pub cleanup_transactions: Vec<String>,
 }
 
 impl TestDatabase {
@@ -48,6 +58,10 @@ impl TestDatabase {
         Ok(Self {
             pool,
             database_name,
+            cleanup_containers: Vec::new(),
+            cleanup_locations: Vec::new(),
+            cleanup_sensors: Vec::new(),
+            cleanup_transactions: Vec::new(),
         })
     }
 
@@ -102,6 +116,22 @@ impl TestDatabase {
         }
 
         Ok(())
+    }
+
+    pub fn track_container(&mut self, container_id: Uuid) {
+        self.cleanup_containers.push(container_id);
+    }
+
+    pub fn track_location(&mut self, location_id: Uuid) {
+        self.cleanup_locations.push(location_id);
+    }
+
+    pub fn track_sensor(&mut self, sensor_id: Uuid) {
+        self.cleanup_sensors.push(sensor_id);
+    }
+
+    pub fn track_transaction(&mut self, transaction_hash: String) {
+        self.cleanup_transactions.push(transaction_hash);
     }
 }
 
@@ -357,4 +387,457 @@ macro_rules! test_with_db {
             result.expect("Test failed");
         }
     };
+}
+
+/// Factory for creating test storage entities with realistic laboratory data
+pub struct StorageFactory;
+
+impl StorageFactory {
+    pub fn create_valid_location_request() -> CreateLocationRequest {
+        CreateLocationRequest {
+            name: format!("Test Location {}", Faker.fake::<String>()),
+            location_type: LocationType::Freezer,
+            temperature_range: TemperatureRange {
+                min: -80.0,
+                max: -78.0,
+            },
+            capacity: 1000,
+            building: Some("Lab Building A".to_string()),
+            room: Some("Room 101".to_string()),
+            zone: Some("Zone A1".to_string()),
+            description: Some("Test storage location for automated testing".to_string()),
+            is_active: true,
+        }
+    }
+
+    pub fn create_valid_container_request() -> CreateContainerRequest {
+        CreateContainerRequest {
+            barcode: Self::generate_container_barcode(),
+            container_type: ContainerType::Rack,
+            location_id: Uuid::new_v4(), // Will be replaced with real location
+            position: Some("A1".to_string()),
+            capacity: 96,
+            temperature_control: Some(true),
+            access_level: AccessLevel::Standard,
+            description: Some("Test container for automated testing".to_string()),
+            parent_container_id: None,
+        }
+    }
+
+    pub fn create_valid_sensor_request() -> CreateSensorRequest {
+        CreateSensorRequest {
+            sensor_type: SensorType::Temperature,
+            identifier: Self::generate_sensor_id(),
+            location_id: Uuid::new_v4(), // Will be replaced with real location
+            calibration_date: chrono::Utc::now().date_naive(),
+            next_calibration: chrono::Utc::now().date_naive() + chrono::Duration::days(365),
+            measurement_unit: "°C".to_string(),
+            range_min: -85.0,
+            range_max: 25.0,
+            accuracy: 0.1,
+            is_active: true,
+            alert_threshold_min: Some(-82.0),
+            alert_threshold_max: Some(-78.0),
+        }
+    }
+
+    pub fn create_blockchain_transaction() -> BlockchainTransaction {
+        BlockchainTransaction {
+            transaction_hash: Self::generate_transaction_hash(),
+            block_number: fastrand::u64(1000000..9999999),
+            operation_type: "storage_event".to_string(),
+            payload: serde_json::json!({
+                "event_type": "container_move",
+                "container_id": Uuid::new_v4(),
+                "from_location": "A1",
+                "to_location": "B2",
+                "timestamp": chrono::Utc::now()
+            }),
+            created_at: chrono::Utc::now(),
+            validated: true,
+        }
+    }
+
+    pub fn generate_container_barcode() -> String {
+        format!("CONT-{:08}-{:06}", 
+                chrono::Utc::now().format("%Y%m%d"),
+                fastrand::u32(100000..999999))
+    }
+
+    pub fn generate_sensor_id() -> String {
+        format!("SENS-{:06}", fastrand::u32(100000..999999))
+    }
+
+    pub fn generate_transaction_hash() -> String {
+        format!("0x{:064x}", fastrand::u128(..))
+    }
+
+    pub async fn create_test_location(storage_service: &EnhancedStorageService) -> StorageLocation {
+        let request = Self::create_valid_location_request();
+        storage_service.create_location(request).await
+            .expect("Failed to create test location")
+    }
+
+    pub async fn create_test_container(storage_service: &EnhancedStorageService, location_id: Uuid) -> StorageContainer {
+        let mut request = Self::create_valid_container_request();
+        request.location_id = location_id;
+        storage_service.create_container(request).await
+            .expect("Failed to create test container")
+    }
+
+    pub async fn create_test_sensor(storage_service: &EnhancedStorageService, location_id: Uuid) -> IoTSensor {
+        let mut request = Self::create_valid_sensor_request();
+        request.location_id = location_id;
+        storage_service.create_sensor(request).await
+            .expect("Failed to create test sensor")
+    }
+}
+
+/// HTTP test client wrapper for storage API testing
+pub struct StorageTestClient {
+    pub server: TestServer,
+    pub auth_token: Option<String>,
+}
+
+impl StorageTestClient {
+    pub fn new(app: Router) -> Self {
+        let server = TestServer::new(app).unwrap();
+        Self {
+            server,
+            auth_token: None,
+        }
+    }
+
+    pub fn with_auth_token(mut self, token: String) -> Self {
+        self.auth_token = Some(token);
+        self
+    }
+
+    pub async fn post_json<T: serde::Serialize>(&self, path: &str, body: &T) -> axum_test::TestResponse {
+        let mut request = self.server.post(path).json(body);
+        if let Some(token) = &self.auth_token {
+            request = request.add_header("Authorization", format!("Bearer {}", token).parse().unwrap());
+        }
+        request.await
+    }
+
+    pub async fn get(&self, path: &str) -> axum_test::TestResponse {
+        let mut request = self.server.get(path);
+        if let Some(token) = &self.auth_token {
+            request = request.add_header("Authorization", format!("Bearer {}", token).parse().unwrap());
+        }
+        request.await
+    }
+
+    pub async fn put_json<T: serde::Serialize>(&self, path: &str, body: &T) -> axum_test::TestResponse {
+        let mut request = self.server.put(path).json(body);
+        if let Some(token) = &self.auth_token {
+            request = request.add_header("Authorization", format!("Bearer {}", token).parse().unwrap());
+        }
+        request.await
+    }
+
+    pub async fn delete(&self, path: &str) -> axum_test::TestResponse {
+        let mut request = self.server.delete(path);
+        if let Some(token) = &self.auth_token {
+            request = request.add_header("Authorization", format!("Bearer {}", token).parse().unwrap());
+        }
+        request.await
+    }
+}
+
+/// Common assertions for storage testing
+pub struct StorageAssertions;
+
+impl StorageAssertions {
+    pub fn assert_successful_creation(response: &Value) {
+        assert_eq!(response["success"], true);
+        assert!(response["data"]["id"].is_string());
+        assert!(response["data"]["created_at"].is_string());
+    }
+
+    pub fn assert_location_data(response: &Value, expected_name: &str) {
+        assert_eq!(response["success"], true);
+        assert_eq!(response["data"]["name"], expected_name);
+        assert!(response["data"]["id"].is_string());
+        assert!(response["data"]["temperature_range"].is_object());
+    }
+
+    pub fn assert_container_data(response: &Value, expected_barcode: &str) {
+        assert_eq!(response["success"], true);
+        assert_eq!(response["data"]["barcode"], expected_barcode);
+        assert!(response["data"]["id"].is_string());
+        assert!(response["data"]["location_id"].is_string());
+    }
+
+    pub fn assert_sensor_data(response: &Value, expected_type: &str) {
+        assert_eq!(response["success"], true);
+        assert_eq!(response["data"]["sensor_type"], expected_type);
+        assert!(response["data"]["id"].is_string());
+        assert!(response["data"]["identifier"].is_string());
+    }
+
+    pub fn assert_blockchain_transaction(response: &Value) {
+        assert_eq!(response["success"], true);
+        assert!(response["data"]["transaction_hash"].is_string());
+        assert!(response["data"]["block_number"].is_number());
+        assert_eq!(response["data"]["validated"], true);
+    }
+
+    pub fn assert_iot_reading(response: &Value, expected_sensor_id: &str) {
+        assert_eq!(response["success"], true);
+        assert_eq!(response["data"]["sensor_id"], expected_sensor_id);
+        assert!(response["data"]["value"].is_number());
+        assert!(response["data"]["timestamp"].is_string());
+    }
+
+    pub fn assert_validation_error(response: &Value) {
+        assert_eq!(response["success"], false);
+        assert!(response["error"].is_string());
+    }
+
+    pub fn assert_status_code(status: StatusCode, expected: StatusCode) {
+        assert_eq!(status, expected);
+    }
+}
+
+/// Test data generators for various storage scenarios
+pub struct StorageTestDataGenerator;
+
+impl StorageTestDataGenerator {
+    pub fn location_types() -> Vec<LocationType> {
+        vec![
+            LocationType::Freezer,
+            LocationType::Refrigerator,
+            LocationType::RoomTemp,
+            LocationType::Incubator,
+            LocationType::LiquidNitrogen,
+        ]
+    }
+
+    pub fn container_types() -> Vec<ContainerType> {
+        vec![
+            ContainerType::Rack,
+            ContainerType::Box,
+            ContainerType::Plate,
+            ContainerType::Shelf,
+            ContainerType::Drawer,
+        ]
+    }
+
+    pub fn sensor_types() -> Vec<SensorType> {
+        vec![
+            SensorType::Temperature,
+            SensorType::Humidity,
+            SensorType::Pressure,
+            SensorType::CO2Level,
+            SensorType::DoorSensor,
+        ]
+    }
+
+    pub fn access_levels() -> Vec<AccessLevel> {
+        vec![
+            AccessLevel::Public,
+            AccessLevel::Standard,
+            AccessLevel::Restricted,
+            AccessLevel::HighSecurity,
+        ]
+    }
+
+    pub fn generate_sensor_readings(sensor_id: Uuid, count: usize) -> Vec<SensorReading> {
+        (0..count)
+            .map(|i| SensorReading {
+                id: Uuid::new_v4(),
+                sensor_id,
+                value: -80.0 + (i as f64 * 0.1),
+                unit: "°C".to_string(),
+                timestamp: chrono::Utc::now() - chrono::Duration::minutes(i as i64),
+                quality: ReadingQuality::Good,
+                alarm_status: if i % 10 == 0 { Some(AlarmStatus::Normal) } else { None },
+            })
+            .collect()
+    }
+
+    pub fn invalid_temperature_ranges() -> Vec<TemperatureRange> {
+        vec![
+            TemperatureRange { min: 10.0, max: -10.0 }, // Invalid: min > max
+            TemperatureRange { min: f64::NEG_INFINITY, max: 0.0 },
+            TemperatureRange { min: 0.0, max: f64::INFINITY },
+            TemperatureRange { min: f64::NAN, max: 0.0 },
+        ]
+    }
+
+    pub fn invalid_capacities() -> Vec<i32> {
+        vec![-1, 0, -100]
+    }
+}
+
+/// Performance testing utilities for storage operations
+pub struct StoragePerformanceUtils;
+
+impl StoragePerformanceUtils {
+    pub async fn measure_location_creation_time(
+        client: &StorageTestClient,
+        request: &CreateLocationRequest,
+    ) -> std::time::Duration {
+        let start = std::time::Instant::now();
+        let _ = client.post_json("/api/storage/locations", request).await;
+        start.elapsed()
+    }
+
+    pub async fn measure_container_creation_time(
+        client: &StorageTestClient,
+        request: &CreateContainerRequest,
+    ) -> std::time::Duration {
+        let start = std::time::Instant::now();
+        let _ = client.post_json("/api/storage/containers", request).await;
+        start.elapsed()
+    }
+
+    pub async fn concurrent_sensor_readings(
+        client: &StorageTestClient,
+        sensor_id: Uuid,
+        concurrent_count: usize,
+    ) -> Vec<StatusCode> {
+        let tasks: Vec<_> = (0..concurrent_count)
+            .map(|i| {
+                let reading = SensorReadingRequest {
+                    sensor_id,
+                    value: -80.0 + (i as f64 * 0.1),
+                    timestamp: chrono::Utc::now(),
+                    quality: ReadingQuality::Good,
+                };
+                async move {
+                    client.post_json("/api/storage/sensor-readings", &reading).await.status_code()
+                }
+            })
+            .collect();
+
+        futures::future::join_all(tasks).await
+    }
+
+    pub async fn blockchain_transaction_throughput(
+        client: &StorageTestClient,
+        operation_count: usize,
+    ) -> std::time::Duration {
+        let start = std::time::Instant::now();
+        
+        let tasks: Vec<_> = (0..operation_count)
+            .map(|i| {
+                let transaction = StorageFactory::create_blockchain_transaction();
+                async move {
+                    client.post_json("/api/storage/blockchain/record", &transaction).await
+                }
+            })
+            .collect();
+
+        let _ = futures::future::join_all(tasks).await;
+        start.elapsed()
+    }
+}
+
+/// Digital Twin testing utilities
+pub struct DigitalTwinTestUtils;
+
+impl DigitalTwinTestUtils {
+    pub fn create_twin_model(location_id: Uuid) -> DigitalTwinModel {
+        DigitalTwinModel {
+            id: Uuid::new_v4(),
+            entity_id: location_id,
+            entity_type: "storage_location".to_string(),
+            model_data: serde_json::json!({
+                "temperature_profile": {
+                    "current": -80.0,
+                    "trend": "stable",
+                    "prediction": {
+                        "next_hour": -80.1,
+                        "confidence": 0.95
+                    }
+                },
+                "capacity_utilization": 0.75,
+                "energy_consumption": {
+                    "current_kw": 2.5,
+                    "daily_kwh": 60.0
+                }
+            }),
+            last_updated: chrono::Utc::now(),
+            simulation_parameters: Some(serde_json::json!({
+                "thermal_mass": 1000.0,
+                "insulation_factor": 0.95,
+                "ambient_temperature": 22.0
+            })),
+        }
+    }
+
+    pub fn assert_twin_prediction(response: &Value, expected_confidence: f64) {
+        assert_eq!(response["success"], true);
+        assert!(response["data"]["prediction"].is_object());
+        assert!(response["data"]["prediction"]["confidence"].as_f64().unwrap() >= expected_confidence);
+    }
+
+    pub async fn simulate_temperature_drift(
+        client: &StorageTestClient,
+        location_id: Uuid,
+        duration_minutes: i64,
+    ) -> Vec<f64> {
+        let mut temperatures = Vec::new();
+        
+        for minute in 0..duration_minutes {
+            let temp = -80.0 + (minute as f64 * 0.01); // Slight drift
+            let reading = SensorReadingRequest {
+                sensor_id: Uuid::new_v4(),
+                value: temp,
+                timestamp: chrono::Utc::now() + chrono::Duration::minutes(minute),
+                quality: ReadingQuality::Good,
+            };
+            
+            let _ = client.post_json("/api/storage/sensor-readings", &reading).await;
+            temperatures.push(temp);
+        }
+        
+        temperatures
+    }
+}
+
+/// Mobile integration testing utilities
+pub struct MobileTestUtils;
+
+impl MobileTestUtils {
+    pub fn create_mobile_request(user_id: Uuid, device_token: String) -> MobileAccessRequest {
+        MobileAccessRequest {
+            user_id,
+            device_token,
+            location: Some(GeoLocation {
+                latitude: 40.7128,
+                longitude: -74.0060,
+                accuracy: 5.0,
+            }),
+            requested_action: "container_access".to_string(),
+            container_id: Some(Uuid::new_v4()),
+            timestamp: chrono::Utc::now(),
+        }
+    }
+
+    pub fn assert_mobile_response(response: &Value) {
+        assert_eq!(response["success"], true);
+        assert!(response["data"]["access_granted"].is_boolean());
+        assert!(response["data"]["session_id"].is_string());
+        if response["data"]["access_granted"].as_bool().unwrap() {
+            assert!(response["data"]["access_token"].is_string());
+            assert!(response["data"]["expires_at"].is_string());
+        }
+    }
+
+    pub async fn test_qr_code_scan(
+        client: &StorageTestClient,
+        qr_data: &str,
+    ) -> axum_test::TestResponse {
+        let scan_request = serde_json::json!({
+            "qr_data": qr_data,
+            "scan_timestamp": chrono::Utc::now(),
+            "device_id": "test-device-123"
+        });
+
+        client.post_json("/api/storage/mobile/scan", &scan_request).await
+    }
 } 
