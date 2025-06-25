@@ -1,6 +1,6 @@
 use anyhow::Result;
 use sqlx::{PgPool, Postgres, migrate::MigrateDatabase};
-use tracing::{info, error};
+use tracing::{error, info};
 
 #[derive(Debug, Clone)]
 pub struct DatabasePool {
@@ -12,13 +12,16 @@ impl DatabasePool {
         info!("Connecting to database: {}", database_url);
 
         // Create database if it doesn't exist
-        if !Postgres::database_exists(database_url).await.unwrap_or(false) {
+        if !Postgres::database_exists(database_url)
+            .await
+            .unwrap_or(false)
+        {
             info!("Creating database...");
             Postgres::create_database(database_url).await?;
         }
 
         let pool = PgPool::connect(database_url).await?;
-        
+
         info!("Database connection established successfully");
 
         Ok(Self { pool })
@@ -29,10 +32,10 @@ impl DatabasePool {
 
         // Create custom types
         self.create_enums().await?;
-        
+
         // Create tables
         self.create_tables().await?;
-        
+
         // Create indexes
         self.create_indexes().await?;
 
@@ -511,4 +514,16 @@ impl DatabasePool {
         sqlx::query("SELECT 1").execute(&self.pool).await?;
         Ok(())
     }
+}
+
+/// Create a new database connection pool (compatibility function)
+pub async fn create_pool(database_url: &str) -> Result<PgPool> {
+    let pool = DatabasePool::new(database_url).await?;
+    Ok(pool.pool)
+}
+
+/// Run database migrations (compatibility function)
+pub async fn run_migrations(pool: &PgPool) -> Result<()> {
+    let db_pool = DatabasePool { pool: pool.clone() };
+    db_pool.migrate().await
 }

@@ -79,6 +79,29 @@ impl Config {
             _ => None,
         }
     }
+
+    /// Create test configuration for axum-test
+    pub fn test_config() -> Self {
+        Config {
+            server: ServerConfig {
+                host: "127.0.0.1".to_string(),
+                port: 0, // Let OS assign port for tests
+            },
+            database_url: std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| {
+                "postgres://postgres:postgres@localhost:5432/sequencing_service_test".to_string()
+            }),
+            auth_service_url: "http://localhost:8001".to_string(),
+            sample_service_url: "http://localhost:8002".to_string(),
+            notification_service_url: "http://localhost:8004".to_string(),
+            template_service_url: "http://localhost:8003".to_string(),
+            storage_service_url: "http://localhost:8005".to_string(),
+            sequencing: SequencingConfig {
+                max_concurrent_runs: 1, // Reduced for tests
+                default_workflow: "test_workflow".to_string(),
+                data_storage_path: "./test_data".to_string(),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

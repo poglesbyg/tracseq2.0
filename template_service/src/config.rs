@@ -391,6 +391,85 @@ impl Config {
         self.environment().to_lowercase() == "development"
     }
 
+    /// Create test configuration for axum-test
+    pub fn test_config() -> Self {
+        Config {
+            server: ServerConfig {
+                host: "127.0.0.1".to_string(),
+                port: 0, // Let OS assign port for tests
+                workers: Some(1),
+            },
+            database_url: std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| {
+                "postgres://postgres:postgres@localhost:5432/template_service_test".to_string()
+            }),
+            template: TemplateConfig {
+                max_templates_per_user: 10,
+                max_fields_per_template: 20,
+                default_template_type: "test_template".to_string(),
+                cache_templates: false, // Disabled for tests
+                cache_ttl_seconds: 60,
+                auto_backup: false, // Disabled for tests
+            },
+            form: FormConfig {
+                enable_dynamic_forms: true,
+                max_form_size_kb: 512,
+                enable_form_preview: true,
+                enable_conditional_fields: true,
+                form_cache_enabled: false, // Disabled for tests
+                render_timeout_seconds: 5,
+            },
+            validation: ValidationConfig {
+                enable_strict_validation: true,
+                max_validation_rules_per_field: 5,
+                enable_cross_field_validation: true,
+                enable_async_validation: false, // Disabled for tests
+                validation_timeout_seconds: 2,
+                cache_validation_results: false, // Disabled for tests
+            },
+            file: FileConfig {
+                upload_path: "./test_uploads".to_string(),
+                max_file_size_mb: 1,
+                allowed_extensions: vec!["json".to_string(), "csv".to_string(), "txt".to_string()],
+                enable_virus_scanning: false, // Disabled for tests
+                enable_compression: false,    // Disabled for tests
+                backup_enabled: false,        // Disabled for tests
+                backup_retention_days: 1,
+            },
+            versioning: VersioningConfig {
+                enable_versioning: true,
+                max_versions_per_template: 3,
+                auto_create_versions: false, // Disabled for tests
+                version_naming_strategy: "sequential".to_string(),
+                compress_old_versions: false, // Disabled for tests
+            },
+            services: ServiceConfig {
+                auth_service_url: "http://localhost:8001".to_string(),
+                sample_service_url: "http://localhost:8002".to_string(),
+                storage_service_url: Some("http://localhost:8003".to_string()),
+                notification_service_url: Some("http://localhost:8004".to_string()),
+                request_timeout_seconds: 5,
+                retry_attempts: 1,
+                circuit_breaker_enabled: false, // Disabled for tests
+            },
+            logging: LoggingConfig {
+                level: "debug".to_string(),
+                format: "text".to_string(),
+                file_enabled: false,
+                file_path: None,
+                audit_enabled: false, // Disabled for tests
+            },
+            features: FeatureConfig {
+                form_builder_enabled: true,
+                template_versioning_enabled: true,
+                file_upload_enabled: true,
+                template_cloning_enabled: true,
+                advanced_validation_enabled: true,
+                template_sharing_enabled: false, // Disabled for tests
+                template_analytics_enabled: false, // Disabled for tests
+            },
+        }
+    }
+
     /// Get the auth service URL
     pub fn auth_service_url(&self) -> &str {
         &self.services.auth_service_url

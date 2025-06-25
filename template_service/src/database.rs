@@ -1,9 +1,9 @@
-use sqlx::{PgPool, postgres::PgPoolOptions};
 use anyhow::Result;
+use sqlx::{PgPool, postgres::PgPoolOptions};
 
 #[derive(Clone)]
 pub struct DatabasePool {
-    pool: PgPool,
+    pub pool: PgPool,
 }
 
 impl DatabasePool {
@@ -12,7 +12,7 @@ impl DatabasePool {
             .max_connections(10)
             .connect(database_url)
             .await?;
-        
+
         Ok(Self { pool })
     }
 
@@ -25,4 +25,16 @@ impl DatabasePool {
     pub fn get_pool(&self) -> &PgPool {
         &self.pool
     }
+}
+
+/// Create a new database connection pool (compatibility function)
+pub async fn create_pool(database_url: &str) -> Result<PgPool> {
+    let pool = DatabasePool::new(database_url).await?;
+    Ok(pool.pool)
+}
+
+/// Run database migrations (compatibility function)
+pub async fn run_migrations(pool: &PgPool) -> Result<()> {
+    let db_pool = DatabasePool { pool: pool.clone() };
+    db_pool.migrate().await
 }

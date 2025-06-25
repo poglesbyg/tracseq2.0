@@ -1,31 +1,13 @@
 use anyhow::Result;
-use axum::{
-    Router, middleware as axum_middleware,
-    routing::{delete, get, post, put},
-};
 use std::net::SocketAddr;
-use tower::ServiceBuilder;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod clients;
-mod config;
-mod database;
-mod error;
-mod handlers;
-mod middleware;
-mod models;
-mod services;
-// TODO: Re-enable when modules exist
-// mod workflow;
-// mod analysis;
-// mod scheduling;
-
-use clients::{AuthClient, NotificationClient, SampleClient, StorageClient, TemplateClient};
-use config::Config;
-use database::DatabasePool;
-use services::SequencingServiceImpl;
+// Import everything from lib.rs to avoid conflicts
+use sequencing_service::{
+    AppState, AuthClient, Config, DatabasePool, NotificationClient, SampleClient,
+    SequencingServiceImpl, StorageClient, TemplateClient, create_app,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -70,16 +52,16 @@ async fn main() -> Result<()> {
     )?;
     info!("Sequencing service initialized");
 
-    // Setup application state
+    // Setup application state with Arc wrappers
     let app_state = AppState {
-        sequencing_service,
-        config: config.clone(),
+        sequencing_service: std::sync::Arc::new(sequencing_service),
+        config: std::sync::Arc::new(config.clone()),
         db_pool,
-        auth_client,
-        sample_client,
-        notification_client,
-        template_client,
-        storage_client,
+        auth_client: std::sync::Arc::new(auth_client),
+        sample_client: std::sync::Arc::new(sample_client),
+        notification_client: std::sync::Arc::new(notification_client),
+        template_client: std::sync::Arc::new(template_client),
+        storage_client: std::sync::Arc::new(storage_client),
     };
 
     // Build the application router
@@ -93,222 +75,4 @@ async fn main() -> Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
-}
-
-/// Application state shared across handlers
-#[derive(Clone)]
-pub struct AppState {
-    pub sequencing_service: SequencingServiceImpl,
-    pub config: Config,
-    pub db_pool: DatabasePool,
-    pub auth_client: AuthClient,
-    pub sample_client: SampleClient,
-    pub notification_client: NotificationClient,
-    pub template_client: TemplateClient,
-    pub storage_client: StorageClient,
-}
-
-/// Create the application router with all routes and middleware
-fn create_app(state: AppState) -> Router {
-    // Health check routes (no auth required)
-    let health_routes = Router::new()
-        .route("/health", get(handlers::health::health_check))
-        .route("/health/ready", get(handlers::health::readiness_check))
-        .route("/health/metrics", get(handlers::health::metrics));
-
-    // Sequencing job management routes
-    let job_routes = Router::new()
-        .route("/jobs", post(handlers::jobs::create_job))
-        .route("/jobs", get(handlers::jobs::list_jobs))
-        .route("/jobs/:job_id", get(handlers::jobs::get_job))
-        .route("/jobs/:job_id", put(handlers::jobs::update_job))
-        .route("/jobs/:job_id", delete(handlers::jobs::delete_job))
-        .route(
-            "/jobs/:job_id/status",
-            put(handlers::jobs::update_job_status),
-        )
-        .route("/jobs/:job_id/clone", post(handlers::jobs::clone_job))
-        .route("/jobs/:job_id/cancel", post(handlers::jobs::cancel_job))
-        .layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::auth_middleware,
-        ));
-
-    // Workflow management routes
-    let workflow_routes = Router::new()
-        .route("/workflows", get(handlers::workflows::list_workflows))
-        .route(
-            "/workflows/:workflow_id",
-            get(handlers::workflows::get_workflow),
-        )
-        .route(
-            "/workflows/:workflow_id/execute",
-            post(handlers::workflows::execute_workflow),
-        )
-        // TODO: Implement missing workflow control handlers
-        // .route("/workflows/:workflow_id/pause", post(handlers::workflows::pause_workflow))
-        // .route("/workflows/:workflow_id/resume", post(handlers::workflows::resume_workflow))
-        // .route("/workflows/:workflow_id/abort", post(handlers::workflows::abort_workflow))
-        .layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::auth_middleware,
-        ));
-
-    // Sample sheet management routes
-    let sample_sheet_routes = Router::new()
-        .route(
-            "/sample-sheets",
-            post(handlers::sample_sheets::create_sample_sheet),
-        )
-        .route(
-            "/sample-sheets",
-            get(handlers::sample_sheets::list_sample_sheets),
-        )
-        .route(
-            "/sample-sheets/:sheet_id",
-            get(handlers::sample_sheets::get_sample_sheet),
-        )
-        .route(
-            "/sample-sheets/:sheet_id",
-            put(handlers::sample_sheets::update_sample_sheet),
-        )
-        .route(
-            "/sample-sheets/:sheet_id",
-            delete(handlers::sample_sheets::delete_sample_sheet),
-        )
-        // TODO: Implement missing sample sheet download handler
-        // .route("/sample-sheets/:sheet_id/download", get(handlers::sample_sheets::download_sample_sheet))
-        .route(
-            "/sample-sheets/:sheet_id/validate",
-            post(handlers::sample_sheets::validate_sample_sheet),
-        )
-        .layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::auth_middleware,
-        ));
-
-    // Sequencing run management routes
-    let run_routes = Router::new()
-        .route("/runs", post(handlers::runs::create_run))
-        .route("/runs", get(handlers::runs::list_runs))
-        .route("/runs/:run_id", get(handlers::runs::get_run))
-        .route("/runs/:run_id", put(handlers::runs::update_run))
-        .route("/runs/:run_id", delete(handlers::runs::delete_run))
-        .route("/runs/:run_id/start", post(handlers::runs::start_run))
-        .route("/runs/:run_id/stop", post(handlers::runs::stop_run))
-        .route(
-            "/runs/:run_id/metrics",
-            get(handlers::runs::get_run_metrics),
-        )
-        .layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::auth_middleware,
-        ));
-
-    // Analysis pipeline routes
-    let analysis_routes = Router::new()
-        // TODO: Implement missing analysis handlers
-        // .route("/analysis/pipelines", get(handlers::analysis::list_pipelines))
-        // .route("/analysis/pipelines/:pipeline_id", get(handlers::analysis::get_pipeline))
-        // .route("/analysis/pipelines/:pipeline_id/execute", post(handlers::analysis::execute_pipeline))
-        // .route("/analysis/jobs", get(handlers::analysis::list_analysis_jobs))
-        // TODO: Implement missing analysis job handlers
-        // .route("/analysis/jobs/:job_id", get(handlers::analysis::get_analysis_job))
-        // .route("/analysis/jobs/:job_id/results", get(handlers::analysis::get_analysis_results))
-        .layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::auth_middleware,
-        ));
-
-    // Quality control routes
-    let qc_routes = Router::new()
-        // TODO: Implement missing QC handlers
-        // .route("/qc/metrics", get(handlers::quality::get_qc_metrics))
-        // .route("/qc/reports", get(handlers::quality::list_qc_reports))
-        // .route("/qc/reports/:report_id", get(handlers::quality::get_qc_report))
-        .route("/qc/thresholds", get(handlers::quality::get_qc_thresholds))
-        // .route("/qc/thresholds", put(handlers::quality::update_qc_thresholds))
-        .layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::auth_middleware,
-        ));
-
-    // Scheduling routes
-    let scheduling_routes = Router::new()
-        // TODO: Implement missing scheduling handlers
-        // .route("/schedule/jobs", get(handlers::scheduling::list_scheduled_jobs))
-        // .route("/schedule/jobs", post(handlers::scheduling::schedule_job))
-        // .route("/schedule/jobs/:job_id", get(handlers::scheduling::get_scheduled_job))
-        // .route("/schedule/jobs/:job_id", put(handlers::scheduling::update_scheduled_job))
-        // .route("/schedule/jobs/:job_id", delete(handlers::scheduling::cancel_scheduled_job))
-        // .route("/schedule/calendar", get(handlers::scheduling::get_schedule_calendar))
-        .layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::auth_middleware,
-        ));
-
-    // Integration routes
-    let integration_routes = Router::new()
-        // TODO: Implement missing integration handlers
-        // .route("/integration/samples/validate", post(handlers::integration::validate_samples_for_sequencing))
-        // TODO: Implement missing handlers
-        // .route("/integration/templates/sequencing", get(handlers::integration::get_sequencing_templates))
-        // .route("/integration/notifications/subscribe", post(handlers::integration::subscribe_to_notifications))
-        .route(
-            "/integration/lims/sync",
-            post(handlers::integration::sync_with_lims),
-        )
-        .layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::auth_middleware,
-        ));
-
-    // Data export routes
-    let export_routes = Router::new()
-        // TODO: Implement missing export handlers
-        // .route("/export/jobs", get(handlers::export::export_jobs))
-        // .route("/export/runs", get(handlers::export::export_runs))
-        // .route("/export/metrics", get(handlers::export::export_metrics))
-        // .route("/export/results", get(handlers::export::export_results))
-        .layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::auth_middleware,
-        ));
-
-    // Admin routes (require admin privileges)
-    let admin_routes = Router::new()
-        .route(
-            "/admin/statistics",
-            get(handlers::admin::get_system_statistics),
-        )
-        // TODO: Implement missing admin handlers
-        // .route("/admin/maintenance", post(handlers::admin::run_maintenance))
-        // .route("/admin/config", get(handlers::admin::get_configuration))
-        // .route("/admin/config", put(handlers::admin::update_configuration))
-        // .route("/admin/cleanup", post(handlers::admin::cleanup_old_data))
-        // .route("/admin/backup", post(handlers::admin::backup_data))
-        .layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::admin_middleware,
-        ));
-
-    // Combine all routes
-    Router::new()
-        .merge(health_routes)
-        .merge(job_routes)
-        .merge(workflow_routes)
-        .merge(sample_sheet_routes)
-        .merge(run_routes)
-        .merge(analysis_routes)
-        .merge(qc_routes)
-        .merge(scheduling_routes)
-        .merge(integration_routes)
-        .merge(export_routes)
-        .merge(admin_routes)
-        .layer(
-            ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
-                .layer(CorsLayer::permissive()), // Configure CORS as needed
-        )
-        .with_state(state)
 }

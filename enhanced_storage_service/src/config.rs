@@ -434,4 +434,101 @@ impl Config {
 
         Ok(())
     }
+
+    /// Create test configuration for axum-test
+    pub fn test_config() -> Self {
+        Config {
+            server: ServerConfig {
+                host: "127.0.0.1".to_string(),
+                port: 0, // Let OS assign port for tests
+                workers: 1,
+                max_connections: 10,
+                timeout_seconds: 5,
+            },
+            database_url: std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| {
+                "postgres://postgres:postgres@localhost:5432/enhanced_storage_test".to_string()
+            }),
+            auth_service_url: "http://localhost:8001".to_string(),
+            iot: IoTConfig {
+                enabled: false, // Disabled for tests
+                mqtt_broker_url: "mqtt://localhost:1883".to_string(),
+                mqtt_username: "test".to_string(),
+                mqtt_password: "test".to_string(),
+                sensor_polling_interval_seconds: 60,
+                alert_threshold_temperature: 5.0,
+                alert_threshold_humidity: 10.0,
+                calibration_enabled: false,
+                real_time_monitoring: false,
+            },
+            analytics: AnalyticsConfig {
+                enabled: false, // Disabled for tests
+                prediction_models_path: "./test_models".to_string(),
+                training_data_retention_days: 30,
+                prediction_horizon_days: 7,
+                anomaly_detection_enabled: false,
+                machine_learning_enabled: false,
+                time_series_analysis: false,
+                model_retraining_interval_hours: 24,
+            },
+            digital_twin: DigitalTwinConfig {
+                enabled: false, // Disabled for tests
+                simulation_engine: "test".to_string(),
+                update_interval_minutes: 10,
+                physics_simulation: false,
+                thermal_modeling: false,
+                capacity_modeling: false,
+                optimization_enabled: false,
+            },
+            blockchain: BlockchainConfig {
+                enabled: false, // Disabled for tests
+                chain_id: "test-chain".to_string(),
+                private_key: "test-key".to_string(),
+                block_size_limit: 100,
+                mining_difficulty: 1,
+                consensus_algorithm: "test".to_string(),
+                immutable_records: false,
+            },
+            automation: AutomationConfig {
+                enabled: false, // Disabled for tests
+                robot_integration: false,
+                automated_placement: false,
+                automated_retrieval: false,
+                scheduling_enabled: false,
+                max_concurrent_tasks: 1,
+                safety_checks: true,
+            },
+            energy: EnergyConfig {
+                optimization_enabled: false,
+                smart_scheduling: false,
+                energy_monitoring: false,
+                cost_optimization: false,
+                renewable_integration: false,
+                efficiency_targets: 0.5,
+            },
+            mobile: MobileConfig {
+                enabled: false, // Disabled for tests
+                jwt_secret: "test-mobile-secret-32-characters".to_string(),
+                barcode_scanning: false,
+                geolocation_tracking: false,
+                offline_support: false,
+                push_notifications: false,
+            },
+            compliance: ComplianceConfig {
+                enabled: true, // Keep enabled for tests
+                regulatory_standards: vec!["TEST".to_string()],
+                audit_logging: true,
+                chain_of_custody: true,
+                data_integrity: true,
+                access_controls: true,
+            },
+            storage: StorageConfig {
+                default_temperature_zones: vec!["RT".to_string(), "4".to_string()],
+                capacity_warning_threshold: 0.8,
+                capacity_critical_threshold: 0.95,
+                auto_organization: false, // Simplified for tests
+                barcode_generation: true,
+                location_tracking: true,
+            },
+        }
+    }
 }

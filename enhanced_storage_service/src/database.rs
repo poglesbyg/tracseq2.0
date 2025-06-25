@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::{PgPool, postgres::PgPoolOptions};
 use tracing::{info, warn};
 
 #[derive(Debug, Clone)]
@@ -271,17 +271,21 @@ impl DatabasePool {
             .execute(&self.pool)
             .await?;
 
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_samples_location ON samples(storage_location_id)")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_samples_location ON samples(storage_location_id)",
+        )
+        .execute(&self.pool)
+        .await?;
 
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_sensor_data_sensor ON sensor_data(sensor_id)")
             .execute(&self.pool)
             .await?;
 
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sensor_data_recorded_at ON sensor_data(recorded_at)")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_sensor_data_recorded_at ON sensor_data(recorded_at)",
+        )
+        .execute(&self.pool)
+        .await?;
 
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status)")
             .execute(&self.pool)
@@ -299,9 +303,11 @@ impl DatabasePool {
             .execute(&self.pool)
             .await?;
 
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_energy_location ON energy_consumption(location_id)")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_energy_location ON energy_consumption(location_id)",
+        )
+        .execute(&self.pool)
+        .await?;
 
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_compliance_status ON compliance_events(compliance_status)")
             .execute(&self.pool)
@@ -319,4 +325,16 @@ impl DatabasePool {
 
         Ok(result == 1)
     }
+}
+
+/// Create a new database connection pool (compatibility function)
+pub async fn create_pool(database_url: &str) -> Result<sqlx::PgPool> {
+    let pool = DatabasePool::new(database_url).await?;
+    Ok(pool.pool)
+}
+
+/// Run database migrations (compatibility function)
+pub async fn run_migrations(pool: &sqlx::PgPool) -> Result<()> {
+    let db_pool = DatabasePool { pool: pool.clone() };
+    db_pool.migrate().await
 }
