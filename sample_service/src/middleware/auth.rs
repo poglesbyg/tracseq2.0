@@ -1,15 +1,15 @@
 use axum::{
+    Json,
     extract::{Request, State},
-    http::{header::AUTHORIZATION, StatusCode},
+    http::{StatusCode, header::AUTHORIZATION},
     middleware::Next,
     response::Response,
-    Json,
 };
 use serde_json::json;
 
 use crate::{
-    error::{SampleResult, SampleServiceError},
     AppState,
+    error::{SampleResult, SampleServiceError},
 };
 
 /// Authentication middleware that validates JWT tokens and injects user context
@@ -18,56 +18,53 @@ pub async fn auth_middleware(
     mut request: Request,
     next: Next,
 ) -> Result<Response, SampleServiceError> {
-    let headers = request.headers();
+    // Extract token first, consuming the headers reference
+    let token = {
+        let headers = request.headers();
+        let auth_header = headers
+            .get(AUTHORIZATION)
+            .and_then(|header| header.to_str().ok())
+            .and_then(|header| {
+                if header.starts_with("Bearer ") {
+                    Some(header[7..].to_string())
+                } else {
+                    None
+                }
+            });
 
-    // Extract authorization header
-    let auth_header = headers
-        .get(AUTHORIZATION)
-        .and_then(|header| header.to_str().ok())
-        .and_then(|header| {
-            if header.starts_with("Bearer ") {
-                Some(&header[7..])
-            } else {
-                None
+        match auth_header {
+            Some(token) => token,
+            None => {
+                return Err(SampleServiceError::Authentication(
+                    "Authorization header with Bearer token is required".to_string(),
+                ));
             }
-        });
-
-    let token = match auth_header {
-        Some(token) => token,
-        None => {
-            return Err(SampleServiceError::Authentication(
-                "Authorization header with Bearer token is required".to_string(),
-            ));
         }
-    };
+    }; // headers reference is dropped here
 
     // Validate token with auth service
-    match state.auth_client.validate_token(token).await {
+    match state.auth_client.validate_token(&token).await {
         Ok(true) => {
             // Get user information and inject into request
-            if let Ok(Some(user_data)) = state.auth_client.get_user_from_token(token).await {
+            if let Ok(Some(user_data)) = state.auth_client.get_user_from_token(&token).await {
                 // Store user context in request extensions for handlers to use
                 request.extensions_mut().insert(UserContext {
                     user_id: user_data["user_id"].as_str().unwrap_or("").to_string(),
                     email: user_data["email"].as_str().unwrap_or("").to_string(),
                     role: user_data["role"].as_str().unwrap_or("guest").to_string(),
-                    token: token.to_string(),
+                    token: token.clone(),
                 });
             }
 
             Ok(next.run(request).await)
         }
-        Ok(false) => {
-            Err(SampleServiceError::Authentication(
-                "Invalid or expired token".to_string(),
-            ))
-        }
-        Err(e) => {
-            Err(SampleServiceError::Authentication(format!(
-                "Token validation failed: {}",
-                e
-            )))
-        }
+        Ok(false) => Err(SampleServiceError::Authentication(
+            "Invalid or expired token".to_string(),
+        )),
+        Err(e) => Err(SampleServiceError::Authentication(format!(
+            "Token validation failed: {}",
+            e
+        ))),
     }
 }
 
@@ -77,28 +74,30 @@ pub async fn optional_auth_middleware(
     mut request: Request,
     next: Next,
 ) -> Result<Response, SampleServiceError> {
-    let headers = request.headers();
+    // Extract token first, consuming the headers reference
+    let auth_header = {
+        let headers = request.headers();
+        headers
+            .get(AUTHORIZATION)
+            .and_then(|header| header.to_str().ok())
+            .and_then(|header| {
+                if header.starts_with("Bearer ") {
+                    Some(header[7..].to_string())
+                } else {
+                    None
+                }
+            })
+    }; // headers reference is dropped here
 
-    // Extract authorization header
-    if let Some(auth_header) = headers
-        .get(AUTHORIZATION)
-        .and_then(|header| header.to_str().ok())
-        .and_then(|header| {
-            if header.starts_with("Bearer ") {
-                Some(&header[7..])
-            } else {
-                None
-            }
-        })
-    {
+    if let Some(auth_header) = auth_header {
         // Try to validate token, but don't fail if it's invalid
-        if let Ok(true) = state.auth_client.validate_token(auth_header).await {
-            if let Ok(Some(user_data)) = state.auth_client.get_user_from_token(auth_header).await {
+        if let Ok(true) = state.auth_client.validate_token(&auth_header).await {
+            if let Ok(Some(user_data)) = state.auth_client.get_user_from_token(&auth_header).await {
                 request.extensions_mut().insert(UserContext {
                     user_id: user_data["user_id"].as_str().unwrap_or("").to_string(),
                     email: user_data["email"].as_str().unwrap_or("").to_string(),
                     role: user_data["role"].as_str().unwrap_or("guest").to_string(),
-                    token: auth_header.to_string(),
+                    token: auth_header.clone(),
                 });
             }
         }
@@ -110,58 +109,67 @@ pub async fn optional_auth_middleware(
 /// Role-based authorization middleware
 pub async fn require_role_middleware(
     required_role: &'static str,
-) -> impl Fn(State<AppState>, Request, Next) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Response, SampleServiceError>> + Send>> {
+) -> impl Fn(
+    State<AppState>,
+    Request,
+    Next,
+) -> std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<Response, SampleServiceError>> + Send>,
+> {
     move |State(state): State<AppState>, mut request: Request, next: Next| {
         Box::pin(async move {
-            let headers = request.headers();
+            // Extract token first, consuming the headers reference
+            let token = {
+                let headers = request.headers();
+                let auth_header = headers
+                    .get(AUTHORIZATION)
+                    .and_then(|header| header.to_str().ok())
+                    .and_then(|header| {
+                        if header.starts_with("Bearer ") {
+                            Some(header[7..].to_string())
+                        } else {
+                            None
+                        }
+                    });
 
-            let auth_header = headers
-                .get(AUTHORIZATION)
-                .and_then(|header| header.to_str().ok())
-                .and_then(|header| {
-                    if header.starts_with("Bearer ") {
-                        Some(&header[7..])
-                    } else {
-                        None
+                match auth_header {
+                    Some(token) => token,
+                    None => {
+                        return Err(SampleServiceError::Authentication(
+                            "Authorization header with Bearer token is required".to_string(),
+                        ));
                     }
-                });
-
-            let token = match auth_header {
-                Some(token) => token,
-                None => {
-                    return Err(SampleServiceError::Authentication(
-                        "Authorization header with Bearer token is required".to_string(),
-                    ));
                 }
-            };
+            }; // headers reference is dropped here
 
             // Validate token and check permissions
-            match state.auth_client.validate_permissions(token, required_role).await {
+            match state
+                .auth_client
+                .validate_permissions(&token, required_role)
+                .await
+            {
                 Ok(true) => {
                     // Inject user context
-                    if let Ok(Some(user_data)) = state.auth_client.get_user_from_token(token).await {
+                    if let Ok(Some(user_data)) = state.auth_client.get_user_from_token(&token).await
+                    {
                         request.extensions_mut().insert(UserContext {
                             user_id: user_data["user_id"].as_str().unwrap_or("").to_string(),
                             email: user_data["email"].as_str().unwrap_or("").to_string(),
                             role: user_data["role"].as_str().unwrap_or("guest").to_string(),
-                            token: token.to_string(),
+                            token: token.clone(),
                         });
                     }
 
                     Ok(next.run(request).await)
                 }
-                Ok(false) => {
-                    Err(SampleServiceError::Authorization(format!(
-                        "Insufficient permissions. Required role: {}",
-                        required_role
-                    )))
-                }
-                Err(e) => {
-                    Err(SampleServiceError::Authentication(format!(
-                        "Permission validation failed: {}",
-                        e
-                    )))
-                }
+                Ok(false) => Err(SampleServiceError::Authorization(format!(
+                    "Insufficient permissions. Required role: {}",
+                    required_role
+                ))),
+                Err(e) => Err(SampleServiceError::Authentication(format!(
+                    "Permission validation failed: {}",
+                    e
+                ))),
             }
         })
     }
@@ -172,10 +180,7 @@ pub fn extract_user_context(request: &Request) -> Option<&UserContext> {
     request.extensions().get::<UserContext>()
 }
 
-/// Helper function to create role-based middleware
-pub fn require_role(role: &'static str) -> axum::middleware::FromFn<AppState, impl Fn(State<AppState>, Request, Next) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Response, SampleServiceError>> + Send>>> {
-    axum::middleware::from_fn_with_state(AppState::default(), require_role_middleware(role))
-}
+// Helper function removed due to axum generic complexity
 
 /// User context structure for request extensions
 #[derive(Debug, Clone)]
@@ -229,4 +234,4 @@ impl UserContext {
     pub fn can_manage_workflows(&self) -> bool {
         self.has_role("lab_technician")
     }
-} 
+}

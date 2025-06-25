@@ -137,6 +137,7 @@ export default function SampleSubmissionWizard({ onSuccess, onClose }: SampleSub
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               value={formData.template_id}
               onChange={(e) => setFormData({ ...formData, template_id: e.target.value })}
+              data-testid="sample-type-select"
             >
               <option value="">Select a template</option>
               {templates?.map((template) => (
@@ -159,6 +160,7 @@ export default function SampleSubmissionWizard({ onSuccess, onClose }: SampleSub
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                data-testid="sample-name-input"
                 required
               />
             </div>
@@ -170,6 +172,7 @@ export default function SampleSubmissionWizard({ onSuccess, onClose }: SampleSub
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                 value={formData.barcode}
                 onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                data-testid="sample-barcode-input"
               />
               <p className="mt-1 text-sm text-gray-500">
                 If left empty, a unique barcode will be generated automatically
@@ -187,6 +190,7 @@ export default function SampleSubmissionWizard({ onSuccess, onClose }: SampleSub
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               value={formData.storage_location_id}
               onChange={(e) => setFormData({ ...formData, storage_location_id: e.target.value })}
+              data-testid="project-select"
             >
               <option value="">Select a storage location</option>
               {storageLocations?.map((location) => (
@@ -289,6 +293,7 @@ export default function SampleSubmissionWizard({ onSuccess, onClose }: SampleSub
             onClick={handleSubmit}
             disabled={submitSample.isPending || !formData.name.trim() || !formData.storage_location_id}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            data-testid="submit-sample-button"
           >
             {submitSample.isPending ? (
               <>

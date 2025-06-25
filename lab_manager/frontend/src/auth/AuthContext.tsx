@@ -104,6 +104,7 @@ const getTestUsers = (): Record<string, TestUser> => {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loginAttempts, setLoginAttempts] = useState<Map<string, number>>(new Map());
 
   // Initialize auth state from localStorage
   useEffect(() => {
@@ -141,6 +142,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const login = async (credentials: LoginRequest): Promise<void> => {
+    // Rate limiting check
+    const attempts = loginAttempts.get(credentials.email) || 0;
+    if (attempts >= 5) {
+      throw new Error('Too many login attempts. Please try again later.');
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
@@ -151,16 +158,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Login failed');
+        let errorMessage = 'Invalid credentials';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error?.message || 'Invalid credentials';
+        } catch {
+          // If JSON parsing fails, use default message
+          errorMessage = 'Invalid credentials';
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
       const { user: userData, token } = data.data;
       setUser(userData);
       localStorage.setItem('auth_token', token);
+      
+      // Reset login attempts on successful login
+      setLoginAttempts(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(credentials.email);
+        return newMap;
+      });
     } catch (error) {
       console.error('Login error:', error);
+      
+      // Handle network/connection errors
+      const errorMessage = error instanceof Error ? error.message : 'Invalid credentials';
       
       // Fallback for E2E testing - use test user credentials
       const testUsers = getTestUsers();
@@ -183,10 +207,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         setUser(mockUser);
         localStorage.setItem('auth_token', `test-token-${testUser.role}`);
+        
+        // Reset login attempts on successful login
+        setLoginAttempts(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(credentials.email);
+          return newMap;
+        });
+        
+        // Small delay to ensure state is set before component re-renders
+        await new Promise(resolve => setTimeout(resolve, 100));
         return;
       }
       
-      throw error;
+      // Increment login attempts for failed login
+      setLoginAttempts(prev => {
+        const newMap = new Map(prev);
+        newMap.set(credentials.email, (newMap.get(credentials.email) || 0) + 1);
+        return newMap;
+      });
+      
+      throw new Error(errorMessage);
     }
   };
 

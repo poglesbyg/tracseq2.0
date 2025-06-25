@@ -201,6 +201,61 @@ impl Config {
         Ok(config)
     }
 
+    /// Create test configuration for unit testing
+    pub fn test_config() -> Self {
+        Config {
+            server: ServerConfig {
+                host: "127.0.0.1".to_string(),
+                port: 0, // Let the OS assign a port for tests
+                workers: Some(1),
+            },
+            database_url: std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| {
+                "postgres://postgres:postgres@localhost:5432/sample_service_test".to_string()
+            }),
+            sample: SampleConfig {
+                max_batch_size: 10,
+                default_status: "pending".to_string(),
+                auto_generate_barcode: true,
+                validation_timeout_seconds: 5,
+                metadata_max_size_kb: 16,
+            },
+            barcode: BarcodeConfig {
+                prefix: "TEST".to_string(),
+                length: 8,
+                include_timestamp: false,
+                include_sequence: true,
+                separator: "-".to_string(),
+                checksum: false,
+            },
+            workflow: WorkflowConfig {
+                auto_transitions: false,
+                validation_required: true,
+                notification_enabled: false,
+                status_timeout_hours: 1,
+            },
+            services: ServiceConfig {
+                auth_service_url: "http://localhost:8001".to_string(),
+                storage_service_url: "http://localhost:8002".to_string(),
+                template_service_url: None,
+                sequencing_service_url: None,
+                request_timeout_seconds: 5,
+            },
+            logging: LoggingConfig {
+                level: "debug".to_string(),
+                format: "pretty".to_string(),
+                file_enabled: false,
+                file_path: None,
+            },
+            features: FeatureConfig {
+                batch_processing_enabled: true,
+                template_integration_enabled: false,
+                workflow_automation_enabled: false,
+                barcode_scanning_enabled: false,
+                audit_logging_enabled: true,
+            },
+        }
+    }
+
     /// Validate the configuration
     pub fn validate(&self) -> Result<()> {
         // Validate server port

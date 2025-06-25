@@ -28,8 +28,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!isAuthenticated) {
-    // Redirect to login with return URL
-    return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname)}`} replace />;
+    // Check if this is due to session expiry
+    const hasAuthToken = localStorage.getItem('auth_token');
+    const redirectUrl = hasAuthToken 
+      ? `/login?redirect=${encodeURIComponent(location.pathname)}&session=expired`
+      : `/login?redirect=${encodeURIComponent(location.pathname)}`;
+    
+    return <Navigate to={redirectUrl} replace />;
   }
 
   // Check role requirements

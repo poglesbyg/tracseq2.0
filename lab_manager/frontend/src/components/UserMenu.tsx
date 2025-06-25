@@ -85,7 +85,7 @@ export const UserMenu: React.FC = () => {
               {user.first_name} {user.last_name}
             </div>
             <div className="text-xs text-gray-500">
-              {user.department || user.lab_affiliation || 'Lab Manager'}
+              {user.department || user.lab_affiliation || getRoleDisplayName(user.role)}
             </div>
           </div>
           <ChevronDownIcon 

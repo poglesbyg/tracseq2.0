@@ -24,7 +24,7 @@ test.describe('TracSeq 2.0 Authentication - Login', () => {
         // Verify redirect to dashboard
         await expect(page).toHaveURL('/dashboard');
         await expect(page.locator('[data-testid="dashboard-title"]')).toBeVisible();
-        await expect(page.locator('[data-testid="user-menu"]')).toContainText('Admin Test');
+        await expect(page.locator('[data-testid="user-menu"]').first()).toContainText('Admin Test');
     });
 
     test('should login successfully with valid researcher credentials', async ({ page }) => {
@@ -34,7 +34,7 @@ test.describe('TracSeq 2.0 Authentication - Login', () => {
 
         // Verify redirect to dashboard
         await expect(page).toHaveURL('/dashboard');
-        await expect(page.locator('[data-testid="user-menu"]')).toContainText('Research Scientist');
+        await expect(page.locator('[data-testid="user-menu"]').first()).toContainText('Research Scientist');
     });
 
     test('should login successfully with valid technician credentials', async ({ page }) => {
@@ -44,7 +44,7 @@ test.describe('TracSeq 2.0 Authentication - Login', () => {
 
         // Verify redirect to dashboard
         await expect(page).toHaveURL('/dashboard');
-        await expect(page.locator('[data-testid="user-menu"]')).toContainText('Lab Technician');
+        await expect(page.locator('[data-testid="user-menu"]').first()).toContainText('Lab Technician');
     });
 
     test('should show error for invalid credentials', async ({ page }) => {
@@ -166,7 +166,7 @@ test.describe('TracSeq 2.0 Authentication - Login', () => {
         await page.goto('/samples');
 
         // Should be redirected to login
-        await expect(page).toHaveURL('/login');
+        await expect(page).toHaveURL(/\/login/);
         await expect(page.locator('[data-testid="info-message"]'))
             .toContainText(/session expired/i);
     });

@@ -1,10 +1,14 @@
 # Page snapshot
 
 ```yaml
+- img
+- heading "Sign in to TracSeq 2.0" [level=2]
+- paragraph: Laboratory Management System
+- text: Email address
+- textbox "Email address"
+- text: Password
+- textbox "Password"
 - button
-- heading "Lab Manager" [level=1]
-- button "Open user menu"
-- main:
-  - text: Loading dashboard...
-  - button "Open lab assistant chat": Ask Lab Assistant
+- button "Sign in"
+- button "Forgot your password?"
 ```

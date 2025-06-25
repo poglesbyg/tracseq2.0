@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../auth/AuthContext';
@@ -11,6 +11,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -19,6 +20,16 @@ export default function Login() {
   // Get redirect URL from query params
   const searchParams = new URLSearchParams(location.search);
   const redirectTo = searchParams.get('redirect') || '/dashboard';
+
+  // Set page title for E2E tests
+  useEffect(() => {
+    document.title = 'TracSeq 2.0 - Login';
+    
+    // Check if redirected due to session expiry
+    if (searchParams.get('session') === 'expired') {
+      setInfoMessage('Your session has expired. Please log in again.');
+    }
+  }, [searchParams]);
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -33,7 +44,7 @@ export default function Login() {
 
     // Validation
     let hasErrors = false;
-    if (!email) {
+    if (!email.trim()) {
       setEmailError('Email is required');
       hasErrors = true;
     } else if (!validateEmail(email)) {
@@ -41,7 +52,7 @@ export default function Login() {
       hasErrors = true;
     }
 
-    if (!password) {
+    if (!password.trim()) {
       setPasswordError('Password is required');
       hasErrors = true;
     }
@@ -87,6 +98,12 @@ export default function Login() {
               <div className="text-sm text-red-700">{error}</div>
             </div>
           )}
+          
+          {infoMessage && (
+            <div className="rounded-md bg-blue-50 p-4" data-testid="info-message">
+              <div className="text-sm text-blue-700">{infoMessage}</div>
+            </div>
+          )}
 
           <div className="space-y-4">
             <div>
@@ -100,7 +117,16 @@ export default function Login() {
                   type="email"
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (emailError) setEmailError(''); // Clear error on change
+                  }}
+                  onBlur={(e) => {
+                    // Validate on blur
+                    if (e.target.value && !validateEmail(e.target.value)) {
+                      setEmailError('Please enter a valid email address');
+                    }
+                  }}
                   className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                   placeholder="Enter your email"
                   data-testid="email-input"
@@ -124,7 +150,10 @@ export default function Login() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (passwordError) setPasswordError(''); // Clear error on change
+                  }}
                   className="appearance-none rounded-md relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                   placeholder="Enter your password"
                   data-testid="password-input"

@@ -269,4 +269,60 @@ impl Config {
     pub fn is_development(&self) -> bool {
         self.environment().to_lowercase() == "development"
     }
+
+    /// Create test configuration for axum-test
+    pub fn test_config() -> Self {
+        Config {
+            server: ServerConfig {
+                host: "127.0.0.1".to_string(),
+                port: 0, // Let OS assign port for tests
+                workers: Some(1),
+            },
+            database_url: std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| {
+                "postgres://postgres:postgres@localhost:5432/auth_service_test".to_string()
+            }),
+            jwt: JwtConfig {
+                secret: "test-secret-key-32-characters-long-for-axum-test".to_string(),
+                access_token_expiry_hours: 1,
+                refresh_token_expiry_days: 1, // Shorter for tests
+                issuer: "auth-service-test".to_string(),
+                audience: "test-suite".to_string(),
+            },
+            security: SecurityConfig {
+                password_min_length: 6, // Relaxed for tests
+                password_require_uppercase: false,
+                password_require_lowercase: false,
+                password_require_numbers: false,
+                password_require_symbols: false,
+                max_login_attempts: 10, // More lenient for tests
+                lockout_duration_minutes: 1,
+                session_timeout_hours: 1,
+                rate_limiting_enabled: false, // Disabled for tests
+                rate_limit_requests_per_minute: 1000,
+            },
+            email: EmailConfig {
+                smtp_host: "localhost".to_string(),
+                smtp_port: 2525, // Test SMTP port
+                smtp_username: "test".to_string(),
+                smtp_password: "test".to_string(),
+                from_address: "test@tracseq.test".to_string(),
+                from_name: "TracSeq Test".to_string(),
+                enabled: false, // Disabled for tests
+            },
+            redis: None, // Disabled for tests
+            logging: LoggingConfig {
+                level: "debug".to_string(),
+                format: "pretty".to_string(), // Better for test debugging
+                file_enabled: false,
+                file_path: None,
+            },
+            features: FeatureConfig {
+                registration_enabled: true,
+                email_verification_required: false, // Disabled for tests
+                password_reset_enabled: true,
+                shibboleth_enabled: false,
+                audit_logging_enabled: true,
+            },
+        }
+    }
 }

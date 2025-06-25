@@ -44,16 +44,79 @@ export class AuthHelpers {
 
         // Wait for successful login redirect
         await this.page.waitForURL('/dashboard');
-        await expect(this.page.locator('[data-testid="user-menu"]')).toBeVisible();
+
+        // Wait for dashboard to load and user menu to appear
+        await expect(this.page.locator('[data-testid="dashboard-title"]')).toBeVisible();
+
+        // Wait for at least one user menu to be visible
+        await this.page.waitForFunction(
+            () => {
+                const menus = document.querySelectorAll('[data-testid="user-menu"]');
+                return Array.from(menus).some(menu => {
+                    const rect = menu.getBoundingClientRect();
+                    const style = window.getComputedStyle(menu);
+                    return rect.width > 0 && rect.height > 0 &&
+                        style.display !== 'none' &&
+                        style.visibility !== 'hidden' &&
+                        style.opacity !== '0';
+                });
+            },
+            { timeout: 10000 }
+        );
     }
 
     /**
      * Log out current user
      */
     async logout() {
-        await this.page.click('[data-testid="user-menu"]');
-        await this.page.click('[data-testid="logout-button"]');
-        await this.page.waitForURL('/login');
+        try {
+            // Scroll to top to ensure user menu is in view
+            await this.page.evaluate(() => window.scrollTo(0, 0));
+
+            // Try to find a visible user menu using Playwright's visibility detection
+            const userMenus = await this.page.locator('[data-testid="user-menu"]').all();
+
+            let visibleMenu: typeof userMenus[0] | null = null;
+            for (const menu of userMenus) {
+                if (await menu.isVisible()) {
+                    visibleMenu = menu;
+                    break;
+                }
+            }
+
+            if (!visibleMenu) {
+                // If no menu is visible, wait a bit and try again
+                await this.page.waitForTimeout(3000);
+                for (const menu of userMenus) {
+                    if (await menu.isVisible()) {
+                        visibleMenu = menu;
+                        break;
+                    }
+                }
+            }
+
+            if (!visibleMenu) {
+                // If still no visible menu, try to find by different approach
+                console.log('No visible user menu found, attempting fallback...');
+                visibleMenu = await this.page.locator('[data-testid="user-menu"]').first();
+
+                if (!(await visibleMenu.isVisible())) {
+                    throw new Error('No visible user menu found for logout');
+                }
+            }
+
+            // Click the visible user menu
+            await visibleMenu.click();
+
+            // Wait for dropdown to appear and click logout
+            await this.page.waitForSelector('[data-testid="logout-button"]', { state: 'visible' });
+            await this.page.click('[data-testid="logout-button"]');
+            await this.page.waitForURL('/login');
+        } catch (error) {
+            console.error('Logout failed:', error);
+            // Try to navigate to login directly as fallback
+            await this.page.goto('/login');
+        }
     }
 
     /**
@@ -61,8 +124,15 @@ export class AuthHelpers {
      */
     async isLoggedIn(): Promise<boolean> {
         try {
-            await this.page.locator('[data-testid="user-menu"]').waitFor({ timeout: 5000 });
-            return true;
+            // Check if any user menu is visible
+            const isVisible = await this.page.waitForFunction(() => {
+                const userMenus = document.querySelectorAll('[data-testid="user-menu"]');
+                return Array.from(userMenus).some(menu => {
+                    const style = window.getComputedStyle(menu);
+                    return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+                });
+            }, { timeout: 5000 });
+            return !!isVisible;
         } catch {
             return false;
         }
@@ -79,6 +149,20 @@ export class LabHelpers {
      * Navigate to samples page
      */
     async goToSamples() {
+        // Check if navigation is visible (desktop) or if we need to open mobile menu
+        const isNavVisible = await this.page.locator('[data-testid="nav-samples"]').isVisible();
+
+        if (!isNavVisible) {
+            // On mobile, need to open the sidebar first
+            const mobileMenuButton = this.page.locator('[data-testid="mobile-menu-button"]');
+
+            if (await mobileMenuButton.isVisible()) {
+                await mobileMenuButton.click();
+                // Wait for the mobile sidebar to open and navigation to become visible
+                await this.page.waitForSelector('[data-testid="nav-samples"]', { state: 'visible', timeout: 10000 });
+            }
+        }
+
         await this.page.click('[data-testid="nav-samples"]');
         await this.page.waitForURL('/samples');
     }

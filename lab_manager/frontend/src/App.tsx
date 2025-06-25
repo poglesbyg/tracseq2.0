@@ -151,6 +151,9 @@ export default function App() {
               </ProtectedRoute>
             } />
             
+            {/* Admin redirect route */}
+            <Route path="/admin/users" element={<Navigate to="/users" replace />} />
+            
             {/* Redirect root to dashboard */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             

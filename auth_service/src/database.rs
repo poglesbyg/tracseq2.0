@@ -1,7 +1,7 @@
 use anyhow::Result;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use std::time::Duration;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 /// Database connection pool wrapper
 #[derive(Debug, Clone)]
@@ -201,21 +201,29 @@ impl DatabasePool {
             .execute(&self.pool)
             .await?;
 
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON user_sessions(expires_at)")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON user_sessions(expires_at)",
+        )
+        .execute(&self.pool)
+        .await?;
 
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON security_audit_log(user_id)")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON security_audit_log(user_id)",
+        )
+        .execute(&self.pool)
+        .await?;
 
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON security_audit_log(timestamp)")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON security_audit_log(timestamp)",
+        )
+        .execute(&self.pool)
+        .await?;
 
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_audit_log_event_type ON security_audit_log(event_type)")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_audit_log_event_type ON security_audit_log(event_type)",
+        )
+        .execute(&self.pool)
+        .await?;
 
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_password_reset_user_id ON password_reset_tokens(user_id)")
             .execute(&self.pool)
@@ -229,17 +237,23 @@ impl DatabasePool {
             .execute(&self.pool)
             .await?;
 
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_rate_limits_identifier ON rate_limits(identifier)")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_rate_limits_identifier ON rate_limits(identifier)",
+        )
+        .execute(&self.pool)
+        .await?;
 
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_activity_log_user_id ON user_activity_log(user_id)")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_activity_log_user_id ON user_activity_log(user_id)",
+        )
+        .execute(&self.pool)
+        .await?;
 
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON user_activity_log(timestamp)")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON user_activity_log(timestamp)",
+        )
+        .execute(&self.pool)
+        .await?;
 
         // Create updated_at trigger function
         sqlx::query(
@@ -326,16 +340,15 @@ impl DatabasePool {
         let start_time = std::time::Instant::now();
 
         // Clean up expired sessions
-        let expired_sessions = sqlx::query(
-            "DELETE FROM user_sessions WHERE expires_at < NOW() OR revoked = TRUE"
-        )
-        .execute(&self.pool)
-        .await?
-        .rows_affected();
+        let expired_sessions =
+            sqlx::query("DELETE FROM user_sessions WHERE expires_at < NOW() OR revoked = TRUE")
+                .execute(&self.pool)
+                .await?
+                .rows_affected();
 
         // Clean up expired password reset tokens
         let expired_password_tokens = sqlx::query(
-            "DELETE FROM password_reset_tokens WHERE expires_at < NOW() OR used = TRUE"
+            "DELETE FROM password_reset_tokens WHERE expires_at < NOW() OR used = TRUE",
         )
         .execute(&self.pool)
         .await?
@@ -343,23 +356,22 @@ impl DatabasePool {
 
         // Clean up expired email verification tokens
         let expired_email_tokens = sqlx::query(
-            "DELETE FROM email_verification_tokens WHERE expires_at < NOW() OR used = TRUE"
+            "DELETE FROM email_verification_tokens WHERE expires_at < NOW() OR used = TRUE",
         )
         .execute(&self.pool)
         .await?
         .rows_affected();
 
         // Clean up old rate limit entries (older than 24 hours)
-        let expired_rate_limits = sqlx::query(
-            "DELETE FROM rate_limits WHERE window_start < NOW() - INTERVAL '24 hours'"
-        )
-        .execute(&self.pool)
-        .await?
-        .rows_affected();
+        let expired_rate_limits =
+            sqlx::query("DELETE FROM rate_limits WHERE window_start < NOW() - INTERVAL '24 hours'")
+                .execute(&self.pool)
+                .await?
+                .rows_affected();
 
         // Clean up old audit log entries (older than 90 days, configurable)
         let expired_audit_logs = sqlx::query(
-            "DELETE FROM security_audit_log WHERE timestamp < NOW() - INTERVAL '90 days'"
+            "DELETE FROM security_audit_log WHERE timestamp < NOW() - INTERVAL '90 days'",
         )
         .execute(&self.pool)
         .await?
@@ -369,7 +381,12 @@ impl DatabasePool {
 
         info!(
             "Database cleanup completed in {:?}: sessions={}, password_tokens={}, email_tokens={}, rate_limits={}, audit_logs={}",
-            duration, expired_sessions, expired_password_tokens, expired_email_tokens, expired_rate_limits, expired_audit_logs
+            duration,
+            expired_sessions,
+            expired_password_tokens,
+            expired_email_tokens,
+            expired_rate_limits,
+            expired_audit_logs
         );
 
         Ok(CleanupResult {
@@ -402,4 +419,16 @@ pub struct CleanupResult {
     pub expired_rate_limits: u64,
     pub expired_audit_logs: u64,
     pub duration_ms: u64,
-} 
+}
+
+/// Create a new database connection pool (compatibility function)
+pub async fn create_pool(database_url: &str) -> Result<PgPool> {
+    let pool = DatabasePool::new(database_url).await?;
+    Ok(pool.pool)
+}
+
+/// Run database migrations (compatibility function)
+pub async fn run_migrations(pool: &PgPool) -> Result<()> {
+    let db_pool = DatabasePool { pool: pool.clone() };
+    db_pool.migrate().await
+}

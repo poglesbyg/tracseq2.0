@@ -80,8 +80,8 @@ async fn main() -> Result<()> {
     // Setup application state
     println!("AUTH SERVICE: Setting up application state");
     let app_state = AppState {
-        auth_service,
-        config: config.clone(),
+        auth_service: std::sync::Arc::new(auth_service),
+        config: std::sync::Arc::new(config.clone()),
         db_pool,
     };
 
