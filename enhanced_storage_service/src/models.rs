@@ -24,7 +24,7 @@ pub struct StorageLocation {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct CreateStorageLocationRequest {
     #[validate(length(min = 1, max = 255))]
     pub name: String,
@@ -71,7 +71,7 @@ pub struct Sample {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct StoreSampleRequest {
     #[validate(length(min = 1))]
     pub barcode: String,
@@ -206,14 +206,14 @@ pub struct Prediction {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PredictionRequest {
     pub model_type: String,
     pub input_data: serde_json::Value,
     pub prediction_horizon: Option<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapacityPrediction {
     pub location_id: Uuid,
     pub predicted_capacity: f64,
@@ -222,7 +222,7 @@ pub struct CapacityPrediction {
     pub factors: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MaintenancePrediction {
     pub equipment_id: String,
     pub predicted_failure_date: DateTime<Utc>,
@@ -441,7 +441,7 @@ pub struct BarcodeScanning {
 // API Response Models
 // ============================================================================
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiResponse<T> {
     pub success: bool,
     pub data: Option<T>,
@@ -449,13 +449,13 @@ pub struct ApiResponse<T> {
     pub timestamp: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaginatedResponse<T> {
     pub data: Vec<T>,
     pub pagination: PaginationInfo,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaginationInfo {
     pub page: i32,
     pub per_page: i32,
