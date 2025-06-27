@@ -7,7 +7,7 @@ import {
   ChevronDownIcon,
   UserCircleIcon
 } from '@heroicons/react/24/outline';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '../auth';
 
 export const UserMenu: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);

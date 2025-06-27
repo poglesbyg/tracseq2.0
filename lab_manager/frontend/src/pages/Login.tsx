@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '../auth';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -17,8 +17,8 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Get redirect URL from query params
-  const searchParams = new URLSearchParams(location.search);
+  // Get redirect URL from query params using useMemo
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const redirectTo = searchParams.get('redirect') || '/dashboard';
 
   // Set page title for E2E tests

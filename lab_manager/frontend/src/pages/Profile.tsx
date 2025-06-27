@@ -9,7 +9,7 @@ import {
   CheckIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '../auth';
 
 interface ProfileForm {
   first_name: string;

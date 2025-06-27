@@ -1,70 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import { 
+  User, 
+  UserRole, 
+  LoginRequest, 
+  AuthContextType,
+  getTestUsers 
+} from './types';
 
-export interface User {
-  id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  role: UserRole;
-  status: UserStatus;
-  lab_affiliation?: string;
-  department?: string;
-  position?: string;
-  phone?: string;
-  office_location?: string;
-  email_verified: boolean;
-  last_login?: string;
-  created_at: string;
-}
-
-export type UserRole = 
-  | 'lab_administrator'
-  | 'principal_investigator' 
-  | 'lab_technician'
-  | 'research_scientist'
-  | 'data_analyst'
-  | 'guest';
-
-export type UserStatus = 'active' | 'inactive' | 'locked' | 'pending_verification';
-
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-interface TestUser {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-}
-
-export interface LoginResponse {
-  user: User;
-  token: string;
-  expires_at: string;
-}
-
-interface AuthContextType {
-  user: User | null;
-  login: (credentials: LoginRequest) => Promise<void>;
-  logout: () => Promise<void>;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  hasRole: (role: UserRole | UserRole[]) => boolean;
-  hasPermission: (resource: string, action: string) => boolean;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -72,34 +15,6 @@ interface AuthProviderProps {
 
 // Use relative URLs to go through Vite proxy
 const API_BASE_URL = '';
-
-// Test users for E2E testing
-const getTestUsers = (): Record<string, TestUser> => {
-  // Test users for E2E testing
-  return {
-    admin: {
-      email: 'admin.test@tracseq.com',
-      password: 'AdminTest123!',
-      firstName: 'Admin',
-      lastName: 'Test',
-      role: 'lab_administrator'
-    },
-    researcher: {
-      email: 'researcher.test@tracseq.com',
-      password: 'ResearchTest123!',
-      firstName: 'Research',
-      lastName: 'Scientist',
-      role: 'research_scientist'
-    },
-    technician: {
-      email: 'tech.test@tracseq.com',
-      password: 'TechTest123!',
-      firstName: 'Lab',
-      lastName: 'Technician',
-      role: 'lab_technician'
-    }
-  };
-};
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);

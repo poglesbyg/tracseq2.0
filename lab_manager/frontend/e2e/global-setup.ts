@@ -1,4 +1,4 @@
-import { chromium, FullConfig } from '@playwright/test';
+import { chromium, FullConfig, Browser } from '@playwright/test';
 
 /**
  * Global setup for TracSeq 2.0 Laboratory Management System E2E Tests
@@ -18,10 +18,10 @@ async function globalSetup(config: FullConfig) {
 
     try {
         // Create test users and store authentication data
-        await setupTestUsers(browser, baseURL);
+        await setupTestUsers(browser);
 
         // Initialize laboratory test data
-        await setupLaboratoryData(browser, baseURL);
+        await setupLaboratoryData(browser);
 
         console.log('✅ TracSeq 2.0 E2E test environment ready');
     } catch (error) {
@@ -35,7 +35,7 @@ async function globalSetup(config: FullConfig) {
 /**
  * Create test users with different roles for authentication testing
  */
-async function setupTestUsers(browser: any, _baseURL: string) {
+async function setupTestUsers(browser: Browser) {
     const context = await browser.newContext();
     // Page setup for future user creation logic
 
@@ -82,7 +82,7 @@ async function setupTestUsers(browser: any, _baseURL: string) {
 /**
  * Set up laboratory test data (samples, projects, equipment)
  */
-async function setupLaboratoryData(browser: any, _baseURL: string) {
+async function setupLaboratoryData(browser: Browser) {
     const context = await browser.newContext();
     // Page setup for future data seeding logic
 

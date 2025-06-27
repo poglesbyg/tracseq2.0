@@ -15,7 +15,7 @@ import {
   CpuChipIcon,
 } from '@heroicons/react/24/outline';
 import { UserMenu } from './UserMenu';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '../auth';
 
 interface LayoutProps {
   children: React.ReactNode;

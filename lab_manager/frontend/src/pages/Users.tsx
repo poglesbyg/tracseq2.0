@@ -9,7 +9,7 @@ import {
   XMarkIcon,
   FunnelIcon
 } from '@heroicons/react/24/outline';
-import { useAuth, User, UserRole, UserStatus } from '../auth/AuthContext';
+import { useAuth, User, UserRole, UserStatus } from '../auth';
 
 interface UserListResponse {
   users: User[];

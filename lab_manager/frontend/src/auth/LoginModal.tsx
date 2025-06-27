@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { XMarkIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
-import { useAuth } from './AuthContext';
+import { useAuth } from '.';
 
 interface LoginModalProps {
   isOpen: boolean;

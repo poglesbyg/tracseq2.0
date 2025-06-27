@@ -1,4 +1,4 @@
-import { chromium, FullConfig } from '@playwright/test';
+import { chromium, FullConfig, Browser } from '@playwright/test';
 
 /**
  * Global teardown for TracSeq 2.0 Laboratory Management System E2E Tests
@@ -19,10 +19,10 @@ async function globalTeardown(config: FullConfig) {
 
     try {
         // Clean up test users and sessions
-        await cleanupTestUsers(browser, baseURL);
+        await cleanupTestUsers(browser);
 
         // Clean up laboratory test data
-        await cleanupLaboratoryData(browser, baseURL);
+        await cleanupLaboratoryData(browser);
 
         // Clear environment variables
         delete process.env.TEST_USERS;
@@ -40,7 +40,7 @@ async function globalTeardown(config: FullConfig) {
 /**
  * Clean up test users and their sessions
  */
-async function cleanupTestUsers(browser: any, _baseURL: string) {
+async function cleanupTestUsers(browser: Browser) {
     const context = await browser.newContext();
     // Context setup for future cleanup logic
 
@@ -65,7 +65,7 @@ async function cleanupTestUsers(browser: any, _baseURL: string) {
 /**
  * Clean up laboratory test data
  */
-async function cleanupLaboratoryData(browser: any, _baseURL: string) {
+async function cleanupLaboratoryData(browser: Browser) {
     const context = await browser.newContext();
     // Context setup for future cleanup logic
 
