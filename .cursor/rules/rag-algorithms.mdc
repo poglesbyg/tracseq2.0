@@ -1,74 +1,67 @@
 ---
-description: Defines business logic for RAG algorithms including data processing, extraction, vector indexing and search.
-globs: **/rag/**,**/rag_*.{py,rs},**/lab_submission_rag/**
+description: Technical specification for RAG algorithms implementation including document processing, embedding, and search functionality.
+globs: **/rag/**/*.{py,rs},**/lab_submission_rag/**/*.py,**/enhanced_storage_service/src/ai/*.rs
 alwaysApply: false
 ---
 
 
 # rag-algorithms
 
-## Document Processing Pipeline
+## Core RAG Pipeline Components
 
-The RAG system implements specialized processing for laboratory documents:
+### Document Processing Engine
+- Specialized chunking strategy for laboratory documents optimized for:
+  - Sample information sections
+  - Protocol details 
+  - Analysis requirements
+  - Technical specifications
+- Custom validation rules for laboratory document types (PDF, DOCX, TXT)
+- Metadata extraction focused on laboratory-relevant fields
 
-- Category-based information extraction targeting:
-  - Administrative data
-  - Sample details 
-  - Sequencing requirements
-  - Storage conditions
-  - Equipment parameters
+### Information Extraction System
+- Domain-specific prompt engineering for laboratory data extraction:
+  - Administrative details (submitter, department, PI)
+  - Sample characteristics (type, volume, concentration)
+  - Storage requirements (temperature, container type)
+  - Processing protocols
+  - Analysis specifications
+- Confidence scoring mechanism for extracted information
 
-- Confidence scoring based on:
-  - Extraction completeness (0-100%)
-  - Data validation status
-  - Cross-reference verification
-  - Document quality metrics
+### Vector Store Integration
+- Laboratory document embedding strategy:
+  - Document-chunk relationship preservation
+  - Metadata-aware similarity search
+  - Laboratory context retention
+- Specialized retrieval mechanism with:
+  - Category-based filtering
+  - Confidence thresholding
+  - Context aggregation for laboratory specifics
 
-- Custom chunking strategy:
-  - Section-aware splits
-  - Metadata preservation
-  - Reference tracking
-  - Context windows
-
-## Vector Indexing and Search
-
-- Laboratory-optimized vector store:
-  - Cosine similarity threshold: 0.7
-  - Re-ranking based on:
-    - Document recency
-    - Confidence scores  
-    - Metadata relevance
-
-- Query enhancement:
-  - Laboratory term expansion
-  - Protocol-aware filtering
-  - Equipment parameter matching
-  - Sample type correlation
-
-## Integration Points
-
-- Lab Manager synchronization:
-  - Submission tracking
-  - Sample record creation
-  - Workflow initiation
-  - Status updates
-
-- Document Processing:
-  - PDF/DOCX/TXT support
-  - OCR optimization
-  - Table extraction
-  - Form recognition
+### Query Processing Engine 
+- Laboratory-specific query understanding:
+  - Sample lookup patterns
+  - Protocol matching
+  - Requirements validation
+  - Storage condition verification
+- Enhanced context building with:
+  - Metadata enrichment
+  - Laboratory terminology expansion
+  - Domain-specific relevance scoring
 
 File Paths:
 ```
-lab_submission_rag/
-  rag/
-    document_processor.py  
-    vector_store.py
-    llm_interface.py
-  models/
-    rag_models.py
+lab_submission_rag/rag/
+├── document_processor.py     # Document processing engine
+├── extractor.py             # Information extraction system
+├── vector_store.py          # Vector store integration
+└── query_processor.py       # Query processing engine
 ```
+
+Key Business Rules:
+1. Document validation must ensure laboratory safety and compliance requirements
+2. Extraction confidence below 0.85 requires manual verification
+3. Vector similarity must account for laboratory protocol compatibility
+4. Query results must maintain sample chain of custody
 
 $END$
 

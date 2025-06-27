@@ -1,67 +1,51 @@
 ---
-description: Used for integrating LLM capabilities into laboratory submission and document processing workflows.
-globs: **/llm_integration/**,**/rag/**,**/ai/**,**/*llm*,**/*rag*
+description: Analyzing LLM integration patterns, prompt engineering, and RAG implementation in laboratory management systems
+globs: **/llm-integration.*,**/rag/*.*,**/*rag*.*,**/ai/*.*,**/models/*.*,**/prompts/*.*
 alwaysApply: false
 ---
 
 
-# LLM Integration
+# llm-integration
 
-## LLM Interface Components
+## RAG System Architecture
 
-### Document Processing Engine
-Specialized tokenization and chunking for laboratory documents with domain-specific knowledge preservation. Processes PDFs, DOCX files and spreadsheets containing laboratory submission data.
+### Laboratory Document Processing
+- **Custom Prompt Engineering**: Specialized prompts for extracting laboratory metadata, sample information, and sequencing requirements from scientific documents
+- **Context Management**: Laboratory-aware context building using domain-specific chunking and relevance scoring
+- **Query Processing**: Natural language query handling tailored for laboratory operations and sample management workflows
 
-### Information Extraction Pipeline 
-Multi-stage pipeline extracts key laboratory metadata:
-- Administrative info (submitter details, project info)
-- Sample details (type, concentration, volume)
-- Sequencing requirements (platform, read length)
-- Storage conditions (temperature, container type)
+### Multi-Model Integration
+- **Model Selection Logic**: Intelligent routing between local Ollama models and cloud APIs based on task complexity and confidence requirements
+- **Fallback Handling**: Graceful degradation with simulated responses when LLM services are unavailable
+- **Confidence Scoring**: Domain-specific scoring system for extraction quality and response reliability
 
-Implements confidence scoring (0.0-1.0) for extracted fields.
+### Laboratory Information Extraction
+- **Field Validation**: Laboratory-specific validation rules for extracted metadata fields
+- **Data Transformation**: Custom mapping of extracted information to laboratory management schema
+- **Quality Assessment**: Multi-factor quality scoring incorporating domain knowledge and data completeness
 
-### Laboratory-Specific Prompt Engineering
-Custom prompts enriched with:
-- Laboratory terminology
-- Sample naming conventions  
-- Equipment specifications
-- Protocol structures
-- Quality requirements
+### Enhanced Response Generation
+- **Laboratory Knowledge Base**: Integration of domain-specific knowledge for enhancing responses
+- **Workflow Awareness**: Response generation incorporating laboratory protocols and procedures
+- **Quality Control**: Domain-specific validation of generated responses against laboratory standards
 
-### RAG System Integration
-Vector store maintains laboratory document embeddings for:
-- Natural language querying of submissions
-- Sample detail lookups
-- Protocol searching
-- Equipment specifications
+### Vector Store Management
+- **Laboratory Document Indexing**: Specialized indexing strategies for scientific documents
+- **Semantic Search**: Domain-aware similarity search incorporating laboratory terminology
+- **Version Control**: Document versioning system aligned with laboratory requirements
 
-### File Paths
+File Paths:
 ```
 lab_submission_rag/
-  rag/
-    document_processor.py
-    llm_interface.py 
-    vector_store.py
-  mlops/
-    continuous_learning.py
+  ├── core/
+  │   ├── llm_interface.py
+  │   └── vector_store.py
+  ├── rag/
+  │   ├── document_processor.py
+  │   └── prompt_templates.py
+  └── models/
+      └── extraction_models.py
 ```
-
-### Critical Components
-
-**Enhanced LLM Interface**
-- Multi-model support (Ollama, OpenAI, Anthropic)
-- Fallback mechanisms for model availability
-- Laboratory domain prompting system
-- Confidence scoring for extractions
-
-**Document Pre/Post Processing**
-- Laboratory form recognition
-- Table extraction for sample sheets  
-- Quality scoring for document clarity
-- Validation against templates
-
-Score: 95 - Core business logic for laboratory document processing
 
 $END$
 

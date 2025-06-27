@@ -1,75 +1,58 @@
 ---
-description: Documents data models and domain entity relationships for scientific laboratory sample management system
-globs: **/models/*.rs,**/models/*.py,**/models.rs,**/models.py,**/schemas/*.py,**/schemas/*.rs
+description: For analyzing database schemas, data models, entity relationships, and business logic around data structures in laboratory management systems.
+globs: *.rs,*.py,*/models/*,*/schemas/*,*/database/*,*/repositories/*
 alwaysApply: false
 ---
 
 
-# Data Models and Relationships
+# data-models-and-relationships
 
-## Core Domain Models
+## Core Data Models
 
-### AdministrativeInfo
-Captures submitter and project information:
-- Submitter name, email, department, role
-- Project identifiers and approvals
-- Administrative metadata with audit trail
+### Laboratory Submission Models
+- **AdministrativeInfo**: Captures submitter details, project codes, and institutional affiliations
+- **SourceMaterial**: Defines sample material types, collection parameters, storage requirements
+- **PoolingInfo**: Manages sample pooling strategies and multiplexing configurations  
+- **SequenceGeneration**: Contains sequencing parameters, platform requirements, coverage targets
+- **ContainerInfo**: Tracks container specifications, volumes, concentrations
+- **InformaticsInfo**: Stores analysis pipeline requirements and parameters
+- **SampleDetails**: Maintains sample metadata, quality metrics, tracking IDs
 
-### SourceMaterial
-Defines biological sample properties:
-- Material type (DNA, RNA, cells, tissue)
-- Origin and collection details  
-- Storage requirements and conditions
-- Sample quality metrics
+### Storage Management Models
+- **StorageLocation**: Manages temperature zones (-80°C, -20°C, 4°C, RT, 37°C), capacity tracking
+- **Sample**: Tracks sample movements, storage conditions, chain of custody
+- **IoTSensor**: Monitors environmental conditions with threshold alerts
+- **AutomationTask**: Orchestrates robotic sample handling operations
 
-### PoolingInfo
-Manages sample pooling configurations:
-- Pool composition and ratios
-- Barcode/index assignments
-- QC requirements per pool
-- Cross-contamination controls
+### Laboratory Workflow Models
+- **LabSubmission**: Parent record for complete submission workflow
+- **ExtractionResult**: Captures document extraction confidence and metadata
+- **QueryResult**: Stores natural language query responses with relevance scores
+- **DocumentChunk**: Manages segmented laboratory documents with vector embeddings
 
-### SequenceGeneration  
-Controls sequencing parameters:
-- Platform-specific configurations
-- Read length and coverage targets
-- Chemistry version and requirements
-- Run QC thresholds
+### Quality Control Models
+- **ComplianceEvent**: Records regulatory compliance checks
+- **QualityMetric**: Tracks sample and process quality scores
+- **MaintenanceRecord**: Documents equipment calibration and service
 
-### ContainerInfo
-Tracks physical sample containers:
-- Container type and specifications
-- Volume and concentration data
-- Temperature requirements
-- Position tracking in storage
+### Domain-Specific Validation Rules
+- Sample type compatibility with storage conditions
+- Temperature zone requirements validation
+- Material concentration and volume constraints
+- Pooling strategy validation for sequencing
+- Container capacity and compatibility checks
 
-### InformaticsInfo
-Defines analysis requirements:
-- Reference genome versions
-- Analysis pipeline parameters
-- Output format specifications
-- Computational requirements
-
-### SampleDetails
-Comprehensive sample tracking:
-- Unique identifiers and barcodes
-- Processing status and history
-- Quality control metrics
-- Chain of custody
-
-## Key Relationships
-
-- AdministrativeInfo -> SampleDetails: 1:N
-- SourceMaterial -> SampleDetails: 1:1
-- PoolingInfo -> SampleDetails: N:N
-- SequenceGeneration -> SampleDetails: 1:N
-- ContainerInfo -> SampleDetails: 1:1
-- InformaticsInfo -> SampleDetails: 1:N
+### Relationship Constraints
+- Samples must have valid storage locations
+- Submissions require administrative and sample details
+- Quality metrics tied to samples and equipment
+- IoT sensors mapped to storage locations
 
 File Paths:
 - `lab_submission_rag/models/submission.py`
-- `lab_submission_rag/models/rag_models.py` 
-- `lab_submission_rag/models/database.py`
+- `enhanced_storage_service/src/models.rs`
+- `qaqc_service/src/models/quality.rs`
+- `library_details_service/src/models/library.rs`
 
 $END$
 

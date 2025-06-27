@@ -1,71 +1,137 @@
 -- Migration for user management system
 -- Creates tables for users, roles, sessions, and authentication
 
--- User roles enumeration
-CREATE TYPE user_role AS ENUM (
-    'lab_administrator',
-    'principal_investigator', 
-    'lab_technician',
-    'research_scientist',
-    'data_analyst',
-    'guest'
-);
+-- User roles enumeration (add new values to existing type if it exists)
+DO $$ BEGIN
+    CREATE TYPE user_role AS ENUM (
+        'lab_administrator',
+        'principal_investigator', 
+        'lab_technician',
+        'research_scientist',
+        'data_analyst',
+        'guest'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN
+        -- Type already exists, add new enum values if they don't exist
+        BEGIN
+            ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'lab_administrator';
+            ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'principal_investigator';
+            ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'lab_technician';
+            ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'research_scientist';
+            ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'data_analyst';
+            ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'guest';
+        EXCEPTION WHEN OTHERS THEN
+            -- Ignore if values already exist or other errors
+            NULL;
+        END;
+END $$;
 
--- User account status enumeration
-CREATE TYPE user_status AS ENUM (
-    'active',
-    'inactive',
-    'locked',
-    'pending_verification'
-);
+-- User account status enumeration (add new values to existing type if it exists)
+DO $$ BEGIN
+    CREATE TYPE user_status AS ENUM (
+        'active',
+        'inactive',
+        'locked',
+        'pending_verification'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN
+        -- Type already exists, add new enum values if they don't exist
+        BEGIN
+            ALTER TYPE user_status ADD VALUE IF NOT EXISTS 'locked';
+            ALTER TYPE user_status ADD VALUE IF NOT EXISTS 'pending_verification';
+        EXCEPTION WHEN OTHERS THEN
+            -- Ignore if values already exist or other errors
+            NULL;
+        END;
+END $$;
 
--- Main users table
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email VARCHAR(255) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
-    role user_role NOT NULL DEFAULT 'guest',
-    status user_status NOT NULL DEFAULT 'pending_verification',
-    
-    -- Laboratory affiliation
-    lab_affiliation VARCHAR(255),
-    department VARCHAR(255),
-    position VARCHAR(255),
-    
-    -- Contact information
-    phone VARCHAR(20),
-    office_location VARCHAR(255),
-    
-    -- Security fields
-    email_verified BOOLEAN DEFAULT FALSE,
-    failed_login_attempts INTEGER DEFAULT 0,
-    locked_until TIMESTAMPTZ,
-    last_login TIMESTAMPTZ,
-    password_changed_at TIMESTAMPTZ DEFAULT NOW(),
-    
-    -- Audit fields
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    created_by UUID REFERENCES users(id),
-    metadata JSONB NOT NULL DEFAULT '{}'::jsonb
-);
+-- Main users table (skip if already exists)
+DO $$ BEGIN
+    CREATE TABLE users (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100) NOT NULL,
+        role user_role NOT NULL DEFAULT 'guest',
+        status user_status NOT NULL DEFAULT 'pending_verification',
+        
+        -- Laboratory affiliation
+        lab_affiliation VARCHAR(255),
+        department VARCHAR(255),
+        position VARCHAR(255),
+        
+        -- Contact information
+        phone VARCHAR(20),
+        office_location VARCHAR(255),
+        
+        -- Security fields
+        email_verified BOOLEAN DEFAULT FALSE,
+        failed_login_attempts INTEGER DEFAULT 0,
+        locked_until TIMESTAMPTZ,
+        last_login TIMESTAMPTZ,
+        password_changed_at TIMESTAMPTZ DEFAULT NOW(),
+        
+        -- Audit fields
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        created_by UUID REFERENCES users(id),
+        metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+    );
+EXCEPTION
+    WHEN duplicate_table THEN
+        -- Table already exists, add missing columns if needed
+        BEGIN
+            -- Try to add columns that might be missing
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100);
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS lab_affiliation VARCHAR(255);
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR(255);
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS position VARCHAR(255);
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS office_location VARCHAR(255);
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ DEFAULT NOW();
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS created_by UUID;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+        EXCEPTION WHEN OTHERS THEN
+            -- Ignore any errors in adding columns
+            NULL;
+        END;
+END $$;
 
--- User sessions table for JWT token management
-CREATE TABLE user_sessions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash VARCHAR(255) NOT NULL UNIQUE, -- Hash of the JWT token
-    device_info VARCHAR(500), -- User agent, device info
-    ip_address INET,
-    expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    last_used_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- User sessions table for JWT token management (create if not exists)
+DO $$ BEGIN
+    CREATE TABLE user_sessions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash VARCHAR(255) NOT NULL UNIQUE, -- Hash of the JWT token
+        device_info VARCHAR(500), -- User agent, device info
+        ip_address INET,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        last_used_at TIMESTAMPTZ DEFAULT NOW()
+    );
+EXCEPTION
+    WHEN duplicate_table THEN
+        -- Table already exists, add missing columns if needed
+        BEGIN
+            ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS token_hash VARCHAR(255);
+            ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS device_info VARCHAR(500);
+            ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMPTZ DEFAULT NOW();
+        EXCEPTION WHEN OTHERS THEN
+            -- Ignore any errors in adding columns
+            NULL;
+        END;
+END $$;
 
--- Password reset tokens table
-CREATE TABLE password_reset_tokens (
+-- Password reset tokens table (create if not exists)
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_hash VARCHAR(255) NOT NULL UNIQUE,
@@ -74,8 +140,8 @@ CREATE TABLE password_reset_tokens (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Email verification tokens table
-CREATE TABLE email_verification_tokens (
+-- Email verification tokens table (create if not exists)
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_hash VARCHAR(255) NOT NULL UNIQUE,
@@ -84,8 +150,8 @@ CREATE TABLE email_verification_tokens (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- User activity log for audit trail
-CREATE TABLE user_activity_log (
+-- User activity log for audit trail (create if not exists)
+CREATE TABLE IF NOT EXISTS user_activity_log (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     action VARCHAR(100) NOT NULL, -- login, logout, password_change, etc.
@@ -97,42 +163,43 @@ CREATE TABLE user_activity_log (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Role permissions table (for fine-grained permissions)
-CREATE TABLE role_permissions (
+-- Role permissions table (for fine-grained permissions) (create if not exists)
+CREATE TABLE IF NOT EXISTS role_permissions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     role user_role NOT NULL,
     resource VARCHAR(50) NOT NULL, -- samples, templates, users, etc.
     action VARCHAR(50) NOT NULL, -- create, read, update, delete, manage
     granted BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(role, resource, action)
 );
 
--- Indexes for performance
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_users_status ON users(status);
-CREATE INDEX idx_users_lab_affiliation ON users(lab_affiliation);
-CREATE INDEX idx_users_created_at ON users(created_at DESC);
+-- Indexes for performance (create if not exists)
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+CREATE INDEX IF NOT EXISTS idx_users_lab_affiliation ON users(lab_affiliation);
+CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at DESC);
 
-CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
-CREATE INDEX idx_user_sessions_token_hash ON user_sessions(token_hash);
-CREATE INDEX idx_user_sessions_expires_at ON user_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_token_hash ON user_sessions(token_hash);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
 
-CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
-CREATE INDEX idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
-CREATE INDEX idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);
 
-CREATE INDEX idx_email_verification_tokens_user_id ON email_verification_tokens(user_id);
-CREATE INDEX idx_email_verification_tokens_token_hash ON email_verification_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_user_id ON email_verification_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_token_hash ON email_verification_tokens(token_hash);
 
-CREATE INDEX idx_user_activity_log_user_id ON user_activity_log(user_id);
-CREATE INDEX idx_user_activity_log_action ON user_activity_log(action);
-CREATE INDEX idx_user_activity_log_created_at ON user_activity_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_activity_log_user_id ON user_activity_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_activity_log_action ON user_activity_log(action);
+CREATE INDEX IF NOT EXISTS idx_user_activity_log_created_at ON user_activity_log(created_at DESC);
 
-CREATE INDEX idx_role_permissions_role ON role_permissions(role);
-CREATE INDEX idx_role_permissions_resource ON role_permissions(resource, action);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_role ON role_permissions(role);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_resource ON role_permissions(resource, action);
 
--- Insert default role permissions
+-- Insert default role permissions (on conflict do nothing)
 INSERT INTO role_permissions (role, resource, action, granted) VALUES
 -- Lab Administrator - Full access
 ('lab_administrator', 'users', 'create', TRUE),
@@ -215,7 +282,8 @@ INSERT INTO role_permissions (role, resource, action, granted) VALUES
 -- Guest - Limited read access
 ('guest', 'samples', 'read', TRUE),
 ('guest', 'templates', 'read', TRUE),
-('guest', 'reports', 'read', TRUE);
+('guest', 'reports', 'read', TRUE)
+ON CONFLICT (role, resource, action) DO NOTHING;
 
 -- Create a default admin user (password will need to be set on first run)
 -- Password hash for 'admin123' - should be changed immediately
@@ -241,4 +309,4 @@ INSERT INTO users (
     'Default Laboratory',
     'System Administration',
     'System Administrator'
-); 
+) ON CONFLICT (email) DO NOTHING; 

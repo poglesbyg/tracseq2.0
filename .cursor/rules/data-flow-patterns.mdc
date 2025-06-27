@@ -1,65 +1,67 @@
 ---
-description: Used to understand data flows through laboratory document processing, including sample submissions, RAG pipelines, and document management.
-globs: lab_submission_rag/*,lab_manager/src/data/*,notification_service/src/handlers/*
+description: Documents data flow patterns in lab submission processing including document pipelines, RAG orchestration, and information extraction workflows.
+globs: **/data_flow/**,**/pipeline/**,**/rag/**,**/extraction/**,**/workflow/**
 alwaysApply: false
 ---
 
 
 # data-flow-patterns
 
-## Core Data Flow Components
+## Document Processing Pipeline
 
-1. **Document Ingestion Pipeline**
-- Documents enter through multiple channels:
-  - Web UI upload portal
-  - Automated folder monitoring 
-  - API submissions
-  - Email attachments
-- Files are validated and queued for processing based on priority levels
-- Raw documents stored in staging with generated IDs
-- Document metadata extraction starts parallel to storage
+### Sample Submission Flow
+- Document uploaded through web interface
+- Text extracted and chunked by DocumentProcessor
+- Chunks vectorized and stored in ChromaDB
+- LLM extracts structured information using category-specific prompts
+- Results validated against confidence thresholds
+- Submission created in database if extraction succeeds
 
-2. **RAG Processing Pipeline**
-- Document chunking optimized for laboratory content
-- Vector embeddings generated using biomedical model
-- Chunks stored in ChromaDB with metadata linking
-- LLM extraction of structured laboratory data:
-  - Administrative information
-  - Sample details
-  - Sequencing requirements
-  - Storage conditions
+### RAG Query Processing
+- Natural language query received from frontend
+- Similar document chunks retrieved from vector store
+- Context assembled from relevant chunks
+- LLM generates response using context
+- Response returned with confidence score and sources
 
-3. **Laboratory Database Integration**
-- Extracted data validated against lab schemas
-- Sample records created in lab_manager database
-- Storage assignments generated based on requirements
-- Notification events triggered for new submissions
+### Information Extraction Workflow
+- Seven categories of lab information extracted:
+  - Administrative details
+  - Sample information
+  - Storage requirements
+  - Sequencing specifications
+  - Pooling data
+  - Quality control
+  - Analysis requirements
+- Each category has custom validation rules
+- Confidence scoring per category
 
-4. **Query Processing Flow**
-- Natural language queries parsed for intent
-- Relevant chunks retrieved from vector store
-- Context assembled from multiple sources:
-  - Retrieved document chunks
-  - Database records
-  - Template definitions
-- Responses generated with citations
+### Batch Processing Pattern
+- Multiple documents processed concurrently
+- Progress tracked per document
+- Aggregate metrics calculated:
+  - Success rate
+  - Average confidence
+  - Processing time
+- Failed documents flagged for review
 
-5. **Event Propagation**
-- Document status changes trigger notifications
-- Sample creation events flow to storage service
-- Template updates propagate to document processors
-- System alerts route through notification service
+### Chain of Custody Flow
+- Sample movements tracked through storage system
+- Temperature zone transitions logged
+- Location history maintained
+- Handling events recorded with timestamps
 
-Key File Paths:
-```
-lab_submission_rag/core/document_processor.py
-lab_submission_rag/rag/vector_store.py 
-lab_submission_rag/services/notification.py
-lab_manager/src/data/sample_processor.rs
-notification_service/src/handlers/events.rs
-```
+### Quality Control Pipeline
+- Sample quality metrics extracted
+- QC thresholds validated
+- Results logged with confidence scores
+- Failed QC triggers notifications
 
-The data flow patterns emphasize reliable document processing, structured data extraction, and event-driven integration between laboratory services.
+Key Files:
+- `lab_submission_rag/rag_orchestrator.py`
+- `lab_submission_rag/document_processor.py`
+- `lab_submission_rag/quality_control.py`
+- `enhanced_storage_service/storage_tracking.rs`
 
 $END$
 
