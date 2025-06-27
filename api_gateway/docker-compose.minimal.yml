@@ -8,14 +8,14 @@ services:
       dockerfile: Dockerfile.simple
     container_name: tracseq-api-gateway
     ports:
-      - "8000:8000"
+      - "8089:8000"
     environment:
       - ENVIRONMENT=development
       - HOST=0.0.0.0
       - PORT=8000
       
       # Route everything to existing monolith initially
-      - MONOLITH__HOST=192.168.0.151
+      - MONOLITH__HOST=host.docker.internal
       - MONOLITH__PORT=3000
       
       # Feature flags for gradual service extraction
@@ -58,7 +58,7 @@ services:
     image: redis:7-alpine
     container_name: tracseq-gateway-redis
     ports:
-      - "6380:6379"  # Different port to avoid conflicts
+      - "6381:6379"  # Different port to avoid conflicts with microservices Redis
     volumes:
       - gateway_redis_data:/data
     networks:

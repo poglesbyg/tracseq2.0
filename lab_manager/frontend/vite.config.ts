@@ -28,7 +28,7 @@ export default defineConfig({
       // Route ALL API requests through the API Gateway
       // This enables gradual microservices migration with feature flags
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8089',
         changeOrigin: true,
         secure: false,
         configure: (proxy) => {
