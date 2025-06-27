@@ -15,7 +15,7 @@ services:
       - PORT=8000
       
       # Route everything to existing monolith initially
-      - MONOLITH__HOST=host.docker.internal
+      - MONOLITH__HOST=192.168.0.151
       - MONOLITH__PORT=3000
       
       # Feature flags for gradual service extraction
