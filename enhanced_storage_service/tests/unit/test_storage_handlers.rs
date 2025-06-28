@@ -27,22 +27,24 @@ mod tests {
             .unwrap();
 
         let request = StorageLocationFixtures::create_location_request();
-        let location_name = request.name.clone();
 
-        let result = create_location(State(app_state), Json(request)).await;
+        let result = create_location(State(app_state), Json(request.clone())).await;
 
         assert!(result.is_ok(), "Create location should succeed");
-        let response = result.unwrap();
+        let (status_code, response) = result.unwrap();
+        assert_eq!(status_code, StatusCode::CREATED);
+        
         let api_response = response.0;
 
         TestAssertions::assert_api_response_success(&api_response);
         let location = api_response.data.unwrap();
 
-        assert_eq!(location.name, location_name);
-        assert_eq!(location.temperature_zone, "-20C");
-        assert_eq!(location.max_capacity, 100);
-        assert_eq!(location.current_capacity, 0);
+        assert_eq!(location.name, request.name);
+        assert_eq!(location.location_type, request.location_type);
+        assert_eq!(location.temperature_zone, request.temperature_zone);
+        assert_eq!(location.max_capacity, request.max_capacity);
         assert_eq!(location.status, "active");
+        assert_eq!(location.current_capacity, 0);
         TestAssertions::assert_timestamp_recent(location.created_at, 5);
 
         test_db.cleanup().await.unwrap();
@@ -142,11 +144,12 @@ mod tests {
             .await
             .unwrap();
 
-        // Create multiple locations
+        // Create multiple locations with unique names
+        let test_run_id = Uuid::new_v4().to_string().chars().take(8).collect::<String>();
         let locations_to_create = 15;
         for i in 0..locations_to_create {
             let mut request = StorageLocationFixtures::create_location_request();
-            request.name = format!("Test Location {}", i);
+            request.name = format!("Test Location {}_{}", test_run_id, i);
             
             let result = create_location(State(app_state.clone()), Json(request)).await;
             assert!(result.is_ok(), "Location creation should succeed");
@@ -391,7 +394,8 @@ mod tests {
         // Create a location first
         let location_request = StorageLocationFixtures::create_location_request();
         let create_result = create_location(State(app_state.clone()), Json(location_request)).await;
-        let created_location = create_result.unwrap().0.data.unwrap();
+        let (_, location_response) = create_result.unwrap();
+        let created_location = location_response.0.data.unwrap();
 
         // Store a sample
         let sample_request = SampleFixtures::store_sample_request(created_location.id);
@@ -400,7 +404,9 @@ mod tests {
         let result = store_sample(State(app_state), Json(sample_request)).await;
 
         assert!(result.is_ok(), "Store sample should succeed");
-        let response = result.unwrap();
+        let (status_code, response) = result.unwrap();
+        assert_eq!(status_code, StatusCode::CREATED);
+        
         let api_response = response.0;
 
         TestAssertions::assert_api_response_success(&api_response);
@@ -493,7 +499,7 @@ mod tests {
         let location1 = location1_result.unwrap().0.data.unwrap();
 
         let mut location2_request = StorageLocationFixtures::create_location_request();
-        location2_request.name = "Target Location".to_string();
+        location2_request.name = format!("Target Location {}", Uuid::new_v4().to_string().chars().take(8).collect::<String>());
         let location2_result = create_location(State(app_state.clone()), Json(location2_request)).await;
         let location2 = location2_result.unwrap().0.data.unwrap();
 

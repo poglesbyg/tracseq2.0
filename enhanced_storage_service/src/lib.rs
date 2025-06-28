@@ -105,12 +105,20 @@ pub fn create_app(state: AppState) -> axum::Router {
         )
         .route("/storage/samples", post(handlers::storage::store_sample))
         .route(
+            "/storage/samples/:sample_id",
+            get(handlers::storage::get_sample),
+        )
+        .route(
             "/storage/samples/:sample_id/location",
             get(handlers::storage::get_sample_location),
         )
         .route(
             "/storage/samples/:sample_id/move",
             post(handlers::storage::move_sample),
+        )
+        .route(
+            "/storage/samples/:sample_id/move",
+            put(handlers::storage::move_sample),
         )
         .route(
             "/storage/samples/:sample_id/retrieve",
@@ -140,8 +148,7 @@ pub fn create_app(state: AppState) -> axum::Router {
     // Combine all routes
     Router::new()
         .merge(health_routes)
-        .merge(storage_routes)
-        .merge(iot_routes)
+        .nest("/api", storage_routes.merge(iot_routes))
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
@@ -172,6 +179,7 @@ pub mod test_utils {
         let config = Config::test_config();
 
         let storage_service = EnhancedStorageService::new(db_pool.clone(), config.clone())
+            .await
             .expect("Failed to create storage service");
 
         let ai_platform = ai::AIPlatform::new(ai::AIConfig::default());

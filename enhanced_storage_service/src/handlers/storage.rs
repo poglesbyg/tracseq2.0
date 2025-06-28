@@ -3,7 +3,8 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use serde::Deserialize;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
 use tracing::{info, error};
 use uuid::Uuid;
 use validator::Validate;
@@ -27,7 +28,7 @@ pub struct LocationQuery {
 pub async fn create_location(
     State(state): State<AppState>,
     Json(request): Json<CreateStorageLocationRequest>,
-) -> StorageResult<Json<ApiResponse<StorageLocation>>> {
+) -> Result<(StatusCode, Json<ApiResponse<StorageLocation>>), StorageError> {
     info!("Creating storage location: {}", request.name);
 
     // Validate request
@@ -37,7 +38,7 @@ pub async fn create_location(
 
     let location = state.storage_service.create_storage_location(request).await?;
 
-    Ok(Json(ApiResponse::success(location)))
+    Ok((StatusCode::CREATED, Json(ApiResponse::success(location))))
 }
 
 /// Get all storage locations with optional filtering
@@ -204,7 +205,7 @@ pub async fn get_capacity(
 pub async fn store_sample(
     State(state): State<AppState>,
     Json(request): Json<StoreSampleRequest>,
-) -> StorageResult<Json<ApiResponse<Sample>>> {
+) -> Result<(StatusCode, Json<ApiResponse<Sample>>), StorageError> {
     info!("Storing sample with barcode: {}", request.barcode);
 
     // Validate request
@@ -214,7 +215,7 @@ pub async fn store_sample(
 
     let sample = state.storage_service.store_sample(request).await?;
 
-    Ok(Json(ApiResponse::success(sample)))
+    Ok((StatusCode::CREATED, Json(ApiResponse::success(sample))))
 }
 
 /// Get the location of a sample
@@ -294,6 +295,19 @@ pub async fn retrieve_sample(
     }
 
     Ok(Json(ApiResponse::success(updated_sample)))
+}
+
+/// Get sample by ID
+/// GET /storage/samples/:sample_id
+pub async fn get_sample(
+    State(state): State<AppState>,
+    Path(sample_id): Path<Uuid>,
+) -> StorageResult<Json<ApiResponse<Sample>>> {
+    info!("Getting sample: {}", sample_id);
+
+    let sample = state.storage_service.get_sample(sample_id).await?;
+
+    Ok(Json(ApiResponse::success(sample)))
 }
 
 // Helper struct for capacity information

@@ -8,6 +8,7 @@ use serde_json::json;
 use uuid::Uuid;
 use chrono::{DateTime, Utc, Duration};
 use tracing::{info, error, warn};
+use sqlx::{FromRow, QueryBuilder};
 
 use crate::{
     error::{StorageError, StorageResult},
@@ -25,34 +26,64 @@ pub async fn list_sensors(
 
     let page = query.page.unwrap_or(1);
     let per_page = query.per_page.unwrap_or(50).min(100);
+    let offset = (page - 1) * per_page;
 
-    // Mock data for demonstration - in production this would query the database
-    let sensors = vec![
-        IoTSensor {
-            id: Uuid::new_v4(),
-            sensor_id: "TEMP001".to_string(),
-            sensor_type: "temperature".to_string(),
-            location_id: None,
-            status: "active".to_string(),
-            last_reading: Some(Utc::now()),
-            battery_level: Some(85),
-            signal_strength: Some(95),
-            firmware_version: Some("1.2.0".to_string()),
-            configuration: Some(json!({"max_temp": 4.0, "min_temp": -20.0})),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        }
-    ];
+    // Build query with filters
+    let mut count_query = sqlx::QueryBuilder::new("SELECT COUNT(*) FROM iot_sensors WHERE 1=1");
+    let mut select_query = sqlx::QueryBuilder::new("SELECT * FROM iot_sensors WHERE 1=1");
+
+    // Add filters
+    if let Some(sensor_type) = &query.sensor_type {
+        count_query.push(" AND sensor_type = ");
+        count_query.push_bind(sensor_type);
+        select_query.push(" AND sensor_type = ");
+        select_query.push_bind(sensor_type);
+    }
+
+    if let Some(status) = &query.status {
+        count_query.push(" AND status = ");
+        count_query.push_bind(status);
+        select_query.push(" AND status = ");
+        select_query.push_bind(status);
+    }
+
+    if let Some(location_id) = &query.location_id {
+        count_query.push(" AND location_id = ");
+        count_query.push_bind(location_id);
+        select_query.push(" AND location_id = ");
+        select_query.push_bind(location_id);
+    }
+
+    // Get total count
+    let total_items: i64 = count_query
+        .build_query_scalar()
+        .fetch_one(&state.storage_service.db.pool)
+        .await?;
+
+    // Add pagination
+    select_query.push(" ORDER BY created_at DESC");
+    select_query.push(" LIMIT ");
+    select_query.push_bind(per_page);
+    select_query.push(" OFFSET ");
+    select_query.push_bind(offset);
+
+    // Get sensors
+    let sensors: Vec<IoTSensor> = select_query
+        .build_query_as()
+        .fetch_all(&state.storage_service.db.pool)
+        .await?;
+
+    let total_pages = ((total_items as i32 + per_page - 1) / per_page).max(1);
 
     let response = PaginatedResponse {
         data: sensors,
         pagination: PaginationInfo {
             page,
             per_page,
-            total_pages: 1,
-            total_items: 1,
-            has_next: false,
-            has_prev: false,
+            total_pages,
+            total_items,
+            has_next: page < total_pages,
+            has_prev: page > 1,
         },
     };
 
@@ -93,20 +124,41 @@ pub async fn register_sensor(
 ) -> StorageResult<Json<ApiResponse<IoTSensor>>> {
     info!("Registering new IoT sensor: {}", request.sensor_id);
 
-    let sensor = IoTSensor {
-        id: Uuid::new_v4(),
-        sensor_id: request.sensor_id,
-        sensor_type: request.sensor_type,
-        location_id: request.location_id,
-        status: "active".to_string(),
-        last_reading: None,
-        battery_level: request.battery_level,
-        signal_strength: request.signal_strength,
-        firmware_version: request.firmware_version,
-        configuration: request.configuration,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-    };
+    // Check if sensor already exists
+    let existing = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM iot_sensors WHERE sensor_id = $1"
+    )
+    .bind(&request.sensor_id)
+    .fetch_one(&state.storage_service.db.pool)
+    .await?;
+
+    if existing > 0 {
+        return Err(StorageError::Validation(format!("Sensor with ID {} already exists", request.sensor_id)));
+    }
+
+    // Insert new sensor
+    let sensor = sqlx::query_as::<_, IoTSensor>(
+        r#"
+        INSERT INTO iot_sensors (
+            id, sensor_id, sensor_type, location_id, status,
+            battery_level, signal_strength, firmware_version, 
+            configuration, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+        RETURNING *
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(&request.sensor_id)
+    .bind(&request.sensor_type)
+    .bind(request.location_id)
+    .bind("active")
+    .bind(request.battery_level)
+    .bind(request.signal_strength)
+    .bind(request.firmware_version)
+    .bind(request.configuration)
+    .fetch_one(&state.storage_service.db.pool)
+    .await?;
 
     Ok(Json(ApiResponse::success(sensor)))
 }
@@ -121,26 +173,45 @@ pub async fn get_sensor_data(
     info!("Getting sensor data for: {}", sensor_id);
 
     let hours_back = query.hours_back.unwrap_or(24);
+    let limit = query.limit.unwrap_or(100).min(1000);
 
-    // Mock data for demonstration
-    let readings = vec![
-        SensorReading {
-            id: Uuid::new_v4(),
-            sensor_id: sensor_id.clone(),
-            value: -18.5,
-            unit: "°C".to_string(),
-            timestamp: Utc::now(),
-            metadata: Some(json!({"location": "freezer_1"})),
-        }
-    ];
+    // Verify sensor exists
+    let sensor_exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM iot_sensors WHERE sensor_id = $1)"
+    )
+    .bind(&sensor_id)
+    .fetch_one(&state.storage_service.db.pool)
+    .await?;
 
-    let stats = SensorStatistics {
-        min_value: -20.0,
-        max_value: -15.0,
-        avg_value: -18.0,
-        reading_count: 24,
-        last_reading: Some(Utc::now()),
-    };
+    if !sensor_exists {
+        return Err(StorageError::SensorNotFound(sensor_id));
+    }
+
+    // Get sensor readings
+    let readings: Vec<SensorReading> = sqlx::query_as(
+        r#"
+        SELECT 
+            sd.id, 
+            s.sensor_id, 
+            sd.value, 
+            sd.unit, 
+            sd.recorded_at as timestamp,
+            sd.metadata
+        FROM sensor_data sd
+        JOIN iot_sensors s ON s.id = sd.sensor_id
+        WHERE s.sensor_id = $1
+        AND sd.recorded_at >= NOW() - INTERVAL '1 hour' * $2
+        ORDER BY sd.recorded_at DESC
+        LIMIT $3
+        "#,
+    )
+    .bind(&sensor_id)
+    .bind(hours_back)
+    .bind(limit)
+    .fetch_all(&state.storage_service.db.pool)
+    .await?;
+
+    let stats = calculate_sensor_statistics(&readings);
 
     let response = SensorDataResponse {
         sensor_id,
@@ -161,14 +232,55 @@ pub async fn record_sensor_reading(
 ) -> StorageResult<Json<ApiResponse<SensorReading>>> {
     info!("Recording sensor reading for: {}", sensor_id);
 
-    let reading = SensorReading {
-        id: Uuid::new_v4(),
-        sensor_id,
-        value: request.value,
-        unit: request.unit.unwrap_or("unknown".to_string()),
-        timestamp: request.timestamp.unwrap_or_else(|| Utc::now()),
-        metadata: request.metadata,
-    };
+    // Get sensor to verify it exists and get its ID
+    let sensor = sqlx::query_as::<_, IoTSensor>(
+        "SELECT * FROM iot_sensors WHERE sensor_id = $1"
+    )
+    .bind(&sensor_id)
+    .fetch_optional(&state.storage_service.db.pool)
+    .await?
+    .ok_or_else(|| StorageError::SensorNotFound(sensor_id.clone()))?;
+
+    // Insert sensor reading
+    let reading = sqlx::query_as::<_, SensorReading>(
+        r#"
+        INSERT INTO sensor_data (
+            id, sensor_id, reading_type, value, unit, 
+            quality_score, metadata, recorded_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING 
+            id, 
+            $9 as sensor_id, 
+            value, 
+            unit, 
+            recorded_at as timestamp,
+            metadata
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(sensor.id)
+    .bind(&sensor.sensor_type)
+    .bind(request.value)
+    .bind(request.unit.as_deref().unwrap_or("unknown"))
+    .bind(1.0) // quality_score
+    .bind(&request.metadata)
+    .bind(request.timestamp.unwrap_or_else(|| Utc::now()))
+    .bind(&sensor_id)
+    .fetch_one(&state.storage_service.db.pool)
+    .await?;
+
+    // Update sensor's last reading timestamp
+    sqlx::query(
+        "UPDATE iot_sensors SET last_reading = $1, updated_at = NOW() WHERE id = $2"
+    )
+    .bind(reading.timestamp)
+    .bind(sensor.id)
+    .execute(&state.storage_service.db.pool)
+    .await?;
+
+    // Check for alerts
+    check_sensor_alerts(&state, &sensor, &reading).await?;
 
     Ok(Json(ApiResponse::success(reading)))
 }
