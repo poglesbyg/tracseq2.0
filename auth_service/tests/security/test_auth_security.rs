@@ -1,4 +1,5 @@
 use auth_service::*;
+use auth_service::handlers::auth::{register, login, get_current_user};
 use crate::test_utils::*;
 use axum::http::StatusCode;
 use serial_test::serial;
@@ -37,6 +38,7 @@ async fn test_sql_injection_prevention() {
         let login_req = LoginRequest {
             email: injection_attempt.clone(),
             password: injection_attempt.clone(),
+            remember_me: None,
         };
         
         let response = client.post_json("/auth/login", &login_req).await;
@@ -59,7 +61,7 @@ async fn test_xss_prevention() {
     let xss_attempts = SecurityTestUtils::generate_xss_attempts();
     
     for xss_attempt in xss_attempts {
-        let register_req = RegisterRequest {
+        let register_req = auth_service::handlers::auth::RegisterRequest {
             first_name: xss_attempt.clone(),
             last_name: xss_attempt.clone(),
             email: format!("test-{}@example.com", uuid::Uuid::new_v4()),
@@ -114,7 +116,7 @@ async fn test_password_strength_enforcement() {
     let weak_passwords = TestDataGenerator::weak_passwords();
     
     for weak_password in weak_passwords {
-        let register_req = RegisterRequest {
+        let register_req = auth_service::handlers::auth::RegisterRequest {
             first_name: "Test".to_string(),
             last_name: "User".to_string(),
             email: TestDataGenerator::random_email(),
@@ -143,7 +145,7 @@ async fn test_email_validation() {
     let invalid_emails = TestDataGenerator::invalid_emails();
     
     for invalid_email in invalid_emails {
-        let register_req = RegisterRequest {
+        let register_req = auth_service::handlers::auth::RegisterRequest {
             first_name: "Test".to_string(),
             last_name: "User".to_string(),
             email: invalid_email.clone(),
@@ -163,7 +165,7 @@ async fn test_email_validation() {
     }
 }
 
-// Helper function simplified
+// Helper function to create auth routes
 fn create_auth_routes(app_state: AppState) -> axum::Router {
     axum::Router::new()
         .route("/auth/register", axum::routing::post(register))
