@@ -5,7 +5,8 @@ import { AuthProvider, useAuth } from '..';
 jest.mock('axios');
 
 // Mock fetch globally
-(globalThis as any).fetch = jest.fn();
+const mockFetch = jest.fn();
+(window as unknown as { fetch: jest.Mock }).fetch = mockFetch;
 
 // Test component to use AuthContext
 const TestAuthComponent = () => {
@@ -29,9 +30,9 @@ describe('AuthContext', () => {
     localStorage.clear();
     
     // Reset fetch mock
-    (globalThis.fetch as jest.Mock).mockReset();
+    mockFetch.mockReset();
     // Default successful login response
-    (globalThis.fetch as jest.Mock).mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
         data: {

@@ -5,8 +5,6 @@
 use super::{AIError, AIInput, AIModel, AIOutput, TrainingData, UpdateData};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Sample routing optimization model

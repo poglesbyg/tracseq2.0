@@ -4,7 +4,7 @@ use crate::{
     models::*,
 };
 use std::{collections::HashMap, sync::Arc};
-use tracing::{info, warn, debug};
+use tracing::info;
 use uuid::Uuid;
 
 #[derive(Debug)]

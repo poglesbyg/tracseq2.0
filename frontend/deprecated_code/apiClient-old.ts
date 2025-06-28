@@ -262,8 +262,8 @@ class EnhancedApiClient {
 
 // Configuration based on environment
 const getApiConfig = () => {
-  const metaEnv = (import.meta as { env: Record<string, string | boolean | undefined> }).env;
-  const isDev = metaEnv.MODE === 'development' || metaEnv.DEV;
+  // const metaEnv = (import.meta as { env: Record<string, string | boolean | undefined> }).env;
+  // const isDev = metaEnv.MODE === 'development' || metaEnv.DEV;
   return {
     baseUrl: '',
     timeout: 30000,

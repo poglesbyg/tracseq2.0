@@ -2,13 +2,13 @@ use anyhow::Result;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tokio::time::{interval, Duration};
-use tracing::{info, warn, error};
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{
     config::IoTConfig,
     error::{StorageError, StorageResult},
-    models::{IoTSensor, SensorData, SensorReading, Alert},
+    models::{SensorReading, Alert},
 };
 
 #[derive(Clone)]
@@ -227,7 +227,7 @@ impl IoTService {
     }
 
     pub async fn process_sensor_alerts(&self, sensor_id: &str, reading: &SensorReading) -> StorageResult<Vec<Alert>> {
-        let mut alerts = Vec::new();
+        let alerts = Vec::new();
 
         for reading_value in &reading.readings {
             if self.is_alert_threshold_exceeded(&reading_value.reading_type, reading_value.value) {

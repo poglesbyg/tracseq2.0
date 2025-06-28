@@ -17,16 +17,16 @@ pub async fn compare_versions(
 }
 
 pub async fn merge_versions(
-    State(state): State<AppState>,
-    Json(request): Json<MergeRequest>,
+    State(_state): State<AppState>,
+    Json(_request): Json<MergeRequest>,
 ) -> ServiceResult<Json<MergeResponse>> {
     // TODO: Implement merge functionality
     todo!("Merge functionality to be implemented")
 }
 
 pub async fn detect_conflicts(
-    State(state): State<AppState>,
-    Json(request): Json<ConflictDetectionRequest>,
+    State(_state): State<AppState>,
+    Json(_request): Json<ConflictDetectionRequest>,
 ) -> ServiceResult<Json<Vec<VersionConflict>>> {
     // TODO: Implement conflict detection
     todo!("Conflict detection to be implemented")

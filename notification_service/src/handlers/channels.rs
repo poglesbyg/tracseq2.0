@@ -1,6 +1,6 @@
 use axum::{
     Json,
-    extract::{Path, Query, State},
+    extract::{Path, State},
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

@@ -1,7 +1,6 @@
 use axum::{
     Json,
     extract::{Path, Query, State},
-    http::StatusCode,
 };
 use chrono::{DateTime, Duration, Utc};
 use serde_json::json;
@@ -143,7 +142,7 @@ pub async fn get_detailed_queue(
 
     // Calculate estimated start times for each job
     let mut jobs_with_estimates = Vec::new();
-    let mut current_time = Utc::now();
+    let current_time = Utc::now();
     let avg_job_duration = Duration::hours(4); // Default 4 hours per job
 
     for (index, job) in queue_jobs.iter().enumerate() {

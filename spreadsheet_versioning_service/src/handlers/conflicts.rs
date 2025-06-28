@@ -19,7 +19,7 @@ pub struct ListConflictsQuery {
 }
 
 pub async fn list_conflicts(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
     Query(query): Query<ListConflictsQuery>,
 ) -> ServiceResult<Json<ConflictListResponse>> {
     // TODO: Implement conflict listing
@@ -32,17 +32,17 @@ pub async fn list_conflicts(
 }
 
 pub async fn get_conflict(
-    State(state): State<AppState>,
-    Path(conflict_id): Path<Uuid>,
+    State(_state): State<AppState>,
+    Path(_conflict_id): Path<Uuid>,
 ) -> ServiceResult<Json<VersionConflict>> {
     // TODO: Implement conflict retrieval
     todo!("Conflict retrieval to be implemented")
 }
 
 pub async fn resolve_conflict(
-    State(state): State<AppState>,
-    Path(conflict_id): Path<Uuid>,
-    Json(request): Json<ConflictResolutionRequest>,
+    State(_state): State<AppState>,
+    Path(_conflict_id): Path<Uuid>,
+    Json(_request): Json<ConflictResolutionRequest>,
 ) -> ServiceResult<Json<VersionConflict>> {
     // TODO: Implement conflict resolution
     todo!("Conflict resolution to be implemented")

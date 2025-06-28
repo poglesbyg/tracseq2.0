@@ -1,6 +1,6 @@
 use anyhow::Result;
-use sqlx::{PgPool, Pool, Postgres};
-use tracing::{info, warn};
+use sqlx::PgPool;
+use tracing::info;
 
 /// Database connection pool wrapper
 #[derive(Debug, Clone)]

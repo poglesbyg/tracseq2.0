@@ -1,10 +1,9 @@
 use axum::{
     extract::{Request, State},
-    http::StatusCode,
     middleware::Next,
     response::Response,
 };
-use tracing::{warn, info};
+use tracing::info;
 
 use crate::{AppState, error::SequencingError};
 

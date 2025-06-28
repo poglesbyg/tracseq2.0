@@ -1,10 +1,20 @@
-import React from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import axios from 'axios';
 import SpreadsheetDataViewer from '../SpreadsheetDataViewer';
 import { act } from 'react';
+import '@testing-library/jest-dom';
+
+// Add global type declaration for tests
+declare global {
+  interface Window {
+    URL: {
+      createObjectURL: jest.Mock;
+      revokeObjectURL: jest.Mock;
+    }
+  }
+}
 
 // Mock axios
 jest.mock('axios');
@@ -70,8 +80,8 @@ describe('SpreadsheetDataViewer', () => {
     // Setup URL mocks for export functionality
     if (typeof window !== 'undefined') {
       // Mock URL.createObjectURL and related functions
-      global.URL.createObjectURL = jest.fn(() => 'mock-blob-url');
-      global.URL.revokeObjectURL = jest.fn();
+      window.URL.createObjectURL = jest.fn(() => 'mock-blob-url');
+      window.URL.revokeObjectURL = jest.fn();
     }
     
     // Create a new QueryClient for each test
@@ -138,7 +148,7 @@ describe('SpreadsheetDataViewer', () => {
     it('shows loading state initially', () => {
       render(
         <QueryClientProvider client={queryClient}>
-          <SpreadsheetDataViewer dataset={mockDataset} />
+          <SpreadsheetDataViewer dataset={mockDataset} onClose={() => {}} />
         </QueryClientProvider>
       );
       expect(screen.getByText('Loading data...')).toBeInTheDocument();
@@ -166,7 +176,7 @@ describe('SpreadsheetDataViewer', () => {
       // The component renders in table mode by default, so check for column headers in the table
       // Note: The actual table might not be visible in the test environment
       // So let's just verify that our column names are mentioned somewhere
-      const columnNames = ['Sample ID', 'Temperature', 'Pressure', 'Status', 'Date'];
+      // const columnNames = ['Sample ID', 'Temperature', 'Pressure', 'Status', 'Date'];
       
       // Check if the dataset info shows the column count
       expect(screen.getByText(/5.*columns/)).toBeInTheDocument();
@@ -278,8 +288,8 @@ describe('SpreadsheetDataViewer', () => {
   describe('Export Functionality', () => {
     beforeEach(() => {
       // Mock URL.createObjectURL and related functions
-      global.URL.createObjectURL = jest.fn(() => 'mock-blob-url');
-      global.URL.revokeObjectURL = jest.fn();
+      window.URL.createObjectURL = jest.fn(() => 'mock-blob-url');
+      window.URL.revokeObjectURL = jest.fn();
     });
 
     it('shows export dropdown on hover', async () => {
@@ -370,7 +380,7 @@ describe('SpreadsheetDataViewer', () => {
       
       render(
         <QueryClientProvider client={queryClient}>
-          <SpreadsheetDataViewer dataset={mockDataset} />
+          <SpreadsheetDataViewer dataset={mockDataset} onClose={() => {}} />
         </QueryClientProvider>
       );
       
@@ -395,7 +405,7 @@ describe('SpreadsheetDataViewer', () => {
       
       render(
         <QueryClientProvider client={queryClient}>
-          <SpreadsheetDataViewer dataset={mockDataset} />
+          <SpreadsheetDataViewer dataset={mockDataset} onClose={() => {}} />
         </QueryClientProvider>
       );
       

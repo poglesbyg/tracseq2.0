@@ -2,7 +2,6 @@ use argon2::password_hash::{rand_core::OsRng, PasswordHasher, SaltString};
 use argon2::Argon2;
 use lab_manager::config::AppConfig;
 use sqlx::PgPool;
-use std::env;
 use std::io::{self, Write};
 use uuid::Uuid;
 

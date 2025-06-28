@@ -1,6 +1,6 @@
 use anyhow::Result;
 use sqlx::{PgPool, postgres::PgPoolOptions};
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Debug, Clone)]
 pub struct DatabasePool {

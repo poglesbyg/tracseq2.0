@@ -7,6 +7,21 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 
+/// Get test database pool
+async fn get_test_db() -> &'static PgPool {
+    static POOL: tokio::sync::OnceCell<PgPool> = tokio::sync::OnceCell::const_new();
+    
+    POOL.get_or_init(|| async {
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/test_qaqc".to_string());
+        
+        PgPool::connect(&database_url)
+            .await
+            .expect("Failed to connect to test database")
+    })
+    .await
+}
+
 /// Test database manager for isolated QAQC testing
 pub struct TestDatabase {
     pub pool: PgPool,
@@ -70,37 +85,15 @@ impl TestDatabase {
 pub struct QAQCFactory;
 
 impl QAQCFactory {
-    pub fn create_valid_qc_rule_request() -> CreateQCRuleRequest {
-        CreateQCRuleRequest {
-            name: format!("Test QC Rule {}", Faker.fake::<String>()),
-            description: Some("Test quality control rule".to_string()),
-            rule_type: QCRuleType::Threshold,
-            category: QCCategory::SampleQuality,
-            parameters: serde_json::json!({
-                "metric": "concentration",
-                "min_value": 10.0,
-                "max_value": 1000.0,
-                "unit": "ng/µL"
-            }),
-            severity: QCSeverity::Warning,
-            is_active: true,
-            auto_apply: true,
-        }
-    }
-
-    pub fn create_valid_qc_check_request() -> CreateQCCheckRequest {
-        CreateQCCheckRequest {
-            name: format!("Test QC Check {}", Faker.fake::<String>()),
-            description: Some("Automated QC check".to_string()),
-            check_type: QCCheckType::Automated,
-            target_entity: QCTargetEntity::Sample,
-            rules: vec![Uuid::new_v4()],
-            schedule: Some(QCSchedule {
-                frequency: QCFrequency::OnDemand,
-                time_of_day: None,
-                days_of_week: None,
-            }),
-            is_active: true,
+    pub fn create_valid_qc_rule_request() -> CreateQcWorkflowRequest {
+        CreateQcWorkflowRequest {
+            name: format!("Test QC Workflow {}", Faker.fake::<String>()),
+            description: Some("Test quality control workflow".to_string()),
+            workflow_type: QcWorkflowType::SampleValidation,
+            steps: vec![],
+            triggers: vec![],
+            quality_thresholds: Default::default(),
+            compliance_requirements: vec![],
         }
     }
 
@@ -140,7 +133,7 @@ impl QAQCTestClient {
     pub async fn post_json<T: serde::Serialize>(&self, path: &str, body: &T) -> axum_test::TestResponse {
         let mut request = self.server.post(path).json(body);
         if let Some(token) = &self.auth_token {
-            request = request.add_header("Authorization", format!("Bearer {}", token).parse().unwrap());
+            request = request.add_header("Authorization", format!("Bearer {}", token).parse::<axum::http::HeaderValue>().unwrap());
         }
         request.await
     }
@@ -148,7 +141,7 @@ impl QAQCTestClient {
     pub async fn get(&self, path: &str) -> axum_test::TestResponse {
         let mut request = self.server.get(path);
         if let Some(token) = &self.auth_token {
-            request = request.add_header("Authorization", format!("Bearer {}", token).parse().unwrap());
+            request = request.add_header("Authorization", format!("Bearer {}", token).parse::<axum::http::HeaderValue>().unwrap());
         }
         request.await
     }
@@ -156,7 +149,7 @@ impl QAQCTestClient {
     pub async fn put_json<T: serde::Serialize>(&self, path: &str, body: &T) -> axum_test::TestResponse {
         let mut request = self.server.put(path).json(body);
         if let Some(token) = &self.auth_token {
-            request = request.add_header("Authorization", format!("Bearer {}", token).parse().unwrap());
+            request = request.add_header("Authorization", format!("Bearer {}", token).parse::<axum::http::HeaderValue>().unwrap());
         }
         request.await
     }
@@ -164,7 +157,7 @@ impl QAQCTestClient {
     pub async fn delete(&self, path: &str) -> axum_test::TestResponse {
         let mut request = self.server.delete(path);
         if let Some(token) = &self.auth_token {
-            request = request.add_header("Authorization", format!("Bearer {}", token).parse().unwrap());
+            request = request.add_header("Authorization", format!("Bearer {}", token).parse::<axum::http::HeaderValue>().unwrap());
         }
         request.await
     }
@@ -204,35 +197,6 @@ impl QAQCAssertions {
 pub struct QAQCTestDataGenerator;
 
 impl QAQCTestDataGenerator {
-    pub fn qc_rule_types() -> Vec<QCRuleType> {
-        vec![
-            QCRuleType::Threshold,
-            QCRuleType::Range,
-            QCRuleType::Pattern,
-            QCRuleType::Statistical,
-            QCRuleType::Custom,
-        ]
-    }
-
-    pub fn qc_categories() -> Vec<QCCategory> {
-        vec![
-            QCCategory::SampleQuality,
-            QCCategory::DataIntegrity,
-            QCCategory::ProcessCompliance,
-            QCCategory::Equipment,
-            QCCategory::Environmental,
-        ]
-    }
-
-    pub fn qc_severities() -> Vec<QCSeverity> {
-        vec![
-            QCSeverity::Info,
-            QCSeverity::Warning,
-            QCSeverity::Error,
-            QCSeverity::Critical,
-        ]
-    }
-
     pub fn generate_failing_sample_data() -> serde_json::Value {
         serde_json::json!({
             "sample_id": Uuid::new_v4(),

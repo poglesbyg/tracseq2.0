@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};
-use tracing::{info, warn};
+use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 // Import everything from lib.rs to avoid conflicts

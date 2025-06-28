@@ -1,6 +1,5 @@
 use axum::{
     extract::State,
-    http::StatusCode,
     response::Json,
     routing::{get, post, put, delete},
     Router,
@@ -9,7 +8,7 @@ use serde_json::json;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::{info, warn};
+use tracing::info;
 
 mod config;
 mod database;

@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -13,7 +13,7 @@ use crate::saga::{
     step::{SagaStep, StepResult, StepStatus},
 };
 use crate::workflows::rag_integration::RagServiceClient;
-use crate::workflows::{RiskLevel, WorkflowPriority};
+use crate::workflows::RiskLevel;
 
 /// Laboratory workflow step type
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::workflows::laboratory::WorkflowStepDefinition;
-use crate::workflows::{RiskLevel, WorkflowPriority};
+use crate::workflows::RiskLevel;
 
 /// A laboratory workflow template
 #[derive(Debug, Clone, Serialize, Deserialize)]

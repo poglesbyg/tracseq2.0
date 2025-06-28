@@ -3,11 +3,10 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
-    error::{ServiceError, ServiceResult},
+    error::ServiceResult,
     models::*,
     AppState,
 };

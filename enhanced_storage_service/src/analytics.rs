@@ -1,14 +1,14 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc, Duration};
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn, error};
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{
     config::AnalyticsConfig,
     database::DatabasePool,
     error::{StorageError, StorageResult},
-    models::{CapacityPrediction, MaintenancePrediction, Prediction},
+    models::{CapacityPrediction, MaintenancePrediction},
 };
 
 #[derive(Clone)]

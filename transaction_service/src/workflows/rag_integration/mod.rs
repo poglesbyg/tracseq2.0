@@ -1,12 +1,11 @@
 //! RAG/LLM Integration for Enhanced Laboratory Workflows
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::workflows::{RiskLevel, WorkflowPriority};
+use crate::workflows::RiskLevel;
 
 /// RAG service client for workflow intelligence
 #[derive(Clone)]

@@ -9,7 +9,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::{
-    coordinator::{TransactionCoordinator, TransactionRequest, TransactionStatus},
+    coordinator::{TransactionRequest, TransactionStatus},
     AppState,
 };
 

@@ -1,7 +1,5 @@
 //! Data models and structures for the transaction service.
 
-pub use crate::coordinator::{CoordinatorStatistics, TransactionRequest, TransactionStatus};
-pub use crate::saga::TransactionContext;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

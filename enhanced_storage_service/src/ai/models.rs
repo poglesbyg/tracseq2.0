@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::ai::{AIError, TrainingData};
+use crate::ai::AIError;
 
 /// Model metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,9 +1,9 @@
 //! Business logic services for the transaction service.
 
-use crate::coordinator::{TransactionCoordinator, TransactionRequest, CoordinatorConfig};
+use crate::coordinator::{TransactionCoordinator, TransactionRequest};
 use crate::models::{TransactionServiceHealth, DependencyHealth};
 use crate::saga::{
-    TransactionSaga, SagaBuilder, TransactionContext,
+    TransactionSaga, TransactionContext,
     step::{CreateSampleStep, ValidateSampleStep, AssignStorageStep, SendNotificationStep, SampleCreationData, StorageRequirements},
     compensation::{DeleteSampleCompensation, ReleaseStorageCompensation, ReverseValidationCompensation, CancelNotificationCompensation},
 };
