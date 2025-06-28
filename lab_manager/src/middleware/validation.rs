@@ -24,77 +24,92 @@ static IPV6_REGEX: OnceLock<Regex> = OnceLock::new();
 
 /// Initialize all validation regexes at startup
 pub fn initialize_validation_regexes() -> Result<(), String> {
-    EMAIL_REGEX
-        .set(
-            Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
-                .map_err(|e| format!("Failed to compile email regex: {}", e))?,
-        )
-        .map_err(|_| "Failed to set email regex")?;
+    // Initialize email regex if not already set
+    if EMAIL_REGEX.get().is_none() {
+        EMAIL_REGEX
+            .set(
+                Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+                    .map_err(|e| format!("Failed to compile email regex: {}", e))?,
+            )
+            .map_err(|_| "Failed to set email regex")?;
+    }
 
-    BARCODE_REGEX
-        .set(
-            Regex::new(r"^[A-Z]{3,5}-\d{14}-\d{3}$")
-                .map_err(|e| format!("Failed to compile barcode regex: {}", e))?,
-        )
-        .map_err(|_| "Failed to set barcode regex")?;
+    // Initialize barcode regex if not already set
+    if BARCODE_REGEX.get().is_none() {
+        BARCODE_REGEX
+            .set(
+                Regex::new(r"^[A-Z]{2,5}-\d{8,16}-[A-Z0-9]{1,6}$")
+                    .map_err(|e| format!("Failed to compile barcode regex: {}", e))?,
+            )
+            .map_err(|_| "Failed to set barcode regex")?;
+    }
 
-    SAFE_PATH_REGEX
-        .set(
-            Regex::new(r"^[a-zA-Z0-9._/-]+$")
-                .map_err(|e| format!("Failed to compile safe path regex: {}", e))?,
-        )
-        .map_err(|_| "Failed to set safe path regex")?;
+    // Initialize safe path regex if not already set
+    if SAFE_PATH_REGEX.get().is_none() {
+        SAFE_PATH_REGEX
+            .set(
+                Regex::new(r"^[a-zA-Z0-9._/-]+$")
+                    .map_err(|e| format!("Failed to compile safe path regex: {}", e))?,
+            )
+            .map_err(|_| "Failed to set safe path regex")?;
+    }
 
-    IPV4_REGEX
-        .set(
-            Regex::new(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
-                .map_err(|e| format!("Failed to compile IPv4 regex: {}", e))?,
-        )
-        .map_err(|_| "Failed to set IPv4 regex")?;
+    // Initialize IPv4 regex if not already set
+    if IPV4_REGEX.get().is_none() {
+        IPV4_REGEX
+            .set(
+                Regex::new(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
+                    .map_err(|e| format!("Failed to compile IPv4 regex: {}", e))?,
+            )
+            .map_err(|_| "Failed to set IPv4 regex")?;
+    }
 
-    IPV6_REGEX
-        .set(
-            Regex::new(r"^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$")
-                .map_err(|e| format!("Failed to compile IPv6 regex: {}", e))?,
-        )
-        .map_err(|_| "Failed to set IPv6 regex")?;
+    // Initialize IPv6 regex if not already set
+    if IPV6_REGEX.get().is_none() {
+        IPV6_REGEX
+            .set(
+                Regex::new(r"^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$")
+                    .map_err(|e| format!("Failed to compile IPv6 regex: {}", e))?,
+            )
+            .map_err(|_| "Failed to set IPv6 regex")?;
+    }
 
     Ok(())
 }
 
 /// Get email regex, initializing if necessary
 fn get_email_regex() -> Result<&'static Regex, String> {
-    EMAIL_REGEX.get().ok_or_else(|| {
-        "Email regex not initialized. Call initialize_validation_regexes() first.".to_string()
-    })
+    Ok(EMAIL_REGEX.get_or_init(|| {
+        Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap()
+    }))
 }
 
 /// Get barcode regex, initializing if necessary
 fn get_barcode_regex() -> Result<&'static Regex, String> {
-    BARCODE_REGEX.get().ok_or_else(|| {
-        "Barcode regex not initialized. Call initialize_validation_regexes() first.".to_string()
-    })
+    Ok(BARCODE_REGEX.get_or_init(|| {
+        Regex::new(r"^[A-Z]{2,5}-\d{8,16}-[A-Z0-9]{1,6}$").unwrap()
+    }))
 }
 
 /// Get safe path regex, initializing if necessary
 fn get_safe_path_regex() -> Result<&'static Regex, String> {
-    SAFE_PATH_REGEX.get().ok_or_else(|| {
-        "Safe path regex not initialized. Call initialize_validation_regexes() first.".to_string()
-    })
+    Ok(SAFE_PATH_REGEX.get_or_init(|| {
+        Regex::new(r"^[a-zA-Z0-9._/-]+$").unwrap()
+    }))
 }
 
 /// Get IPv4 regex, initializing if necessary
 fn get_ipv4_regex() -> Result<&'static Regex, String> {
-    IPV4_REGEX.get().ok_or_else(|| {
-        "IPv4 regex not initialized. Call initialize_validation_regexes() first.".to_string()
-    })
+    Ok(IPV4_REGEX.get_or_init(|| {
+        Regex::new(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$").unwrap()
+    }))
 }
 
 /// Get IPv6 regex, initializing if necessary
 fn get_ipv6_regex() -> Result<&'static Regex, String> {
-    IPV6_REGEX.get().ok_or_else(|| {
-        "IPv6 regex not initialized. Call initialize_validation_regexes() first.".to_string()
-    })
+    Ok(IPV6_REGEX.get_or_init(|| {
+        Regex::new(r"^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$").unwrap()
+    }))
 }
 
 /// Input validation middleware for API endpoints
@@ -523,6 +538,11 @@ impl RateLimitValidator {
 mod tests {
     use super::*;
 
+    fn setup_test_validation() {
+        // Regexes will be auto-initialized on first use via get_or_init
+        // This ensures thread-safe initialization without race conditions
+    }
+
     #[test]
     fn test_sanitize_string() {
         let input = "<script>alert('xss')</script>";
@@ -533,13 +553,46 @@ mod tests {
 
     #[test]
     fn test_validate_email() {
+        setup_test_validation();
         assert!(InputSanitizer::validate_email("test@example.com").is_ok());
         assert!(InputSanitizer::validate_email("invalid-email").is_err());
     }
 
     #[test]
     fn test_validate_barcode() {
-        assert!(InputSanitizer::validate_barcode("DNA-20240320123456-001").is_ok());
-        assert!(InputSanitizer::validate_barcode("invalid-barcode").is_err());
+        setup_test_validation();
+        
+        // Test valid barcode patterns
+        let valid_barcodes = vec![
+            "DNA-20240320123456-001",
+            "RNA-12345678-ABC123",
+            "PROT-987654321234567-999999",
+        ];
+        
+        for barcode in valid_barcodes {
+            assert!(
+                InputSanitizer::validate_barcode(barcode).is_ok(),
+                "Barcode '{}' should be valid",
+                barcode
+            );
+        }
+        
+        // Test invalid barcode patterns
+        let invalid_barcodes = vec![
+            "invalid-barcode",
+            "DNA-123-456",
+            "A-12345678-001",
+            "DNA--001",
+            "DNA-12345678-",
+            "",
+        ];
+        
+        for barcode in invalid_barcodes {
+            assert!(
+                InputSanitizer::validate_barcode(barcode).is_err(),
+                "Barcode '{}' should be invalid",
+                barcode
+            );
+        }
     }
 }

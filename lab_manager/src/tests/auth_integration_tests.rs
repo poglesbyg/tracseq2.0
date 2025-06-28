@@ -14,13 +14,23 @@ mod auth_integration_tests {
 
         PgPoolOptions::new()
             .max_connections(5)
+            .acquire_timeout(std::time::Duration::from_secs(2))
             .connect(&database_url)
             .await
             .expect("Failed to connect to test database")
     }
 
+    fn should_skip_db_tests() -> bool {
+        std::env::var("SKIP_DB_TESTS").unwrap_or_default() == "1"
+    }
+
     #[tokio::test]
     async fn test_auth_service_integration() {
+        if should_skip_db_tests() {
+            println!("Skipping database test (SKIP_DB_TESTS=1)");
+            return;
+        }
+
         let pool = setup_test_db().await;
         let auth_service = AuthService::new(pool.clone(), "test-secret".to_string());
 
@@ -30,6 +40,11 @@ mod auth_integration_tests {
 
     #[tokio::test]
     async fn test_login_flow_integration() {
+        if should_skip_db_tests() {
+            println!("Skipping database test (SKIP_DB_TESTS=1)");
+            return;
+        }
+
         let pool = setup_test_db().await;
         let auth_service = AuthService::new(pool.clone(), "test-secret".to_string());
 
@@ -64,6 +79,11 @@ mod auth_integration_tests {
 
     #[tokio::test]
     async fn test_session_management_integration() {
+        if should_skip_db_tests() {
+            println!("Skipping database test (SKIP_DB_TESTS=1)");
+            return;
+        }
+
         let pool = setup_test_db().await;
         let auth_service = AuthService::new(pool.clone(), "test-secret".to_string());
 
