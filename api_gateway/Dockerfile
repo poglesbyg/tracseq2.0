@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements first for better caching
 COPY pyproject.toml .
+COPY README-gateway.md .
 
 # Install Python dependencies
 RUN pip install --upgrade pip
@@ -43,4 +44,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Command to run the application
-CMD ["python", "-m", "api_gateway.main"] 
+CMD ["python", "src/api_gateway/simple_main.py"] 

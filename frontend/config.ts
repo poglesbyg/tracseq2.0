@@ -27,8 +27,8 @@ export interface AppConfig {
   };
 }
 
-const isDevelopment = (import.meta as any).env?.DEV || (import.meta as any).env?.MODE === 'development';
-const isProduction = (import.meta as any).env?.PROD || (import.meta as any).env?.MODE === 'production';
+const isDevelopment = (import.meta as { env: Record<string, string | boolean | undefined> }).env.DEV || 
+                      (import.meta as { env: Record<string, string | boolean | undefined> }).env.MODE === 'development';
 
 // Default configuration
 const defaultConfig: AppConfig = {
@@ -60,7 +60,7 @@ const defaultConfig: AppConfig = {
 };
 
 // Override with environment variables if available
-const env = (import.meta as any).env || {};
+const env = (import.meta as { env: Record<string, string | boolean | undefined> }).env;
 const config: AppConfig = {
   api: {
     gatewayUrl: env.VITE_API_GATEWAY_URL || defaultConfig.api.gatewayUrl,

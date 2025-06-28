@@ -7,47 +7,50 @@ export default defineConfig({
         host: true,
         port: 5173,
         proxy: {
-            // RAG API - route to RAG service (local development defaults to localhost)
+            // RAG API - route to RAG service (containerized development)
             '/api/rag': {
                 target: process.env.RAG_API_URL || 'http://localhost:8000',
                 changeOrigin: true,
                 secure: false,
-                configure: function (proxy, _options) {
-                    proxy.on('error', function (err, _req, _res) {
+                configure: function (proxy) {
+                    proxy.on('error', function (err) {
                         console.log('RAG API proxy error', err);
                     });
-                    proxy.on('proxyReq', function (proxyReq, req, _res) {
+                    proxy.on('proxyReq', function (proxyReq, req) {
                         console.log('Sending RAG Request to the Target:', req.method, req.url);
                     });
-                    proxy.on('proxyRes', function (proxyRes, req, _res) {
+                    proxy.on('proxyRes', function (proxyRes, req) {
                         console.log('Received RAG Response from the Target:', proxyRes.statusCode, req.url);
                     });
                 },
             },
-            // All other API calls - route through API Gateway for microservices
+            // Route ALL API requests directly to lab manager for now
+            // This enables direct connection while we set up the API Gateway
             '/api': {
-                target: process.env.API_GATEWAY_URL || 'http://host.docker.internal:8000',
+                target: 'http://localhost:3000',
                 changeOrigin: true,
                 secure: false,
-                configure: function (proxy, _options) {
-                    proxy.on('error', function (err, _req, _res) {
-                        console.log('API Gateway proxy error', err);
+                configure: function (proxy) {
+                    proxy.on('error', function (err) {
+                        console.log('proxy error', err);
                     });
-                    proxy.on('proxyReq', function (proxyReq, req, _res) {
-                        console.log('Sending Request to API Gateway:', req.method, req.url);
+                    proxy.on('proxyReq', function (proxyReq, req) {
+                        console.log('Sending Request to the Target:', req.method, req.url);
                     });
-                    proxy.on('proxyRes', function (proxyRes, req, _res) {
-                        console.log('Received Response from API Gateway:', proxyRes.statusCode, req.url);
+                    proxy.on('proxyRes', function (proxyRes, req) {
+                        console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
                     });
                 },
             },
+            // Health check through API Gateway
             '/health': {
-                target: process.env.API_GATEWAY_URL || 'http://host.docker.internal:8000',
+                target: process.env.API_GATEWAY_URL || 'http://localhost:8000',
                 changeOrigin: true,
                 secure: false,
             },
+            // Routing status for API Gateway
             '/routing-status': {
-                target: process.env.API_GATEWAY_URL || 'http://host.docker.internal:8000',
+                target: process.env.API_GATEWAY_URL || 'http://localhost:8000',
                 changeOrigin: true,
                 secure: false,
             },

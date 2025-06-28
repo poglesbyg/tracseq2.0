@@ -1,6 +1,6 @@
 ---
-description: 
-globs: *.yml
+description: Docker and containerization guide for laboratory management system microservices
+globs: **/*.yml,**/*.yaml,**/Dockerfile*,**/docker-compose*
 alwaysApply: false
 ---
 # Docker Development and Deployment Guide for Laboratory Management System

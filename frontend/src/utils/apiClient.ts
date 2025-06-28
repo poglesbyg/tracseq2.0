@@ -133,7 +133,7 @@ class EnhancedApiClient {
     const isNetworkError = !error.response;
     const isServerError = status && status >= 500 && status < 600;
     const isRetryableClientError = status === 408 || status === 429; // Timeout or Too Many Requests
-    const responseData = error.response?.data as any;
+    const responseData = error.response?.data as Record<string, unknown>;
     const isRetryableResponse = responseData?.retryable === true;
 
     return isNetworkError || isServerError || isRetryableClientError || isRetryableResponse;
@@ -154,10 +154,10 @@ class EnhancedApiClient {
 
   private formatError(error: AxiosError): ApiError {
     const status = error.response?.status;
-    const data = error.response?.data as any;
+    const data = error.response?.data as Record<string, unknown>;
 
-    if (data?.error) {
-      return data.error;
+    if (data?.error && typeof data.error === 'object') {
+      return data.error as ApiError;
     }
 
     return {
@@ -192,8 +192,8 @@ class EnhancedApiClient {
   }
 
   private getErrorMessage(error: AxiosError): string {
-    const data = error.response?.data as any;
-    return data?.message || error.message || 'An unexpected error occurred';
+    const data = error.response?.data as Record<string, unknown>;
+    return (typeof data?.message === 'string' ? data.message : null) || error.message || 'An unexpected error occurred';
   }
 
   private getErrorSeverity(status?: number): 'Low' | 'Medium' | 'High' | 'Critical' {
@@ -262,7 +262,8 @@ class EnhancedApiClient {
 
 // Configuration based on environment
 const getApiConfig = () => {
-  const isDev = (import.meta as any).env?.MODE === 'development' || (import.meta as any).env?.DEV;
+  const metaEnv = (import.meta as { env: Record<string, string | boolean | undefined> }).env;
+  const isDev = metaEnv.MODE === 'development' || metaEnv.DEV;
   return {
     baseUrl: isDev ? 'http://localhost:8089/api' : '/api',
     timeout: 30000,

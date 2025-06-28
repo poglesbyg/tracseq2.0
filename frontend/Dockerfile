@@ -1,37 +1,35 @@
-# Multi-stage build for production optimization
+# Build stage
 FROM node:18-alpine AS build
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
+# Copy package files first for better caching
+COPY package.json ./
 
 # Install dependencies
-RUN npm install -g pnpm && pnpm install --frozen-lockfile
+RUN npm install
 
-# Copy source code
-COPY . .
+# Copy only necessary source files
+COPY src/ ./src/
+COPY public/ ./public/
+COPY *.config.* ./
+COPY *.json ./
+COPY index.html ./
 
-# Build for production
-RUN pnpm build
+# Build the application
+RUN npm run build
 
-# Production stage
+# Production stage with nginx
 FROM nginx:1.25-alpine AS production
 
-# Copy custom nginx configuration
+# Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Copy built application
+# Copy built application from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Add healthcheck script
-RUN echo '#!/bin/sh\ncurl -f http://localhost:80/health || exit 1' > /healthcheck.sh && \
-    chmod +x /healthcheck.sh
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD /healthcheck.sh
+# Health check endpoint
+RUN echo '<!DOCTYPE html><html><body><h1>OK</h1></body></html>' > /usr/share/nginx/html/health
 
 # Expose port
 EXPOSE 80

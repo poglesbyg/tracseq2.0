@@ -1,6 +1,6 @@
 ---
-description: 
-globs: *.rs,*.toml
+description: Comprehensive Rust development guide for laboratory management microservices architecture
+globs: **/*.rs,**/*.toml,**/Cargo.toml
 alwaysApply: false
 ---
 # Rust Development Guide for Laboratory Management System
