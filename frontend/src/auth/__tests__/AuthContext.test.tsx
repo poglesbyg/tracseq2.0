@@ -4,6 +4,9 @@ import { AuthProvider, useAuth } from '..';
 // Mock axios
 jest.mock('axios');
 
+// Mock fetch globally
+global.fetch = jest.fn();
+
 // Test component to use AuthContext
 const TestAuthComponent = () => {
   const { user, isAuthenticated, login, logout, isLoading } = useAuth();
@@ -24,6 +27,24 @@ describe('AuthContext', () => {
     jest.clearAllMocks();
     // Clear localStorage
     localStorage.clear();
+    
+    // Reset fetch mock
+    (global.fetch as jest.Mock).mockReset();
+    // Default successful login response
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          user: {
+            id: '1',
+            email: 'test@example.com',
+            name: 'Test User',
+            role: 'lab_technician'
+          },
+          token: 'mock-token'
+        }
+      })
+    });
   });
 
   const renderWithAuthProvider = () => {
