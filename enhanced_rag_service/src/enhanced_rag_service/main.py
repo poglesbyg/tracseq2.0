@@ -107,12 +107,11 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    logger.info("🚀 Starting Enhanced RAG Service", host="0.0.0.0", port=8086)
+    logger.info("🚀 Starting Enhanced RAG Service", host="0.0.0.0", port=8000)
     
     uvicorn.run(
-        "enhanced_rag_service.main:app",
+        app,
         host="0.0.0.0",
-        port=8086,
-        reload=True,
+        port=8000,
         log_config=None,
     )
