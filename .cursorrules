@@ -10,61 +10,62 @@
 - Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
 
 
-The TracSeq 2.0 laboratory management system implements specialized business logic across several core domains:
+The TracSeq 2.0 laboratory management system implements domain-specific business logic across several key components:
 
-### Laboratory Sample Processing
-Core functionality resides in the laboratory submission and processing workflows:
-- Multi-stage sample validation with confidence scoring
-- Automated document extraction with laboratory-specific RAG processing
-- Template-based sample creation with quality control gates
-- Chain of custody tracking for regulatory compliance
+## RAG Laboratory Document Processing
 
-File paths:
-- `lab_submission_rag/rag_orchestrator.py`
-- `lab_submission_rag/models/submission.py`
+### Document Analysis Engine
+- Specialized extraction of laboratory information using AI models
+- Document validation and confidence scoring for lab submissions
+- Integration with local and cloud LLM providers
+- Files: `lab_submission_rag/rag_orchestrator.py`, `lab_submission_rag/simple_lab_rag.py`
 
-### Enhanced Storage Management 
-Specialized storage system for laboratory environments:
-- Temperature-controlled zone management (-80°C to 37°C)
+### Laboratory Submission Workflow
+- Sample tracking and metadata management
+- Chain of custody for sample movement
+- Quality control validation rules
+- Files: `enhanced_storage_service/src/services.rs`, `lab_submission_rag/models/submission.py`
+
+## Storage Management System
+
+### Intelligent Storage Allocation
+- Temperature zone management (-80°C, -20°C, 4°C, RT, 37°C)
+- Capacity optimization and predictive analytics
 - IoT sensor integration for environmental monitoring
-- AI-driven storage optimization and predictive maintenance
-- Digital twin modeling for capacity planning
+- Files: `enhanced_storage_service/src/handlers/storage.rs`
 
-File paths:
-- `enhanced_storage_service/src/handlers/storage.rs`
-- `enhanced_storage_service/src/ai/predictive_maintenance.rs`
+### Digital Twin Technology
+- Virtual modeling of storage environments
+- Simulation-based optimization
+- Real-time synchronization with physical storage
+- Files: `enhanced_storage_service/src/handlers/digital_twin.rs`
 
-### Laboratory Workflows
-Domain-specific workflow implementation:
-- Sample lifecycle state management 
-- Quality control validation gates
-- Sequencing job orchestration
-- Laboratory document processing pipeline
+## MLOps Pipeline
 
-File paths:
-- `lab_manager/src/workflows/sample_workflow.rs`
-- `lab_manager/src/services/qc_validation.rs`
+### Model Management
+- Laboratory-specific model registry
+- A/B testing for extraction models
+- Continuous learning from new submissions
+- Files: `lab_submission_rag/mlops/model_registry.py`
 
-### AI/ML Integration
-Laboratory-specific AI implementations:
-- RAG system for document processing and information extraction
-- Computer vision for sample analysis
-- Predictive analytics for equipment maintenance
-- Anomaly detection for storage conditions
+### Experiment Tracking
+- Custom metrics for laboratory data extraction
+- Performance monitoring and validation
+- Files: `lab_submission_rag/mlops/experiment_tracker.py`
 
-File paths:
-- `lab_submission_rag/rag/document_processor.py`
-- `enhanced_storage_service/src/ai/computer_vision.rs`
+## Enterprise Integration
 
-### Laboratory Notifications
-Domain-specific notification orchestration:
-- Multi-channel delivery based on alert severity
-- Role-based notification routing
-- Equipment and process-specific alerts
-- Compliance-aware delivery tracking
+### Notification Service
+- Multi-channel laboratory alerts
+- Priority-based message routing
+- Template management for notifications
+- Files: `notification_service/src/handlers/channels.rs`
 
-File paths:
-- `notification_service/src/services/notification_service.rs`
+### Event Service
+- Laboratory-specific event handling
+- Real-time processing capabilities
+- Redis-based message broker integration
+- Files: `event_service/src/events/handlers.rs`
 
 $END$
 

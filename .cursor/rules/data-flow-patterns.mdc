@@ -1,6 +1,6 @@
 ---
-description: Documents data flow patterns in lab submission processing including document pipelines, RAG orchestration, and information extraction workflows.
-globs: **/data_flow/**,**/pipeline/**,**/rag/**,**/extraction/**,**/workflow/**
+description: Specifies data flow patterns, document processing pipelines, RAG orchestration, and information extraction workflows
+globs: */rag/*,*/mlops/*,*/data/*,*/pipeline/*,*/extraction/*,*/flow/*
 alwaysApply: false
 ---
 
@@ -9,59 +9,49 @@ alwaysApply: false
 
 ## Document Processing Pipeline
 
-### Sample Submission Flow
-- Document uploaded through web interface
-- Text extracted and chunked by DocumentProcessor
-- Chunks vectorized and stored in ChromaDB
-- LLM extracts structured information using category-specific prompts
-- Results validated against confidence thresholds
-- Submission created in database if extraction succeeds
+1. **Document Ingestion Flow**
+- PDF, DOCX, and TXT documents are processed through the `DocumentProcessor` class
+- Each document is chunked using intelligent text segmentation specific to laboratory documents
+- Document chunks are embedded and stored in a vector database (ChromaDB) for semantic search
+- Metadata about processed documents is tracked for audit and retrieval
 
-### RAG Query Processing
-- Natural language query received from frontend
-- Similar document chunks retrieved from vector store
-- Context assembled from relevant chunks
-- LLM generates response using context
-- Response returned with confidence score and sources
+2. **Information Extraction Pipeline**
+- A language model (local Ollama or cloud provider) extracts structured information from documents
+- Extracts administrative info, sample details, and sequencing requirements 
+- Information is validated against laboratory-specific schemas
+- Confidence scores are calculated for extracted information
 
-### Information Extraction Workflow
-- Seven categories of lab information extracted:
-  - Administrative details
-  - Sample information
-  - Storage requirements
-  - Sequencing specifications
-  - Pooling data
-  - Quality control
-  - Analysis requirements
-- Each category has custom validation rules
-- Confidence scoring per category
+3. **RAG Orchestration**
+- Query handling routes natural language questions to relevant document chunks
+- Context assembly combines retrieved chunks with submission data
+- LLM generates responses based on assembled context
+- Response validation ensures quality and relevance
 
-### Batch Processing Pattern
-- Multiple documents processed concurrently
-- Progress tracked per document
-- Aggregate metrics calculated:
-  - Success rate
-  - Average confidence
-  - Processing time
-- Failed documents flagged for review
+4. **RAG Enhancements**
+- Context management maintains conversational state
+- Lab-specific knowledge integration improves response quality
+- Custom prompts guide document extraction and query responses
+- Fallback mechanisms ensure system availability
 
-### Chain of Custody Flow
-- Sample movements tracked through storage system
-- Temperature zone transitions logged
-- Location history maintained
-- Handling events recorded with timestamps
+5. **MLOps Integration**
+- Experiment tracking for model performance monitoring
+- A/B testing compares model versions
+- Continuous learning pipeline updates models with new data
+- Model registry manages different model versions
 
-### Quality Control Pipeline
-- Sample quality metrics extracted
-- QC thresholds validated
-- Results logged with confidence scores
-- Failed QC triggers notifications
+6. **Data Validation Workflow** 
+- Schema validation ensures data completeness
+- Custom validation rules for laboratory data
+- Quality checks on extracted information
+- Confidence thresholds for data acceptance
 
-Key Files:
-- `lab_submission_rag/rag_orchestrator.py`
-- `lab_submission_rag/document_processor.py`
-- `lab_submission_rag/quality_control.py`
-- `enhanced_storage_service/storage_tracking.rs`
+## Key Files
+- `lab_submission_rag/core/document_processor.py`
+- `lab_submission_rag/rag/llm_interface.py`
+- `lab_submission_rag/rag/vector_store.py`
+- `lab_submission_rag/mlops/experiment_tracker.py`
+- `lab_submission_rag/mlops/continuous_learning.py`
+- `lab_submission_rag/core/validation.py`
 
 $END$
 

@@ -1,50 +1,49 @@
 ---
-description: Analyzing LLM integration patterns, prompt engineering, and RAG implementation in laboratory management systems
-globs: **/llm-integration.*,**/rag/*.*,**/*rag*.*,**/ai/*.*,**/models/*.*,**/prompts/*.*
+description: Specifications for LLM integration patterns, prompt engineering, conversation context management, and enhanced response generation algorithms
+globs: 
 alwaysApply: false
 ---
 
 
 # llm-integration
 
-## RAG System Architecture
+## LLM Integration Architecture
 
-### Laboratory Document Processing
-- **Custom Prompt Engineering**: Specialized prompts for extracting laboratory metadata, sample information, and sequencing requirements from scientific documents
-- **Context Management**: Laboratory-aware context building using domain-specific chunking and relevance scoring
-- **Query Processing**: Natural language query handling tailored for laboratory operations and sample management workflows
+### Core LLM Integration Components
+- **Local LLM Support**: Prioritizes Ollama for local LLM operations with configurable model preferences
+- **Cloud LLM Fallback**: Implements fallback to OpenAI/Anthropic when local LLM unavailable 
+- **Enhanced Prompt Management**: Specialized prompts for laboratory document extraction and query processing
+- **Context Management**: Maintains conversation history and relevant document chunks
+- **Response Generation**: AI-powered responses incorporating domain knowledge and context
 
-### Multi-Model Integration
-- **Model Selection Logic**: Intelligent routing between local Ollama models and cloud APIs based on task complexity and confidence requirements
-- **Fallback Handling**: Graceful degradation with simulated responses when LLM services are unavailable
-- **Confidence Scoring**: Domain-specific scoring system for extraction quality and response reliability
+### Intelligent Document Processing
+- **Multi-Format Support**: Processes PDF, DOCX, TXT with format-specific extraction
+- **Chunking Logic**: Smart document chunking for optimal LLM processing
+- **Information Extraction**: Structured data extraction for laboratory submissions
+- **Confidence Scoring**: LLM confidence assessment for extracted information
 
-### Laboratory Information Extraction
-- **Field Validation**: Laboratory-specific validation rules for extracted metadata fields
-- **Data Transformation**: Custom mapping of extracted information to laboratory management schema
-- **Quality Assessment**: Multi-factor quality scoring incorporating domain knowledge and data completeness
+### Query Processing System
+- **Natural Language Understanding**: Processes domain-specific laboratory queries
+- **Context Enhancement**: Incorporates relevant document chunks and conversation history
+- **Response Generation**: Produces detailed, context-aware responses for laboratory queries
+- **Query Classification**: Routes queries to appropriate processing pipelines
 
-### Enhanced Response Generation
-- **Laboratory Knowledge Base**: Integration of domain-specific knowledge for enhancing responses
-- **Workflow Awareness**: Response generation incorporating laboratory protocols and procedures
-- **Quality Control**: Domain-specific validation of generated responses against laboratory standards
+### MLOps Integration
+- **Model Registry**: Manages multiple LLM models and versions
+- **Performance Monitoring**: Tracks LLM performance metrics and confidence scores
+- **Continuous Learning**: Updates models based on new data and feedback
+- **A/B Testing**: Compares LLM model performance in production
 
-### Vector Store Management
-- **Laboratory Document Indexing**: Specialized indexing strategies for scientific documents
-- **Semantic Search**: Domain-aware similarity search incorporating laboratory terminology
-- **Version Control**: Document versioning system aligned with laboratory requirements
-
-File Paths:
+### File Paths
 ```
 lab_submission_rag/
-  ├── core/
-  │   ├── llm_interface.py
-  │   └── vector_store.py
-  ├── rag/
-  │   ├── document_processor.py
-  │   └── prompt_templates.py
-  └── models/
-      └── extraction_models.py
+  - rag/llm_interface.py
+  - rag/enhanced_llm_interface.py
+  - mlops/experiment_tracker.py
+  - mlops/model_registry.py
+enhanced_storage_service/src/ai/
+  - nlp_interface.rs
+  - inference.rs
 ```
 
 $END$

@@ -1,67 +1,65 @@
 ---
-description: Technical specification for RAG algorithms implementation including document processing, embedding, and search functionality.
-globs: **/rag/**/*.{py,rs},**/lab_submission_rag/**/*.py,**/enhanced_storage_service/src/ai/*.rs
+description: Specifies RAG algorithms, document processing, vector embeddings, and AI-driven information extraction for laboratory submissions.
+globs: **/rag/**,**/rag_service/**,**/*rag*.{py,rs},**/mlops/**
 alwaysApply: false
 ---
 
 
 # rag-algorithms
 
-## Core RAG Pipeline Components
+The RAG system implements specialized algorithms for processing laboratory documents and extracting structured information through several key components:
 
-### Document Processing Engine
-- Specialized chunking strategy for laboratory documents optimized for:
-  - Sample information sections
-  - Protocol details 
-  - Analysis requirements
-  - Technical specifications
-- Custom validation rules for laboratory document types (PDF, DOCX, TXT)
-- Metadata extraction focused on laboratory-relevant fields
+### Document Processing Pipeline
+- Extracts text from PDF, DOCX, and TXT files using format-specific extractors
+- Chunks documents based on laboratory domain knowledge using a `RecursiveCharacterTextSplitter`
+- Maintains document metadata including file path, page numbers, and chunk indices
+- Assigns unique identifiers based on file stem, page number, and chunk position
 
-### Information Extraction System
-- Domain-specific prompt engineering for laboratory data extraction:
-  - Administrative details (submitter, department, PI)
-  - Sample characteristics (type, volume, concentration)
-  - Storage requirements (temperature, container type)
-  - Processing protocols
-  - Analysis specifications
-- Confidence scoring mechanism for extracted information
+### Information Extraction
+- Uses LLM prompting to extract structured data from documents, focusing on laboratory-specific fields:
+  - Administrative information (submitter details, project info)
+  - Sample information (type, quantity, conditions)
+  - Sequencing requirements (platform, read length)
+  - Storage specifications (temperature, container type)
+- Assigns confidence scores to extracted information
+- Falls back to template-based extraction for standard forms
 
-### Vector Store Integration
-- Laboratory document embedding strategy:
-  - Document-chunk relationship preservation
-  - Metadata-aware similarity search
-  - Laboratory context retention
-- Specialized retrieval mechanism with:
-  - Category-based filtering
-  - Confidence thresholding
-  - Context aggregation for laboratory specifics
+### Vector Store Implementation
+- Uses ChromaDB for storing document embeddings
+- Generates embeddings using SentenceTransformer with 'all-MiniLM-L6-v2' model
+- Implements similarity search with configurable thresholds
+- Maintains metadata about embeddings including model version and timestamp
 
-### Query Processing Engine 
-- Laboratory-specific query understanding:
-  - Sample lookup patterns
-  - Protocol matching
-  - Requirements validation
-  - Storage condition verification
-- Enhanced context building with:
-  - Metadata enrichment
-  - Laboratory terminology expansion
-  - Domain-specific relevance scoring
+### Query Processing
+- Processes natural language queries about laboratory submissions
+- Uses vector similarity to retrieve relevant context chunks
+- Enhances responses with structured data from database
+- Provides confidence scores for responses
 
-File Paths:
+### MLOps Pipeline Integration
+- Tracks RAG model performance metrics
+- Implements A/B testing for extraction algorithms
+- Supports continuous learning from user feedback
+- Monitors extraction quality and confidence trends
+
+### Resilience Mechanisms
+- Implements retry logic for LLM calls
+- Provides fallback mechanisms between local and cloud LLMs
+- Caches extraction results to improve performance
+- Handles partial extraction results gracefully
+
+Relevant file paths:
 ```
-lab_submission_rag/rag/
-├── document_processor.py     # Document processing engine
-├── extractor.py             # Information extraction system
-├── vector_store.py          # Vector store integration
-└── query_processor.py       # Query processing engine
+lab_submission_rag/
+  rag/
+    document_processor.py
+    llm_interface.py 
+    vector_store.py
+  mlops/
+    experiment_tracker.py
+    model_registry.py
+    continuous_learning.py
 ```
-
-Key Business Rules:
-1. Document validation must ensure laboratory safety and compliance requirements
-2. Extraction confidence below 0.85 requires manual verification
-3. Vector similarity must account for laboratory protocol compatibility
-4. Query results must maintain sample chain of custody
 
 $END$
 

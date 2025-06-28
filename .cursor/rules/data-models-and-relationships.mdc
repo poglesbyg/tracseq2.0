@@ -1,58 +1,110 @@
 ---
-description: For analyzing database schemas, data models, entity relationships, and business logic around data structures in laboratory management systems.
-globs: *.rs,*.py,*/models/*,*/schemas/*,*/database/*,*/repositories/*
+description: Used for documenting data models, domain entities, and relationships within TracSeq 2.0's submission processing and laboratory management system.
+globs: lab_manager/**/*.rs,lab_submission_rag/**/*.py,auth_service/**/*.rs
 alwaysApply: false
 ---
 
 
 # data-models-and-relationships
 
-## Core Data Models
+## Core Data Models 
 
-### Laboratory Submission Models
-- **AdministrativeInfo**: Captures submitter details, project codes, and institutional affiliations
-- **SourceMaterial**: Defines sample material types, collection parameters, storage requirements
-- **PoolingInfo**: Manages sample pooling strategies and multiplexing configurations  
-- **SequenceGeneration**: Contains sequencing parameters, platform requirements, coverage targets
-- **ContainerInfo**: Tracks container specifications, volumes, concentrations
-- **InformaticsInfo**: Stores analysis pipeline requirements and parameters
-- **SampleDetails**: Maintains sample metadata, quality metrics, tracking IDs
+1. **Administrative Information Model**
+```python
+class AdministrativeInfo:
+    submitter_name: str
+    submitter_email: str  
+    submitter_phone: str
+    project_id: Optional[str]
+    department: Optional[str]
+```
 
-### Storage Management Models
-- **StorageLocation**: Manages temperature zones (-80°C, -20°C, 4°C, RT, 37°C), capacity tracking
-- **Sample**: Tracks sample movements, storage conditions, chain of custody
-- **IoTSensor**: Monitors environmental conditions with threshold alerts
-- **AutomationTask**: Orchestrates robotic sample handling operations
+2. **Source Material Model**
+```python
+class SourceMaterial:
+    material_type: str
+    collection_date: datetime
+    storage_conditions: str
+    quantity: float
+    unit: str
+```
 
-### Laboratory Workflow Models
-- **LabSubmission**: Parent record for complete submission workflow
-- **ExtractionResult**: Captures document extraction confidence and metadata
-- **QueryResult**: Stores natural language query responses with relevance scores
-- **DocumentChunk**: Manages segmented laboratory documents with vector embeddings
+3. **Pooling Information Model**  
+```python
+class PoolingInfo:
+    is_pooled: bool
+    pool_id: Optional[str]
+    barcode_sequence: Optional[str]
+    pooling_ratio: Optional[float]
+```
 
-### Quality Control Models
-- **ComplianceEvent**: Records regulatory compliance checks
-- **QualityMetric**: Tracks sample and process quality scores
-- **MaintenanceRecord**: Documents equipment calibration and service
+4. **Sequence Generation Model**
+```python
+class SequenceGeneration:
+    platform: str
+    read_length: int
+    paired_end: bool
+    target_coverage: float
+    library_prep_kit: Optional[str]
+```
 
-### Domain-Specific Validation Rules
-- Sample type compatibility with storage conditions
-- Temperature zone requirements validation
-- Material concentration and volume constraints
-- Pooling strategy validation for sequencing
-- Container capacity and compatibility checks
+5. **Container Information Model**
+```python
+class ContainerInfo:
+    container_type: str
+    volume: float
+    concentration: float 
+    buffer: str
+    storage_temp: float
+```
 
-### Relationship Constraints
-- Samples must have valid storage locations
-- Submissions require administrative and sample details
-- Quality metrics tied to samples and equipment
-- IoT sensors mapped to storage locations
+6. **Informatics Information Model**
+```python
+class InformaticsInfo:
+    analysis_type: str
+    reference_genome: str
+    pipeline_version: str
+    special_parameters: Optional[Dict]
+```
 
-File Paths:
-- `lab_submission_rag/models/submission.py`
-- `enhanced_storage_service/src/models.rs`
-- `qaqc_service/src/models/quality.rs`
-- `library_details_service/src/models/library.rs`
+7. **Sample Details Model**
+```python
+class SampleDetails:
+    sample_id: str
+    sample_type: str
+    organism: str
+    tissue_type: Optional[str]
+    quality_score: float
+    notes: Optional[str]
+```
+
+## Relationships
+
+1. **Laboratory Submission**
+- Links AdministrativeInfo (1-1)
+- Contains SourceMaterial (1-1)
+- Contains PoolingInfo (0-1) 
+- Links SequenceGeneration (1-1)
+- Contains ContainerInfo (1-1)
+- Contains InformaticsInfo (1-1)
+- Contains SampleDetails (1-n)
+
+2. **Storage Management**
+- ContainerInfo links to physical storage locations
+- Tracks temperature requirements from ContainerInfo
+- Maintains relationships between samples and storage units
+
+3. **Quality Control**
+- SampleDetails links to QC metrics
+- Tracks sample quality scores and validation status
+- Associates samples with QC reports
+
+## Key Files
+- `lab_submission_rag/models/submission.py`: Core submission models
+- `lab_submission_rag/models/database.py`: Database schema mappings
+- `lab_submission_rag/models/rag_models.py`: RAG-specific models
+- `lab_manager/src/models/sample.rs`: Sample tracking models
+- `lab_manager/src/models/storage.rs`: Storage relationship models
 
 $END$
 
