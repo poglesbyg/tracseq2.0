@@ -15,7 +15,7 @@ jest.mock('../../utils/axios', () => ({
 
 import Templates from '../Templates';
 // Import the mocked module
-import axios from '../../utils/axios';
+import axios from '../../utils/axios-fixed';
 
 // Mock template data
 const mockTemplates = [

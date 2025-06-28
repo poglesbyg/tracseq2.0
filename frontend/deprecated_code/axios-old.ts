@@ -1,21 +1,23 @@
 import axios from 'axios';
 
-// CACHE-BUSTING: New axios instance to fix double /api issue
-// This file replaces utils/axios.ts with correct Vite proxy configuration
+// Create axios instance with base configuration (using Vite proxy)
+// Vite proxy forwards /api/* to http://localhost:8089/api/*
+const baseURL = import.meta.env.VITE_API_BASE_URL || '';
+
+console.log('🔧 Axios baseURL (PROXY METHOD):', baseURL || 'Using Vite proxy');
+
 const api = axios.create({
-  baseURL: '', // Empty baseURL - let Vite proxy handle /api routing
+  baseURL: baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-console.log('🔧 FIXED Axios: Using Vite proxy (no baseURL)');
-
 // Request interceptor to add Authorization header
 api.interceptors.request.use(
   (config) => {
     const fullUrl = (config.baseURL || '') + (config.url || '');
-    console.log('📤 FIXED Axios request:', config.method?.toUpperCase(), fullUrl);
+    console.log('📤 Axios request:', config.method?.toUpperCase(), fullUrl);
     const token = localStorage.getItem('auth_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -23,7 +25,7 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    console.error('❌ FIXED Axios request error:', error);
+    console.error('❌ Axios request error:', error);
     return Promise.reject(error);
   }
 );
@@ -31,11 +33,11 @@ api.interceptors.request.use(
 // Response interceptor to handle common errors
 api.interceptors.response.use(
   (response) => {
-    console.log('📥 FIXED Axios response:', response.status, response.config.url);
+    console.log('📥 Axios response:', response.status, response.config.url);
     return response;
   },
   (error) => {
-    console.error('❌ FIXED Axios response error:', error.message, error.config?.url);
+    console.error('❌ Axios response error:', error.message, error.config?.url);
     if (error.response?.status === 401) {
       // Token expired or invalid - remove it and redirect to login
       localStorage.removeItem('auth_token');

@@ -33,8 +33,8 @@ const isDevelopment = (import.meta as { env: Record<string, string | boolean | u
 // Default configuration
 const defaultConfig: AppConfig = {
   api: {
-    gatewayUrl: isDevelopment ? 'http://localhost:8089' : '/api',
-    baseUrl: isDevelopment ? 'http://localhost:8089/api' : '/api',
+    gatewayUrl: '',
+    baseUrl: '',
     wsUrl: isDevelopment ? 'ws://localhost:8089/ws' : `ws://${typeof window !== 'undefined' ? window.location.host : 'localhost'}/ws`,
     timeout: 30000,
     retries: 3,

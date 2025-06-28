@@ -265,7 +265,7 @@ const getApiConfig = () => {
   const metaEnv = (import.meta as { env: Record<string, string | boolean | undefined> }).env;
   const isDev = metaEnv.MODE === 'development' || metaEnv.DEV;
   return {
-    baseUrl: isDev ? 'http://localhost:5173/api' : '/api',
+    baseUrl: '',
     timeout: 30000,
     retries: 3,
     retryDelay: 1000,

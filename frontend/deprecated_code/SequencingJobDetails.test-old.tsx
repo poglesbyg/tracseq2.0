@@ -15,7 +15,7 @@ jest.mock('../../utils/axios', () => ({
 }));
 
 // Import the mocked module
-import api from '../../utils/axios';
+import api from '../../utils/axios-fixed';
 
 // Mock data - Updated to match component interface
 const mockJob = {
