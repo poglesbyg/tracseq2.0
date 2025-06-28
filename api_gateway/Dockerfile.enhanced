@@ -1,0 +1,153 @@
+# Enhanced Production Dockerfile for TracSeq API Gateway
+# Multi-stage build with security hardening and optimizations
+
+ARG PYTHON_VERSION=3.11
+
+# Stage 1: Build dependencies
+FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    make \
+    libssl-dev \
+    libffi-dev \
+    libpq-dev \
+    git \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create build directory
+WORKDIR /build
+
+# Copy dependency files
+COPY pyproject.toml .
+COPY README.md .
+
+# Create virtual environment and install dependencies
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip and install build tools
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install dependencies
+RUN pip install --no-cache-dir -e .
+
+# Stage 2: Runtime image
+FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser -u 1000 appuser
+
+# Create application directory
+WORKDIR /app
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy application code
+COPY --chown=appuser:appuser . .
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/config && \
+    chown -R appuser:appuser /app
+
+# Security hardening
+RUN chmod -R 750 /app && \
+    find /app -type f -name "*.py" -exec chmod 640 {} \;
+
+# Switch to non-root user
+USER appuser
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONHASHSEED=random \
+    PYTHONPATH=/app/src:$PYTHONPATH \
+    # Optimization flags
+    PYTHONOPTIMIZE=1 \
+    # Security flags
+    PYTHONIOENCODING=utf-8
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Expose ports
+EXPOSE 8000 9090
+
+# Default command with production settings
+CMD ["uvicorn", "api_gateway.enhanced_main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--workers", "4", \
+     "--loop", "uvloop", \
+     "--access-log", \
+     "--log-config", "/app/config/logging.json"]
+
+# Stage 3: Development image (optional)
+FROM runtime AS development
+
+# Switch back to root for development tools
+USER root
+
+# Install development dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    vim \
+    less \
+    procps \
+    net-tools \
+    iputils-ping \
+    telnet \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install development Python packages
+RUN pip install --no-cache-dir \
+    ipython \
+    pytest \
+    pytest-asyncio \
+    pytest-cov \
+    black \
+    ruff \
+    mypy \
+    httpx[http2]
+
+# Switch back to appuser
+USER appuser
+
+# Development command with auto-reload
+CMD ["uvicorn", "api_gateway.enhanced_main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--reload", \
+     "--log-level", "debug"]
+
+# Stage 4: Testing image
+FROM runtime AS testing
+
+# Switch to root for test setup
+USER root
+
+# Install test dependencies
+COPY --chown=appuser:appuser tests/ /app/tests/
+RUN pip install --no-cache-dir pytest pytest-asyncio pytest-cov pytest-mock faker
+
+# Create test results directory
+RUN mkdir -p /app/test-results && chown appuser:appuser /app/test-results
+
+# Switch back to appuser
+USER appuser
+
+# Test command
+CMD ["pytest", "-v", "--cov=api_gateway", "--cov-report=html:/app/test-results/coverage", "tests/"]

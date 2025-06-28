@@ -4,63 +4,81 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tracseq-api-gateway"
-version = "0.1.0"
-description = "TracSeq 2.0 API Gateway - Intelligent routing and management for microservices"
-readme = "README-gateway.md"
-requires-python = ">=3.9"
-license = "MIT"
-keywords = ["api-gateway", "microservices", "routing", "tracseq", "laboratory"]
+version = "2.1.0"
+description = "Enhanced API Gateway for TracSeq 2.0 with production-grade features"
+readme = "README.md"
 authors = [
-  { name = "TracSeq Team", email = "dev@tracseq.com" },
+    { name = "TracSeq Team", email = "team@tracseq.com" }
 ]
-classifiers = [
-  "Development Status :: 4 - Beta",
-  "Programming Language :: Python",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: Implementation :: CPython",
-]
+requires-python = ">=3.9"
 
 dependencies = [
-  # Web Framework & API
-  "fastapi>=0.104.0",
-  "uvicorn>=0.24.0",
-  "pydantic>=2.4.0",
-  
-  # HTTP Client & Proxy
-  "httpx>=0.25.0",
-  "requests>=2.31.0",
-  
-  # Configuration & Environment
-  "python-dotenv>=1.0.0",
-  
-  # Utilities
-  "click>=8.1.0",
+    # Core web framework
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "uvloop>=0.19.0",
+    "httpx>=0.25.0",
+    "pydantic>=2.4.0",
+    "pydantic-settings>=2.0.0",
+    
+    # Enhanced features
+    "redis>=5.0.0",
+    "circuitbreaker>=2.0.0",
+    "PyJWT>=2.8.0",
+    "cryptography>=41.0.0",
+    
+    # Monitoring and observability
+    "prometheus-client>=0.19.0",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-sdk>=1.21.0",
+    "opentelemetry-instrumentation-fastapi>=0.43b0",
+    "opentelemetry-instrumentation-httpx>=0.43b0",
+    "opentelemetry-exporter-prometheus>=0.43b0",
+    "opentelemetry-exporter-jaeger>=1.21.0",
+    
+    # System monitoring
+    "psutil>=5.9.0",
+    "aiohttp>=3.9.0",
+    
+    # Logging and utilities
+    "structlog>=23.2.0",
+    "python-json-logger>=2.0.0",
+    "python-multipart>=0.0.6",
+    "python-dotenv>=1.0.0",
+    "tenacity>=8.2.0",
+    
+    # FastMCP integration
+    "fastmcp>=0.3.6",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "black>=23.10.0",
-  "ruff>=0.1.5",
-  "mypy>=1.7.0",
-  "pre-commit>=3.5.0",
-  "ipython>=8.16.0",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0",
+    "httpx[http2]>=0.25.0",
+    "black>=23.7.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.3.0",
+    "locust>=2.17.0",
+]
+
+test = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0",
+    "pytest-timeout>=2.1.0",
+    "pytest-xdist>=3.3.0",
+    "faker>=20.0.0",
+    "freezegun>=1.2.0",
 ]
 
 monitoring = [
-  # Advanced monitoring
-  "grafana-api>=1.0.3",
-  "elasticsearch>=8.10.0",
-  "kibana-api>=0.1.0",
-]
-
-enterprise = [
-  # Enterprise features
-  "cryptography>=41.0.7",
-  "boto3>=1.29.0",
-  "azure-identity>=1.15.0",
-  "google-cloud-storage>=2.10.0",
+    "grafana-api>=1.0.0",
+    "prometheus-api-client>=0.5.0",
 ]
 
 [project.urls]
@@ -120,64 +138,125 @@ all = [
 ]
 
 [tool.black]
-target-version = ["py39"]
 line-length = 88
-skip-string-normalization = true
+target-version = ["py39", "py310", "py311"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
 
 [tool.ruff]
-target-version = "py39"
 line-length = 88
-
-[tool.ruff.lint]
+target-version = "py39"
 select = [
-  "A",
-  "ARG", 
-  "B",
-  "C",
-  "DTZ",
-  "E",
-  "EM",
-  "F",
-  "FBT",
-  "I",
-  "ICN",
-  "ISC",
-  "N",
-  "PLC",
-  "PLE",
-  "PLR",
-  "PLW",
-  "Q",
-  "RUF",
-  "S",
-  "T",
-  "TID",
-  "UP",
-  "W",
-  "YTT",
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "C",    # flake8-comprehensions
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "PL",   # pylint
+    "RUF",  # ruff specific
 ]
 ignore = [
-  "B027",
-  "FBT003",
-  "S105", "S106", "S107",
-  "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
+    "E501",  # line too long
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+    "PLR0913", # too many arguments
 ]
-unfixable = [
-  "F401",
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
 ]
 
-[tool.ruff.lint.isort]
-known-first-party = ["api_gateway"]
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+strict_optional = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+show_error_codes = true
+namespace_packages = true
+exclude = [
+    "tests/",
+    "build/",
+    "dist/",
+]
 
-[tool.ruff.lint.per-file-ignores]
-"tests/**/*" = ["PLR2004", "S101", "TID252"]
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 88
+skip_gitignore = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+asyncio_mode = "auto"
+addopts = [
+    "--verbose",
+    "--strict-markers",
+    "--tb=short",
+    "--cov=api_gateway",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow tests",
+    "smoke: Smoke tests",
+]
 
 [tool.coverage.run]
-source_pkgs = ["api_gateway", "tests"]
-branch = true
-parallel = true
+source = ["src/api_gateway"]
 omit = [
-  "src/api_gateway/__about__.py",
+    "*/tests/*",
+    "*/test_*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstract",
 ]
 
 [tool.coverage.paths]
