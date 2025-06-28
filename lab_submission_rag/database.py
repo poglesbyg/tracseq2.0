@@ -9,8 +9,8 @@ from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from config import settings
-from models.database import Base
+from lab_submission_rag.config import settings
+from lab_submission_rag.models.database import Base
 
 logger = logging.getLogger(__name__)
 
