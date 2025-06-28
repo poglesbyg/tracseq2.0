@@ -91,7 +91,9 @@ services:
 
   # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile
     container_name: tracseq-enhanced-postgres
     ports:
       - "5433:5432"
