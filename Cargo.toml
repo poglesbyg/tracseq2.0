@@ -12,8 +12,11 @@ members = [
     "spreadsheet_versioning_service",
     # Phase 2 Services
     "qaqc_service",
-    "library_details_service"
-, "temp_auth_test"]
+    "library_details_service",
+    "temp_auth_test",
+    # Test utilities
+    "test-helpers"
+]
 exclude = [
     "circuit-breaker-lib",
     "config-service"
