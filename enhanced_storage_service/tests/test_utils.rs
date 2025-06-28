@@ -185,8 +185,8 @@ impl TestAppStateBuilder {
         let integration_hub = Arc::new(enhanced_storage_service::integrations::IntegrationHub::new(integration_config));
 
         Ok(AppState {
-            storage_service,
-            config,
+            storage_service: Arc::new(storage_service),
+            config: Arc::new(config),
             db_pool,
             ai_platform,
             integration_hub,

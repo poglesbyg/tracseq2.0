@@ -172,6 +172,7 @@ pub mod test_utils {
         let config = Config::test_config();
 
         let storage_service = EnhancedStorageService::new(db_pool.clone(), config.clone())
+            .await
             .expect("Failed to create storage service");
 
         let ai_platform = ai::AIPlatform::new(ai::AIConfig::default());

@@ -1,11 +1,9 @@
 use crate::{test_utils::*, fixtures::*};
 use axum::{
-    body::Body,
-    extract::{Path, Query, State},
+    body::{Body, to_bytes},
     http::{Request, StatusCode},
-    Json, Router,
 };
-use enhanced_storage_service::{create_app, AppState};
+use enhanced_storage_service::create_app;
 use tower::ServiceExt;
 use uuid::Uuid;
 
@@ -32,7 +30,7 @@ async fn test_complete_sample_lifecycle() {
     let response = app.clone().oneshot(create_location_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let location_response: enhanced_storage_service::models::ApiResponse<enhanced_storage_service::models::StorageLocation> 
         = serde_json::from_slice(&body).unwrap();
     let location = location_response.data.unwrap();
@@ -49,7 +47,7 @@ async fn test_complete_sample_lifecycle() {
     let response = app.clone().oneshot(store_sample_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let sample_response: enhanced_storage_service::models::ApiResponse<enhanced_storage_service::models::Sample> 
         = serde_json::from_slice(&body).unwrap();
     let sample = sample_response.data.unwrap();
@@ -77,7 +75,7 @@ async fn test_complete_sample_lifecycle() {
     let response = app.clone().oneshot(create_location2_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let location2_response: enhanced_storage_service::models::ApiResponse<enhanced_storage_service::models::StorageLocation> 
         = serde_json::from_slice(&body).unwrap();
     let location2 = location2_response.data.unwrap();
@@ -105,7 +103,7 @@ async fn test_complete_sample_lifecycle() {
     let response = app.clone().oneshot(retrieve_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let retrieved_response: enhanced_storage_service::models::ApiResponse<enhanced_storage_service::models::Sample> 
         = serde_json::from_slice(&body).unwrap();
     let retrieved_sample = retrieved_response.data.unwrap();
@@ -139,7 +137,7 @@ async fn test_iot_monitoring_workflow() {
     let response = app.clone().oneshot(create_location_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let location_response: enhanced_storage_service::models::ApiResponse<enhanced_storage_service::models::StorageLocation> 
         = serde_json::from_slice(&body).unwrap();
     let location = location_response.data.unwrap();
@@ -213,7 +211,7 @@ async fn test_capacity_management_workflow() {
     let response = app.clone().oneshot(create_location_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let location_response: enhanced_storage_service::models::ApiResponse<enhanced_storage_service::models::StorageLocation> 
         = serde_json::from_slice(&body).unwrap();
     let location = location_response.data.unwrap();
@@ -274,7 +272,7 @@ async fn test_capacity_management_workflow() {
     let response = app.clone().oneshot(final_capacity_request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let capacity_response: enhanced_storage_service::models::ApiResponse<enhanced_storage_service::handlers::storage::CapacityInfo> 
         = serde_json::from_slice(&body).unwrap();
     let capacity_info = capacity_response.data.unwrap();

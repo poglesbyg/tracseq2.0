@@ -1,0 +1,1535 @@
+   Compiling serde_derive v1.0.219
+   Compiling synstructure v0.13.2
+   Compiling zerovec-derive v0.11.1
+   Compiling displaydoc v0.2.5
+   Compiling tracing-attributes v0.1.30
+   Compiling thiserror-impl v2.0.12
+   Compiling tokio-macros v2.5.0
+   Compiling futures-macro v0.3.31
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.8.0
+   Compiling openssl-sys v0.9.109
+   Compiling ring v0.17.14
+    Checking futures-util v0.3.31
+   Compiling hashbrown v0.15.4
+    Checking tracing v0.1.41
+   Compiling thiserror v2.0.12
+   Compiling num-traits v0.2.19
+    Checking ahash v0.8.12
+   Compiling crunchy v0.2.4
+   Compiling zerocopy v0.8.26
+   Compiling socket2 v0.5.10
+   Compiling mio v1.0.4
+    Checking zerofrom v0.1.6
+    Checking yoke v0.8.0
+   Compiling utf8_iter v1.0.4
+    Checking zerovec v0.11.2
+    Checking zerotrie v0.2.2
+   Compiling percent-encoding v2.3.1
+    Checking tinyvec_macros v0.1.1
+    Checking untrusted v0.9.0
+   Compiling bytes v1.10.1
+   Compiling futures-sink v0.3.31
+    Checking cpufeatures v0.2.17
+   Compiling tinyvec v1.9.0
+    Checking tinystr v0.8.1
+    Checking potential_utf v0.1.2
+    Checking icu_locale_core v2.0.0
+    Checking icu_collections v2.0.0
+   Compiling ppv-lite86 v0.2.21
+    Checking serde v1.0.219
+   Compiling tokio v1.45.1
+    Checking icu_provider v2.0.0
+   Compiling form_urlencoded v1.2.1
+    Checking icu_properties v2.0.1
+   Compiling rustls-webpki v0.103.3
+   Compiling tiny-keccak v2.0.2
+    Checking hashbrown v0.14.5
+   Compiling concurrent-queue v2.5.0
+    Checking http-body v1.0.1
+   Compiling rustls v0.23.28
+   Compiling webpki-roots v1.0.1
+    Checking rand_core v0.6.4
+   Compiling tracing-core v0.1.34
+    Checking crossbeam-utils v0.8.21
+   Compiling ucd-trie v0.1.7
+   Compiling parking v2.2.1
+   Compiling futures-task v0.3.31
+    Checking httpdate v1.0.3
+   Compiling futures-io v0.3.31
+    Checking foreign-types-shared v0.1.1
+   Compiling log v0.4.27
+   Compiling slab v0.4.10
+   Compiling crc-catalog v2.4.0
+   Compiling ryu v1.0.20
+   Compiling iana-time-zone v0.1.63
+   Compiling syn v1.0.109
+   Compiling openssl v0.10.73
+   Compiling pin-utils v0.1.0
+   Compiling itoa v1.0.15
+   Compiling getrandom v0.3.3
+   Compiling chrono v0.4.41
+    Checking smallvec v1.15.1
+    Checking bitflags v2.9.1
+    Checking serde_json v1.0.140
+    Checking parking_lot_core v0.9.11
+    Checking icu_normalizer v2.0.0
+   Compiling crc v3.3.0
+    Checking parking_lot v0.12.4
+    Checking foreign-types v0.3.2
+   Compiling sha2 v0.10.9
+    Checking idna_adapter v1.2.1
+    Checking idna v1.0.3
+    Checking url v2.5.4
+   Compiling either v1.15.0
+   Compiling event-listener v5.4.0
+   Compiling futures-intrusive v0.5.0
+   Compiling pest v2.8.1
+   Compiling tokio-stream v0.1.17
+    Checking rand_chacha v0.3.1
+   Compiling webpki-roots v0.26.11
+   Compiling const-random-macro v0.1.16
+    Checking unicode-normalization v0.1.24
+   Compiling indexmap v2.10.0
+   Compiling hashlink v0.10.0
+   Compiling crossbeam-queue v0.3.12
+   Compiling hmac v0.12.1
+    Checking http v0.2.12
+   Compiling openssl-macros v0.1.1
+   Compiling proc-macro-error-attr v1.0.4
+    Checking base64 v0.22.1
+   Compiling native-tls v0.2.14
+    Checking unicode-bidi v0.3.18
+    Checking byteorder v1.5.0
+   Compiling unicode-properties v0.1.3
+   Compiling uuid v1.17.0
+    Checking tower-layer v0.3.3
+   Compiling hkdf v0.12.4
+   Compiling pest_meta v2.8.1
+    Checking const-random v0.1.18
+   Compiling stringprep v0.1.5
+   Compiling rand v0.8.5
+    Checking tokio-util v0.7.15
+   Compiling futures-channel v0.3.31
+   Compiling atoi v2.0.0
+   Compiling md-5 v0.10.6
+    Checking num-integer v0.1.46
+   Compiling aho-corasick v1.1.3
+   Compiling proc-macro-error v1.0.4
+    Checking try-lock v0.2.5
+    Checking base64 v0.21.7
+    Checking regex-syntax v0.8.5
+   Compiling home v0.5.11
+   Compiling sqlx-core v0.8.6
+   Compiling dotenvy v0.15.7
+   Compiling whoami v1.6.0
+   Compiling thiserror v1.0.69
+    Checking powerfmt v0.2.0
+   Compiling num-conv v0.1.0
+   Compiling time-core v0.1.4
+   Compiling hex v0.4.3
+    Checking openssl-probe v0.1.6
+   Compiling rustversion v1.0.21
+   Compiling time-macros v0.2.22
+    Checking deranged v0.4.0
+    Checking regex-automata v0.4.9
+    Checking want v0.3.1
+    Checking h2 v0.3.26
+   Compiling sqlx-postgres v0.8.6
+   Compiling pest_generator v2.8.1
+    Checking dlv-list v0.5.2
+    Checking http-body v0.4.6
+    Checking toml_datetime v0.6.11
+    Checking serde_spanned v0.6.9
+    Checking http-body-util v0.1.3
+   Compiling thiserror-impl v1.0.69
+   Compiling async-trait v0.1.88
+   Compiling matrixmultiply v0.3.10
+    Checking encoding_rs v0.8.35
+    Checking lazy_static v1.5.0
+    Checking mime v0.3.17
+    Checking toml_write v0.1.2
+    Checking regex-syntax v0.6.29
+   Compiling heck v0.5.0
+    Checking sync_wrapper v1.0.2
+    Checking winnow v0.7.11
+    Checking time v0.3.41
+    Checking hyper v0.14.32
+   Compiling regex v1.11.1
+    Checking regex-automata v0.1.10
+   Compiling sqlx-macros-core v0.8.6
+   Compiling pest_derive v2.8.1
+    Checking ordered-multimap v0.7.3
+    Checking toml_edit v0.22.27
+    Checking tokio-native-tls v0.3.1
+   Compiling validator_types v0.16.0
+    Checking num-bigint v0.4.6
+    Checking hyper v1.6.0
+    Checking serde_urlencoded v0.7.1
+    Checking hashlink v0.8.4
+    Checking sha1 v0.10.6
+    Checking rawpointer v0.2.1
+    Checking data-encoding v2.9.0
+    Checking arraydeque v0.5.1
+   Compiling anyhow v1.0.98
+    Checking minimal-lexical v0.2.1
+    Checking unicode-segmentation v1.12.0
+    Checking utf-8 v0.7.6
+   Compiling if_chain v1.0.2
+    Checking overload v0.1.1
+    Checking nu-ansi-term v0.46.0
+   Compiling validator_derive v0.16.0
+    Checking nom v7.1.3
+    Checking tungstenite v0.21.0
+    Checking toml v0.8.23
+    Checking convert_case v0.6.0
+    Checking simple_asn1 v0.6.3
+    Checking hyper-tls v0.5.0
+    Checking yaml-rust2 v0.8.1
+    Checking hyper-util v0.1.14
+    Checking axum-core v0.4.5
+    Checking json5 v0.4.1
+    Checking rust-ini v0.20.0
+    Checking matchers v0.1.0
+    Checking tower v0.5.2
+    Checking sharded-slab v0.1.7
+    Checking ron v0.8.1
+    Checking rustls-pemfile v1.0.4
+    Checking idna v0.4.0
+    Checking pem v3.0.5
+    Checking serde_path_to_error v0.1.17
+    Checking futures-executor v0.3.31
+    Checking num-complex v0.4.6
+    Checking tracing-log v0.2.0
+    Checking thread_local v1.1.9
+    Checking sync_wrapper v0.1.2
+    Checking pathdiff v0.2.3
+    Checking ipnet v2.11.0
+    Checking matchit v0.7.3
+    Checking config v0.14.1
+    Checking tracing-subscriber v0.3.19
+    Checking reqwest v0.11.27
+    Checking ndarray v0.15.6
+    Checking validator v0.16.1
+    Checking futures v0.3.31
+   Compiling sqlx-macros v0.8.6
+    Checking jsonwebtoken v9.3.1
+    Checking tokio-tungstenite v0.21.0
+    Checking tower-http v0.5.2
+    Checking tower v0.4.13
+    Checking fxhash v0.2.1
+    Checking dashmap v5.5.3
+    Checking base64ct v1.6.0
+    Checking axum v0.7.9
+    Checking fastrand v2.3.0
+    Checking sqlx v0.8.6
+    Checking enhanced_storage_service v0.1.0 (/workspace/enhanced_storage_service)
+warning: unused import: `serde_json::json`
+ --> src/ai/predictive_maintenance.rs:8:5
+  |
+8 | use serde_json::json;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `serde_json::json`
+ --> src/ai/intelligent_routing.rs:8:5
+  |
+8 | use serde_json::json;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> src/ai/intelligent_routing.rs:9:5
+  |
+9 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `TrainingData`
+  --> src/ai/models.rs:13:26
+   |
+13 | use crate::ai::{AIError, TrainingData};
+   |                          ^^^^^^^^^^^^
+
+warning: unused imports: `error` and `warn`
+ --> src/analytics.rs:4:21
+  |
+4 | use tracing::{info, warn, error};
+  |                     ^^^^  ^^^^^
+
+warning: unused import: `Prediction`
+  --> src/analytics.rs:11:57
+   |
+11 |     models::{CapacityPrediction, MaintenancePrediction, Prediction},
+   |                                                         ^^^^^^^^^^
+
+warning: unused import: `warn`
+ --> src/database.rs:3:21
+  |
+3 | use tracing::{info, warn};
+  |                     ^^^^
+
+warning: unused imports: `Deserialize` and `Serialize`
+ --> src/digital_twin.rs:3:13
+  |
+3 | use serde::{Deserialize, Serialize};
+  |             ^^^^^^^^^^^  ^^^^^^^^^
+
+warning: unused imports: `Path` and `http::StatusCode`
+ --> src/handlers/admin.rs:2:15
+  |
+2 |     extract::{Path, Query, State},
+  |               ^^^^
+3 |     http::StatusCode,
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `error`
+  --> src/handlers/admin.rs:10:21
+   |
+10 | use tracing::{info, error, warn};
+   |                     ^^^^^
+
+warning: unused import: `StorageError`
+  --> src/handlers/admin.rs:13:13
+   |
+13 |     error::{StorageError, StorageResult},
+   |             ^^^^^^^^^^^^
+
+warning: unused import: `http::StatusCode`
+  --> src/handlers/ai.rs:11:5
+   |
+11 |     http::StatusCode,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `warn`
+  --> src/handlers/ai.rs:18:28
+   |
+18 | use tracing::{info, error, warn};
+   |                            ^^^^
+
+warning: unused import: `AIPlatform`
+  --> src/handlers/ai.rs:21:10
+   |
+21 |     ai::{AIPlatform, AIInput, AIError},
+   |          ^^^^^^^^^^
+
+warning: unused imports: `Path` and `http::StatusCode`
+ --> src/handlers/analytics.rs:2:15
+  |
+2 |     extract::{Path, Query, State},
+  |               ^^^^
+3 |     http::StatusCode,
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `error`
+  --> src/handlers/analytics.rs:10:21
+   |
+10 | use tracing::{info, error};
+   |                     ^^^^^
+
+warning: unused import: `http::StatusCode`
+ --> src/handlers/automation.rs:3:5
+  |
+3 |     http::StatusCode,
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `error` and `warn`
+  --> src/handlers/automation.rs:10:21
+   |
+10 | use tracing::{info, error, warn};
+   |                     ^^^^^  ^^^^
+
+warning: unused import: `http::StatusCode`
+ --> src/handlers/blockchain.rs:3:5
+  |
+3 |     http::StatusCode,
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `error` and `warn`
+  --> src/handlers/blockchain.rs:10:21
+   |
+10 | use tracing::{info, error, warn};
+   |                     ^^^^^  ^^^^
+
+warning: unused import: `StorageError`
+  --> src/handlers/blockchain.rs:14:13
+   |
+14 |     error::{StorageError, StorageResult},
+   |             ^^^^^^^^^^^^
+
+warning: unused import: `http::StatusCode`
+ --> src/handlers/digital_twin.rs:3:5
+  |
+3 |     http::StatusCode,
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `error` and `warn`
+  --> src/handlers/digital_twin.rs:10:21
+   |
+10 | use tracing::{info, error, warn};
+   |                     ^^^^^  ^^^^
+
+warning: unused import: `http::StatusCode`
+ --> src/handlers/energy.rs:3:5
+  |
+3 |     http::StatusCode,
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `serde_json::json`
+ --> src/handlers/energy.rs:7:5
+  |
+7 | use serde_json::json;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `error` and `warn`
+  --> src/handlers/energy.rs:10:21
+   |
+10 | use tracing::{info, error, warn};
+   |                     ^^^^^  ^^^^
+
+warning: unused import: `error`
+ --> src/handlers/health.rs:4:21
+  |
+4 | use tracing::{info, error};
+  |                     ^^^^^
+
+warning: unused import: `http::StatusCode`
+  --> src/handlers/integrations.rs:12:5
+   |
+12 |     http::StatusCode,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `error` and `warn`
+  --> src/handlers/integrations.rs:19:21
+   |
+19 | use tracing::{info, error, warn};
+   |                     ^^^^^  ^^^^
+
+warning: unused imports: `IntegrationError`, `IntegrationHub`, and `StorageError`
+  --> src/handlers/integrations.rs:22:20
+   |
+22 |     integrations::{IntegrationHub, IntegrationError},
+   |                    ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^
+23 |     error::{StorageError, StorageResult},
+   |             ^^^^^^^^^^^^
+
+warning: unused import: `http::StatusCode`
+ --> src/handlers/iot.rs:3:5
+  |
+3 |     http::StatusCode,
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `Duration`
+ --> src/handlers/iot.rs:9:29
+  |
+9 | use chrono::{DateTime, Utc, Duration};
+  |                             ^^^^^^^^
+
+warning: unused imports: `error` and `warn`
+  --> src/handlers/iot.rs:10:21
+   |
+10 | use tracing::{info, error, warn};
+   |                     ^^^^^  ^^^^
+
+warning: unused import: `http::StatusCode`
+ --> src/handlers/mobile.rs:3:5
+  |
+3 |     http::StatusCode,
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `error` and `warn`
+  --> src/handlers/mobile.rs:10:21
+   |
+10 | use tracing::{info, error, warn};
+   |                     ^^^^^  ^^^^
+
+warning: unused import: `StorageError`
+  --> src/handlers/mobile.rs:13:13
+   |
+13 |     error::{StorageError, StorageResult},
+   |             ^^^^^^^^^^^^
+
+warning: unused import: `http::StatusCode`
+ --> src/handlers/storage.rs:3:5
+  |
+3 |     http::StatusCode,
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `error`
+ --> src/handlers/storage.rs:7:21
+  |
+7 | use tracing::{info, error};
+  |                     ^^^^^
+
+warning: unused imports: `error` and `warn`
+ --> src/iot.rs:5:21
+  |
+5 | use tracing::{info, warn, error};
+  |                     ^^^^  ^^^^^
+
+warning: unused imports: `IoTSensor` and `SensorData`
+  --> src/iot.rs:11:14
+   |
+11 |     models::{IoTSensor, SensorData, SensorReading, Alert},
+   |              ^^^^^^^^^  ^^^^^^^^^^
+
+warning: unused import: `warn`
+  --> src/services.rs:10:21
+   |
+10 | use tracing::{info, warn, error};
+   |                     ^^^^
+
+warning: unused variable: `data`
+   --> src/ai/mod.rs:154:53
+    |
+154 |     pub async fn train(&mut self, model_name: &str, data: &TrainingData) -> Result<(), AIError> {
+    |                                                     ^^^^ help: if this is intentional, prefix it with an underscore: `_data`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `historical_data`
+  --> src/analytics.rs:84:13
+   |
+84 |         let historical_data = self.get_historical_capacity_data(location_id).await?;
+   |             ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_historical_data`
+
+warning: unused variable: `location_id`
+   --> src/analytics.rs:248:50
+    |
+248 |     async fn get_historical_capacity_data(&self, location_id: Uuid) -> StorageResult<Vec<(DateTime<Utc>, f64)>> {
+    |                                                  ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_location_id`
+
+warning: unused variable: `health_data`
+   --> src/analytics.rs:115:13
+    |
+115 |         let health_data = self.get_equipment_health_data(equipment_id).await?;
+    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_health_data`
+
+warning: unused variable: `equipment_id`
+   --> src/analytics.rs:258:47
+    |
+258 |     async fn get_equipment_health_data(&self, equipment_id: &str) -> StorageResult<serde_json::Value> {
+    |                                               ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_equipment_id`
+
+warning: unused variable: `task_type`
+  --> src/automation.rs:16:39
+   |
+16 |     pub async fn schedule_task(&self, task_type: &str) -> StorageResult<String> {
+   |                                       ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_task_type`
+
+warning: unused variable: `data`
+  --> src/blockchain.rs:15:44
+   |
+15 |     pub async fn create_transaction(&self, data: &str) -> StorageResult<String> {
+   |                                            ^^^^ help: if this is intentional, prefix it with an underscore: `_data`
+
+warning: unused variable: `entity_id`
+  --> src/digital_twin.rs:23:37
+   |
+23 |     pub async fn create_twin(&self, entity_id: Uuid, entity_type: &str) -> StorageResult<String> {
+   |                                     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_entity_id`
+
+warning: unused variable: `entity_type`
+  --> src/digital_twin.rs:23:54
+   |
+23 |     pub async fn create_twin(&self, entity_id: Uuid, entity_type: &str) -> StorageResult<String> {
+   |                                                      ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_entity_type`
+
+warning: unused variable: `scenario`
+  --> src/digital_twin.rs:27:40
+   |
+27 |     pub async fn run_simulation(&self, scenario: &str) -> StorageResult<String> {
+   |                                        ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_scenario`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:353:37
+    |
+353 | async fn get_storage_location_count(state: &AppState) -> StorageResult<i32> {
+    |                                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:358:33
+    |
+358 | async fn get_total_sample_count(state: &AppState) -> StorageResult<i32> {
+    |                                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:363:34
+    |
+363 | async fn get_active_sensor_count(state: &AppState) -> StorageResult<i32> {
+    |                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:368:34
+    |
+368 | async fn get_pending_alert_count(state: &AppState) -> StorageResult<i32> {
+    |                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:373:40
+    |
+373 | async fn calculate_system_health_score(state: &AppState) -> StorageResult<f64> {
+    |                                        ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:378:31
+    |
+378 | async fn get_last_backup_time(state: &AppState) -> StorageResult<Option<DateTime<Utc>>> {
+    |                               ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+  --> src/handlers/admin.rs:47:11
+   |
+47 |     State(state): State<AppState>,
+   |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:400:32
+    |
+400 | async fn reset_sensor_readings(state: &AppState, older_than_days: Option<i32>) -> StorageResult<i32> {
+    |                                ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `older_than_days`
+   --> src/handlers/admin.rs:400:50
+    |
+400 | async fn reset_sensor_readings(state: &AppState, older_than_days: Option<i32>) -> StorageResult<i32> {
+    |                                                  ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_older_than_days`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:405:34
+    |
+405 | async fn reset_analytics_reports(state: &AppState, older_than_days: Option<i32>) -> StorageResult<i32> {
+    |                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `older_than_days`
+   --> src/handlers/admin.rs:405:52
+    |
+405 | async fn reset_analytics_reports(state: &AppState, older_than_days: Option<i32>) -> StorageResult<i32> {
+    |                                                    ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_older_than_days`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:410:36
+    |
+410 | async fn reset_performance_metrics(state: &AppState, older_than_days: Option<i32>) -> StorageResult<i32> {
+    |                                    ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `older_than_days`
+   --> src/handlers/admin.rs:410:54
+    |
+410 | async fn reset_performance_metrics(state: &AppState, older_than_days: Option<i32>) -> StorageResult<i32> {
+    |                                                      ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_older_than_days`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:415:30
+    |
+415 | async fn reset_alert_history(state: &AppState, older_than_days: Option<i32>) -> StorageResult<i32> {
+    |                              ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `older_than_days`
+   --> src/handlers/admin.rs:415:48
+    |
+415 | async fn reset_alert_history(state: &AppState, older_than_days: Option<i32>) -> StorageResult<i32> {
+    |                                                ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_older_than_days`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:106:11
+    |
+106 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:132:11
+    |
+132 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:168:11
+    |
+168 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `hours_back`
+   --> src/handlers/admin.rs:175:9
+    |
+175 |     let hours_back = query.hours_back.unwrap_or(24);
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_hours_back`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:448:34
+    |
+448 | async fn estimate_export_records(state: &AppState, request: &ExportRequest) -> StorageResult<i32> {
+    |                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:242:11
+    |
+242 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:289:11
+    |
+289 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/admin.rs:320:11
+    |
+320 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+  --> src/handlers/ai.rs:30:11
+   |
+30 |     State(state): State<AppState>,
+   |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/ai.rs:190:11
+    |
+190 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/ai.rs:258:11
+    |
+258 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/ai.rs:289:11
+    |
+289 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/ai.rs:353:11
+    |
+353 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/ai.rs:385:11
+    |
+385 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/analytics.rs:546:5
+    |
+546 |     state: &AppState,
+    |     ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/analytics.rs:564:5
+    |
+564 |     state: &AppState,
+    |     ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/analytics.rs:579:5
+    |
+579 |     state: &AppState,
+    |     ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `request`
+   --> src/handlers/analytics.rs:495:5
+    |
+495 |     request: &AnalyticsReportRequest,
+    |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_request`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:330:41
+    |
+330 | async fn validate_sample_for_automation(state: &AppState, sample_id: Uuid) -> StorageResult<()> {
+    |                                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:342:32
+    |
+342 | async fn queue_automation_task(state: &AppState, task: &AutomationTask) -> StorageResult<()> {
+    |                                ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:336:40
+    |
+336 | async fn validate_sample_for_retrieval(state: &AppState, sample_id: Uuid) -> StorageResult<()> {
+    |                                        ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:348:28
+    |
+348 | async fn get_robot_details(state: &AppState, robot_id: &str) -> StorageResult<RobotStatus> {
+    |                            ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:373:31
+    |
+373 | async fn get_available_robots(state: &AppState, query: &RobotListQuery) -> StorageResult<PaginatedResponse<RobotStatus>> {
+    |                               ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:408:38
+    |
+408 | async fn execute_calibration_command(state: &AppState, robot_id: &str, request: &RobotCommandRequest) -> StorageResult<RobotCommandRespon...
+    |                                      ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:421:31
+    |
+421 | async fn execute_home_command(state: &AppState, robot_id: &str, request: &RobotCommandRequest) -> StorageResult<RobotCommandResponse> {
+    |                               ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:434:31
+    |
+434 | async fn execute_stop_command(state: &AppState, robot_id: &str, request: &RobotCommandRequest) -> StorageResult<RobotCommandResponse> {
+    |                               ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:447:33
+    |
+447 | async fn execute_resume_command(state: &AppState, robot_id: &str, request: &RobotCommandRequest) -> StorageResult<RobotCommandResponse> {
+    |                                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:460:38
+    |
+460 | async fn execute_maintenance_command(state: &AppState, robot_id: &str, request: &RobotCommandRequest) -> StorageResult<RobotCommandRespon...
+    |                                      ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:496:31
+    |
+496 | async fn store_scheduled_task(state: &AppState, task: &ScheduledTask) -> StorageResult<()> {
+    |                               ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:502:30
+    |
+502 | async fn get_automation_jobs(state: &AppState, query: &JobListQuery) -> StorageResult<PaginatedResponse<AutomationJob>> {
+    |                              ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:534:26
+    |
+534 | async fn get_job_details(state: &AppState, job_id: Uuid) -> StorageResult<AutomationJob> {
+    |                          ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:571:35
+    |
+571 | async fn get_automation_workflows(state: &AppState, query: &WorkflowListQuery) -> StorageResult<PaginatedResponse<AutomationWorkflow>> {
+    |                                   ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:623:36
+    |
+623 | async fn store_automation_workflow(state: &AppState, workflow: &AutomationWorkflow) -> StorageResult<()> {
+    |                                    ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:629:35
+    |
+629 | async fn start_workflow_execution(state: &AppState, workflow_id: Uuid, request: &ExecuteWorkflowRequest) -> StorageResult<WorkflowExecuti...
+    |                                   ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:647:41
+    |
+647 | async fn calculate_automation_analytics(state: &AppState, query: &AnalyticsQuery) -> StorageResult<AutomationAnalytics> {
+    |                                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:668:32
+    |
+668 | async fn get_maintenance_tasks(state: &AppState, query: &MaintenanceQuery) -> StorageResult<PaginatedResponse<MaintenanceTask>> {
+    |                                ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/automation.rs:698:34
+    |
+698 | async fn create_maintenance_task(state: &AppState, request: &ScheduleMaintenanceRequest) -> StorageResult<MaintenanceTask> {
+    |                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:208:41
+    |
+208 | async fn perform_integrity_verification(state: &AppState) -> StorageResult<BlockchainIntegrityReport> {
+    |                                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:228:38
+    |
+228 | async fn get_blockchain_transactions(state: &AppState, query: &TransactionListQuery) -> StorageResult<PaginatedResponse<BlockchainTransac...
+    |                                      ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:264:34
+    |
+264 | async fn get_transaction_details(state: &AppState, transaction_id: &str) -> StorageResult<BlockchainTransaction> {
+    |                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:286:32
+    |
+286 | async fn get_blockchain_blocks(state: &AppState, query: &BlockListQuery) -> StorageResult<PaginatedResponse<BlockchainBlock>> {
+    |                                ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:323:28
+    |
+323 | async fn get_block_details(state: &AppState, block_hash: &str) -> StorageResult<BlockchainBlock> {
+    |                            ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `transaction`
+  --> src/handlers/blockchain.rs:95:9
+   |
+95 |     let transaction = add_to_blockchain(&state, &custody_event).await?;
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_transaction`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:345:31
+    |
+345 | async fn create_custody_event(state: &AppState, sample_id: Uuid, request: &CustodyEventRequest) -> StorageResult<CustodyEvent> {
+    |                               ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:366:28
+    |
+366 | async fn add_to_blockchain(state: &AppState, custody_event: &CustodyEvent) -> StorageResult<String> {
+    |                            ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `custody_event`
+   --> src/handlers/blockchain.rs:366:46
+    |
+366 | async fn add_to_blockchain(state: &AppState, custody_event: &CustodyEvent) -> StorageResult<String> {
+    |                                              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_custody_event`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:373:37
+    |
+373 | async fn get_sample_custody_history(state: &AppState, sample_id: Uuid, query: &CustodyHistoryQuery) -> StorageResult<CustodyHistory> {
+    |                                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `query`
+   --> src/handlers/blockchain.rs:373:72
+    |
+373 | async fn get_sample_custody_history(state: &AppState, sample_id: Uuid, query: &CustodyHistoryQuery) -> StorageResult<CustodyHistory> {
+    |                                                                        ^^^^^ help: if this is intentional, prefix it with an underscore: `_query`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:417:40
+    |
+417 | async fn validate_sample_custody_chain(state: &AppState, sample_id: Uuid) -> StorageResult<CustodyValidationResult> {
+    |                                        ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:438:30
+    |
+438 | async fn create_audit_record(state: &AppState, request: &AuditEntryRequest) -> StorageResult<AuditEntry> {
+    |                              ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:457:34
+    |
+457 | async fn add_audit_to_blockchain(state: &AppState, audit_entry: &AuditEntry) -> StorageResult<()> {
+    |                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:463:31
+    |
+463 | async fn search_audit_records(state: &AppState, query: &AuditSearchQuery) -> StorageResult<PaginatedResponse<AuditEntry>> {
+    |                               ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:497:42
+    |
+497 | async fn calculate_blockchain_statistics(state: &AppState) -> StorageResult<BlockchainStats> {
+    |                                          ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:539:27
+    |
+539 | async fn get_latest_block(state: &AppState) -> StorageResult<BlockchainBlock> {
+    |                           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:558:33
+    |
+558 | async fn export_blockchain_data(state: &AppState, query: &ExportQuery) -> StorageResult<ExportResult> {
+    |                                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/blockchain.rs:572:35
+    |
+572 | async fn verify_digital_signature(state: &AppState, request: &SignatureVerificationRequest) -> StorageResult<SignatureVerificationResult> {
+    |                                   ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+  --> src/handlers/digital_twin.rs:21:11
+   |
+21 |     State(state): State<AppState>,
+   |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/digital_twin.rs:483:34
+    |
+483 | async fn run_capacity_simulation(state: &AppState, request: &SimulationRequest) -> StorageResult<InternalSimulationResult> {
+    |                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `request`
+   --> src/handlers/digital_twin.rs:483:52
+    |
+483 | async fn run_capacity_simulation(state: &AppState, request: &SimulationRequest) -> StorageResult<InternalSimulationResult> {
+    |                                                    ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_request`
+
+warning: unused variable: `state`
+   --> src/handlers/digital_twin.rs:501:37
+    |
+501 | async fn run_temperature_simulation(state: &AppState, request: &SimulationRequest) -> StorageResult<InternalSimulationResult> {
+    |                                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `request`
+   --> src/handlers/digital_twin.rs:501:55
+    |
+501 | async fn run_temperature_simulation(state: &AppState, request: &SimulationRequest) -> StorageResult<InternalSimulationResult> {
+    |                                                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_request`
+
+warning: unused variable: `state`
+   --> src/handlers/digital_twin.rs:517:34
+    |
+517 | async fn run_workflow_simulation(state: &AppState, request: &SimulationRequest) -> StorageResult<InternalSimulationResult> {
+    |                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `request`
+   --> src/handlers/digital_twin.rs:517:52
+    |
+517 | async fn run_workflow_simulation(state: &AppState, request: &SimulationRequest) -> StorageResult<InternalSimulationResult> {
+    |                                                    ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_request`
+
+warning: unused variable: `state`
+   --> src/handlers/digital_twin.rs:534:35
+    |
+534 | async fn run_emergency_simulation(state: &AppState, request: &SimulationRequest) -> StorageResult<InternalSimulationResult> {
+    |                                   ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `request`
+   --> src/handlers/digital_twin.rs:534:53
+    |
+534 | async fn run_emergency_simulation(state: &AppState, request: &SimulationRequest) -> StorageResult<InternalSimulationResult> {
+    |                                                     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_request`
+
+warning: unused variable: `state`
+   --> src/handlers/digital_twin.rs:551:32
+    |
+551 | async fn run_energy_simulation(state: &AppState, request: &SimulationRequest) -> StorageResult<InternalSimulationResult> {
+    |                                ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `request`
+   --> src/handlers/digital_twin.rs:551:50
+    |
+551 | async fn run_energy_simulation(state: &AppState, request: &SimulationRequest) -> StorageResult<InternalSimulationResult> {
+    |                                                  ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_request`
+
+warning: unused variable: `state`
+   --> src/handlers/digital_twin.rs:569:36
+    |
+569 | async fn store_simulation_scenario(state: &AppState, scenario: &SimulationScenario) -> StorageResult<()> {
+    |                                    ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/digital_twin.rs:136:11
+    |
+136 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `priority`
+   --> src/handlers/digital_twin.rs:142:9
+    |
+142 |     let priority = query.priority.as_deref().unwrap_or("medium");
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_priority`
+
+warning: unused variable: `state`
+   --> src/handlers/digital_twin.rs:189:11
+    |
+189 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/digital_twin.rs:243:11
+    |
+243 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/digital_twin.rs:301:11
+    |
+301 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/digital_twin.rs:335:11
+    |
+335 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/digital_twin.rs:386:11
+    |
+386 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/digital_twin.rs:432:11
+    |
+432 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+  --> src/handlers/energy.rs:21:11
+   |
+21 |     State(state): State<AppState>,
+   |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+  --> src/handlers/energy.rs:68:11
+   |
+68 |     State(state): State<AppState>,
+   |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `query`
+  --> src/handlers/energy.rs:69:11
+   |
+69 |     Query(query): Query<RealtimeQuery>,
+   |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_query`
+
+warning: unused variable: `state`
+   --> src/handlers/energy.rs:143:11
+    |
+143 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/energy.rs:197:11
+    |
+197 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/energy.rs:272:11
+    |
+272 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/energy.rs:352:11
+    |
+352 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/energy.rs:394:11
+    |
+394 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/energy.rs:461:11
+    |
+461 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/energy.rs:507:11
+    |
+507 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `start`
+  --> src/handlers/health.rs:56:9
+   |
+56 |     let start = std::time::Instant::now();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_start`
+
+warning: unused variable: `state`
+  --> src/handlers/integrations.rs:31:11
+   |
+31 |     State(state): State<AppState>,
+   |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/integrations.rs:125:11
+    |
+125 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/integrations.rs:151:11
+    |
+151 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/integrations.rs:201:11
+    |
+201 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/integrations.rs:226:11
+    |
+226 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/integrations.rs:325:11
+    |
+325 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/integrations.rs:375:11
+    |
+375 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/integrations.rs:457:11
+    |
+457 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/integrations.rs:545:11
+    |
+545 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+  --> src/handlers/iot.rs:21:11
+   |
+21 |     State(state): State<AppState>,
+   |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+  --> src/handlers/iot.rs:65:11
+   |
+65 |     State(state): State<AppState>,
+   |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+  --> src/handlers/iot.rs:91:11
+   |
+91 |     State(state): State<AppState>,
+   |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/iot.rs:117:11
+    |
+117 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/iot.rs:158:11
+    |
+158 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/iot.rs:179:11
+    |
+179 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `sensor`
+   --> src/handlers/iot.rs:357:9
+    |
+357 |     let sensor = sqlx::query_as::<_, IoTSensor>(
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_sensor`
+
+warning: unused variable: `state`
+  --> src/handlers/mobile.rs:21:11
+   |
+21 |     State(state): State<AppState>,
+   |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/mobile.rs:110:11
+    |
+110 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/mobile.rs:160:11
+    |
+160 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/mobile.rs:222:11
+    |
+222 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `query`
+   --> src/handlers/mobile.rs:223:11
+    |
+223 |     Query(query): Query<MobileAlertQuery>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_query`
+
+warning: unused variable: `state`
+   --> src/handlers/mobile.rs:284:11
+    |
+284 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/mobile.rs:304:11
+    |
+304 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `query`
+   --> src/handlers/mobile.rs:305:11
+    |
+305 |     Query(query): Query<MobileEquipmentQuery>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_query`
+
+warning: unused variable: `state`
+   --> src/handlers/mobile.rs:363:11
+    |
+363 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/mobile.rs:429:11
+    |
+429 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/mobile.rs:471:11
+    |
+471 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `state`
+   --> src/handlers/mobile.rs:515:11
+    |
+515 |     State(state): State<AppState>,
+    |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `start_time`
+   --> src/integrations/lims.rs:254:13
+    |
+254 |         let start_time = std::time::Instant::now();
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_start_time`
+
+warning: unused variable: `system_info`
+   --> src/integrations/lims.rs:257:13
+    |
+257 |         let system_info = self.get_system_info().await?;
+    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_system_info`
+
+warning: unused variable: `calibration_data`
+   --> src/iot.rs:105:59
+    |
+105 |     pub async fn calibrate_sensor(&self, sensor_id: &str, calibration_data: serde_json::Value) -> StorageResult<String> {
+    |                                                           ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_calibration_data`
+
+warning: variable does not need to be mutable
+   --> src/iot.rs:230:13
+    |
+230 |         let mut alerts = Vec::new();
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: unused variable: `coordinates`
+   --> src/ai/intelligent_routing.rs:204:34
+    |
+204 |     fn get_nearby_samples(&self, coordinates: &Coordinates, radius: f64) -> Vec<SampleInfo> {
+    |                                  ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_coordinates`
+
+warning: unused variable: `radius`
+   --> src/ai/intelligent_routing.rs:204:61
+    |
+204 |     fn get_nearby_samples(&self, coordinates: &Coordinates, radius: f64) -> Vec<SampleInfo> {
+    |                                                             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_radius`
+
+warning: unused variable: `request`
+   --> src/ai/intelligent_routing.rs:273:9
+    |
+273 |         request: &RoutingRequest,
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_request`
+
+warning: unused variable: `request`
+   --> src/ai/intelligent_routing.rs:281:9
+    |
+281 |         request: &RoutingRequest,
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_request`
+
+warning: unused variable: `model`
+   --> src/ai/models.rs:100:13
+    |
+100 |         let model = self.models.get(model_name)
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_model`
+
+warning: unused variable: `id`
+  --> src/error.rs:88:48
+   |
+88 |             StorageError::LocationNotFound(ref id) => {
+   |                                                ^^ help: if this is intentional, prefix it with an underscore: `_id`
+
+warning: unused variable: `id`
+  --> src/error.rs:91:46
+   |
+91 |             StorageError::SampleNotFound(ref id) => (StatusCode::NOT_FOUND, "Sample not found"),
+   |                                              ^^ help: if this is intentional, prefix it with an underscore: `_id`
+
+warning: unused variable: `avg_daily_consumption`
+   --> src/handlers/analytics.rs:421:9
+    |
+421 |     let avg_daily_consumption = total_consumption / energy_data.len() as f64;
+    |         ^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_avg_daily_consumption`
+
+warning: unused variable: `request`
+   --> src/handlers/automation.rs:566:32
+    |
+566 | fn estimate_retrieval_duration(request: &AutomatedRetrievalRequest) -> i32 {
+    |                                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_request`
+
+warning: unused variable: `time_period`
+   --> src/handlers/energy.rs:587:30
+    |
+587 | fn generate_consumption_data(time_period: &str, granularity: &str) -> Vec<ConsumptionDataPoint> {
+    |                              ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_time_period`
+
+warning: unused variable: `granularity`
+   --> src/handlers/energy.rs:587:49
+    |
+587 | fn generate_consumption_data(time_period: &str, granularity: &str) -> Vec<ConsumptionDataPoint> {
+    |                                                 ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_granularity`
+
+warning: field `config` is never read
+   --> src/ai/mod.rs:142:5
+    |
+141 | pub struct TrainingPipeline {
+    |            ---------------- field in this struct
+142 |     config: AIConfig,
+    |     ^^^^^^
+    |
+    = note: `TrainingPipeline` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` on by default
+
+warning: fields `features`, `historical_patterns`, and `last_updated` are never read
+  --> src/ai/predictive_maintenance.rs:16:5
+   |
+14 | pub struct EquipmentFailureModel {
+   |            --------------------- fields in this struct
+15 |     model_version: String,
+16 |     features: Vec<String>,
+   |     ^^^^^^^^
+17 |     thresholds: HashMap<String, f64>,
+18 |     historical_patterns: Vec<FailurePattern>,
+   |     ^^^^^^^^^^^^^^^^^^^
+19 |     last_updated: DateTime<Utc>,
+   |     ^^^^^^^^^^^^
+   |
+   = note: `EquipmentFailureModel` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `routing_algorithms`, `historical_patterns`, and `last_updated` are never read
+  --> src/ai/intelligent_routing.rs:16:5
+   |
+14 | pub struct SampleRoutingModel {
+   |            ------------------ fields in this struct
+15 |     model_version: String,
+16 |     routing_algorithms: Vec<RoutingAlgorithm>,
+   |     ^^^^^^^^^^^^^^^^^^
+...
+19 |     historical_patterns: Vec<AccessPattern>,
+   |     ^^^^^^^^^^^^^^^^^^^
+20 |     last_updated: DateTime<Utc>,
+   |     ^^^^^^^^^^^^
+   |
+   = note: `SampleRoutingModel` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: function `check_sensor_alerts` is never used
+   --> src/handlers/iot.rs:400:10
+    |
+400 | async fn check_sensor_alerts(
+    |          ^^^^^^^^^^^^^^^^^^^
+
+warning: function `create_alert` is never used
+   --> src/handlers/iot.rs:460:10
+    |
+460 | async fn create_alert(
+    |          ^^^^^^^^^^^^
+
+warning: function `calculate_sensor_statistics` is never used
+   --> src/handlers/iot.rs:492:4
+    |
+492 | fn calculate_sensor_statistics(readings: &[SensorReading]) -> SensorStatistics {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: methods `authenticate` and `health_check` are never used
+   --> src/integrations/lims.rs:36:14
+    |
+25  | impl LIMSIntegration {
+    | -------------------- methods in this implementation
+...
+36  |     async fn authenticate(&mut self) -> Result<(), IntegrationError> {
+    |              ^^^^^^^^^^^^
+...
+253 |     async fn health_check(&mut self) -> Result<(), IntegrationError> {
+    |              ^^^^^^^^^^^^
+
+warning: struct `LIMSAuthRequest` is never constructed
+   --> src/integrations/lims.rs:449:8
+    |
+449 | struct LIMSAuthRequest {
+    |        ^^^^^^^^^^^^^^^
+
+warning: fields `access_token`, `token_type`, and `expires_in` are never read
+   --> src/integrations/lims.rs:458:5
+    |
+457 | struct LIMSAuthResponse {
+    |        ---------------- fields in this struct
+458 |     access_token: String,
+    |     ^^^^^^^^^^^^
+459 |     token_type: String,
+    |     ^^^^^^^^^^
+460 |     expires_in: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `LIMSAuthResponse` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `total_count`, `page`, and `per_page` are never read
+   --> src/integrations/lims.rs:518:5
+    |
+516 | struct LIMSSamplesResponse {
+    |        ------------------- fields in this struct
+517 |     samples: Vec<LIMSSample>,
+518 |     total_count: usize,
+    |     ^^^^^^^^^^^
+519 |     page: usize,
+    |     ^^^^
+520 |     per_page: usize,
+    |     ^^^^^^^^
+    |
+    = note: `LIMSSamplesResponse` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: `enhanced_storage_service` (lib) generated 206 warnings (run `cargo fix --lib -p enhanced_storage_service` to apply 42 suggestions)
+warning: unused import: `warn`
+ --> src/main.rs:3:21
+  |
+3 | use tracing::{info, warn};
+  |                     ^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: `enhanced_storage_service` (bin "enhanced_storage_service") generated 1 warning (run `cargo fix --bin "enhanced_storage_service"` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 26.33s
