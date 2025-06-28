@@ -41,8 +41,7 @@ impl Default for AppState {
     }
 }
 
-// Test utilities
-#[cfg(test)]
+// Test utilities - accessible to both unit and integration tests
 pub mod test_utils {
     use super::*;
     use sqlx::PgPool;

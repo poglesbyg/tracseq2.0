@@ -1,5 +1,12 @@
 use crate::test_utils::*;
+use crate::test_with_auth_db;
 use auth_service::{AuthError, models::*};
+use axum::http;
+use auth_service::handlers::auth::{
+    register, login, get_current_user, change_password, 
+    forgot_password, logout, get_sessions, revoke_session,
+    RegisterRequest, LogoutRequest, ChangePasswordRequest, ForgotPasswordRequest
+};
 use axum::{Json, http::StatusCode};
 use serde_json::json;
 use serial_test::serial;
@@ -31,7 +38,7 @@ async fn test_register_success(test_db: &mut TestDatabase) {
 }
 
 #[test_with_auth_db]
-async fn test_register_validation_failure(test_db: &mut TestDatabase) {
+async fn test_register_validation_failure(_test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
     let request = UserFactory::create_invalid_register_request();
 
@@ -39,7 +46,7 @@ async fn test_register_validation_failure(test_db: &mut TestDatabase) {
 
     assert!(result.is_err());
     match result.unwrap_err() {
-        AuthError::Validation(_) => {} // Expected
+        AuthError::Validation { .. } => {} // Expected
         other => panic!("Expected validation error, got: {:?}", other),
     }
 }
@@ -85,7 +92,7 @@ async fn test_login_success(test_db: &mut TestDatabase) {
 }
 
 #[test_with_auth_db]
-async fn test_login_invalid_credentials(test_db: &mut TestDatabase) {
+async fn test_login_invalid_credentials(_test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
     let request = UserFactory::create_invalid_login_request();
 
@@ -95,18 +102,19 @@ async fn test_login_invalid_credentials(test_db: &mut TestDatabase) {
 }
 
 #[test_with_auth_db]
-async fn test_login_validation_failure(test_db: &mut TestDatabase) {
+async fn test_login_validation_failure(_test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
     let request = LoginRequest {
         email: "".to_string(),    // Invalid
         password: "".to_string(), // Invalid
+        remember_me: None,
     };
 
     let result = login(axum::extract::State(app_state), Json(request)).await;
 
     assert!(result.is_err());
     match result.unwrap_err() {
-        AuthError::Validation(_) => {} // Expected
+        AuthError::Validation { .. } => {} // Expected
         other => panic!("Expected validation error, got: {:?}", other),
     }
 }
@@ -200,7 +208,7 @@ async fn test_forgot_password_success(test_db: &mut TestDatabase) {
 }
 
 #[test_with_auth_db]
-async fn test_forgot_password_nonexistent_user(test_db: &mut TestDatabase) {
+async fn test_forgot_password_nonexistent_user(_test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
 
     let request = ForgotPasswordRequest {
@@ -218,7 +226,7 @@ async fn test_forgot_password_nonexistent_user(test_db: &mut TestDatabase) {
 #[test_with_auth_db]
 async fn test_get_sessions_success(test_db: &mut TestDatabase) {
     let app_state = create_test_app_state().await;
-    let auth_service = &app_service.auth_service;
+    let auth_service = &app_state.auth_service;
 
     // Create test user
     let user = UserFactory::create_test_user(auth_service).await;
