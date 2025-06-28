@@ -1,6 +1,4 @@
-use event_service::{events::*, test_utils::*, services::*, Config};
-use fake::{Fake, Faker};
-use serde_json::Value;
+use event_service::{events::*, Config, EventBus, RedisEventBus};
 use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -8,7 +6,7 @@ use chrono::Utc;
 
 /// Test environment for event service testing
 pub struct TestEventEnvironment {
-    pub event_service: Arc<EventService>,
+    pub event_bus: Arc<dyn EventBus>,
     pub config: Arc<Config>,
     pub created_events: Vec<Uuid>,
     pub created_subscriptions: Vec<String>,
@@ -16,11 +14,11 @@ pub struct TestEventEnvironment {
 
 impl TestEventEnvironment {
     pub async fn new() -> Self {
-        let event_service = get_test_event_service().await;
+        let event_bus = get_test_event_bus().await;
         let config = Config::test_config();
         
         Self {
-            event_service: Arc::new(event_service.clone()),
+            event_bus,
             config: Arc::new(config),
             created_events: Vec::new(),
             created_subscriptions: Vec::new(),
@@ -28,13 +26,10 @@ impl TestEventEnvironment {
     }
 
     pub async fn cleanup(&mut self) {
-        // Cleanup subscriptions
-        for subscription_name in &self.created_subscriptions {
-            let _ = self.event_service.unsubscribe(subscription_name).await;
-        }
+        // Note: EventBus doesn't have unsubscribe method, so we just clear tracking
         
         // Cleanup Redis test database
-        cleanup_test_events().await;
+        let _ = cleanup_test_events().await;
         
         self.created_events.clear();
         self.created_subscriptions.clear();
@@ -326,35 +321,35 @@ pub struct EventPerformanceUtils;
 
 impl EventPerformanceUtils {
     pub async fn measure_event_publication_time(
-        event_service: &EventService,
+        event_bus: &Arc<dyn EventBus>,
         event: &Event,
     ) -> std::time::Duration {
         let start = std::time::Instant::now();
-        let _ = event_service.publish_event(event.clone()).await;
+        let _ = event_bus.publish(event.clone()).await;
         start.elapsed()
     }
 
     pub async fn measure_batch_publication_time(
-        event_service: &EventService,
+        event_bus: &Arc<dyn EventBus>,
         events: &[Event],
     ) -> std::time::Duration {
         let start = std::time::Instant::now();
         for event in events {
-            let _ = event_service.publish_event(event.clone()).await;
+            let _ = event_bus.publish(event.clone()).await;
         }
         start.elapsed()
     }
 
     pub async fn concurrent_event_publication(
-        event_service: &EventService,
+        event_bus: &Arc<dyn EventBus>,
         events: Vec<Event>,
     ) -> Vec<Result<EventPublicationResult, String>> {
         let tasks: Vec<_> = events
             .into_iter()
             .map(|event| {
-                let service = event_service.clone();
+                let bus = event_bus.clone();
                 tokio::spawn(async move {
-                    service.publish_event(event).await
+                    bus.publish(event).await
                         .map_err(|e| e.to_string())
                 })
             })
@@ -368,14 +363,14 @@ impl EventPerformanceUtils {
     }
 
     pub async fn measure_subscription_processing_time(
-        event_service: &EventService,
+        event_bus: &Arc<dyn EventBus>,
         subscription: &SubscriptionConfig,
         event_count: usize,
     ) -> std::time::Duration {
         let start = std::time::Instant::now();
         
         // Subscribe to events
-        let _ = event_service.subscribe(subscription.clone()).await;
+        let _ = event_bus.subscribe(subscription.clone()).await;
         
         // Publish test events
         for i in 0..event_count {
@@ -384,7 +379,7 @@ impl EventPerformanceUtils {
                 "performance-service".to_string(),
                 serde_json::json!({ "index": i }),
             );
-            let _ = event_service.publish_event(event).await;
+            let _ = event_bus.publish(event).await;
         }
         
         // Simulate processing time
@@ -398,8 +393,8 @@ impl EventPerformanceUtils {
 pub struct EventAssertions;
 
 impl EventAssertions {
-    pub fn assert_event_published(result: &Result<EventPublicationResult, String>) {
-        assert!(result.is_ok(), "Event should be published successfully");
+    pub fn assert_event_published(success: bool) {
+        assert!(success, "Event should be published successfully");
     }
 
     pub fn assert_event_received(events: &[EventContext], expected_event_type: &str) {
@@ -446,4 +441,30 @@ impl EventAssertions {
             max_ms
         );
     }
+}
+
+// Add a helper to get test event bus
+pub async fn get_test_event_bus() -> Arc<dyn EventBus> {
+    let config = Config::test_config();
+    let bus = RedisEventBus::new(&config.redis_url).await
+        .expect("Failed to create test event bus");
+    Arc::new(bus)
+}
+
+// Add cleanup function
+pub async fn cleanup_test_events() -> anyhow::Result<()> {
+    use redis::AsyncCommands;
+    
+    let config = Config::test_config();
+    let client = redis::Client::open(config.redis_url)?;
+    let mut conn = client.get_async_connection().await?;
+    
+    // Get all stream keys that match our pattern
+    let keys: Vec<String> = conn.keys("tracseq:events:*").await?;
+    
+    if !keys.is_empty() {
+        let _: () = conn.del(&keys).await?;
+    }
+    
+    Ok(())
 } 
