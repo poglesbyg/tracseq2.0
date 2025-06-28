@@ -300,6 +300,21 @@ impl EnhancedStorageService {
         Ok(updated_sample)
     }
 
+    /// Get sample by ID
+    pub async fn get_sample(&self, sample_id: Uuid) -> StorageResult<Sample> {
+        info!("Getting sample: {}", sample_id);
+
+        let sample = sqlx::query_as::<_, Sample>(
+            "SELECT * FROM samples WHERE id = $1"
+        )
+        .bind(sample_id)
+        .fetch_optional(&self.db.pool)
+        .await?
+        .ok_or_else(|| StorageError::SampleNotFound(sample_id.to_string()))?;
+
+        Ok(sample)
+    }
+
     // ============================================================================
     // IoT Integration
     // ============================================================================

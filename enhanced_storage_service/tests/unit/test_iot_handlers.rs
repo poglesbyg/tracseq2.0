@@ -1,7 +1,7 @@
 use crate::{test_utils::*, fixtures::*};
-use axum::{extract::{Path, Query, State}, Json};
+use axum::{extract::{Path, Query, State}, http::StatusCode, Json};
 use enhanced_storage_service::{
-    handlers::iot::*,
+    handlers::{iot::*, storage},
     models::*,
     error::StorageError,
 };
@@ -16,13 +16,11 @@ async fn test_register_sensor_success() {
         .await
         .unwrap();
 
-    // Create a location first
+    // Create location for sensor
     let location_request = StorageLocationFixtures::create_location_request();
-    let location_result = enhanced_storage_service::handlers::storage::create_location(
-        State(app_state.clone()), 
-        Json(location_request)
-    ).await;
-    let location = location_result.unwrap().0.data.unwrap();
+    let location_result = storage::create_location(State(app_state.clone()), Json(location_request)).await;
+    let (_, location_response) = location_result.unwrap();
+    let location = location_response.0.data.unwrap();
 
     let sensor_request = RegisterSensorRequest {
         sensor_id: TestDataFactory::sensor_id(),
@@ -169,7 +167,11 @@ async fn test_record_sensor_reading_success() {
         Json(reading_request)
     ).await;
 
-    assert!(result.is_ok(), "Record sensor reading should succeed");
+    match &result {
+        Ok(_) => {},
+        Err(e) => panic!("Record sensor reading failed: {:?}", e),
+    }
+    
     let response = result.unwrap();
     let api_response = response.0;
 

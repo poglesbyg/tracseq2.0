@@ -8,8 +8,14 @@ async fn test_database_connection_health() {
     let test_db = TestDatabase::new().await.unwrap();
     
     let health_result = test_db.pool.health_check().await;
-    assert!(health_result.is_ok(), "Database health check should pass");
-    assert!(health_result.unwrap(), "Database should be healthy");
+    match &health_result {
+        Ok(is_healthy) => {
+            assert!(*is_healthy, "Database should be healthy");
+        }
+        Err(e) => {
+            panic!("Database health check failed: {:?}", e);
+        }
+    }
 
     test_db.cleanup().await.unwrap();
 }
@@ -68,7 +74,7 @@ async fn test_sample_movement_workflow() {
     let location1 = service.create_storage_location(location1_request).await.unwrap();
 
     let mut location2_request = StorageLocationFixtures::create_location_request();
-    location2_request.name = "Target Location".to_string();
+    location2_request.name = format!("Target Location {}", Uuid::new_v4().to_string().chars().take(8).collect::<String>());
     let location2 = service.create_storage_location(location2_request).await.unwrap();
 
     // Store sample in first location
@@ -167,21 +173,26 @@ async fn test_concurrent_location_creation() {
     let service2 = EnhancedStorageService::new(test_db.pool.clone(), config.clone()).await.unwrap();
     let service3 = EnhancedStorageService::new(test_db.pool.clone(), config).await.unwrap();
 
-    // Create locations concurrently
+    // Create locations concurrently with unique names
+    let test_id = Uuid::new_v4().to_string().chars().take(8).collect::<String>();
+    let test_id1 = test_id.clone();
+    let test_id2 = test_id.clone();
+    let test_id3 = test_id.clone();
+    
     let handles = vec![
         tokio::spawn(async move {
             let mut request = StorageLocationFixtures::create_location_request();
-            request.name = "Concurrent Location 1".to_string();
+            request.name = format!("Concurrent Location 1_{}", test_id1);
             service1.create_storage_location(request).await
         }),
         tokio::spawn(async move {
             let mut request = StorageLocationFixtures::create_location_request();
-            request.name = "Concurrent Location 2".to_string();
+            request.name = format!("Concurrent Location 2_{}", test_id2);
             service2.create_storage_location(request).await
         }),
         tokio::spawn(async move {
             let mut request = StorageLocationFixtures::create_location_request();
-            request.name = "Concurrent Location 3".to_string();
+            request.name = format!("Concurrent Location 3_{}", test_id3);
             service3.create_storage_location(request).await
         }),
     ];
@@ -230,10 +241,11 @@ async fn test_pagination_edge_cases() {
     assert!(!result.pagination.has_next);
     assert!(!result.pagination.has_prev);
 
-    // Create some locations
+    // Create some locations with unique names
+    let test_id = Uuid::new_v4().to_string().chars().take(8).collect::<String>();
     for i in 0..25 {
         let mut request = StorageLocationFixtures::create_location_request();
-        request.name = format!("Location {}", i);
+        request.name = format!("Location {}_{}", test_id, i);
         service.create_storage_location(request).await.unwrap();
     }
 
