@@ -87,7 +87,11 @@ impl DatabasePool {
                 sensor_type VARCHAR NOT NULL,
                 location_id UUID REFERENCES storage_locations(id),
                 status VARCHAR NOT NULL DEFAULT 'active',
-                last_reading JSONB,
+                last_reading TIMESTAMPTZ,
+                battery_level INTEGER,
+                signal_strength INTEGER,
+                firmware_version VARCHAR,
+                configuration JSONB,
                 calibration_data JSONB DEFAULT '{}',
                 maintenance_schedule JSONB DEFAULT '{}',
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -133,6 +137,43 @@ impl DatabasePool {
                 resolved_at TIMESTAMPTZ,
                 metadata JSONB DEFAULT '{}',
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Create IoT alerts table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS iot_alerts (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                sensor_id VARCHAR NOT NULL,
+                alert_type VARCHAR NOT NULL,
+                severity VARCHAR NOT NULL,
+                message TEXT NOT NULL,
+                threshold_value DECIMAL,
+                actual_value DECIMAL,
+                resolved BOOLEAN NOT NULL DEFAULT false,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                resolved_at TIMESTAMPTZ
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Create sensor maintenance table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS sensor_maintenance (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                sensor_id VARCHAR NOT NULL,
+                maintenance_type VARCHAR NOT NULL,
+                description TEXT NOT NULL,
+                performed_by VARCHAR NOT NULL,
+                performed_at TIMESTAMPTZ NOT NULL,
+                next_maintenance TIMESTAMPTZ
             )
             "#,
         )
@@ -310,6 +351,20 @@ impl DatabasePool {
         .await?;
 
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_compliance_status ON compliance_events(compliance_status)")
+            .execute(&self.pool)
+            .await?;
+
+        // Create indexes for IoT alerts
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_iot_alerts_sensor_id ON iot_alerts(sensor_id)")
+            .execute(&self.pool)
+            .await?;
+
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_iot_alerts_resolved ON iot_alerts(resolved)")
+            .execute(&self.pool)
+            .await?;
+
+        // Create indexes for sensor maintenance
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sensor_maintenance_sensor_id ON sensor_maintenance(sensor_id)")
             .execute(&self.pool)
             .await?;
 

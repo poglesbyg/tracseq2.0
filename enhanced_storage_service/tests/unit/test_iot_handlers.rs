@@ -64,11 +64,14 @@ async fn test_list_sensors() {
         .await
         .unwrap();
 
-    // Create multiple sensors
+    // Create multiple sensors with unique IDs
     let sensors_to_create = 5;
+    let mut created_sensor_ids = Vec::new();
+    let test_run_id = Uuid::new_v4().to_string().chars().take(8).collect::<String>();
+    
     for i in 0..sensors_to_create {
         let sensor_request = RegisterSensorRequest {
-            sensor_id: format!("SENSOR_{}", i),
+            sensor_id: format!("TEST_SENSOR_{}_{}", test_run_id, i),
             sensor_type: if i % 2 == 0 { "temperature" } else { "humidity" }.to_string(),
             location_id: None,
             battery_level: Some(95),
@@ -77,15 +80,27 @@ async fn test_list_sensors() {
             configuration: Some(serde_json::json!({"test": true})),
         };
 
-        let result = register_sensor(State(app_state.clone()), Json(sensor_request)).await;
-        assert!(result.is_ok(), "Sensor registration should succeed");
+        let result = register_sensor(State(app_state.clone()), Json(sensor_request.clone())).await;
+        match &result {
+            Ok(response) => {
+                if let Some(sensor) = &response.0.data {
+                    created_sensor_ids.push(sensor.sensor_id.clone());
+                    println!("Created sensor: {}", sensor.sensor_id);
+                }
+            }
+            Err(e) => {
+                panic!("Sensor registration failed for sensor {}: {:?}", i, e);
+            }
+        }
     }
+
+    println!("Total sensors created: {}", created_sensor_ids.len());
 
     let query = SensorListQuery {
         page: Some(1),
-        per_page: Some(10),
+        per_page: Some(100), // Increase page size to ensure we get all sensors
         sensor_type: None,
-        status: None,
+        status: Some("active".to_string()), // Filter by active status
         location_id: None,
     };
 
@@ -98,7 +113,21 @@ async fn test_list_sensors() {
     TestAssertions::assert_api_response_success(&api_response);
     let sensors = api_response.data.unwrap();
 
-    assert!(sensors.data.len() >= sensors_to_create);
+    println!("Total sensors returned: {}", sensors.data.len());
+    for sensor in &sensors.data {
+        println!("Found sensor: {} (type: {}, status: {})", sensor.sensor_id, sensor.sensor_type, sensor.status);
+    }
+
+    // Count how many of our test sensors are in the response
+    let our_sensors_count = sensors.data.iter()
+        .filter(|s| created_sensor_ids.contains(&s.sensor_id))
+        .count();
+    
+    println!("Our sensors found: {}", our_sensors_count);
+    
+    assert_eq!(our_sensors_count, sensors_to_create, 
+        "Should find all {} created test sensors, but found {}", 
+        sensors_to_create, our_sensors_count);
 
     test_db.cleanup().await.unwrap();
 }
