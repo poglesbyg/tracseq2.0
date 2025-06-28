@@ -1,14 +1,13 @@
 use axum::{
     Json,
     extract::{Path, Query, State},
-    http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
     AppState,
-    error::{NotificationError, Result},
+    error::Result,
     models::*,
 };
 

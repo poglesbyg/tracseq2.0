@@ -1,4 +1,4 @@
-use reqwest::{Client, Error as ReqwestError};
+use reqwest::Client;
 use serde_json::json;
 use tracing::{warn, error};
 

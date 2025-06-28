@@ -3,11 +3,10 @@ use crate::{
     error::{ServiceError, ServiceResult},
     models::*,
 };
-use async_trait::async_trait;
 use calamine::{open_workbook_auto_from_rs, Reader};
 use sha2::{Digest, Sha256};
 use std::{io::Cursor, sync::Arc};
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 use uuid::Uuid;
 
 #[derive(Debug)]

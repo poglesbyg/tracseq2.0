@@ -1,15 +1,13 @@
 use axum::{
-    Json,
     extract::{Request, State},
-    http::{StatusCode, header::AUTHORIZATION},
+    http::header::AUTHORIZATION,
     middleware::Next,
     response::Response,
 };
-use serde_json::json;
 
 use crate::{
     AppState,
-    error::{SampleResult, SampleServiceError},
+    error::SampleServiceError,
 };
 
 /// Authentication middleware that validates JWT tokens and injects user context

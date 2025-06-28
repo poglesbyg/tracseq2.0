@@ -7,7 +7,7 @@ use crate::{
 use anyhow::Result;
 use chrono::Utc;
 use sqlx::Row;
-use tracing::{info, warn, error};
+use tracing::{info, error};
 use uuid::Uuid;
 
 #[derive(Clone)]

@@ -1,11 +1,9 @@
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
     Json,
 };
 use serde_json::json;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 use crate::{
     error::{Result, SequencingError},

@@ -4,8 +4,7 @@ use crate::{
     models::*,
 };
 use std::sync::Arc;
-use tracing::{info, warn};
-use uuid::Uuid;
+use tracing::info;
 
 #[derive(Debug)]
 pub struct ConflictResolver {
@@ -49,7 +48,7 @@ impl ConflictResolver {
     /// List conflicts with optional filtering
     pub async fn list_conflicts(
         &self,
-        status_filter: Option<ConflictStatus>,
+        _status_filter: Option<ConflictStatus>,
         limit: Option<i64>,
         offset: Option<i64>,
     ) -> ServiceResult<ConflictListResponse> {

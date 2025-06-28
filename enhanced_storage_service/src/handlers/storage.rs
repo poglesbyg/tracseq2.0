@@ -3,9 +3,8 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use chrono::Utc;
-use serde::{Deserialize, Serialize};
-use tracing::{info, error};
+use serde::Deserialize;
+use tracing::info;
 use uuid::Uuid;
 use validator::Validate;
 

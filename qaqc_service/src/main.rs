@@ -2,8 +2,6 @@ use axum::{
     Router,
     routing::{get, post, put},
 };
-use sqlx::PgPool;
-use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

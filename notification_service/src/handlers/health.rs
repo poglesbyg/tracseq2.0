@@ -2,7 +2,7 @@ use axum::{
     extract::State,
     Json,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use chrono::{DateTime, Utc};
 
 use crate::{error::Result, AppState};

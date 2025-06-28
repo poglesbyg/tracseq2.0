@@ -1,6 +1,6 @@
 use anyhow::Result;
 use sqlx::{PgPool, Postgres, migrate::MigrateDatabase};
-use tracing::{info, error};
+use tracing::info;
 
 #[derive(Debug, Clone)]
 pub struct DatabasePool {

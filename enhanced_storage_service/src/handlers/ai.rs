@@ -8,17 +8,16 @@
 
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
     Json,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 use chrono::{DateTime, Utc, Duration};
-use tracing::{info, error, warn};
+use tracing::{info, error};
 
 use crate::{
-    ai::{AIPlatform, AIInput, AIError},
+    ai::{AIInput, AIError},
     error::{StorageError, StorageResult},
     models::*,
     AppState,

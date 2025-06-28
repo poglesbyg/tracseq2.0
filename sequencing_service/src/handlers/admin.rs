@@ -1,11 +1,9 @@
 use axum::{
     Json,
-    extract::{Path, Query, State},
-    http::StatusCode,
+    extract::{Query, State},
 };
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde_json::json;
-use uuid::Uuid;
 
 use crate::{
     AppState,

@@ -1,7 +1,6 @@
 use axum::{
     Json,
     extract::{Path, Query, State},
-    http::StatusCode,
 };
 use chrono::{DateTime, Utc};
 use serde_json::json;

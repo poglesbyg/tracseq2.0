@@ -1,7 +1,7 @@
 use axum::{extract::State, http::StatusCode, Json};
 use serde::Serialize;
 use std::collections::HashMap;
-use tracing::{info, error};
+use tracing::info;
 use chrono::{DateTime, Utc};
 
 use crate::{error::StorageResult, AppState};

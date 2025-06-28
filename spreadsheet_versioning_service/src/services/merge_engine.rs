@@ -4,7 +4,7 @@ use crate::{
     models::*,
 };
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -50,18 +50,15 @@ impl MergeEngine {
         }
     }
 
-    async fn auto_merge(&self, source_id: Uuid, target_id: Uuid) -> ServiceResult<MergeResponse> {
-        // TODO: Implement auto-merge logic
-        Err(ServiceError::Internal("Auto-merge not yet implemented".to_string()))
+    async fn auto_merge(&self, _source_id: Uuid, _target_id: Uuid) -> ServiceResult<MergeResponse> {
+        todo!("Automatic merge to be implemented")
     }
 
-    async fn create_merge_request(&self, source_id: Uuid, target_id: Uuid) -> ServiceResult<MergeResponse> {
-        // TODO: Implement merge request creation
-        Err(ServiceError::Internal("Manual merge requests not yet implemented".to_string()))
+    async fn create_merge_request(&self, _source_id: Uuid, _target_id: Uuid) -> ServiceResult<MergeResponse> {
+        todo!("Merge request creation to be implemented")
     }
 
-    async fn merge_with_precedence(&self, source_id: Uuid, target_id: Uuid, source_wins: bool) -> ServiceResult<MergeResponse> {
-        // TODO: Implement precedence-based merge
-        Err(ServiceError::Internal("Precedence-based merge not yet implemented".to_string()))
+    async fn merge_with_precedence(&self, _source_id: Uuid, _target_id: Uuid, _source_wins: bool) -> ServiceResult<MergeResponse> {
+        todo!("Merge with precedence to be implemented")
     }
 } 

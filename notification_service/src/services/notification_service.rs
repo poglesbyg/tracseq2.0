@@ -3,7 +3,7 @@ use crate::{
     database::DatabasePool,
     error::{NotificationError, Result},
     handlers::{
-        admin::{ChannelHealthResponse, HealthStatus, NotificationStatistics, RateLimitResponse},
+        admin::{ChannelHealthResponse, NotificationStatistics, RateLimitResponse},
         channels::{ChannelConfigResponse, EmailTemplate, SlackWebhook},
         integration::AlertSeverity,
     },
@@ -12,10 +12,8 @@ use crate::{
 use chrono::{DateTime, Utc};
 use reqwest::Client;
 use serde_json::json;
-use sqlx::query_as;
 use std::collections::HashMap;
-use tokio::time::Duration;
-use tracing::{error, info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 #[derive(Clone)]

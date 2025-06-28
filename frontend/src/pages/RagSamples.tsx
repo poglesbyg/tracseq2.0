@@ -110,7 +110,7 @@ export default function RagSamples() {
               matches = matches && (
                 sample.name.toLowerCase().includes(searchLower) ||
                 sample.barcode.toLowerCase().includes(searchLower) ||
-                (sample.metadata?.submitter_name && typeof sample.metadata.submitter_name === 'string' && sample.metadata.submitter_name.toLowerCase().includes(searchLower))
+                !!(sample.metadata?.submitter_name && typeof sample.metadata.submitter_name === 'string' && sample.metadata.submitter_name.toLowerCase().includes(searchLower))
               );
             }
             

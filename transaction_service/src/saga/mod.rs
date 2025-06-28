@@ -5,7 +5,6 @@ pub mod compensation;
 pub mod state;
 pub mod error;
 
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -13,7 +12,7 @@ use uuid::Uuid;
 
 pub use error::SagaError;
 pub use step::{SagaStep, StepResult};
-pub use compensation::{CompensationStep, CompensationResult};
+pub use compensation::CompensationStep;
 pub use state::{SagaState, SagaStatus};
 
 /// Transaction context for saga execution

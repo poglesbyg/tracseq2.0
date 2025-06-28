@@ -41,7 +41,7 @@ pub async fn create_version(
 
 pub async fn get_version(
     State(state): State<AppState>,
-    Path((spreadsheet_id, version_id)): Path<(Uuid, Uuid)>,
+    Path((_spreadsheet_id, version_id)): Path<(Uuid, Uuid)>,
 ) -> ServiceResult<Json<SpreadsheetVersion>> {
     // TODO: Verify that the version belongs to the spreadsheet
     let version = state.versioning_service.get_version(version_id).await?;
