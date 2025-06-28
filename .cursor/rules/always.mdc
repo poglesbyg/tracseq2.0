@@ -1,10 +1,5 @@
 ---
-description: 
-globs: 
-alwaysApply: true
----
----
-description: 
+description: Global development workflow rules that apply to all files in the project
 globs: 
 alwaysApply: true
 ---
