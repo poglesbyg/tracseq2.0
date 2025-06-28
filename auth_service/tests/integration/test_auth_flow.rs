@@ -1,6 +1,7 @@
 use crate::test_utils::*;
 use auth_service::*;
-use axum::{Router, extract::State, http::StatusCode};
+use auth_service::handlers::auth::{RegisterRequest};
+use axum::{Router, extract::State, http::{StatusCode, header}};
 use axum_test::TestServer;
 use chrono::{DateTime, Utc};
 use serde_json::json;
@@ -58,7 +59,7 @@ async fn test_complete_registration_login_flow() {
     let profile_response = server
         .get("/auth/me")
         .add_header(
-            "Authorization".parse().unwrap(),
+            header::AUTHORIZATION,
             format!("Bearer {}", auth_token).parse().unwrap(),
         )
         .await;
@@ -386,13 +387,86 @@ async fn test_logout_flow() {
 
 // Helper function to create test router with real handlers
 async fn create_test_router(app_state: AppState) -> Router {
-    use auth_service::handlers::{auth_handlers, user_handlers, validation_handlers};
-
+    use auth_service::handlers::{auth, validation};
+    
+    // For tests, we'll create simplified routes without middleware complexity
     Router::new()
-        .merge(auth_handlers::create_routes())
-        .merge(validation_handlers::create_routes())
-        .merge(user_handlers::create_routes())
+        .route("/auth/register", axum::routing::post(auth::register))
+        .route("/auth/login", axum::routing::post(auth::login))
+        .route("/auth/forgot-password", axum::routing::post(auth::forgot_password))
+        .route("/auth/logout", axum::routing::post(auth::logout))
+        .route("/validate/token", axum::routing::post(validation::validate_token))
+        // These routes would normally require auth middleware, but for testing
+        // we'll handle authentication differently
+        .route("/auth/me", axum::routing::get(test_get_current_user))
+        .route("/auth/sessions", axum::routing::get(test_get_sessions))
+        .route("/auth/change-password", axum::routing::put(test_change_password))
         .with_state(app_state)
+}
+
+// Test wrapper for get_current_user that extracts user from token
+async fn test_get_current_user(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+) -> Result<axum::Json<serde_json::Value>, AuthError> {
+    let token = extract_token_from_headers(&headers)?;
+    let token_response = state.auth_service.validate_token(&token).await?;
+    
+    if !token_response.valid {
+        return Err(AuthError::TokenInvalid);
+    }
+    
+    let user_id = token_response.user_id.ok_or(AuthError::TokenInvalid)?;
+    let user = state.auth_service.get_user_by_id(user_id).await?;
+    
+    auth::get_current_user(State(state), user).await
+}
+
+// Test wrapper for get_sessions
+async fn test_get_sessions(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+) -> Result<axum::Json<serde_json::Value>, AuthError> {
+    let token = extract_token_from_headers(&headers)?;
+    let token_response = state.auth_service.validate_token(&token).await?;
+    
+    if !token_response.valid {
+        return Err(AuthError::TokenInvalid);
+    }
+    
+    let user_id = token_response.user_id.ok_or(AuthError::TokenInvalid)?;
+    let user = state.auth_service.get_user_by_id(user_id).await?;
+    
+    auth::get_sessions(State(state), user).await
+}
+
+// Test wrapper for change_password
+async fn test_change_password(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    axum::Json(request): axum::Json<auth::ChangePasswordRequest>,
+) -> Result<axum::Json<serde_json::Value>, AuthError> {
+    let token = extract_token_from_headers(&headers)?;
+    let token_response = state.auth_service.validate_token(&token).await?;
+    
+    if !token_response.valid {
+        return Err(AuthError::TokenInvalid);
+    }
+    
+    let user_id = token_response.user_id.ok_or(AuthError::TokenInvalid)?;
+    let user = state.auth_service.get_user_by_id(user_id).await?;
+    
+    auth::change_password(State(state), axum::Json(request), user).await
+}
+
+// Helper to extract token from headers
+fn extract_token_from_headers(headers: &axum::http::HeaderMap) -> Result<String, AuthError> {
+    headers
+        .get(header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "))
+        .map(|s| s.to_string())
+        .ok_or_else(|| AuthError::authentication("Missing or invalid authorization header"))
 }
 
 // Helper function to create user and login

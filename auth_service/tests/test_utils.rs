@@ -1,4 +1,5 @@
-use auth_service::{AppState, AuthServiceImpl, Config, DatabasePool, models::*};
+use auth_service::{AppState, AuthError, Config, DatabasePool, models::*};
+use auth_service::services::AuthServiceImpl;
 use axum::{
     Router,
     body::Body,
@@ -6,7 +7,8 @@ use axum::{
 };
 use axum_test::TestServer;
 use fake::{Fake, Faker};
-use serde_json::Value;
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -14,7 +16,7 @@ use uuid::Uuid;
 /// Test database manager for isolated test environments
 pub struct TestDatabase {
     pub pool: PgPool,
-    pub cleanup_users: Vec<Uuid>,
+    pub tracked_users: Vec<Uuid>,
 }
 
 impl TestDatabase {
@@ -22,12 +24,12 @@ impl TestDatabase {
         let pool = auth_service::test_utils::get_test_db().await.clone();
         Self {
             pool,
-            cleanup_users: Vec::new(),
+            tracked_users: Vec::new(),
         }
     }
 
     pub async fn cleanup(&mut self) {
-        for user_id in &self.cleanup_users {
+        for user_id in &self.tracked_users {
             let _ = sqlx::query("DELETE FROM user_sessions WHERE user_id = $1")
                 .bind(user_id)
                 .execute(&self.pool)
@@ -37,18 +39,18 @@ impl TestDatabase {
                 .execute(&self.pool)
                 .await;
         }
-        self.cleanup_users.clear();
+        self.tracked_users.clear();
     }
 
     pub fn track_user(&mut self, user_id: Uuid) {
-        self.cleanup_users.push(user_id);
+        self.tracked_users.push(user_id);
     }
 }
 
 impl Drop for TestDatabase {
     fn drop(&mut self) {
         let pool = self.pool.clone();
-        let users = self.cleanup_users.clone();
+        let users = self.tracked_users.clone();
         tokio::spawn(async move {
             for user_id in users {
                 let _ = sqlx::query("DELETE FROM user_sessions WHERE user_id = $1")
@@ -68,6 +70,30 @@ impl Drop for TestDatabase {
 pub struct UserFactory;
 
 impl UserFactory {
+    pub fn create_valid_register_request() -> auth_service::handlers::auth::RegisterRequest {
+        auth_service::handlers::auth::RegisterRequest {
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+            email: format!("test{}@example.com", Uuid::new_v4()),
+            password: "SecurePassword123!".to_string(),
+            department: Some("Engineering".to_string()),
+            position: Some("Developer".to_string()),
+            lab_affiliation: Some("Lab A".to_string()),
+        }
+    }
+
+    pub fn create_invalid_register_request() -> auth_service::handlers::auth::RegisterRequest {
+        auth_service::handlers::auth::RegisterRequest {
+            first_name: "".to_string(), // Invalid
+            last_name: "User".to_string(),
+            email: "invalid-email".to_string(), // Invalid
+            password: "weak".to_string(),       // Invalid
+            department: None,
+            position: None,
+            lab_affiliation: None,
+        }
+    }
+
     pub fn create_valid_login_request(email: String) -> LoginRequest {
         LoginRequest {
             email,
@@ -84,15 +110,15 @@ impl UserFactory {
         }
     }
 
-    pub async fn create_test_user(auth_service: &AuthServiceImpl) -> User {
-        let email = format!("test-{}@example.com", Uuid::new_v4());
+    pub async fn create_test_user(auth_service: &Arc<AuthServiceImpl>) -> User {
+        let email = format!("test{}@example.com", Uuid::new_v4());
         auth_service
             .create_user(
                 "Test".to_string(),
                 "User".to_string(),
                 email,
                 "SecurePassword123!".to_string(),
-                UserRole::DataAnalyst,
+                UserRole::Guest,
             )
             .await
             .expect("Failed to create test user")
@@ -122,11 +148,11 @@ impl JwtTestUtils {
     }
 
     pub fn create_expired_token() -> String {
-        "expired.jwt.token".to_string()
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjEwMDAwMDAwMDB9.expired".to_string()
     }
 
     pub fn create_invalid_token() -> String {
-        "invalid.jwt.token".to_string()
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalid.signature".to_string()
     }
 }
 
@@ -195,20 +221,25 @@ impl AuthTestClient {
 pub struct AuthAssertions;
 
 impl AuthAssertions {
-    pub fn assert_successful_login(response: &Value) {
+    pub fn assert_successful_login(response: &serde_json::Value) {
         assert_eq!(response["success"], true);
         assert!(response["data"]["access_token"].is_string());
-        assert!(response["data"]["user_id"].is_string());
+        assert!(response["data"]["refresh_token"].is_string());
+        assert!(response["data"]["expires_at"].is_string());
+        assert!(response["data"]["user"]["id"].is_string());
+        assert!(response["data"]["user"]["email"].is_string());
     }
 
-    pub fn assert_user_data(response: &Value, expected_email: &str) {
+    pub fn assert_user_data(response: &serde_json::Value, expected_email: &str) {
         assert_eq!(response["success"], true);
         assert_eq!(response["data"]["email"], expected_email);
         assert!(response["data"]["id"].is_string());
-        assert!(response["data"]["created_at"].is_string());
+        assert!(response["data"]["first_name"].is_string());
+        assert!(response["data"]["last_name"].is_string());
+        assert!(response["data"]["role"].is_string());
     }
 
-    pub fn assert_validation_error(response: &Value) {
+    pub fn assert_validation_error(response: &serde_json::Value) {
         assert!(response["error"].is_object());
         assert_eq!(response["error"]["code"], "VALIDATION_ERROR");
     }
@@ -231,7 +262,7 @@ pub struct TestDataGenerator;
 
 impl TestDataGenerator {
     pub fn random_email() -> String {
-        format!("test-{}@example.com", Uuid::new_v4())
+        format!("test{}@example.com", Uuid::new_v4())
     }
 
     pub fn random_password() -> String {
@@ -247,21 +278,27 @@ impl TestDataGenerator {
 
     pub fn weak_passwords() -> Vec<String> {
         vec![
-            "123".to_string(),
+            "123456".to_string(),
             "password".to_string(),
+            "qwerty".to_string(),
+            "abc123".to_string(),
+            "letmein".to_string(),
             "".to_string(),
-            "abc".to_string(),
-            "12345678".to_string(), // Only numbers
+            "a".to_string(),
+            "1234567".to_string(), // Just below minimum length
         ]
     }
 
     pub fn invalid_emails() -> Vec<String> {
         vec![
-            "invalid-email".to_string(),
+            "notanemail".to_string(),
             "@example.com".to_string(),
-            "test@".to_string(),
+            "user@".to_string(),
+            "user@.com".to_string(),
+            "user@@example.com".to_string(),
+            "user example@com".to_string(),
             "".to_string(),
-            "spaces in@email.com".to_string(),
+            "user@example".to_string(),
         ]
     }
 }
@@ -270,10 +307,30 @@ impl TestDataGenerator {
 pub struct SecurityTestUtils;
 
 impl SecurityTestUtils {
+    pub fn generate_sql_injection_attempts() -> Vec<String> {
+        vec![
+            "' OR '1'='1".to_string(),
+            "admin'--".to_string(),
+            "'; DROP TABLE users; --".to_string(),
+            "1' UNION SELECT * FROM users--".to_string(),
+            "' OR 1=1--".to_string(),
+        ]
+    }
+
+    pub fn generate_xss_attempts() -> Vec<String> {
+        vec![
+            "<script>alert('XSS')</script>".to_string(),
+            "javascript:alert('XSS')".to_string(),
+            "<img src=x onerror=alert('XSS')>".to_string(),
+            "<iframe src='javascript:alert(\"XSS\")'></iframe>".to_string(),
+            "<svg onload=alert('XSS')>".to_string(),
+        ]
+    }
+
     pub async fn attempt_brute_force_login(
         client: &AuthTestClient,
         email: &str,
-        attempts: u32,
+        attempts: usize,
     ) -> Vec<StatusCode> {
         let mut results = Vec::new();
 
@@ -286,29 +343,9 @@ impl SecurityTestUtils {
 
             let response = client.post_json("/auth/login", &login_req).await;
             results.push(response.status_code());
-
-            // Small delay to avoid overwhelming the test
-            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
 
         results
-    }
-
-    pub fn generate_sql_injection_attempts() -> Vec<String> {
-        vec![
-            "'; DROP TABLE users; --".to_string(),
-            "' OR '1'='1".to_string(),
-            "admin'--".to_string(),
-            "' UNION SELECT * FROM users --".to_string(),
-        ]
-    }
-
-    pub fn generate_xss_attempts() -> Vec<String> {
-        vec![
-            "<script>alert('xss')</script>".to_string(),
-            "javascript:alert('xss')".to_string(),
-            "<img src=x onerror=alert('xss')>".to_string(),
-        ]
     }
 }
 

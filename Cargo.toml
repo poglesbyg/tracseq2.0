@@ -13,7 +13,7 @@ members = [
     # Phase 2 Services
     "qaqc_service",
     "library_details_service"
-]
+, "temp_auth_test"]
 exclude = [
     "circuit-breaker-lib",
     "config-service"

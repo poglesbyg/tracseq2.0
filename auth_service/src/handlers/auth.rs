@@ -285,7 +285,7 @@ pub async fn verify_email(
 
 // Helper request models that weren't in the main models
 
-#[derive(Debug, serde::Deserialize, validator::Validate)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, validator::Validate)]
 pub struct RegisterRequest {
     #[validate(email(message = "Invalid email format"))]
     pub email: String,
@@ -303,13 +303,13 @@ pub struct RegisterRequest {
     pub lab_affiliation: Option<String>,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct LogoutRequest {
     #[allow(dead_code)]
     pub session_id: uuid::Uuid,
 }
 
-#[derive(Debug, serde::Deserialize, validator::Validate)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, validator::Validate)]
 pub struct ChangePasswordRequest {
     #[validate(length(min = 1, message = "Current password is required"))]
     pub current_password: String,
@@ -317,19 +317,19 @@ pub struct ChangePasswordRequest {
     pub new_password: String,
 }
 
-#[derive(Debug, serde::Deserialize, validator::Validate)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, validator::Validate)]
 pub struct RefreshTokenRequest {
     #[validate(length(min = 1, message = "Refresh token is required"))]
     pub refresh_token: String,
 }
 
-#[derive(Debug, serde::Deserialize, validator::Validate)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, validator::Validate)]
 pub struct ForgotPasswordRequest {
     #[validate(email(message = "Invalid email format"))]
     pub email: String,
 }
 
-#[derive(Debug, serde::Deserialize, validator::Validate)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, validator::Validate)]
 pub struct ResetPasswordRequest {
     #[validate(length(min = 1, message = "Token is required"))]
     pub token: String,
@@ -337,7 +337,7 @@ pub struct ResetPasswordRequest {
     pub new_password: String,
 }
 
-#[derive(Debug, serde::Deserialize, validator::Validate)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, validator::Validate)]
 pub struct VerifyEmailRequest {
     #[validate(length(min = 1, message = "Token is required"))]
     pub token: String,
