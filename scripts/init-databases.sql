@@ -1,38 +1,68 @@
--- TracSeq 2.0 Database Initialization Script
--- Creates multiple databases for microservices
+-- Initialize multiple databases for microservices
+-- This script creates separate databases for each service
 
--- Create additional databases
-CREATE DATABASE IF NOT EXISTS lab_manager;
-CREATE DATABASE IF NOT EXISTS enhanced_storage;
-CREATE DATABASE IF NOT EXISTS auth_db;
-CREATE DATABASE IF NOT EXISTS samples_db;
+-- Auth Service Database
+CREATE DATABASE auth_db;
+GRANT ALL PRIVILEGES ON DATABASE auth_db TO postgres;
 
--- Create users for services (optional - for better security)
--- CREATE USER lab_manager_user WITH PASSWORD 'lab_manager_pass';
--- CREATE USER storage_user WITH PASSWORD 'storage_pass';
--- CREATE USER auth_user WITH PASSWORD 'auth_pass';
+-- Sample Service Database  
+CREATE DATABASE sample_db;
+GRANT ALL PRIVILEGES ON DATABASE sample_db TO postgres;
 
--- Grant permissions
--- GRANT ALL PRIVILEGES ON DATABASE lab_manager TO lab_manager_user;
--- GRANT ALL PRIVILEGES ON DATABASE enhanced_storage TO storage_user;
--- GRANT ALL PRIVILEGES ON DATABASE auth_db TO auth_user;
+-- Storage Service Database
+CREATE DATABASE storage_db;
+GRANT ALL PRIVILEGES ON DATABASE storage_db TO postgres;
 
--- Enable extensions that might be needed
-\c tracseq_db;
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pg_trgm";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- Template Service Database
+CREATE DATABASE template_db;
+GRANT ALL PRIVILEGES ON DATABASE template_db TO postgres;
 
-\c lab_manager;
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pg_trgm";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- Sequencing Service Database
+CREATE DATABASE sequencing_db;
+GRANT ALL PRIVILEGES ON DATABASE sequencing_db TO postgres;
 
-\c enhanced_storage;
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pg_trgm";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- Notification Service Database
+CREATE DATABASE notification_db;
+GRANT ALL PRIVILEGES ON DATABASE notification_db TO postgres;
 
+-- RAG Service Database
+CREATE DATABASE rag_db;
+GRANT ALL PRIVILEGES ON DATABASE rag_db TO postgres;
+
+-- Transaction Service Database
+CREATE DATABASE transaction_db;
+GRANT ALL PRIVILEGES ON DATABASE transaction_db TO postgres;
+
+-- Create extensions that might be needed
 \c auth_db;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+\c sample_db;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+\c storage_db;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+\c template_db;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+\c sequencing_db;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+\c notification_db;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+\c rag_db;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "vector";
+
+\c transaction_db;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto"; 
