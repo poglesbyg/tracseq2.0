@@ -1,8 +1,43 @@
-use chrono::{DateTime, Utc};
-use fake::{Fake, Faker};
+use chrono::Utc;
 use uuid::Uuid;
 use enhanced_storage_service::models::*;
-use crate::test_utils::TestDataFactory;
+
+// Helper functions for test data generation
+fn generate_uuid() -> Uuid {
+    Uuid::new_v4()
+}
+
+fn generate_barcode() -> String {
+    let uuid_str = Uuid::new_v4().simple().to_string();
+    format!("TEST{}", &uuid_str[..8].to_uppercase())
+}
+
+fn generate_sensor_id() -> String {
+    let uuid_str = Uuid::new_v4().simple().to_string();
+    format!("SENSOR_{}", &uuid_str[..8].to_uppercase())
+}
+
+fn generate_temperature(zone: &str) -> f64 {
+    match zone {
+        "-80C" => -80.0 + (fastrand::f64() * 4.0 - 2.0), // -82 to -78
+        "-20C" => -20.0 + (fastrand::f64() * 4.0 - 2.0), // -22 to -18
+        "4C" => 4.0 + (fastrand::f64() * 2.0 - 1.0),     // 3 to 5
+        "RT" => 22.0 + (fastrand::f64() * 6.0 - 3.0),    // 19 to 25
+        "37C" => 37.0 + (fastrand::f64() * 2.0 - 1.0),   // 36 to 38
+        _ => 20.0,
+    }
+}
+
+fn generate_coordinates() -> serde_json::Value {
+    serde_json::json!({
+        "x": fastrand::f64() * 100.0,
+        "y": fastrand::f64() * 100.0,
+        "z": fastrand::f64() * 10.0,
+        "rack": format!("R{}", fastrand::u32(1..=20)),
+        "shelf": fastrand::u32(1..=10),
+        "position": fastrand::u32(1..=96)
+    })
+}
 
 /// Storage Location Fixtures
 pub struct StorageLocationFixtures;
@@ -15,7 +50,7 @@ impl StorageLocationFixtures {
             location_type: "rack".to_string(),
             temperature_zone: "-20C".to_string(),
             max_capacity: 100,
-            coordinates: Some(TestDataFactory::coordinates()),
+            coordinates: Some(generate_coordinates()),
             metadata: Some(serde_json::json!({
                 "test": true,
                 "created_by": "test_suite"
@@ -37,7 +72,7 @@ impl StorageLocationFixtures {
             location_type: Some("freezer".to_string()),
             temperature_zone: Some("-80C".to_string()),
             max_capacity: Some(200),
-            coordinates: Some(TestDataFactory::coordinates()),
+            coordinates: Some(generate_coordinates()),
             status: Some("maintenance".to_string()),
             metadata: Some(serde_json::json!({
                 "updated": true,
@@ -48,14 +83,14 @@ impl StorageLocationFixtures {
 
     pub fn storage_location() -> StorageLocation {
         StorageLocation {
-            id: TestDataFactory::uuid(),
+            id: generate_uuid(),
             name: format!("Test Location {}", fastrand::u32(1..=1000)),
             description: Some("Test storage location".to_string()),
             location_type: "rack".to_string(),
             temperature_zone: "-20C".to_string(),
             max_capacity: 100,
             current_capacity: fastrand::i32(0..=50),
-            coordinates: Some(TestDataFactory::coordinates()),
+            coordinates: Some(generate_coordinates()),
             status: "active".to_string(),
             metadata: serde_json::json!({"test": true}),
             created_at: Utc::now(),
@@ -70,10 +105,10 @@ pub struct SampleFixtures;
 impl SampleFixtures {
     pub fn store_sample_request(location_id: Uuid) -> StoreSampleRequest {
         StoreSampleRequest {
-            barcode: TestDataFactory::barcode(),
+            barcode: generate_barcode(),
             sample_type: "blood".to_string(),
             storage_location_id: location_id,
-            position: Some(TestDataFactory::coordinates()),
+            position: Some(generate_coordinates()),
             temperature_requirements: Some("-20C".to_string()),
             metadata: Some(serde_json::json!({
                 "patient_id": "P12345",
@@ -92,25 +127,25 @@ impl SampleFixtures {
     pub fn move_sample_request(new_location_id: Uuid) -> MoveSampleRequest {
         MoveSampleRequest {
             new_location_id,
-            new_position: Some(TestDataFactory::coordinates()),
+            new_position: Some(generate_coordinates()),
             reason: "Quality control testing".to_string(),
         }
     }
 
     pub fn sample() -> Sample {
         Sample {
-            id: TestDataFactory::uuid(),
-            barcode: TestDataFactory::barcode(),
+            id: generate_uuid(),
+            barcode: generate_barcode(),
             sample_type: "blood".to_string(),
-            storage_location_id: Some(TestDataFactory::uuid()),
-            position: Some(TestDataFactory::coordinates()),
+            storage_location_id: Some(generate_uuid()),
+            position: Some(generate_coordinates()),
             temperature_requirements: Some("-20C".to_string()),
             status: "stored".to_string(),
             metadata: serde_json::json!({"test": true}),
             chain_of_custody: serde_json::json!([{
                 "action": "stored",
                 "timestamp": Utc::now(),
-                "location_id": TestDataFactory::uuid()
+                "location_id": generate_uuid()
             }]),
             stored_at: Some(Utc::now()),
             created_at: Utc::now(),
@@ -125,10 +160,10 @@ pub struct IoTSensorFixtures;
 impl IoTSensorFixtures {
     pub fn iot_sensor() -> IoTSensor {
         IoTSensor {
-            id: TestDataFactory::uuid(),
-            sensor_id: TestDataFactory::sensor_id(),
+            id: generate_uuid(),
+            sensor_id: generate_sensor_id(),
             sensor_type: "temperature".to_string(),
-            location_id: Some(TestDataFactory::uuid()),
+            location_id: Some(generate_uuid()),
             status: "active".to_string(),
             last_reading: Some(serde_json::json!({
                 "temperature": -20.5,
@@ -155,7 +190,7 @@ impl IoTSensorFixtures {
             readings: vec![
                 SensorReadingValue {
                     reading_type: "temperature".to_string(),
-                    value: TestDataFactory::temperature("-20C"),
+                    value: generate_temperature("-20C"),
                     unit: "celsius".to_string(),
                     quality_score: Some(0.98),
                 },
@@ -172,10 +207,10 @@ impl IoTSensorFixtures {
 
     pub fn sensor_data() -> SensorData {
         SensorData {
-            id: TestDataFactory::uuid(),
-            sensor_id: TestDataFactory::uuid(),
+            id: generate_uuid(),
+            sensor_id: generate_uuid(),
             reading_type: "temperature".to_string(),
-            value: TestDataFactory::temperature("-20C"),
+            value: generate_temperature("-20C"),
             unit: "celsius".to_string(),
             quality_score: 0.98,
             metadata: serde_json::json!({"test": true}),
@@ -195,7 +230,7 @@ impl AlertFixtures {
             title: "Temperature Alert".to_string(),
             message: "Temperature deviation detected in storage location".to_string(),
             source_type: "sensor".to_string(),
-            source_id: Some(TestDataFactory::uuid()),
+            source_id: Some(generate_uuid()),
             metadata: Some(serde_json::json!({
                 "sensor_reading": -25.5,
                 "threshold": -22.0,
@@ -206,13 +241,13 @@ impl AlertFixtures {
 
     pub fn alert() -> Alert {
         Alert {
-            id: TestDataFactory::uuid(),
+            id: generate_uuid(),
             alert_type: "environmental".to_string(),
             severity: "high".to_string(),
             title: "Temperature Alert".to_string(),
             message: "Temperature deviation detected".to_string(),
             source_type: "sensor".to_string(),
-            source_id: Some(TestDataFactory::uuid()),
+            source_id: Some(generate_uuid()),
             status: "active".to_string(),
             acknowledged_by: None,
             acknowledged_at: None,
@@ -229,7 +264,7 @@ pub struct AnalyticsFixtures;
 impl AnalyticsFixtures {
     pub fn analytics_model() -> AnalyticsModel {
         AnalyticsModel {
-            id: TestDataFactory::uuid(),
+            id: generate_uuid(),
             model_name: "capacity_prediction".to_string(),
             model_type: "linear_regression".to_string(),
             version: "1.0.0".to_string(),
@@ -261,7 +296,7 @@ impl AnalyticsFixtures {
                 "current_utilization": 0.75,
                 "historical_trend": 0.05,
                 "seasonal_factor": 1.1,
-                "location_id": TestDataFactory::uuid()
+                "location_id": generate_uuid()
             }),
             prediction_horizon: Some(30),
         }
@@ -269,8 +304,8 @@ impl AnalyticsFixtures {
 
     pub fn prediction() -> Prediction {
         Prediction {
-            id: TestDataFactory::uuid(),
-            model_id: TestDataFactory::uuid(),
+            id: generate_uuid(),
+            model_id: generate_uuid(),
             prediction_type: "capacity".to_string(),
             input_data: serde_json::json!({
                 "utilization": 0.75,
@@ -296,10 +331,10 @@ impl BlockchainFixtures {
         BlockchainRecord {
             transaction_type: "sample_stored".to_string(),
             data: serde_json::json!({
-                "sample_id": TestDataFactory::uuid(),
-                "location_id": TestDataFactory::uuid(),
+                "sample_id": generate_uuid(),
+                "location_id": generate_uuid(),
                 "timestamp": Utc::now(),
-                "user_id": TestDataFactory::uuid()
+                "user_id": generate_uuid()
             }),
             timestamp: Utc::now(),
             previous_hash: Some("prev_hash_123".to_string()),
@@ -308,7 +343,7 @@ impl BlockchainFixtures {
 
     pub fn blockchain_transaction() -> BlockchainTransaction {
         BlockchainTransaction {
-            id: TestDataFactory::uuid(),
+            id: generate_uuid(),
             transaction_hash: format!("hash_{}", fastrand::u64(..)),
             block_number: Some(fastrand::i64(1..=1000)),
             transaction_type: "sample_stored".to_string(),
@@ -331,7 +366,7 @@ impl AutomationFixtures {
             task_type: "sample_retrieval".to_string(),
             priority: Some(5),
             input_parameters: serde_json::json!({
-                "sample_id": TestDataFactory::uuid(),
+                "sample_id": generate_uuid(),
                 "destination": "lab_bench_1"
             }),
             scheduled_at: Some(Utc::now()),
@@ -344,12 +379,12 @@ impl AutomationFixtures {
 
     pub fn automation_task() -> AutomationTask {
         AutomationTask {
-            id: TestDataFactory::uuid(),
+            id: generate_uuid(),
             task_type: "sample_retrieval".to_string(),
             priority: 5,
             status: "pending".to_string(),
             input_parameters: serde_json::json!({
-                "sample_id": TestDataFactory::uuid()
+                "sample_id": generate_uuid()
             }),
             output_results: None,
             assigned_robot_id: Some("ROBOT_001".to_string()),
@@ -385,8 +420,8 @@ pub struct EnergyFixtures;
 impl EnergyFixtures {
     pub fn energy_consumption() -> EnergyConsumption {
         EnergyConsumption {
-            id: TestDataFactory::uuid(),
-            location_id: Some(TestDataFactory::uuid()),
+            id: generate_uuid(),
+            location_id: Some(generate_uuid()),
             equipment_type: "freezer".to_string(),
             consumption_kwh: 15.5,
             cost_usd: Some(2.33),
@@ -412,13 +447,13 @@ pub struct ComplianceFixtures;
 impl ComplianceFixtures {
     pub fn compliance_event() -> ComplianceEvent {
         ComplianceEvent {
-            id: TestDataFactory::uuid(),
+            id: generate_uuid(),
             event_type: "temperature_monitoring".to_string(),
             regulatory_standard: "FDA_CFR_21".to_string(),
             compliance_status: "compliant".to_string(),
             description: "Temperature monitoring within acceptable range".to_string(),
             affected_entity_type: "storage_location".to_string(),
-            affected_entity_id: TestDataFactory::uuid(),
+            affected_entity_id: generate_uuid(),
             remediation_required: false,
             remediation_actions: serde_json::json!([]),
             auditor_notes: Some("Automated compliance check passed".to_string()),

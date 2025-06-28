@@ -7,7 +7,7 @@ members = [
     "notification_service",
     "template_service",
     "transaction_service",
-    "enhanced_storage_service",
+    # "enhanced_storage_service",  # Temporarily excluded for testing
     "event_service",
     "spreadsheet_versioning_service",
     # Phase 2 Services
@@ -16,7 +16,8 @@ members = [
 , "temp_auth_test"]
 exclude = [
     "circuit-breaker-lib",
-    "config-service"
+    "config-service",
+    "enhanced_storage_service"
 ]
 resolver = "2"
 

@@ -14,7 +14,7 @@ pub mod unit {
 // Integration test modules
 pub mod integration {
     pub mod test_database_operations;
-    pub mod test_iot_workflows;
+    pub mod storage_workflow_tests;
 }
 
 // End-to-end test modules
