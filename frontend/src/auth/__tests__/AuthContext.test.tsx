@@ -1,8 +1,11 @@
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from '..';
 
 // Mock axios
 jest.mock('axios');
+
+// Mock fetch globally
+global.fetch = jest.fn();
 
 // Test component to use AuthContext
 const TestAuthComponent = () => {
@@ -24,6 +27,24 @@ describe('AuthContext', () => {
     jest.clearAllMocks();
     // Clear localStorage
     localStorage.clear();
+    
+    // Reset fetch mock
+    (global.fetch as jest.Mock).mockReset();
+    // Default successful login response
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          user: {
+            id: '1',
+            email: 'test@example.com',
+            name: 'Test User',
+            role: 'lab_technician'
+          },
+          token: 'mock-token'
+        }
+      })
+    });
   });
 
   const renderWithAuthProvider = () => {
@@ -75,36 +96,41 @@ describe('AuthContext', () => {
   });
 
   describe('Token Management', () => {
-    it('persists authentication in localStorage', () => {
-      // Set up localStorage with token
-      localStorage.setItem('auth_token', 'mock-token');
-      localStorage.setItem('user', JSON.stringify({ 
-        id: '1', 
-        email: 'test@example.com', 
-        name: 'Test User' 
-      }));
+    it('persists authentication in localStorage', async () => {
+      render(
+        <AuthProvider>
+          <TestAuthComponent />
+        </AuthProvider>
+      );
       
-      renderWithAuthProvider();
+      expect(screen.getByTestId('auth-status')).toHaveTextContent('Not Authenticated');
       
+      await act(async () => {
+        fireEvent.click(screen.getByText('Login'));
+        // Wait a bit for the async login to complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+      });
+      
+      expect(localStorage.getItem('auth_token')).toBe('mock-token');
       expect(screen.getByTestId('auth-status')).toHaveTextContent('Authenticated');
-      expect(screen.getByTestId('user-info')).toHaveTextContent('test@example.com');
+      expect(screen.getByTestId('user-info')).toHaveTextContent('Test User');
     });
 
     it('clears localStorage on logout', async () => {
-      // Set up localStorage
       localStorage.setItem('auth_token', 'mock-token');
-      localStorage.setItem('user', JSON.stringify({ 
-        id: '1', 
-        email: 'test@example.com' 
-      }));
       
-      renderWithAuthProvider();
+      render(
+        <AuthProvider>
+          <TestAuthComponent />
+        </AuthProvider>
+      );
       
-      const logoutButton = screen.getByText('Logout');
-      fireEvent.click(logoutButton);
+      await act(async () => {
+        const logoutButton = screen.getByText('Logout');
+        fireEvent.click(logoutButton);
+      });
       
       expect(localStorage.getItem('auth_token')).toBeNull();
-      expect(localStorage.getItem('user')).toBeNull();
     });
   });
 

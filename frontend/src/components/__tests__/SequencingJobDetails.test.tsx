@@ -1,11 +1,21 @@
+import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import axios from 'axios';
 import SequencingJobDetails from '../SequencingJobDetails';
 
-// Mock axios
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+// Mock the utils/axios module
+jest.mock('../../utils/axios', () => ({
+  default: {
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    delete: jest.fn(),
+    patch: jest.fn()
+  }
+}));
+
+// Import the mocked module
+import api from '../../utils/axios';
 
 // Mock data - Updated to match component interface
 const mockJob = {
@@ -35,7 +45,7 @@ describe('SequencingJobDetails', () => {
   });
 
   it('renders loading state initially', () => {
-    mockedAxios.get.mockImplementation(() => new Promise(() => {}));
+    api.get.mockImplementation(() => new Promise(() => {}));
     
     render(
       <QueryClientProvider client={queryClient}>
@@ -47,7 +57,7 @@ describe('SequencingJobDetails', () => {
   });
 
   it('renders job details correctly', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: mockJob });
+    api.get.mockResolvedValueOnce({ data: mockJob });
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -64,8 +74,8 @@ describe('SequencingJobDetails', () => {
   });
 
   it('handles sample sheet generation', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: mockJob });
-    mockedAxios.post.mockResolvedValueOnce({ data: { sample_sheet_path: 'http://example.com/sheet' } });
+    api.get.mockResolvedValueOnce({ data: mockJob });
+    api.post.mockResolvedValueOnce({ data: { sample_sheet_path: 'http://example.com/sheet' } });
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -80,13 +90,13 @@ describe('SequencingJobDetails', () => {
     fireEvent.click(screen.getByText('Generate Sample Sheet'));
 
     await waitFor(() => {
-      expect(mockedAxios.post).toHaveBeenCalledWith('/api/sequencing/jobs/1/sample-sheet');
+      expect(api.post).toHaveBeenCalledWith('/api/sequencing/jobs/1/sample-sheet');
     });
   });
 
   it('handles job status updates', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: mockJob });
-    mockedAxios.patch.mockResolvedValueOnce({ data: { ...mockJob, status: 'InProgress' } });
+    api.get.mockResolvedValueOnce({ data: mockJob });
+    api.patch.mockResolvedValueOnce({ data: { ...mockJob, status: 'InProgress' } });
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -101,12 +111,12 @@ describe('SequencingJobDetails', () => {
     fireEvent.click(screen.getByText('Start Job'));
 
     await waitFor(() => {
-      expect(mockedAxios.patch).toHaveBeenCalledWith('/api/sequencing/jobs/1', { status: 'InProgress' });
+      expect(api.patch).toHaveBeenCalledWith('/api/sequencing/jobs/1', { status: 'InProgress' });
     });
   });
 
   it('calls onClose when close button is clicked', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: mockJob });
+    api.get.mockResolvedValueOnce({ data: mockJob });
     const onClose = jest.fn();
 
     render(

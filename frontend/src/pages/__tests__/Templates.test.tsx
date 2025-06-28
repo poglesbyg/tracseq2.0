@@ -1,27 +1,43 @@
+import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import axios from 'axios';
+
+// Mock the utils/axios module
+jest.mock('../../utils/axios', () => ({
+  default: {
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    delete: jest.fn()
+  }
+}));
+
 import Templates from '../Templates';
+// Import the mocked module
+import axios from '../../utils/axios';
 
-// Mock axios
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
-
-// Mock data
+// Mock template data
 const mockTemplates = [
   {
-    id: '1',
-    name: 'Template 1',
-    version: '1.0',
-    created_at: '2024-03-20T10:00:00Z',
-    updated_at: '2024-03-20T10:00:00Z'
+    id: 'template-1',
+    name: 'Blood Sample Template',
+    description: 'Template for blood samples',
+    created_at: '2025-01-01T00:00:00Z',
+    created_by: 'user@example.com',
+    fields: [],
+    usage_count: 10,
+    last_used: '2025-01-01T00:00:00Z'
   },
   {
-    id: '2',
-    name: 'Template 2',
-    version: '1.0',
-    created_at: '2024-03-20T11:00:00Z',
-    updated_at: '2024-03-20T11:00:00Z'
+    id: 'template-2',
+    name: 'DNA Extraction Template',
+    description: 'Template for DNA extraction',
+    created_at: '2025-01-02T00:00:00Z',
+    created_by: 'user@example.com',
+    fields: [],
+    usage_count: 5,
+    last_used: '2025-01-02T00:00:00Z'
   }
 ];
 
@@ -40,7 +56,7 @@ describe('Templates', () => {
   });
 
   it('renders loading state initially', () => {
-    mockedAxios.get.mockImplementation(() => new Promise(() => {}));
+    axios.get.mockImplementation(() => new Promise(() => {}));
     
     render(
       <QueryClientProvider client={queryClient}>
@@ -52,7 +68,7 @@ describe('Templates', () => {
   });
 
   it('renders templates list correctly', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: mockTemplates });
+    axios.get.mockResolvedValueOnce({ data: mockTemplates });
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -61,13 +77,13 @@ describe('Templates', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Template 1')).toBeInTheDocument();
-      expect(screen.getByText('Template 2')).toBeInTheDocument();
+      expect(screen.getByText('Blood Sample Template')).toBeInTheDocument();
+      expect(screen.getByText('DNA Extraction Template')).toBeInTheDocument();
     });
   });
 
   it('handles file selection via click', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: mockTemplates });
+    axios.get.mockResolvedValueOnce({ data: mockTemplates });
     
     render(
       <QueryClientProvider client={queryClient}>
@@ -95,7 +111,7 @@ describe('Templates', () => {
   });
 
   it('handles drag and drop of valid file', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: mockTemplates });
+    axios.get.mockResolvedValueOnce({ data: mockTemplates });
     
     render(
       <QueryClientProvider client={queryClient}>
@@ -131,7 +147,7 @@ describe('Templates', () => {
   });
 
   it('rejects invalid file types', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: mockTemplates });
+    axios.get.mockResolvedValueOnce({ data: mockTemplates });
     
     render(
       <QueryClientProvider client={queryClient}>
@@ -160,8 +176,8 @@ describe('Templates', () => {
   });
 
   it('handles successful file upload', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: mockTemplates });
-    mockedAxios.post.mockResolvedValueOnce({ data: { id: '3', name: 'New Template' } });
+    axios.get.mockResolvedValueOnce({ data: mockTemplates });
+    axios.post.mockResolvedValueOnce({ data: { id: '3', name: 'New Template' } });
     
     render(
       <QueryClientProvider client={queryClient}>
@@ -187,7 +203,7 @@ describe('Templates', () => {
     fireEvent.click(uploadButton);
 
     await waitFor(() => {
-      expect(mockedAxios.post).toHaveBeenCalledWith(
+      expect(axios.post).toHaveBeenCalledWith(
         '/api/templates/upload',
         expect.any(FormData),
         expect.any(Object)
@@ -196,8 +212,8 @@ describe('Templates', () => {
   });
 
   it('shows loading state during upload', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: mockTemplates });
-    mockedAxios.post.mockImplementation(() => new Promise(() => {}));
+    axios.get.mockResolvedValueOnce({ data: mockTemplates });
+    axios.post.mockImplementation(() => new Promise(() => {}));
     
     render(
       <QueryClientProvider client={queryClient}>

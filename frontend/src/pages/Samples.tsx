@@ -67,16 +67,41 @@ export default function Samples() {
   };
 
   // Fetch samples
-  const { data: samples, isLoading: isLoadingSamples, refetch } = useQuery<Sample[]>({
+  const { data: samplesResponse, isLoading: isLoadingSamples, isError, error, refetch } = useQuery<{ samples: Sample[], total: number }>({
     queryKey: ['samples'],
     queryFn: async () => {
       const response = await axios.get('/api/samples');
-      return response.data;
+      // Handle both API response formats
+      if (response.data.data && response.data.data.samples) {
+        return response.data.data;
+      }
+      // Fallback to direct array response
+      return { samples: response.data, total: response.data.length };
     },
   });
 
+  // Extract samples array from response
+  const samples = samplesResponse?.samples || [];
+
+  // Handle error state
+  if (isError) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8">
+        <div className="text-center py-12">
+          <p className="text-red-600">Error loading samples. Please try again.</p>
+          <button
+            onClick={() => refetch()}
+            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Filter samples based on current filters
-  const filteredSamples = samples?.filter(sample => {
+  const filteredSamples = samples.filter((sample: Sample) => {
     // Search filter
     if (searchQuery && !sample.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
         !sample.barcode.toLowerCase().includes(searchQuery.toLowerCase())) {
@@ -106,7 +131,7 @@ export default function Samples() {
     }
     
     return true;
-  }) || [];
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -148,10 +173,10 @@ export default function Samples() {
     return remainingHours > 0 ? `${diffInDays}d ${remainingHours}h` : `${diffInDays}d`;
   };
 
-  const statusCounts = samples?.reduce((acc, sample) => {
+  const statusCounts = samples.reduce((acc: Record<string, number>, sample: Sample) => {
     acc[sample.status] = (acc[sample.status] || 0) + 1;
     return acc;
-  }, {} as Record<string, number>) || {};
+  }, {} as Record<string, number>);
 
   return (
     <div className="px-4 sm:px-6 lg:px-8">
@@ -277,7 +302,7 @@ export default function Samples() {
         {/* Results Count */}
         <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
           <p className="text-sm text-gray-600">
-            Showing {filteredSamples.length} of {samples?.length || 0} samples
+            Showing {filteredSamples.length} of {samples.length} samples
           </p>
         </div>
       </div>
