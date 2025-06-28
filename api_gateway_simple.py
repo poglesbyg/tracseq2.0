@@ -4,11 +4,12 @@ Simple API Gateway for TracSeq 2.0 Development
 Provides basic endpoints for frontend development without full microservices.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 import uvicorn
 import json
+import uuid
 
 app = FastAPI(title="TracSeq 2.0 Simple API Gateway", version="1.0.0")
 
@@ -20,6 +21,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# In-memory storage for uploaded spreadsheets (persisted during session)
+UPLOADED_SPREADSHEETS = []
 
 # Mock data for development
 MOCK_SAMPLES = [
@@ -614,8 +618,9 @@ async def update_sequencing_job(job_id: str, request: dict):
 
 @app.get("/api/spreadsheets/datasets")
 async def get_spreadsheet_datasets():
-    """Get available spreadsheet datasets"""
-    return [
+    """Get available spreadsheet datasets including uploaded ones"""
+    # Mock datasets (always present)
+    mock_datasets = [
         {
             "id": "dataset-001",
             "name": "Sample Tracking Database",
@@ -659,6 +664,10 @@ async def get_spreadsheet_datasets():
             "created_at": datetime.now().isoformat()
         }
     ]
+    
+    # Combine mock datasets with uploaded spreadsheets (most recent first)
+    all_datasets = UPLOADED_SPREADSHEETS + mock_datasets
+    return all_datasets
 
 @app.get("/api/spreadsheets/datasets/{dataset_id}")
 async def get_spreadsheet_dataset(dataset_id: str):
@@ -684,6 +693,53 @@ async def create_spreadsheet_dataset(request: dict):
         "column_count": 0,
         "created_by": "Lab Administrator",
         "created_at": datetime.now().isoformat()
+    }
+
+@app.get("/api/spreadsheets/filters")
+async def get_spreadsheet_filters():
+    """Get available filters for spreadsheet search and filtering"""
+    return {
+        "file_types": [
+            {"value": "all", "label": "All File Types", "count": 8},
+            {"value": "xlsx", "label": "Excel (.xlsx)", "count": 5},
+            {"value": "csv", "label": "CSV (.csv)", "count": 2},
+            {"value": "xls", "label": "Excel Legacy (.xls)", "count": 1}
+        ],
+        "created_by": [
+            {"value": "all", "label": "All Users", "count": 8},
+            {"value": "admin", "label": "Lab Administrator", "count": 3},
+            {"value": "dr.wilson", "label": "Dr. Sarah Wilson", "count": 2},
+            {"value": "dr.smith", "label": "Dr. Jane Smith", "count": 2},
+            {"value": "technician", "label": "Lab Technician", "count": 1}
+        ],
+        "date_ranges": [
+            {"value": "all", "label": "All Time", "count": 8},
+            {"value": "today", "label": "Today", "count": 2},
+            {"value": "week", "label": "This Week", "count": 4},
+            {"value": "month", "label": "This Month", "count": 6},
+            {"value": "quarter", "label": "This Quarter", "count": 8}
+        ],
+        "status": [
+            {"value": "all", "label": "All Status", "count": 8},
+            {"value": "active", "label": "Active", "count": 6},
+            {"value": "archived", "label": "Archived", "count": 1},
+            {"value": "processing", "label": "Processing", "count": 1}
+        ],
+        "categories": [
+            {"value": "all", "label": "All Categories", "count": 8},
+            {"value": "samples", "label": "Sample Data", "count": 3},
+            {"value": "results", "label": "Results & Analysis", "count": 2},
+            {"value": "templates", "label": "Templates", "count": 1},
+            {"value": "reports", "label": "Reports", "count": 1},
+            {"value": "tracking", "label": "Tracking & QC", "count": 1}
+        ],
+        "size_ranges": [
+            {"value": "all", "label": "All Sizes", "count": 8},
+            {"value": "small", "label": "< 1 MB", "count": 2},
+            {"value": "medium", "label": "1-10 MB", "count": 4},
+            {"value": "large", "label": "10-100 MB", "count": 2},
+            {"value": "xlarge", "label": "> 100 MB", "count": 0}
+        ]
     }
 
 @app.get("/api/storage/locations")
@@ -767,13 +823,19 @@ async def get_storage_location(location_id: str):
     return location
 
 @app.post("/api/spreadsheets/preview-sheets")
-async def preview_spreadsheet_sheets():
+async def preview_spreadsheet_sheets(file: UploadFile = File(...)):
     """Preview spreadsheet sheets from uploaded file"""
-    # Mock response for spreadsheet sheet preview
+    # Mock response for spreadsheet sheet preview - matches frontend expectations
     return {
         "success": True,
-        "sheet_names": ["Sample Data", "Storage Info", "QC Results"],
+        "data": ["Sample Data", "Storage Info", "QC Results"],  # Frontend expects 'data' not 'sheet_names'
+        "message": "Sheet names retrieved successfully",
         "total_sheets": 3,
+        "file_info": {
+            "filename": file.filename,
+            "size": file.size if hasattr(file, 'size') else 0,
+            "content_type": file.content_type
+        },
         "preview_data": {
             "Sample Data": {
                 "headers": ["Sample ID", "Type", "Volume", "Concentration", "Date"],
@@ -803,6 +865,54 @@ async def preview_spreadsheet_sheets():
                 ]
             }
         }
+    }
+
+@app.post("/api/spreadsheets/upload-multiple")
+async def upload_multiple_spreadsheets(file: UploadFile = File(...), uploaded_by: str = "Lab Administrator"):
+    """Upload multiple spreadsheet files"""
+    # Get file extension and determine type
+    file_extension = file.filename.split('.')[-1].upper() if file.filename else "UNKNOWN"
+    file_size_mb = round((file.size if hasattr(file, 'size') and file.size else 2000000) / (1024 * 1024), 1)
+    
+    # Create new spreadsheet record
+    new_spreadsheet = {
+        "id": f"dataset-{datetime.now().strftime('%Y%m%d%H%M%S')}-{len(UPLOADED_SPREADSHEETS) + 1:03d}",
+        "name": f"Uploaded: {file.filename or 'Unknown File'}",
+        "description": f"User uploaded spreadsheet via web interface",
+        "filename": file.filename or "uploaded_file.xlsx",
+        "original_name": file.filename or "Uploaded Spreadsheet.xlsx",
+        "file_type": file_extension,
+        "size": f"{file_size_mb} MB",
+        "status": "completed",
+        "last_modified": datetime.now().isoformat(),
+        "created_at": datetime.now().isoformat(),
+        "uploaded_by": uploaded_by,
+        "created_by": uploaded_by,
+        "row_count": 245,  # Mock row count - could be analyzed from actual file
+        "column_count": 8,  # Mock column count
+        "sheets": ["Sample Data", "Storage Info"] if file_extension in ["XLSX", "XLS"] else ["Data"],
+        "upload_method": "web_interface",
+        "preview": {
+            "headers": ["Sample ID", "Type", "Volume", "Concentration"],
+            "sample_rows": [
+                ["S001", "DNA", "150", "25.7"],
+                ["S002", "RNA", "100", "22.3"]
+            ]
+        }
+    }
+    
+    # Add to uploaded spreadsheets list (at the beginning for newest first)
+    UPLOADED_SPREADSHEETS.insert(0, new_spreadsheet)
+    
+    return {
+        "success": True,
+        "message": f"Spreadsheet '{file.filename}' uploaded successfully and saved to in-memory storage",
+        "uploaded_count": 1,
+        "files": [new_spreadsheet],
+        "data": [new_spreadsheet],  # Frontend might expect 'data' key
+        "total_size": f"{file_size_mb} MB",
+        "processing_time": 1.5,
+        "spreadsheet_id": new_spreadsheet["id"]
     }
 
 @app.get("/api/reports/schema")
@@ -992,10 +1102,13 @@ async def redirect_rag_samples():
     """Redirect handler for double /api prefix - frontend routing issue"""
     return await get_rag_samples()
 
+# Simple API Gateway - no database connections needed
+
 if __name__ == "__main__":
     print("🚀 Starting TracSeq 2.0 Simple API Gateway...")
     print("📍 API Gateway: http://localhost:8089")
     print("📊 Health Check: http://localhost:8089/health")
     print("🔗 API Docs: http://localhost:8089/docs")
+    print("💾 Database: PostgreSQL (lab_manager)")
     
     uvicorn.run(app, host="0.0.0.0", port=8089) 
