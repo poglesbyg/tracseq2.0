@@ -313,17 +313,84 @@ Need specific help? Ask about "submitting samples", "viewing AI samples", "seque
         response = """Sample Storage Information:
 
 **Current Storage Status**:
-• Samples In Storage: 1
-• Samples Pending: 1
+• Total Storage Zones: 5 active locations
+• Ultra-Low Freezer (-80°C): 287/500 occupied (57%)
+• Standard Freezer (-20°C): 156/300 occupied (52%)
+• Refrigerated Storage (4°C): 89/200 occupied (45%)
+• Room Temperature: 34/150 occupied (23%)
+• Incubator (37°C): 23/100 occupied (23%)
 
-**Storage Zones Available**:
-• -80°C (Ultra-low freezer)
-• -20°C (Standard freezer) 
-• 4°C (Refrigerated)
-• Room Temperature
-• 37°C (Incubator)
+**Storage Management**:
+• Real-time capacity monitoring
+• Temperature alerts and notifications
+• Automated sample location assignment
+• Equipment status tracking (all operational)
 
 Storage locations are automatically assigned based on sample requirements extracted from your documents or manually specified during sample creation."""
+        
+    elif any(word in query for word in ["reports", "export", "analytics", "dashboard"]):
+        response = """Reports & Analytics:
+
+**Available Reports**:
+• Sample Summary Report - All samples with key metrics
+• Storage Audit Report - Detailed utilization and audit trail
+• Sequencing Performance Metrics - Platform analysis
+
+**Report Formats**:
+• CSV - Data exports for analysis
+• XLSX - Formatted spreadsheets 
+• PDF - Formatted reports for sharing
+
+**Dashboard Features**:
+• Real-time system statistics
+• Sample processing metrics
+• Storage utilization charts
+• Performance monitoring
+
+Access the Reports section or Dashboard to generate custom reports and view analytics."""
+        
+    elif any(word in query for word in ["user", "account", "team", "permissions"]):
+        response = """User Management:
+
+**Current Users**:
+• Lab Administrator (admin@lab.local) - Full access
+• Dr. Sarah Wilson (scientist@lab.local) - Principal Investigator  
+• John Smith (tech@lab.local) - Lab Technician
+
+**User Roles Available**:
+• Lab Administrator - Full system access
+• Principal Investigator - Research project management
+• Lab Technician - Sample processing and data entry
+• Data Analyst - Read-only access to reports
+• Research Scientist - Sample management and analysis
+
+**Permissions**:
+• Role-based access control
+• Departmental restrictions
+• Activity logging and audit trails
+
+Contact your administrator to manage user accounts and permissions."""
+        
+    elif any(word in query for word in ["spreadsheet", "dataset", "data export", "excel"]):
+        response = """Spreadsheet & Data Management:
+
+**Available Datasets**:
+• Sample Tracking Database (2.4 MB, 1,247 rows)
+• Sequencing Results Archive (856 KB, 892 rows)  
+• Template Usage Statistics (1.1 MB, 456 rows)
+
+**Data Export Options**:
+• Download datasets in XLSX or CSV format
+• Filter and export specific sample subsets
+• Generate custom reports from templates
+
+**Spreadsheet Features**:
+• Import/export laboratory data
+• Version control for dataset changes
+• Real-time collaboration on shared spreadsheets
+• Automated data validation and quality checks
+
+Access the Spreadsheets page to view, download, or create new datasets."""
         
     elif any(word in query for word in ["login", "access", "permission", "account"]):
         response = """Access & Authentication:
@@ -545,6 +612,310 @@ async def update_sequencing_job(job_id: str, request: dict):
     job["updated_at"] = datetime.now().isoformat()
     return job
 
+@app.get("/api/spreadsheets/datasets")
+async def get_spreadsheet_datasets():
+    """Get available spreadsheet datasets"""
+    return [
+        {
+            "id": "dataset-001",
+            "name": "Sample Tracking Database",
+            "description": "Comprehensive sample tracking and metadata",
+            "file_type": "XLSX",
+            "size": "2.4 MB",
+            "last_modified": datetime.now().isoformat(),
+            "status": "active",
+            "row_count": 1247,
+            "column_count": 23,
+            "sheets": ["Samples", "Storage", "QC Results"],
+            "created_by": "Dr. Sarah Wilson",
+            "created_at": datetime.now().isoformat()
+        },
+        {
+            "id": "dataset-002", 
+            "name": "Sequencing Results Archive",
+            "description": "Historical sequencing job results and metrics",
+            "file_type": "CSV",
+            "size": "856 KB",
+            "last_modified": datetime.now().isoformat(),
+            "status": "active",
+            "row_count": 892,
+            "column_count": 15,
+            "sheets": ["Results"],
+            "created_by": "Dr. Jane Smith",
+            "created_at": datetime.now().isoformat()
+        },
+        {
+            "id": "dataset-003",
+            "name": "Template Usage Statistics",
+            "description": "Analytics on template usage and effectiveness",
+            "file_type": "XLSX",
+            "size": "1.1 MB", 
+            "last_modified": datetime.now().isoformat(),
+            "status": "active",
+            "row_count": 456,
+            "column_count": 12,
+            "sheets": ["Usage Stats", "Templates", "Metrics"],
+            "created_by": "Lab Administrator",
+            "created_at": datetime.now().isoformat()
+        }
+    ]
+
+@app.get("/api/spreadsheets/datasets/{dataset_id}")
+async def get_spreadsheet_dataset(dataset_id: str):
+    """Get a specific spreadsheet dataset"""
+    datasets = await get_spreadsheet_datasets()
+    dataset = next((d for d in datasets if d["id"] == dataset_id), None)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    return dataset
+
+@app.post("/api/spreadsheets/datasets")
+async def create_spreadsheet_dataset(request: dict):
+    """Create a new spreadsheet dataset"""
+    return {
+        "id": f"dataset-{datetime.now().strftime('%H%M%S')}",
+        "name": request.get("name", "New Dataset"),
+        "description": request.get("description", ""),
+        "file_type": "XLSX",
+        "size": "0 KB",
+        "last_modified": datetime.now().isoformat(),
+        "status": "active",
+        "row_count": 0,
+        "column_count": 0,
+        "created_by": "Lab Administrator",
+        "created_at": datetime.now().isoformat()
+    }
+
+@app.get("/api/storage/locations")
+async def get_storage_locations():
+    """Get available storage locations"""
+    return [
+        {
+            "id": "zone-001",
+            "name": "Ultra-Low Freezer Zone A",
+            "zone": "Zone-A",
+            "temperature": "-80°C",
+            "capacity": 500,
+            "occupied": 287,
+            "available": 213,
+            "status": "operational",
+            "last_checked": datetime.now().isoformat(),
+            "equipment": "Thermo Fisher ULT-2586",
+            "location": "Building A, Room 101"
+        },
+        {
+            "id": "zone-002", 
+            "name": "Standard Freezer Zone B",
+            "zone": "Zone-B",
+            "temperature": "-20°C",
+            "capacity": 300,
+            "occupied": 156,
+            "available": 144,
+            "status": "operational",
+            "last_checked": datetime.now().isoformat(),
+            "equipment": "Fisher Scientific Freezer",
+            "location": "Building A, Room 102"
+        },
+        {
+            "id": "zone-003",
+            "name": "Refrigerated Storage Zone C",
+            "zone": "Zone-C", 
+            "temperature": "4°C",
+            "capacity": 200,
+            "occupied": 89,
+            "available": 111,
+            "status": "operational",
+            "last_checked": datetime.now().isoformat(),
+            "equipment": "Lab Refrigerator Unit",
+            "location": "Building A, Room 103"
+        },
+        {
+            "id": "zone-004",
+            "name": "Room Temperature Zone D",
+            "zone": "Zone-D",
+            "temperature": "RT",
+            "capacity": 150,
+            "occupied": 34,
+            "available": 116,
+            "status": "operational", 
+            "last_checked": datetime.now().isoformat(),
+            "equipment": "Climate Controlled Cabinet",
+            "location": "Building A, Room 104"
+        },
+        {
+            "id": "zone-005",
+            "name": "Incubator Zone E",
+            "zone": "Zone-E",
+            "temperature": "37°C",
+            "capacity": 100,
+            "occupied": 23,
+            "available": 77,
+            "status": "operational",
+            "last_checked": datetime.now().isoformat(), 
+            "equipment": "CO2 Incubator",
+            "location": "Building A, Room 105"
+        }
+    ]
+
+@app.get("/api/storage/locations/{location_id}")
+async def get_storage_location(location_id: str):
+    """Get specific storage location details"""
+    locations = await get_storage_locations()
+    location = next((l for l in locations if l["id"] == location_id), None)
+    if not location:
+        raise HTTPException(status_code=404, detail="Storage location not found")
+    return location
+
+@app.post("/api/spreadsheets/preview-sheets")
+async def preview_spreadsheet_sheets():
+    """Preview spreadsheet sheets from uploaded file"""
+    # Mock response for spreadsheet sheet preview
+    return {
+        "success": True,
+        "sheet_names": ["Sample Data", "Storage Info", "QC Results"],
+        "total_sheets": 3,
+        "preview_data": {
+            "Sample Data": {
+                "headers": ["Sample ID", "Type", "Volume", "Concentration", "Date"],
+                "row_count": 156,
+                "preview_rows": [
+                    ["S001", "DNA", "150", "25.7", "2024-01-15"],
+                    ["S002", "RNA", "100", "22.3", "2024-01-16"], 
+                    ["S003", "Protein", "200", "18.9", "2024-01-17"]
+                ]
+            },
+            "Storage Info": {
+                "headers": ["Sample ID", "Location", "Temperature", "Container"],
+                "row_count": 156,
+                "preview_rows": [
+                    ["S001", "Zone-A-01", "-80°C", "Cryotube"],
+                    ["S002", "Zone-B-05", "-20°C", "PCR Tube"],
+                    ["S003", "Zone-C-12", "4°C", "Eppendorf"]
+                ]
+            },
+            "QC Results": {
+                "headers": ["Sample ID", "Quality Score", "Pass/Fail", "Notes"],
+                "row_count": 156,
+                "preview_rows": [
+                    ["S001", "8.5", "Pass", "Good quality"],
+                    ["S002", "7.2", "Pass", "Minor degradation"],
+                    ["S003", "9.1", "Pass", "Excellent"]
+                ]
+            }
+        }
+    }
+
+@app.get("/api/reports/schema")
+async def get_reports_schema():
+    """Get reports schema information"""
+    return {
+        "schemas": [
+            {
+                "id": "sample_report",
+                "name": "Sample Report",
+                "description": "Comprehensive sample tracking report",
+                "fields": ["sample_id", "type", "status", "location", "created_date"],
+                "format": "CSV"
+            },
+            {
+                "id": "storage_report", 
+                "name": "Storage Utilization Report",
+                "description": "Storage capacity and utilization metrics",
+                "fields": ["zone", "capacity", "occupied", "utilization_percent", "temperature"],
+                "format": "XLSX"
+            },
+            {
+                "id": "sequencing_report",
+                "name": "Sequencing Jobs Report", 
+                "description": "Sequencing job status and metrics",
+                "fields": ["job_id", "status", "platform", "samples_count", "created_date"],
+                "format": "PDF"
+            }
+        ]
+    }
+
+@app.get("/api/reports/templates")
+async def get_reports_templates():
+    """Get available report templates"""
+    return [
+        {
+            "id": "tpl_sample_summary",
+            "name": "Sample Summary Report",
+            "description": "Summary of all samples with key metrics",
+            "category": "samples",
+            "format": "XLSX",
+            "parameters": ["date_range", "sample_type", "status"]
+        },
+        {
+            "id": "tpl_storage_audit",
+            "name": "Storage Audit Report", 
+            "description": "Detailed storage utilization and audit trail",
+            "category": "storage",
+            "format": "PDF",
+            "parameters": ["zone", "date_range", "include_movements"]
+        },
+        {
+            "id": "tpl_sequencing_metrics",
+            "name": "Sequencing Performance Metrics",
+            "description": "Platform performance and throughput analysis", 
+            "category": "sequencing",
+            "format": "CSV",
+            "parameters": ["platform", "date_range", "job_status"]
+        }
+    ]
+
+@app.get("/api/users")
+async def get_users(page: int = 1, per_page: int = 10):
+    """Get paginated list of users"""
+    mock_users = [
+        {
+            "id": "user-001",
+            "email": "admin@lab.local",
+            "first_name": "Lab",
+            "last_name": "Administrator",
+            "role": "lab_administrator",
+            "status": "active",
+            "department": "Laboratory Management",
+            "created_at": datetime.now().isoformat()
+        },
+        {
+            "id": "user-002", 
+            "email": "scientist@lab.local",
+            "first_name": "Dr. Sarah",
+            "last_name": "Wilson",
+            "role": "principal_investigator",
+            "status": "active",
+            "department": "Research",
+            "created_at": datetime.now().isoformat()
+        },
+        {
+            "id": "user-003",
+            "email": "tech@lab.local", 
+            "first_name": "John",
+            "last_name": "Smith",
+            "role": "lab_technician",
+            "status": "active",
+            "department": "Laboratory Operations",
+            "created_at": datetime.now().isoformat()
+        }
+    ]
+    
+    # Simulate pagination
+    total = len(mock_users)
+    start = (page - 1) * per_page
+    end = start + per_page
+    users = mock_users[start:end]
+    
+    return {
+        "users": users,
+        "pagination": {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "pages": (total + per_page - 1) // per_page
+        }
+    }
+
 @app.post("/api/auth/login")
 async def login(request: dict):
     """Mock login endpoint with correct response format"""
@@ -579,6 +950,47 @@ async def login(request: dict):
         }
     
     raise HTTPException(status_code=401, detail="Invalid credentials. Use password 'password' or any valid email.")
+
+# Redirect handlers for double /api URLs (frontend routing issue) 
+@app.get("/api/api/storage/locations")
+async def redirect_storage_locations():
+    """Redirect handler for double /api prefix - frontend routing issue"""
+    return await get_storage_locations()
+
+@app.get("/api/api/samples")
+async def redirect_samples():
+    """Redirect handler for double /api prefix - frontend routing issue"""
+    return await get_samples()
+
+@app.get("/api/api/templates")
+async def redirect_templates():
+    """Redirect handler for double /api prefix - frontend routing issue"""
+    return await get_templates()
+
+@app.get("/api/api/sequencing/jobs")
+async def redirect_sequencing_jobs():
+    """Redirect handler for double /api prefix - frontend routing issue"""
+    return await get_sequencing_jobs()
+
+@app.get("/api/api/spreadsheets/datasets")
+async def redirect_spreadsheets_datasets():
+    """Redirect handler for double /api prefix - frontend routing issue"""
+    return await get_spreadsheet_datasets()
+
+@app.get("/api/api/dashboard/stats")
+async def redirect_dashboard_stats():
+    """Redirect handler for double /api prefix - frontend routing issue"""
+    return await get_dashboard_stats()
+
+@app.get("/api/api/rag/submissions")
+async def redirect_rag_submissions():
+    """Redirect handler for double /api prefix - frontend routing issue"""
+    return await get_rag_submissions()
+
+@app.get("/api/api/rag/samples")
+async def redirect_rag_samples():
+    """Redirect handler for double /api prefix - frontend routing issue"""
+    return await get_rag_samples()
 
 if __name__ == "__main__":
     print("🚀 Starting TracSeq 2.0 Simple API Gateway...")

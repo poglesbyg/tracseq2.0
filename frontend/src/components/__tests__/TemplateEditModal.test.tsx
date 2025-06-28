@@ -40,7 +40,7 @@ describe('TemplateEditModal', () => {
     });
   });
 
-  const renderComponent = (isOpen = true, template = mockTemplate) => {
+  const renderComponent = (isOpen = true, template: typeof mockTemplate | null = mockTemplate) => {
     return render(
       <QueryClientProvider client={queryClient}>
         <TemplateEditModal
@@ -72,8 +72,10 @@ describe('TemplateEditModal', () => {
     it('displays template information', () => {
       renderComponent();
       
+      const expectedDate = new Date(mockTemplate.created_at).toLocaleDateString();
+      
       expect(screen.getByText('template-1')).toBeInTheDocument();
-      expect(screen.getByText('1/1/2025')).toBeInTheDocument();
+      expect(screen.getByText(expectedDate)).toBeInTheDocument();
       expect(screen.getByText('csv')).toBeInTheDocument();
       expect(screen.getByText('template.csv')).toBeInTheDocument();
     });
