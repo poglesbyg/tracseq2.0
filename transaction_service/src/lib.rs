@@ -1,6 +1,7 @@
 pub mod coordinator;
 pub mod handlers;
 pub mod models;
+#[cfg(feature = "database-persistence")]
 pub mod persistence;
 pub mod saga;
 pub mod services;
