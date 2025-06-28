@@ -4,17 +4,16 @@ Simple Frontend API Bridge for RAG Submissions
 Provides basic API endpoints that the lab_manager frontend needs
 """
 
-import asyncio
-import asyncpg
 import json
 import os
 import sys
 import time
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+import asyncpg
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -60,10 +59,10 @@ class RagSubmissionResponse(BaseModel):
 
     id: str
     submission_id: str
-    submitter_name: Optional[str]
-    submitter_email: Optional[str]
-    sample_type: Optional[str]
-    sample_name: Optional[str]
+    submitter_name: str | None
+    submitter_email: str | None
+    sample_type: str | None
+    sample_name: str | None
     confidence_score: float
     created_at: str
     status: str = "completed"
@@ -72,34 +71,34 @@ class RagSubmissionResponse(BaseModel):
 class DocumentProcessRequest(BaseModel):
     """Request model for document processing"""
     text: str
-    filename: Optional[str] = "document.txt"
+    filename: str | None = "document.txt"
 
 
 class SampleInfo(BaseModel):
     """Sample information extracted from document"""
-    sample_id: Optional[str] = None
-    sample_name: Optional[str] = None
-    sample_type: Optional[str] = None
-    concentration: Optional[str] = None
-    volume: Optional[str] = None
-    storage_conditions: Optional[str] = None
+    sample_id: str | None = None
+    sample_name: str | None = None
+    sample_type: str | None = None
+    concentration: str | None = None
+    volume: str | None = None
+    storage_conditions: str | None = None
 
 
 class SubmitterInfo(BaseModel):
     """Submitter information extracted from document"""
-    name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    institution: Optional[str] = None
-    project_name: Optional[str] = None
+    name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    institution: str | None = None
+    project_name: str | None = None
 
 
 class SequencingInfo(BaseModel):
     """Sequencing information extracted from document"""
-    platform: Optional[str] = None
-    analysis_type: Optional[str] = None
-    coverage: Optional[str] = None
-    read_length: Optional[str] = None
+    platform: str | None = None
+    analysis_type: str | None = None
+    coverage: str | None = None
+    read_length: str | None = None
 
 
 class DocumentProcessResponse(BaseModel):
@@ -108,7 +107,7 @@ class DocumentProcessResponse(BaseModel):
     confidence_score: float
     samples_found: int
     processing_time: float
-    extracted_data: Dict[str, Any]
+    extracted_data: dict[str, Any]
     submitter_info: SubmitterInfo
     sample_info: SampleInfo
     sequencing_info: SequencingInfo
@@ -137,7 +136,7 @@ async def health_check():
         raise HTTPException(status_code=503, detail=f"Database connection failed: {e}")
 
 
-@app.get("/api/rag/submissions", response_model=List[RagSubmissionResponse])
+@app.get("/api/rag/submissions", response_model=list[RagSubmissionResponse])
 async def get_rag_submissions(limit: int = 50, offset: int = 0):
     """Get RAG submissions for the frontend"""
     try:
@@ -229,7 +228,7 @@ async def get_rag_statistics():
 async def process_document(request: DocumentProcessRequest):
     """Process document and extract laboratory information using AI"""
     start_time = time.time()
-    
+
     try:
         if not llm_interface:
             return DocumentProcessResponse(
@@ -243,21 +242,21 @@ async def process_document(request: DocumentProcessRequest):
                 sequencing_info=SequencingInfo(),
                 message="LLM interface not available"
             )
-        
+
         # Extract information using LLM
         extraction_result = llm_interface.extract_submission_info(request.text)
-        
+
         # Calculate confidence score based on how much information was extracted
         confidence_score = calculate_confidence_score(extraction_result)
-        
+
         # Count samples found
         samples_found = 1 if extraction_result.get('sample', {}).get('sample_id') else 0
-        
+
         # Convert extracted data to structured format
         admin_data = extraction_result.get('administrative', {}) or {}
         sample_data = extraction_result.get('sample', {}) or {}
         sequencing_data = extraction_result.get('sequencing', {}) or {}
-        
+
         submitter_info = SubmitterInfo(
             name=admin_data.get('submitter_name'),
             email=admin_data.get('submitter_email'),
@@ -265,7 +264,7 @@ async def process_document(request: DocumentProcessRequest):
             institution=admin_data.get('institution'),
             project_name=admin_data.get('project_name')
         )
-        
+
         sample_info = SampleInfo(
             sample_id=sample_data.get('sample_id'),
             sample_name=sample_data.get('sample_id'),  # Use ID as name if no separate name
@@ -274,16 +273,16 @@ async def process_document(request: DocumentProcessRequest):
             volume=sample_data.get('volume'),
             storage_conditions=sample_data.get('storage_conditions')
         )
-        
+
         sequencing_info = SequencingInfo(
             platform=sequencing_data.get('platform'),
             analysis_type=sequencing_data.get('analysis_type'),
             coverage=sequencing_data.get('coverage'),
             read_length=sequencing_data.get('read_length')
         )
-        
+
         processing_time = time.time() - start_time
-        
+
         # Store the extraction in database if successful
         if samples_found > 0:
             try:
@@ -295,7 +294,7 @@ async def process_document(request: DocumentProcessRequest):
                 )
             except Exception as db_error:
                 print(f"⚠️ Failed to store extraction result: {db_error}")
-        
+
         return DocumentProcessResponse(
             success=True,
             confidence_score=confidence_score,
@@ -307,11 +306,11 @@ async def process_document(request: DocumentProcessRequest):
             sequencing_info=sequencing_info,
             message="Document processed successfully" if samples_found > 0 else "Document processed but no complete sample information found"
         )
-        
+
     except Exception as e:
         processing_time = time.time() - start_time
         print(f"❌ Document processing failed: {e}")
-        
+
         return DocumentProcessResponse(
             success=False,
             confidence_score=0.0,
@@ -331,7 +330,7 @@ async def process_file_upload(file: UploadFile = File(...)):
     try:
         # Read file content
         content = await file.read()
-        
+
         # Convert to text (basic text extraction)
         if file.content_type == "text/plain":
             text = content.decode('utf-8')
@@ -341,23 +340,23 @@ async def process_file_upload(file: UploadFile = File(...)):
                 text = content.decode('utf-8')
             except UnicodeDecodeError:
                 raise HTTPException(status_code=400, detail="Unable to process file. Please upload a text file.")
-        
+
         # Process the document
         request = DocumentProcessRequest(text=text, filename=file.filename)
         return await process_document(request)
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"File processing failed: {str(e)}")
 
 
-def calculate_confidence_score(extraction_result: Dict[str, Any]) -> float:
+def calculate_confidence_score(extraction_result: dict[str, Any]) -> float:
     """Calculate confidence score based on extracted information completeness"""
     if "error" in extraction_result:
         return 0.0
-    
+
     total_fields = 0
     filled_fields = 0
-    
+
     # Check administrative fields
     admin = extraction_result.get('administrative', {}) or {}
     admin_fields = ['submitter_name', 'submitter_email', 'project_name', 'institution']
@@ -365,15 +364,15 @@ def calculate_confidence_score(extraction_result: Dict[str, Any]) -> float:
         total_fields += 1
         if admin.get(field) and admin[field] != "null":
             filled_fields += 1
-    
-    # Check sample fields  
+
+    # Check sample fields
     sample = extraction_result.get('sample', {}) or {}
     sample_fields = ['sample_id', 'sample_type', 'concentration', 'volume']
     for field in sample_fields:
         total_fields += 1
         if sample.get(field) and sample[field] != "null":
             filled_fields += 1
-    
+
     # Check sequencing fields
     sequencing = extraction_result.get('sequencing', {}) or {}
     seq_fields = ['platform', 'analysis_type', 'coverage']
@@ -381,29 +380,29 @@ def calculate_confidence_score(extraction_result: Dict[str, Any]) -> float:
         total_fields += 1
         if sequencing.get(field) and sequencing[field] != "null":
             filled_fields += 1
-    
+
     if total_fields == 0:
         return 0.0
-    
+
     # Convert to percentage
     confidence = (filled_fields / total_fields) * 100
     return min(95.0, confidence)  # Cap at 95% to indicate AI uncertainty
 
 
-async def store_extraction_result(submission_id: str, filename: str, extracted_data: Dict[str, Any], confidence_score: float):
+async def store_extraction_result(submission_id: str, filename: str, extracted_data: dict[str, Any], confidence_score: float):
     """Store extraction result in database"""
     try:
         conn = await get_db_connection()
-        
+
         admin_data = extracted_data.get('administrative', {}) or {}
         sample_data = extracted_data.get('sample', {}) or {}
-        
+
         await conn.execute("""
             INSERT INTO rag_submissions (
                 submission_id, document_name, submitter_name, submitter_email,
                 sample_type, confidence_score, extracted_data, created_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        """, 
+        """,
             submission_id,
             filename,
             admin_data.get('submitter_name'),
@@ -413,10 +412,10 @@ async def store_extraction_result(submission_id: str, filename: str, extracted_d
             json.dumps(extracted_data),
             datetime.utcnow()
         )
-        
+
         await conn.close()
         print(f"✅ Stored extraction result: {submission_id}")
-        
+
     except Exception as e:
         print(f"❌ Failed to store extraction: {e}")
         # Don't raise - this is not critical for the user experience
@@ -426,7 +425,7 @@ class QueryRequest(BaseModel):
     """Request model for queries"""
 
     query: str
-    session_id: Optional[str] = "default"
+    session_id: str | None = "default"
 
 
 class QueryResponse(BaseModel):

@@ -1,6 +1,6 @@
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,18 +41,18 @@ async def startup_event():
 
 class QueryRequest(BaseModel):
     query: str
-    submission_id: Optional[str] = None
-    session_id: Optional[str] = "default"
-    k: Optional[int] = 5
+    submission_id: str | None = None
+    session_id: str | None = "default"
+    k: int | None = 5
 
 
 # Updated response models to match Rust expectations
 class RagExtractionResult(BaseModel):
     success: bool
-    submission: Optional[Dict[str, Any]] = None
+    submission: dict[str, Any] | None = None
     confidence_score: float
-    missing_fields: List[str] = []
-    warnings: List[str] = []
+    missing_fields: list[str] = []
+    warnings: list[str] = []
     processing_time: float
     source_document: str
 
@@ -138,7 +138,7 @@ async def process_submission_legacy(file: UploadFile = File(...)):
 
 @app.get("/samples/count")
 async def get_sample_count(
-    sample_type: Optional[str] = None, storage_condition: Optional[str] = None
+    sample_type: str | None = None, storage_condition: str | None = None
 ):
     """Get count of samples with optional filtering"""
     try:
@@ -207,9 +207,9 @@ async def search_samples(q: str, limit: int = 50):
 async def get_submissions(
     limit: int = 100,
     offset: int = 0,
-    client_id: Optional[str] = None,
-    status: Optional[str] = None,
-    sample_type: Optional[str] = None,
+    client_id: str | None = None,
+    status: str | None = None,
+    sample_type: str | None = None,
 ):
     """Get submissions with optional filtering"""
     try:

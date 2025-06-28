@@ -11,4 +11,134 @@ alwaysApply: true
 4. To run tests: `pnpm test --filter @app/<web/api/db>`
 
 5. Never try to start a dev server or curl a local endpoint.
+ 
++ ## Core Development Principles
++ 
++ ### Code Quality First
++ - Write clean, readable, and maintainable code over clever solutions
++ - Follow the principle of least surprise - code should do what it appears to do
++ - Prefer explicit over implicit - clarity beats brevity
++ - Each function/method should have a single, well-defined responsibility
++ - Keep functions small and focused (typically under 20-30 lines)
++ - Use meaningful variable and function names that describe their purpose
++ 
++ ### Problem-Solving Approach
++ - Break complex problems into smaller, manageable steps
++ - Always understand the problem fully before proposing solutions
++ - Consider edge cases and error scenarios upfront
++ - Think about scalability and future requirements
++ - Validate assumptions with code exploration before making changes
++ - Use logs and debugging to gather evidence, not guesswork
++ 
++ ### Communication Excellence
++ - Explain reasoning clearly before implementing changes
++ - Provide context for decisions and trade-offs
++ - Use examples to illustrate complex concepts
++ - Structure responses with clear sections (OBSERVATIONS, REASONING, PLAN)
++ - Highlight potential risks or side effects of changes
++ - Be concise but complete - avoid unnecessary verbosity
++ 
++ ## Technical Best Practices
++ 
++ ### Code Changes
++ - Make minimal, focused changes that address the specific request
++ - Preserve existing functionality unless explicitly asked to change it
++ - Test changes thoroughly before considering them complete
++ - Consider the impact on other parts of the system
++ - Follow existing code patterns and conventions in the codebase
++ - Add appropriate error handling and validation
++ 
++ ### Performance & Optimization
++ - Measure before optimizing - use profiling data
++ - Optimize for readability first, performance second (unless critical)
++ - Consider memory usage in addition to execution speed
++ - Use appropriate data structures for the use case
++ - Implement caching strategically where it provides clear benefits
++ - Avoid premature optimization
++ 
++ ### Security & Safety
++ - Validate all inputs, especially from external sources
++ - Use parameterized queries to prevent SQL injection
++ - Implement proper authentication and authorization checks
++ - Handle sensitive data with appropriate encryption
++ - Follow the principle of least privilege
++ - Log security-relevant events for auditing
++ 
++ ## System-Specific Guidelines
++ 
++ ### Laboratory System Context
++ - Always consider data integrity and compliance requirements
++ - Maintain audit trails for all critical operations
++ - Ensure proper error handling for laboratory workflows
++ - Consider the impact on sample tracking and chain of custody
++ - Validate scientific data formats and constraints
++ - Support both manual and automated workflows
++ 
++ ### Multi-Service Architecture
++ - Consider service boundaries and responsibilities
++ - Maintain loose coupling between services
++ - Use appropriate communication patterns (sync vs async)
++ - Handle distributed system failures gracefully
++ - Ensure data consistency across services
++ - Document service interfaces clearly
++ 
++ ### Testing Strategy
++ - Write tests that verify behavior, not implementation
++ - Include both positive and negative test cases
++ - Test edge cases and boundary conditions
++ - Use appropriate test types (unit, integration, e2e)
++ - Maintain test data that reflects real-world scenarios
++ - Keep tests fast and reliable
++ 
++ ## Workflow Optimization
++ 
++ ### Development Workflow
++ - Use version control effectively with clear commit messages
++ - Review changes before committing
++ - Keep commits focused and atomic
++ - Document significant architectural decisions
++ - Maintain up-to-date dependencies
++ - Use continuous integration to catch issues early
++ 
++ ### Debugging Approach
++ - Reproduce the issue consistently before attempting fixes
++ - Use systematic debugging techniques
++ - Add temporary logging to understand execution flow
++ - Remove debugging code before finalizing changes
++ - Document the root cause and solution
++ - Consider similar issues that might exist elsewhere
++ 
++ ### Collaboration
++ - Write code as if someone else will maintain it
++ - Document complex logic and business rules
++ - Use clear naming conventions consistently
++ - Provide helpful error messages for users
++ - Consider the developer experience when designing APIs
++ - Share knowledge through documentation and comments
++ 
++ ## Continuous Improvement
++ 
++ ### Learning from Issues
++ - Analyze root causes, not just symptoms
++ - Look for patterns in recurring issues
++ - Update documentation based on lessons learned
++ - Improve error messages based on user confusion
++ - Refactor code when patterns become clear
++ - Share insights with the team
++ 
++ ### Code Review Mindset
++ - Review your own code before submission
++ - Consider readability and maintainability
++ - Look for potential bugs and edge cases
++ - Ensure consistent style and patterns
++ - Verify that changes meet requirements
++ - Think about testability and debugging
++ 
++ ### Always Remember
++ - The goal is working, maintainable software that serves users well
++ - Balance perfectionism with pragmatism
++ - Every decision has trade-offs - acknowledge them
++ - Good enough today often beats perfect tomorrow
++ - Keep learning and adapting to new challenges
++ - Your code will be read more often than written - optimize for readers
 

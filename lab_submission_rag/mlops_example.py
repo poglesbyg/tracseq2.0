@@ -20,7 +20,11 @@ from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_sc
 from sklearn.model_selection import train_test_split
 
 from mlops.ab_testing import ABTestConfig, ABTestInteraction, ABTestManager, TestType
-from mlops.continuous_learning import ContinuousLearningPipeline, RetrainingConfig, TriggerType
+from mlops.continuous_learning import (
+    ContinuousLearningPipeline,
+    RetrainingConfig,
+    TriggerType,
+)
 from mlops.data_pipeline import DataPipeline, DataSchema, FeatureEngineeringConfig
 from mlops.deployment_manager import (
     DeploymentConfig,
@@ -28,7 +32,11 @@ from mlops.deployment_manager import (
     DeploymentStrategy,
     ModelDeploymentManager,
 )
-from mlops.experiment_tracker import ExperimentConfig, ExperimentMetrics, ExperimentTracker
+from mlops.experiment_tracker import (
+    ExperimentConfig,
+    ExperimentMetrics,
+    ExperimentTracker,
+)
 
 # Import MLOps components
 from mlops.model_registry import ModelMetadata, ModelRegistry, ModelStatus
@@ -44,7 +52,7 @@ class TracSeqMLOpsDemo:
     Complete demonstration of TracSeq 2.0 MLOps pipeline
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Database URL (use appropriate database for production)
         self.database_url = "sqlite:///mlops_demo.db"
 
@@ -57,7 +65,7 @@ class TracSeqMLOpsDemo:
         self.deployment_manager = None
         self.data_pipeline = None
 
-    async def initialize_components(self):
+    async def initialize_components(self) -> None:
         """Initialize all MLOps components"""
         print("🚀 Initializing MLOps components...")
 
@@ -101,7 +109,7 @@ class TracSeqMLOpsDemo:
 
         print("✅ All components initialized successfully!")
 
-    async def demo_data_pipeline(self):
+    async def demo_data_pipeline(self) -> None:
         """Demonstrate data pipeline functionality"""
         print("\n📊 === DATA PIPELINE DEMO ===")
 
@@ -167,7 +175,7 @@ class TracSeqMLOpsDemo:
 
         return pipeline_run.output_data_path if pipeline_run else None
 
-    async def demo_experiment_tracking(self, processed_data_path: str):
+    async def demo_experiment_tracking(self, processed_data_path: str) -> None:
         """Demonstrate experiment tracking"""
         print("\n🧪 === EXPERIMENT TRACKING DEMO ===")
 
@@ -243,7 +251,7 @@ class TracSeqMLOpsDemo:
         print("✅ Experiment completed successfully!")
         return model, experiment_id, metrics
 
-    async def demo_model_registry(self, model, experiment_id: str, metrics):
+    async def demo_model_registry(self, model, experiment_id: str, metrics) -> None:
         """Demonstrate model registry functionality"""
         print("\n📦 === MODEL REGISTRY DEMO ===")
 
@@ -285,7 +293,7 @@ class TracSeqMLOpsDemo:
 
         return model_id
 
-    async def demo_monitoring(self, model_id: str):
+    async def demo_monitoring(self, model_id: str) -> None:
         """Demonstrate model monitoring"""
         print("\n📈 === MODEL MONITORING DEMO ===")
 
@@ -341,7 +349,7 @@ class TracSeqMLOpsDemo:
         if dashboard_path:
             print(f"✅ Generated dashboard: {dashboard_path}")
 
-    async def demo_ab_testing(self):
+    async def demo_ab_testing(self) -> None:
         """Demonstrate A/B testing functionality"""
         print("\n🔬 === A/B TESTING DEMO ===")
 
@@ -407,7 +415,7 @@ class TracSeqMLOpsDemo:
         for variant_id, result in results.items():
             print(f"   {variant_id}: {result.accuracy:.3f} accuracy, {result.sample_size} samples")
 
-    async def demo_continuous_learning(self):
+    async def demo_continuous_learning(self) -> None:
         """Demonstrate continuous learning pipeline"""
         print("\n🔄 === CONTINUOUS LEARNING DEMO ===")
 
@@ -466,7 +474,7 @@ class TracSeqMLOpsDemo:
                 print(f"✅ Training completed: {training_run.status.value}")
                 print(f"   Metrics: {training_run.metrics}")
 
-    async def demo_deployment(self):
+    async def demo_deployment(self) -> None:
         """Demonstrate model deployment"""
         print("\n🚀 === DEPLOYMENT DEMO ===")
 
@@ -524,7 +532,7 @@ class TracSeqMLOpsDemo:
 
         return pd.DataFrame(data)
 
-    async def run_complete_demo(self):
+    async def run_complete_demo(self) -> None:
         """Run the complete MLOps pipeline demonstration"""
         print("🎯 TRACSEQ 2.0 MLOPS PIPELINE DEMONSTRATION")
         print("=" * 60)

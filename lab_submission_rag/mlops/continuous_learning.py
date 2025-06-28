@@ -8,17 +8,28 @@ import asyncio
 import hashlib
 import pickle
 import uuid
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any
 
 import aiofiles
 import numpy as np
 import pandas as pd
 import structlog
-from sqlalchemy import JSON, Boolean, Column, DateTime, Float, Integer, String, Text, create_engine
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    Text,
+    create_engine,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -50,7 +61,7 @@ class DataDriftConfig:
     threshold: float = 0.05
     window_size: int = 1000
     reference_window_size: int = 5000
-    features_to_monitor: List[str] = field(default_factory=list)
+    features_to_monitor: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -58,7 +69,7 @@ class PerformanceDegradationConfig:
     """Configuration for performance degradation detection"""
 
     enabled: bool = True
-    metrics_to_monitor: List[str] = field(default_factory=lambda: ["accuracy", "f1_score"])
+    metrics_to_monitor: list[str] = field(default_factory=lambda: ["accuracy", "f1_score"])
     degradation_threshold: float = 0.05  # 5% drop
     evaluation_window: int = 100
     minimum_samples: int = 50
@@ -72,7 +83,7 @@ class RetrainingConfig:
     training_pipeline: str  # Reference to training pipeline
 
     # Scheduling
-    schedule_cron: Optional[str] = None  # e.g., "0 2 * * 1" for weekly at 2 AM
+    schedule_cron: str | None = None  # e.g., "0 2 * * 1" for weekly at 2 AM
     min_retrain_interval_hours: int = 24
 
     # Trigger conditions
@@ -118,22 +129,22 @@ class TrainingRun:
     test_samples: int
 
     # Training details
-    hyperparameters: Dict[str, Any]
+    hyperparameters: dict[str, Any]
     training_duration_seconds: float
 
     # Results
-    metrics: Dict[str, float]
-    model_path: Optional[str] = None
+    metrics: dict[str, float]
+    model_path: str | None = None
 
     # Status
     status: TrainingStatus = TrainingStatus.SCHEDULED
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    error_message: Optional[str] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error_message: str | None = None
 
     # Comparison with previous model
-    baseline_metrics: Dict[str, float] = field(default_factory=dict)
-    improvement: Dict[str, float] = field(default_factory=dict)
+    baseline_metrics: dict[str, float] = field(default_factory=dict)
+    improvement: dict[str, float] = field(default_factory=dict)
 
     created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -154,11 +165,11 @@ class DataDriftReport:
     drift_detected: bool
     drift_score: float
     threshold: float
-    affected_features: List[str]
+    affected_features: list[str]
 
     # Statistical details
-    statistical_tests: Dict[str, Dict[str, float]]  # feature -> {statistic, p_value}
-    feature_distributions: Dict[str, Dict[str, Any]]
+    statistical_tests: dict[str, dict[str, float]]  # feature -> {statistic, p_value}
+    feature_distributions: dict[str, dict[str, Any]]
 
     created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -287,7 +298,7 @@ class ContinuousLearningPipeline:
     """
 
     def __init__(
-        self, database_url: str, data_dir: Union[str, Path], model_registry, experiment_tracker
+        self, database_url: str, data_dir: str | Path, model_registry, experiment_tracker
     ):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -302,10 +313,10 @@ class ContinuousLearningPipeline:
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
 
         # Training pipelines registry
-        self.training_pipelines: Dict[str, Callable] = {}
+        self.training_pipelines: dict[str, Callable] = {}
 
         # Background tasks
-        self._monitoring_tasks: List[asyncio.Task] = []
+        self._monitoring_tasks: list[asyncio.Task] = []
 
     def register_training_pipeline(self, name: str, pipeline_func: Callable):
         """Register a training pipeline function."""
@@ -389,7 +400,7 @@ class ContinuousLearningPipeline:
 
     async def trigger_retraining(
         self, config_id: str, trigger_type: TriggerType, trigger_reason: str, force: bool = False
-    ) -> Optional[str]:
+    ) -> str | None:
         """Trigger a retraining run."""
         config = await self.get_config(config_id)
         if not config:
@@ -453,7 +464,7 @@ class ContinuousLearningPipeline:
 
         return run_id
 
-    async def get_training_run(self, run_id: str) -> Optional[TrainingRun]:
+    async def get_training_run(self, run_id: str) -> TrainingRun | None:
         """Get training run details."""
         with self.SessionLocal() as session:
             record = (
@@ -485,7 +496,7 @@ class ContinuousLearningPipeline:
                 created_at=record.created_at,
             )
 
-    async def get_config(self, config_id: str) -> Optional[RetrainingConfig]:
+    async def get_config(self, config_id: str) -> RetrainingConfig | None:
         """Get retraining configuration."""
         with self.SessionLocal() as session:
             record = (
@@ -531,7 +542,7 @@ class ContinuousLearningPipeline:
                 enabled=record.enabled,
             )
 
-    async def list_configs(self, enabled_only: bool = False) -> List[RetrainingConfig]:
+    async def list_configs(self, enabled_only: bool = False) -> list[RetrainingConfig]:
         """List all retraining configurations."""
         with self.SessionLocal() as session:
             query = session.query(RetrainingConfigRecord)
@@ -551,10 +562,10 @@ class ContinuousLearningPipeline:
 
     async def list_training_runs(
         self,
-        config_id: Optional[str] = None,
-        status: Optional[TrainingStatus] = None,
+        config_id: str | None = None,
+        status: TrainingStatus | None = None,
         limit: int = 50,
-    ) -> List[TrainingRun]:
+    ) -> list[TrainingRun]:
         """List training runs."""
         with self.SessionLocal() as session:
             query = session.query(TrainingRunRecord)
@@ -575,7 +586,7 @@ class ContinuousLearningPipeline:
 
             return runs
 
-    async def detect_data_drift(self, config_id: str) -> Optional[DataDriftReport]:
+    async def detect_data_drift(self, config_id: str) -> DataDriftReport | None:
         """Manually trigger data drift detection."""
         config = await self.get_config(config_id)
         if not config or not config.data_drift_config.enabled:
@@ -810,7 +821,7 @@ class ContinuousLearningPipeline:
 
             logger.error("Training run failed", run_id=training_run.run_id, error=str(e))
 
-    async def _detect_data_drift(self, config: RetrainingConfig) -> Optional[DataDriftReport]:
+    async def _detect_data_drift(self, config: RetrainingConfig) -> DataDriftReport | None:
         """Detect data drift using statistical tests."""
         drift_config = config.data_drift_config
 
@@ -950,7 +961,7 @@ class ContinuousLearningPipeline:
 
         return data_hash, train_samples, val_samples, test_samples
 
-    async def _get_baseline_metrics(self, model_type: str) -> Dict[str, float]:
+    async def _get_baseline_metrics(self, model_type: str) -> dict[str, float]:
         """Get baseline metrics for comparison."""
         # Get current production model metrics
         prod_model_info = await self.model_registry.get_production_model(model_type)
@@ -1038,7 +1049,7 @@ class ContinuousLearningPipeline:
             session.commit()
 
     async def _validate_training_results(
-        self, metrics: Dict[str, float], config: RetrainingConfig
+        self, metrics: dict[str, float], config: RetrainingConfig
     ) -> bool:
         """Validate training results against quality gates."""
         accuracy = metrics.get("accuracy", 0.0)
@@ -1058,19 +1069,19 @@ class ContinuousLearningPipeline:
     # Placeholder methods for data access - implement based on your data infrastructure
     async def _get_reference_data(
         self, model_type: str, window_size: int
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """Get reference data for drift detection."""
         # Implement based on your data storage
         return None
 
-    async def _get_recent_data(self, model_type: str, window_size: int) -> Optional[pd.DataFrame]:
+    async def _get_recent_data(self, model_type: str, window_size: int) -> pd.DataFrame | None:
         """Get recent data for drift detection."""
         # Implement based on your data storage
         return None
 
     async def _get_recent_performance_metrics(
         self, model_type: str, window_size: int
-    ) -> Optional[Dict[str, List[float]]]:
+    ) -> dict[str, list[float]] | None:
         """Get recent performance metrics."""
         # Implement based on your monitoring system
         return None

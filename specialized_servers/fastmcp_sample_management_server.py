@@ -10,9 +10,9 @@ import logging
 import time
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastmcp import FastMCP, Context
+from fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
 
 # Configure logging
@@ -24,7 +24,7 @@ mcp = FastMCP("TracSeq Sample Management Server", version="2.0.0")
 
 # Pydantic models for tool inputs
 class SampleCreationRequest(BaseModel):
-    sample_data: Dict[str, Any] = Field(description="Sample metadata and properties")
+    sample_data: dict[str, Any] = Field(description="Sample metadata and properties")
     auto_assign_storage: bool = Field(default=True, description="Automatically assign storage location")
     priority: str = Field(default="normal", description="Sample processing priority")
     notify_submitter: bool = Field(default=True, description="Send notification to submitter")
@@ -32,13 +32,13 @@ class SampleCreationRequest(BaseModel):
 class IntelligentSearchRequest(BaseModel):
     query: str = Field(description="Natural language search query")
     search_type: str = Field(default="comprehensive", description="Type of search: basic, comprehensive, advanced")
-    filters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional search filters")
+    filters: dict[str, Any] | None = Field(default_factory=dict, description="Additional search filters")
     max_results: int = Field(default=50, description="Maximum number of results")
 
 class BatchOperationRequest(BaseModel):
     operation_type: str = Field(description="Type of batch operation: update, move, archive, analyze")
-    sample_ids: List[str] = Field(description="List of sample IDs for batch operation")
-    operation_parameters: Dict[str, Any] = Field(description="Parameters for the batch operation")
+    sample_ids: list[str] = Field(description="List of sample IDs for batch operation")
+    operation_parameters: dict[str, Any] = Field(description="Parameters for the batch operation")
 
 class QualityAssessmentRequest(BaseModel):
     sample_id: str = Field(description="Sample ID for quality assessment")
@@ -65,7 +65,7 @@ sample_state = {
 async def intelligent_sample_search(
     request: IntelligentSearchRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     AI-powered intelligent sample search with natural language processing.
     
@@ -73,14 +73,14 @@ async def intelligent_sample_search(
     intelligent filtering, ranking, and contextual information.
     """
     await ctx.info(f"Processing intelligent sample search: {request.query}")
-    
+
     start_time = time.time()
     search_session_id = str(uuid.uuid4())
-    
+
     try:
         # Step 1: AI-powered query interpretation
         await ctx.info("Interpreting search query with AI")
-        
+
         query_analysis = await ctx.sample(
             messages=[{
                 "role": "user",
@@ -105,10 +105,10 @@ async def intelligent_sample_search(
             }],
             model_preferences=["claude-3-sonnet-20240229", "gpt-4"]
         )
-        
+
         # Step 2: Execute enhanced search with AI criteria
         await ctx.info("Executing enhanced sample search")
-        
+
         # Simulate intelligent search results based on query analysis
         mock_samples = []
         if "dna" in request.query.lower():
@@ -127,7 +127,7 @@ async def intelligent_sample_search(
                     "relevance_score": 0.95
                 },
                 {
-                    "id": "SMPL-DNA-002", 
+                    "id": "SMPL-DNA-002",
                     "name": "DNA Sample 002",
                     "type": "DNA",
                     "concentration": "75 ng/μL",
@@ -140,13 +140,13 @@ async def intelligent_sample_search(
                     "relevance_score": 0.87
                 }
             ])
-        
+
         if "high quality" in request.query.lower():
             mock_samples = [s for s in mock_samples if s.get("quality_score", 0) > 90]
-        
+
         # Step 3: AI-enhanced result analysis and recommendations
         await ctx.info("Analyzing search results and generating recommendations")
-        
+
         result_analysis = await ctx.sample(
             messages=[{
                 "role": "user",
@@ -172,14 +172,14 @@ async def intelligent_sample_search(
             }],
             model_preferences=["claude-3-sonnet-20240229"]
         )
-        
+
         processing_time = time.time() - start_time
-        
+
         # Update sample state
         sample_state["last_activity"] = datetime.now().isoformat()
-        
+
         await ctx.info(f"Intelligent sample search completed in {processing_time:.2f}s")
-        
+
         return {
             "success": True,
             "search_session_id": search_session_id,
@@ -192,7 +192,7 @@ async def intelligent_sample_search(
             "processing_time": processing_time,
             "filters_applied": request.filters
         }
-        
+
     except Exception as e:
         await ctx.error(f"Intelligent sample search failed: {str(e)}")
         return {
@@ -206,22 +206,22 @@ async def intelligent_sample_search(
 async def create_samples_with_ai_optimization(
     request: SampleCreationRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Create samples with AI-powered optimization and automated workflow setup.
     
     Uses AI to optimize sample properties, assign storage, and set up
     automated workflows based on sample characteristics and laboratory protocols.
     """
-    await ctx.info(f"Creating samples with AI optimization")
-    
+    await ctx.info("Creating samples with AI optimization")
+
     start_time = time.time()
     creation_session_id = str(uuid.uuid4())
-    
+
     try:
         # Step 1: AI-powered sample optimization
         await ctx.info("Optimizing sample properties with AI")
-        
+
         optimization_analysis = await ctx.sample(
             messages=[{
                 "role": "user",
@@ -246,13 +246,13 @@ async def create_samples_with_ai_optimization(
             }],
             model_preferences=["claude-3-sonnet-20240229", "gpt-4"]
         )
-        
+
         # Step 2: Generate optimized sample IDs and properties
         await ctx.info("Generating optimized sample configuration")
-        
+
         # Create optimized sample based on AI recommendations
         sample_id = f"SMPL-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
-        
+
         optimized_sample = {
             "id": sample_id,
             "creation_session": creation_session_id,
@@ -270,10 +270,10 @@ async def create_samples_with_ai_optimization(
             "created_at": datetime.now().isoformat(),
             "status": "Created - Awaiting Processing"
         }
-        
+
         # Step 3: Set up automated workflows
         await ctx.info("Setting up automated workflows")
-        
+
         workflow_setup = await ctx.sample(
             messages=[{
                 "role": "user",
@@ -295,17 +295,17 @@ async def create_samples_with_ai_optimization(
             }],
             model_preferences=["claude-3-sonnet-20240229"]
         )
-        
+
         processing_time = time.time() - start_time
-        
+
         # Update sample state
         sample_state["total_samples"] += 1
         sample_state["active_samples"] += 1
         sample_state["samples_processed_today"] += 1
         sample_state["last_activity"] = datetime.now().isoformat()
-        
+
         await ctx.info(f"Sample creation with AI optimization completed in {processing_time:.2f}s")
-        
+
         return {
             "success": True,
             "creation_session_id": creation_session_id,
@@ -315,7 +315,7 @@ async def create_samples_with_ai_optimization(
             "priority": request.priority,
             "notifications_enabled": request.notify_submitter
         }
-        
+
     except Exception as e:
         await ctx.error(f"Sample creation with AI optimization failed: {str(e)}")
         return {
@@ -329,7 +329,7 @@ async def create_samples_with_ai_optimization(
 async def execute_batch_sample_operations(
     request: BatchOperationRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Execute intelligent batch operations on multiple samples with AI coordination.
     
@@ -337,14 +337,14 @@ async def execute_batch_sample_operations(
     and intelligent error handling for large-scale sample management.
     """
     await ctx.info(f"Executing batch operation: {request.operation_type} on {len(request.sample_ids)} samples")
-    
+
     start_time = time.time()
     batch_session_id = str(uuid.uuid4())
-    
+
     try:
         # Step 1: AI-powered batch operation planning
         await ctx.info("Planning batch operation with AI optimization")
-        
+
         operation_plan = await ctx.sample(
             messages=[{
                 "role": "user",
@@ -370,21 +370,21 @@ async def execute_batch_sample_operations(
             }],
             model_preferences=["claude-3-sonnet-20240229"]
         )
-        
+
         # Step 2: Execute batch operation with progress tracking
         await ctx.info("Executing batch operation with progress tracking")
-        
+
         batch_results = []
         successful_operations = 0
-        
+
         for i, sample_id in enumerate(request.sample_ids):
             # Report progress for each sample
             progress = (i + 1) / len(request.sample_ids)
             await ctx.report_progress(token="batch_operation", progress=progress, total=1.0)
-            
+
             # Simulate operation execution
             operation_success = True  # In real implementation, execute actual operation
-            
+
             operation_result = {
                 "sample_id": sample_id,
                 "operation": request.operation_type,
@@ -392,18 +392,18 @@ async def execute_batch_sample_operations(
                 "timestamp": datetime.now().isoformat(),
                 "parameters_applied": request.operation_parameters
             }
-            
+
             if operation_success:
                 successful_operations += 1
                 operation_result["message"] = f"{request.operation_type.title()} completed successfully"
             else:
                 operation_result["error"] = f"Failed to {request.operation_type}"
-            
+
             batch_results.append(operation_result)
-        
+
         # Step 3: AI-powered result analysis and recommendations
         await ctx.info("Analyzing batch operation results")
-        
+
         result_analysis = await ctx.sample(
             messages=[{
                 "role": "user",
@@ -430,15 +430,15 @@ async def execute_batch_sample_operations(
             }],
             model_preferences=["claude-3-sonnet-20240229"]
         )
-        
+
         processing_time = time.time() - start_time
         success_rate = successful_operations / len(request.sample_ids) * 100
-        
+
         # Update sample state
         sample_state["last_activity"] = datetime.now().isoformat()
-        
+
         await ctx.info(f"Batch operation completed in {processing_time:.2f}s with {success_rate:.1f}% success rate")
-        
+
         return {
             "success": True,
             "batch_session_id": batch_session_id,
@@ -451,7 +451,7 @@ async def execute_batch_sample_operations(
             "ai_analysis": result_analysis.text,
             "processing_time": processing_time
         }
-        
+
     except Exception as e:
         await ctx.error(f"Batch sample operation failed: {str(e)}")
         return {
@@ -465,7 +465,7 @@ async def execute_batch_sample_operations(
 async def predictive_quality_assessment(
     request: QualityAssessmentRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Perform predictive quality assessment using AI analysis and machine learning.
     
@@ -473,14 +473,14 @@ async def predictive_quality_assessment(
     trend analysis, and recommendations for quality optimization.
     """
     await ctx.info(f"Performing predictive quality assessment for sample: {request.sample_id}")
-    
+
     start_time = time.time()
     assessment_session_id = str(uuid.uuid4())
-    
+
     try:
         # Step 1: AI-powered quality prediction
         await ctx.info("Generating predictive quality analysis")
-        
+
         quality_prediction = await ctx.sample(
             messages=[{
                 "role": "user",
@@ -511,10 +511,10 @@ async def predictive_quality_assessment(
             }],
             model_preferences=["claude-3-sonnet-20240229", "gpt-4"]
         )
-        
+
         # Step 2: Generate quality metrics and scores
         await ctx.info("Calculating quality metrics and scores")
-        
+
         # Simulate quality assessment results
         quality_metrics = {
             "overall_score": 94.8,
@@ -526,11 +526,11 @@ async def predictive_quality_assessment(
             "storage_compliance": "Excellent",
             "processing_readiness": "Ready"
         }
-        
+
         # Step 3: Predictive trend analysis
         if request.include_predictions:
             await ctx.info("Generating predictive trend analysis")
-            
+
             trend_analysis = await ctx.sample(
                 messages=[{
                     "role": "user",
@@ -555,17 +555,17 @@ async def predictive_quality_assessment(
             )
         else:
             trend_analysis = None
-        
+
         processing_time = time.time() - start_time
-        
+
         # Update quality trends
         sample_state["quality_trends"]["daily_average"] = (
             sample_state["quality_trends"]["daily_average"] + quality_metrics["overall_score"]
         ) / 2
         sample_state["last_activity"] = datetime.now().isoformat()
-        
+
         await ctx.info(f"Predictive quality assessment completed in {processing_time:.2f}s")
-        
+
         return {
             "success": True,
             "assessment_session_id": assessment_session_id,
@@ -578,7 +578,7 @@ async def predictive_quality_assessment(
             "processing_time": processing_time,
             "include_predictions": request.include_predictions
         }
-        
+
     except Exception as e:
         await ctx.error(f"Predictive quality assessment failed: {str(e)}")
         return {
@@ -622,9 +622,9 @@ async def sample_management_status(ctx: Context) -> str:
 ---
 *Status updated: {datetime.now().isoformat()}*
         """
-        
+
         return status_info.strip()
-        
+
     except Exception as e:
         await ctx.error(f"Error generating sample management status: {str(e)}")
         return f"Sample management status unavailable: {str(e)}"
@@ -663,9 +663,9 @@ async def sample_quality_trends(ctx: Context) -> str:
 ---
 *Trends updated: {datetime.now().isoformat()}*
         """
-        
+
         return trends_info.strip()
-        
+
     except Exception as e:
         await ctx.error(f"Error generating quality trends: {str(e)}")
         return f"Quality trends unavailable: {str(e)}"
@@ -680,14 +680,14 @@ async def initialize_sample_management_server():
 # Main execution
 if __name__ == "__main__":
     import sys
-    
+
     # Initialize server
     asyncio.run(initialize_sample_management_server())
-    
+
     # Run FastMCP server with multiple transport options
     if len(sys.argv) > 1 and sys.argv[1] == "--http":
         mcp.run(transport="http", port=8010)
     elif len(sys.argv) > 1 and sys.argv[1] == "--sse":
         mcp.run(transport="sse", port=8011)
     else:
-        mcp.run(transport="stdio") 
+        mcp.run(transport="stdio")

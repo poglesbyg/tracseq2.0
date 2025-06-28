@@ -7,18 +7,29 @@ Automated data preprocessing, feature engineering, and data quality validation.
 import asyncio
 import hashlib
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any
 
 import aiofiles
 import numpy as np
 import pandas as pd
 import structlog
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sqlalchemy import JSON, Boolean, Column, DateTime, Float, Integer, String, Text, create_engine
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    Text,
+    create_engine,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -49,10 +60,10 @@ class DataSchema:
     version: str
 
     # Column definitions
-    columns: Dict[str, Dict[str, Any]]  # column_name -> {type, nullable, constraints}
+    columns: dict[str, dict[str, Any]]  # column_name -> {type, nullable, constraints}
 
     # Validation rules
-    validation_rules: List[Dict[str, Any]] = field(default_factory=list)
+    validation_rules: list[dict[str, Any]] = field(default_factory=list)
 
     # Metadata
     description: str = ""
@@ -75,10 +86,10 @@ class DataQualityReport:
     duplicate_rows: int
 
     # Quality issues
-    issues: List[Dict[str, Any]] = field(default_factory=list)
+    issues: list[dict[str, Any]] = field(default_factory=list)
 
     # Column-level statistics
-    column_stats: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    column_stats: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     # Overall quality score (0-1)
     quality_score: float = 1.0
@@ -94,9 +105,9 @@ class FeatureEngineeringConfig:
     name: str
 
     # Feature transformations
-    numeric_features: List[str] = field(default_factory=list)
-    categorical_features: List[str] = field(default_factory=list)
-    text_features: List[str] = field(default_factory=list)
+    numeric_features: list[str] = field(default_factory=list)
+    categorical_features: list[str] = field(default_factory=list)
+    text_features: list[str] = field(default_factory=list)
 
     # Scaling and encoding
     scaling_method: str = "standard"  # "standard", "minmax", "robust"
@@ -104,7 +115,7 @@ class FeatureEngineeringConfig:
 
     # Feature selection
     feature_selection_enabled: bool = True
-    max_features: Optional[int] = None
+    max_features: int | None = None
     correlation_threshold: float = 0.95
 
     # Text processing
@@ -112,7 +123,7 @@ class FeatureEngineeringConfig:
     max_vocab_size: int = 10000
 
     # Custom transformations
-    custom_transformations: List[Dict[str, Any]] = field(default_factory=list)
+    custom_transformations: list[dict[str, Any]] = field(default_factory=list)
 
     created_at: datetime = field(default_factory=datetime.utcnow)
     created_by: str = ""
@@ -136,27 +147,27 @@ class PipelineRun:
     feature_config_id: str
 
     # Output data
-    output_data_path: Optional[str] = None
-    output_data_hash: Optional[str] = None
+    output_data_path: str | None = None
+    output_data_hash: str | None = None
     output_rows: int = 0
 
     # Quality assessment
-    quality_report_id: Optional[str] = None
+    quality_report_id: str | None = None
     data_quality_score: float = 0.0
 
     # Processing details
-    processing_steps: List[str] = field(default_factory=list)
+    processing_steps: list[str] = field(default_factory=list)
     feature_count: int = 0
 
     # Status and timing
     status: PipelineStatus = PipelineStatus.PENDING
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
     processing_time_seconds: float = 0.0
 
     # Logs and errors
-    processing_logs: List[str] = field(default_factory=list)
-    error_message: Optional[str] = None
+    processing_logs: list[str] = field(default_factory=list)
+    error_message: str | None = None
 
     created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -294,7 +305,7 @@ class DataPipeline:
     - Quality monitoring and alerting
     """
 
-    def __init__(self, database_url: str, data_dir: Union[str, Path]):
+    def __init__(self, database_url: str, data_dir: str | Path):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
@@ -312,7 +323,7 @@ class DataPipeline:
             dir_path.mkdir(parents=True, exist_ok=True)
 
         # Custom transformation functions
-        self.transformation_functions: Dict[str, Callable] = {}
+        self.transformation_functions: dict[str, Callable] = {}
 
     def register_transformation(self, name: str, func: Callable):
         """Register a custom transformation function."""
@@ -424,7 +435,7 @@ class DataPipeline:
 
         return run_id
 
-    async def get_pipeline_run(self, run_id: str) -> Optional[PipelineRun]:
+    async def get_pipeline_run(self, run_id: str) -> PipelineRun | None:
         """Get pipeline run by ID."""
         with self.SessionLocal() as session:
             record = (
@@ -568,7 +579,7 @@ class DataPipeline:
 
         return report
 
-    async def get_schema(self, schema_id: str) -> Optional[DataSchema]:
+    async def get_schema(self, schema_id: str) -> DataSchema | None:
         """Get data schema by ID."""
         with self.SessionLocal() as session:
             record = (
@@ -591,7 +602,7 @@ class DataPipeline:
                 created_by=record.created_by or "",
             )
 
-    async def get_feature_config(self, config_id: str) -> Optional[FeatureEngineeringConfig]:
+    async def get_feature_config(self, config_id: str) -> FeatureEngineeringConfig | None:
         """Get feature engineering configuration by ID."""
         with self.SessionLocal() as session:
             record = (

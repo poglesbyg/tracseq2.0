@@ -7,13 +7,12 @@ Python components with better AI integration and agent coordination.
 """
 
 import asyncio
-import json
 import sys
 from pathlib import Path
 
 # Try to import FastMCP (will gracefully handle if not installed)
 try:
-    from fastmcp import FastMCP, Context, Client
+    from fastmcp import Client, Context, FastMCP
     FASTMCP_AVAILABLE = True
 except ImportError:
     print("⚠️  FastMCP not installed. Run: pip install fastmcp")
@@ -21,33 +20,33 @@ except ImportError:
 
 async def test_fastmcp_laboratory_server():
     """Test the FastMCP laboratory server functionality"""
-    
+
     if not FASTMCP_AVAILABLE:
         print("❌ Cannot test FastMCP - library not available")
         return False
-    
+
     print("🧪 Testing FastMCP Laboratory Server Integration")
     print("=" * 50)
-    
+
     try:
         # Test 1: In-memory client connection
         print("\n📋 Test 1: FastMCP Server Connection")
-        
+
         # Import our FastMCP server
         server_path = Path("fastmcp_laboratory_server.py")
         if not server_path.exists():
             print("❌ FastMCP laboratory server not found")
             return False
-        
+
         print("✅ FastMCP laboratory server found")
-        
+
         # Test 2: Mock document processing
         print("\n📋 Test 2: Document Processing Simulation")
-        
+
         # Create mock document
         mock_doc_path = "test_documents/sample_manifest.pdf"
         print(f"📄 Processing mock document: {mock_doc_path}")
-        
+
         # Simulate FastMCP processing
         mock_processing_result = {
             "success": True,
@@ -67,7 +66,7 @@ async def test_fastmcp_laboratory_server():
                         "storage_temp": "-80°C"
                     },
                     {
-                        "sample_id": "SMPL-002", 
+                        "sample_id": "SMPL-002",
                         "type": "RNA",
                         "concentration": "75 ng/μL",
                         "volume": "50 μL",
@@ -83,47 +82,47 @@ async def test_fastmcp_laboratory_server():
             "confidence_score": 0.94,
             "processing_time": 2.3
         }
-        
+
         print("✅ Mock processing completed successfully")
         print(f"   📊 Confidence Score: {mock_processing_result['confidence_score']}")
         print(f"   ⏱️  Processing Time: {mock_processing_result['processing_time']}s")
         print(f"   🧬 Samples Extracted: {len(mock_processing_result['extracted_data']['samples'])}")
-        
+
         # Test 3: Query system simulation
         print("\n📋 Test 3: Laboratory Query System")
-        
+
         test_queries = [
             "How many samples are currently in storage?",
             "What is the status of sample SMPL-001?",
             "Show me recent quality assessments",
             "Optimize storage for new DNA samples"
         ]
-        
+
         for query in test_queries:
             print(f"❓ Query: {query}")
-            
+
             # Simulate FastMCP AI-powered response
             mock_responses = {
-                "How many samples are currently in storage?": 
+                "How many samples are currently in storage?":
                     "There are currently **1,247** total samples in the TracSeq 2.0 system. This includes 89 active samples currently being processed, 1,158 completed samples, and 23 pending samples awaiting processing. The storage utilization is at 78.5% across all temperature zones.",
-                
+
                 "What is the status of sample SMPL-001?":
                     "Sample **SMPL-001** is currently in **RAG_Analyzed** status. It's a DNA sample with high quality (94% confidence score) that has completed AI-powered document processing. The sample is stored in Freezer A1-B2 at -80°C and is approved for sequencing workflows.",
-                
+
                 "Show me recent quality assessments":
                     "Recent quality assessments show a **95.2%** pass rate across all samples. In the last 24 hours, 45 samples were assessed with 43 passing quality controls. Two samples (SMPL-089, SMPL-091) require reprocessing due to concentration below threshold. Overall system quality trends are positive.",
-                
+
                 "Optimize storage for new DNA samples":
                     "For optimal DNA sample storage, I recommend: **Freezer A1** (currently 67% capacity) for long-term storage at -80°C, **Freezer B2** for medium-term storage, and ensure samples are in cryogenic vials with proper labeling. Current optimization suggests a 15% efficiency gain by reorganizing based on access frequency."
             }
-            
+
             response = mock_responses.get(query, "I can help with laboratory management queries. Please ask about samples, storage, sequencing, or quality control.")
             print(f"💬 Response: {response}")
             print()
-        
+
         # Test 4: Multi-service coordination simulation
         print("📋 Test 4: Multi-Service Coordination")
-        
+
         workflow_simulation = {
             "workflow_id": "WF-2024-001",
             "steps": [
@@ -136,16 +135,16 @@ async def test_fastmcp_laboratory_server():
             "overall_status": "Processing",
             "completion": "75%"
         }
-        
+
         print("🔄 Laboratory Workflow Coordination:")
         for step in workflow_simulation["steps"]:
             print(f"   {step['status']} {step['service']} - {step['action']} ({step['time']})")
-        
+
         print(f"\n📈 Overall Progress: {workflow_simulation['completion']} complete")
-        
+
         # Test 5: Performance comparison
         print("\n📋 Test 5: FastMCP vs Current Implementation")
-        
+
         comparison = {
             "Document Processing": {
                 "Current": "5.2s (manual LLM calls)",
@@ -154,7 +153,7 @@ async def test_fastmcp_laboratory_server():
             },
             "Error Handling": {
                 "Current": "Manual try/catch blocks",
-                "FastMCP": "Built-in context management", 
+                "FastMCP": "Built-in context management",
                 "Improvement": "40% less code"
             },
             "Agent Coordination": {
@@ -168,33 +167,33 @@ async def test_fastmcp_laboratory_server():
                 "Improvement": "Enhanced consistency"
             }
         }
-        
+
         print("📊 Performance Comparison:")
         for feature, metrics in comparison.items():
             print(f"\n🔹 **{feature}**")
             print(f"   Current: {metrics['Current']}")
             print(f"   FastMCP: {metrics['FastMCP']}")
             print(f"   Improvement: {metrics['Improvement']}")
-        
+
         print("\n✅ All FastMCP integration tests completed successfully!")
         return True
-        
+
     except Exception as e:
         print(f"❌ FastMCP test failed: {str(e)}")
         return False
 
 async def demonstrate_fastmcp_benefits():
     """Demonstrate specific FastMCP benefits for TracSeq 2.0"""
-    
+
     print("\n🚀 FastMCP Benefits for TracSeq 2.0")
     print("=" * 40)
-    
+
     benefits = [
         {
             "category": "🤖 AI Integration",
             "improvements": [
                 "Built-in LLM sampling with model preferences",
-                "Context-aware conversation management", 
+                "Context-aware conversation management",
                 "Structured prompt engineering templates",
                 "Progress reporting for long-running AI operations"
             ]
@@ -227,12 +226,12 @@ async def demonstrate_fastmcp_benefits():
             ]
         }
     ]
-    
+
     for benefit in benefits:
         print(f"\n{benefit['category']}")
         for improvement in benefit['improvements']:
             print(f"   ✅ {improvement}")
-    
+
     print("\n📋 Implementation Roadmap:")
     roadmap = [
         "1. ✅ Create FastMCP laboratory server (completed)",
@@ -242,35 +241,35 @@ async def demonstrate_fastmcp_benefits():
         "5. 🌐 Integrate with API Gateway",
         "6. 🚀 Deploy specialized laboratory servers"
     ]
-    
+
     for step in roadmap:
         print(f"   {step}")
 
 async def test_existing_integration():
     """Test integration with existing TracSeq 2.0 components"""
-    
+
     print("\n🔗 Testing Integration with Existing Components")
     print("=" * 45)
-    
+
     # Test API Gateway integration
     print("\n📡 API Gateway Integration Test")
     try:
         import httpx
-        
+
         # Test if API Gateway is running
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get("http://localhost:3000/health", timeout=5.0)
                 if response.status_code == 200:
                     print("✅ API Gateway is running and accessible")
-                    
+
                     # Test specific endpoints that could benefit from FastMCP
                     test_endpoints = [
                         "/api/samples?extraction_method=ai_rag",
                         "/api/rag/submissions",
                         "/api/samples/rag/query"
                     ]
-                    
+
                     for endpoint in test_endpoints:
                         print(f"   📍 Testing {endpoint}")
                         try:
@@ -281,9 +280,9 @@ async def test_existing_integration():
                                 )
                             else:
                                 test_response = await client.get(f"http://localhost:3000{endpoint}")
-                            
+
                             if test_response.status_code == 200:
-                                print(f"      ✅ Endpoint accessible")
+                                print("      ✅ Endpoint accessible")
                             else:
                                 print(f"      ⚠️  Status: {test_response.status_code}")
                         except Exception as e:
@@ -296,23 +295,23 @@ async def test_existing_integration():
                 print(f"❌ Error connecting to API Gateway: {str(e)}")
     except ImportError:
         print("⚠️  httpx not available for API testing")
-    
+
     # Test file system components
     print("\n📁 File System Integration Test")
-    
+
     key_components = [
         "lab_submission_rag/rag_orchestrator.py",
-        "mcp_infrastructure/laboratory_assistant_agent.py", 
+        "mcp_infrastructure/laboratory_assistant_agent.py",
         "enhanced_rag_service/src/enhanced_rag_service/main.py",
         "api_gateway/src/api_gateway/simple_main.py"
     ]
-    
+
     for component in key_components:
         if Path(component).exists():
             print(f"   ✅ {component}")
         else:
             print(f"   ❌ {component} (not found)")
-    
+
     print("\n📋 Migration Readiness Assessment:")
     readiness_checks = [
         ("FastMCP Server Created", Path("fastmcp_laboratory_server.py").exists()),
@@ -320,23 +319,23 @@ async def test_existing_integration():
         ("Core Components Present", len([c for c in key_components if Path(c).exists()]) >= 3),
         ("FastMCP Dependencies", FASTMCP_AVAILABLE)
     ]
-    
+
     for check, status in readiness_checks:
         status_icon = "✅" if status else "❌"
         print(f"   {status_icon} {check}")
-    
+
     all_ready = all(status for _, status in readiness_checks)
-    
+
     if all_ready:
         print("\n🎉 System is ready for FastMCP migration!")
     else:
         print("\n⚠️  Some prerequisites need attention before migration")
-    
+
     return all_ready
 
 async def main():
     """Main test function"""
-    
+
     print("🧬 TracSeq 2.0 FastMCP Integration Test Suite")
     print("=" * 50)
     print()
@@ -344,20 +343,20 @@ async def main():
     print("TracSeq 2.0's Python components with better AI integration,")
     print("agent coordination, and laboratory workflow management.")
     print()
-    
+
     # Run all tests
     tests = [
         ("FastMCP Laboratory Server", test_fastmcp_laboratory_server),
         ("FastMCP Benefits Demo", demonstrate_fastmcp_benefits),
         ("Existing System Integration", test_existing_integration)
     ]
-    
+
     results = []
-    
+
     for test_name, test_func in tests:
         print(f"\n🧪 Running: {test_name}")
         print("-" * 30)
-        
+
         try:
             if asyncio.iscoroutinefunction(test_func):
                 result = await test_func()
@@ -367,20 +366,20 @@ async def main():
         except Exception as e:
             print(f"❌ Test failed: {str(e)}")
             results.append((test_name, False))
-    
+
     # Summary
     print("\n📊 Test Summary")
     print("=" * 20)
-    
+
     passed = sum(1 for _, result in results if result)
     total = len(results)
-    
+
     for test_name, result in results:
         status = "✅ PASSED" if result else "❌ FAILED"
         print(f"   {status} {test_name}")
-    
+
     print(f"\n🎯 Results: {passed}/{total} tests passed")
-    
+
     if passed == total:
         print("\n🎉 All tests passed! TracSeq 2.0 is ready for FastMCP enhancement!")
         print("\nNext steps:")
@@ -389,7 +388,7 @@ async def main():
         print("3. Start with Phase 2: Enhanced RAG Service migration")
     else:
         print("\n⚠️  Some tests failed. Review the issues above before proceeding.")
-    
+
     return passed == total
 
 if __name__ == "__main__":
@@ -401,4 +400,4 @@ if __name__ == "__main__":
         sys.exit(1)
     except Exception as e:
         print(f"\n❌ Unexpected error: {str(e)}")
-        sys.exit(1) 
+        sys.exit(1)

@@ -7,8 +7,9 @@ dependencies, and provides a centralized way to configure and access services.
 
 import asyncio
 import logging
+from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Any, Callable, Dict, Optional, TypeVar
+from typing import Any, TypeVar
 
 from .exceptions import ServiceException
 from .factories import (
@@ -45,12 +46,12 @@ class ServiceContainer:
     - Health checking
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         self.config = config or {}
-        self._services: Dict[str, Any] = {}
-        self._factories: Dict[str, Callable] = {}
-        self._singletons: Dict[str, Any] = {}
-        self._health_checkers: Dict[str, IHealthChecker] = {}
+        self._services: dict[str, Any] = {}
+        self._factories: dict[str, Callable] = {}
+        self._singletons: dict[str, Any] = {}
+        self._health_checkers: dict[str, IHealthChecker] = {}
         self._initialized = False
 
         # Register default factories
@@ -58,7 +59,7 @@ class ServiceContainer:
 
         logger.info("ServiceContainer initialized")
 
-    def _register_default_factories(self):
+    def _register_default_factories(self) -> None:
         """Register default component factories"""
         self._factories.update(
             {
@@ -245,7 +246,7 @@ class ServiceContainer:
         except Exception as e:
             logger.warning(f"Failed to initialize health checkers: {str(e)}")
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Perform health check on all registered services"""
         health_status = {
             "status": "healthy",
@@ -297,7 +298,7 @@ class ServiceContainer:
             logger.error(f"Error during container shutdown: {str(e)}")
 
     @asynccontextmanager
-    async def managed_lifecycle(self):
+    async def managed_lifecycle(self) -> None:
         """Context manager for automatic container lifecycle management"""
         try:
             await self.initialize()
@@ -322,14 +323,14 @@ class ServiceContainer:
 class ComponentHealthChecker(IHealthChecker):
     """Base health checker for components"""
 
-    def __init__(self, component: Any, component_name: str):
+    def __init__(self, component: Any, component_name: str) -> None:
         self.component = component
         self.component_name = component_name
 
     def get_component_name(self) -> str:
         return self.component_name
 
-    async def check_health(self) -> Dict[str, Any]:
+    async def check_health(self) -> dict[str, Any]:
         """Basic health check implementation"""
         try:
             # Check if component is available
@@ -360,7 +361,7 @@ class ComponentHealthChecker(IHealthChecker):
 class DocumentProcessorHealthChecker(ComponentHealthChecker):
     """Health checker for document processor"""
 
-    def __init__(self, document_processor: IDocumentProcessor):
+    def __init__(self, document_processor: IDocumentProcessor) -> None:
         super().__init__(document_processor, "document_processor")
 
     async def _component_specific_check(self) -> bool:
@@ -376,7 +377,7 @@ class DocumentProcessorHealthChecker(ComponentHealthChecker):
 class VectorStoreHealthChecker(ComponentHealthChecker):
     """Health checker for vector store"""
 
-    def __init__(self, vector_store: IVectorStore):
+    def __init__(self, vector_store: IVectorStore) -> None:
         super().__init__(vector_store, "vector_store")
 
     async def _component_specific_check(self) -> bool:
@@ -392,7 +393,7 @@ class VectorStoreHealthChecker(ComponentHealthChecker):
 class LLMInterfaceHealthChecker(ComponentHealthChecker):
     """Health checker for LLM interface"""
 
-    def __init__(self, llm_interface: ILLMInterface):
+    def __init__(self, llm_interface: ILLMInterface) -> None:
         super().__init__(llm_interface, "llm_interface")
 
     async def _component_specific_check(self) -> bool:
@@ -409,34 +410,34 @@ class LLMInterfaceHealthChecker(ComponentHealthChecker):
 class MockSubmissionRepository(ISubmissionRepository):
     """Mock repository for testing"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._submissions = {}
 
-    async def create_submission(self, submission):
+    async def create_submission(self, submission) -> None:
         submission_id = f"mock_{len(self._submissions)}"
         self._submissions[submission_id] = submission
         return submission_id
 
-    async def get_submission(self, submission_id):
+    async def get_submission(self, submission_id) -> None:
         return self._submissions.get(submission_id)
 
-    async def update_submission(self, submission):
+    async def update_submission(self, submission) -> None:
         if submission.submission_id in self._submissions:
             self._submissions[submission.submission_id] = submission
             return True
         return False
 
-    async def delete_submission(self, submission_id):
+    async def delete_submission(self, submission_id) -> None:
         if submission_id in self._submissions:
             del self._submissions[submission_id]
             return True
         return False
 
-    async def search_submissions(self, criteria, limit=100, offset=0):
+    async def search_submissions(self, criteria, limit=100, offset=0) -> None:
         # Simple mock implementation
         return list(self._submissions.values())[offset : offset + limit]
 
-    async def get_submission_statistics(self):
+    async def get_submission_statistics(self) -> None:
         return {
             "total_submissions": len(self._submissions),
             "total_samples": len(self._submissions) * 5,  # Mock data

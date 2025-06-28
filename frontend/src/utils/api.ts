@@ -189,13 +189,13 @@ class ApiClient {
 // API clients configuration
 const API_CONFIG = {
   labManager: new ApiClient({
-    baseUrl: import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:8089/api'),
+    baseUrl: import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:5173/api'),
     timeout: 30000,
     retries: 3,
     retryDelay: 1000,
   }),
   rag: new ApiClient({
-    baseUrl: import.meta.env.VITE_RAG_SERVICE_URL || (import.meta.env.PROD ? '/api/rag' : 'http://localhost:8089/api/rag'),
+    baseUrl: import.meta.env.VITE_RAG_SERVICE_URL || (import.meta.env.PROD ? '/api/rag' : 'http://localhost:5173/api/rag'),
     timeout: 60000, // RAG operations can take longer
     retries: 2,
     retryDelay: 2000,

@@ -21,12 +21,12 @@ class TestAPIEndpoints:
     """Test cases for API endpoints"""
 
     @pytest.fixture
-    def client(self):
+    def client(self) -> None:
         """Create a test client for the FastAPI app"""
         return TestClient(app)
 
     @pytest.fixture
-    def mock_rag_system(self):
+    def mock_rag_system(self) -> None:
         """Mock RAG system for testing"""
         mock_rag = AsyncMock()
 
@@ -76,12 +76,12 @@ class TestAPIEndpoints:
         return mock_rag
 
     @pytest.fixture
-    def sample_pdf_file(self):
+    def sample_pdf_file(self) -> None:
         """Create a sample PDF file for testing"""
         pdf_content = b"Sample PDF content for laboratory submission testing"
         return ("test_document.pdf", io.BytesIO(pdf_content), "application/pdf")
 
-    def test_health_check(self, client):
+    def test_health_check(self, client) -> None:
         """Test health check endpoint"""
         response = client.get("/health")
 
@@ -89,7 +89,7 @@ class TestAPIEndpoints:
         assert response.json() == {"status": "healthy"}
 
     @patch("api.main.rag_system")
-    def test_process_document_success(self, mock_rag, client, mock_rag_system, sample_pdf_file):
+    def test_process_document_success(self, mock_rag, client, mock_rag_system, sample_pdf_file) -> None:
         """Test successful document processing"""
         mock_rag.process_document = mock_rag_system.process_document
 
@@ -108,7 +108,7 @@ class TestAPIEndpoints:
         assert data["submission"]["patient_name"] == "John Doe"
 
     @patch("api.main.rag_system")
-    def test_process_document_failure(self, mock_rag, client, sample_pdf_file):
+    def test_process_document_failure(self, mock_rag, client, sample_pdf_file) -> None:
         """Test document processing failure"""
         # Mock failed extraction
         failed_result = ExtractionResult(
@@ -137,7 +137,7 @@ class TestAPIEndpoints:
         assert "submission" not in data or data["submission"] is None
 
     @patch("api.main.rag_system")
-    def test_process_document_exception(self, mock_rag, client, sample_pdf_file):
+    def test_process_document_exception(self, mock_rag, client, sample_pdf_file) -> None:
         """Test document processing with exception"""
         mock_rag.process_document = AsyncMock(side_effect=Exception("Processing error"))
 
@@ -149,14 +149,14 @@ class TestAPIEndpoints:
         assert response.status_code == 500
         assert "Processing error" in response.json()["detail"]
 
-    def test_process_document_no_file(self, client):
+    def test_process_document_no_file(self, client) -> None:
         """Test document processing without file"""
         response = client.post("/process-document")
 
         assert response.status_code == 422  # Unprocessable Entity
 
     @patch("api.main.rag_system")
-    def test_query_submission_success(self, mock_rag, client, mock_rag_system):
+    def test_query_submission_success(self, mock_rag, client, mock_rag_system) -> None:
         """Test successful query submission"""
         mock_rag.query_submissions = mock_rag_system.query_submissions
 
@@ -176,7 +176,7 @@ class TestAPIEndpoints:
         assert data["answer"] == "Test response from RAG system"
 
     @patch("api.main.rag_system")
-    def test_query_submission_minimal_params(self, mock_rag, client, mock_rag_system):
+    def test_query_submission_minimal_params(self, mock_rag, client, mock_rag_system) -> None:
         """Test query submission with minimal parameters"""
         mock_rag.query_submissions = mock_rag_system.query_submissions
 
@@ -194,7 +194,7 @@ class TestAPIEndpoints:
         assert call_args[1]["session_id"] == "default"
 
     @patch("api.main.rag_system")
-    def test_query_submission_exception(self, mock_rag, client):
+    def test_query_submission_exception(self, mock_rag, client) -> None:
         """Test query submission with exception"""
         mock_rag.query_submissions = AsyncMock(side_effect=Exception("Query error"))
 
@@ -205,7 +205,7 @@ class TestAPIEndpoints:
         assert response.status_code == 500
         assert "Query error" in response.json()["detail"]
 
-    def test_query_submission_invalid_data(self, client):
+    def test_query_submission_invalid_data(self, client) -> None:
         """Test query submission with invalid data"""
         # Missing required query field
         query_data = {"session_id": "session_1"}
@@ -215,7 +215,7 @@ class TestAPIEndpoints:
         assert response.status_code == 422  # Unprocessable Entity
 
     @patch("api.main.rag_system")
-    def test_get_system_info_success(self, mock_rag, client, mock_rag_system):
+    def test_get_system_info_success(self, mock_rag, client, mock_rag_system) -> None:
         """Test successful system info retrieval"""
         mock_rag.get_system_status = mock_rag_system.get_system_status
 
@@ -230,7 +230,7 @@ class TestAPIEndpoints:
         assert "last_updated" in data
 
     @patch("api.main.rag_system")
-    def test_get_system_info_exception(self, mock_rag, client):
+    def test_get_system_info_exception(self, mock_rag, client) -> None:
         """Test system info retrieval with exception"""
         mock_rag.get_system_status = AsyncMock(side_effect=Exception("System error"))
 
@@ -240,7 +240,7 @@ class TestAPIEndpoints:
         assert "System error" in response.json()["detail"]
 
     @patch("api.main.rag_system")
-    def test_legacy_process_endpoint(self, mock_rag, client, mock_rag_system, sample_pdf_file):
+    def test_legacy_process_endpoint(self, mock_rag, client, mock_rag_system, sample_pdf_file) -> None:
         """Test legacy process endpoint"""
         mock_rag.process_document = mock_rag_system.process_document
 
@@ -254,7 +254,7 @@ class TestAPIEndpoints:
         assert data["success"] is True
         assert "submission" in data
 
-    def test_cors_headers(self, client):
+    def test_cors_headers(self, client) -> None:
         """Test CORS headers are properly set"""
         response = client.options("/health")
 
@@ -262,7 +262,7 @@ class TestAPIEndpoints:
         assert response.status_code in [200, 405]  # 405 is also acceptable for OPTIONS
 
     @patch("api.main.rag_system")
-    def test_concurrent_requests(self, mock_rag, client, mock_rag_system):
+    def test_concurrent_requests(self, mock_rag, client, mock_rag_system) -> None:
         """Test handling concurrent requests"""
         mock_rag.query_submissions = mock_rag_system.query_submissions
 
@@ -280,7 +280,7 @@ class TestAPIEndpoints:
             assert "answer" in response.json()
 
     @patch("api.main.rag_system")
-    def test_large_file_upload(self, mock_rag, client, mock_rag_system):
+    def test_large_file_upload(self, mock_rag, client, mock_rag_system) -> None:
         """Test uploading larger files"""
         mock_rag.process_document = mock_rag_system.process_document
 
@@ -297,7 +297,7 @@ class TestAPIEndpoints:
         data = response.json()
         assert data["success"] is True
 
-    def test_api_documentation_endpoints(self, client):
+    def test_api_documentation_endpoints(self, client) -> None:
         """Test that API documentation endpoints are accessible"""
         # Test OpenAPI schema
         response = client.get("/openapi.json")
@@ -310,7 +310,7 @@ class TestAPIEndpoints:
         assert schema["info"]["title"] == "Laboratory Submission RAG API"
 
     @patch("api.main.rag_system")
-    def test_query_with_submission_filter(self, mock_rag, client, mock_rag_system):
+    def test_query_with_submission_filter(self, mock_rag, client, mock_rag_system) -> None:
         """Test query with submission ID filter"""
         mock_rag.query_submissions = mock_rag_system.query_submissions
 

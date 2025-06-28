@@ -6,7 +6,7 @@ import asyncio
 import io
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 from models.rag_models import DocumentChunk, ExtractionResult
@@ -16,7 +16,7 @@ class TestDataGenerator:
     """Generate test data for various testing scenarios"""
 
     @staticmethod
-    def create_sample_chunks(count: int = 5) -> List[DocumentChunk]:
+    def create_sample_chunks(count: int = 5) -> list[DocumentChunk]:
         """Create sample document chunks for testing"""
         chunks = []
         for i in range(count):
@@ -37,7 +37,7 @@ class TestDataGenerator:
         return chunks
 
     @staticmethod
-    def create_lab_submission_data() -> Dict[str, Any]:
+    def create_lab_submission_data() -> dict[str, Any]:
         """Create sample lab submission data"""
         return {
             "patient_name": "John Doe",
@@ -90,7 +90,7 @@ class MockFactory:
     """Factory for creating mock objects for testing"""
 
     @staticmethod
-    def create_mock_chromadb_client():
+    def create_mock_chromadb_client() -> tuple[Mock, Mock]:
         """Create a mock ChromaDB client"""
         mock_client = Mock()
         mock_collection = Mock()
@@ -121,7 +121,7 @@ class MockFactory:
         return mock_client, mock_collection
 
     @staticmethod
-    def create_mock_openai_client():
+    def create_mock_openai_client() -> AsyncMock:
         """Create a mock OpenAI client"""
         mock_client = AsyncMock()
         mock_response = Mock()
@@ -130,7 +130,7 @@ class MockFactory:
         return mock_client
 
     @staticmethod
-    def create_mock_embedding_model():
+    def create_mock_embedding_model() -> Mock:
         """Create a mock sentence transformer model"""
         mock_model = Mock()
         mock_model.encode = Mock(return_value=[[0.1, 0.2, 0.3, 0.4, 0.5]])
@@ -140,7 +140,7 @@ class MockFactory:
 class TestFileManager:
     """Manage test files and cleanup"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.temp_files = []
         self.temp_dirs = []
 
@@ -160,7 +160,7 @@ class TestFileManager:
         self.temp_dirs.append(temp_dir)
         return temp_dir
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clean up all temporary files and directories"""
         for file_path in self.temp_files:
             if file_path.exists():
@@ -180,17 +180,17 @@ class AssertionHelpers:
     """Helper functions for common test assertions"""
 
     @staticmethod
-    def assert_valid_document_chunk(chunk: DocumentChunk):
+    def assert_valid_document_chunk(chunk: DocumentChunk) -> None:
         """Assert that a DocumentChunk is valid"""
         assert isinstance(chunk, DocumentChunk)
         assert chunk.chunk_id is not None
         assert len(chunk.content) > 0
         assert chunk.source_document is not None
         assert isinstance(chunk.metadata, dict)
-        assert chunk.chunk_index >= 0
+        assert chunk.chunk_index is not None and chunk.chunk_index >= 0
 
     @staticmethod
-    def assert_valid_extraction_result(result: ExtractionResult):
+    def assert_valid_extraction_result(result: ExtractionResult) -> None:
         """Assert that an ExtractionResult is valid"""
         assert isinstance(result, ExtractionResult)
         assert isinstance(result.success, bool)
@@ -202,14 +202,14 @@ class AssertionHelpers:
         assert isinstance(result.extracted_data, dict)
 
     @staticmethod
-    def assert_llm_response_valid(response: str):
+    def assert_llm_response_valid(response: str) -> None:
         """Assert that an LLM response is valid"""
         assert isinstance(response, str)
         assert len(response) > 0
         assert len(response) <= 10000  # Reasonable upper limit
 
     @staticmethod
-    def assert_vector_search_results(results: List[tuple]):
+    def assert_vector_search_results(results: list[tuple]) -> None:
         """Assert that vector search results are valid"""
         assert isinstance(results, list)
         for chunk, score in results:
@@ -222,7 +222,7 @@ class PerformanceTestHelper:
     """Helper for performance testing"""
 
     @staticmethod
-    async def measure_async_execution_time(coro):
+    async def measure_async_execution_time(coro) -> tuple[Any, float]:
         """Measure execution time of an async function"""
         import time
 
@@ -233,18 +233,18 @@ class PerformanceTestHelper:
         return result, execution_time
 
     @staticmethod
-    def assert_execution_time_within_limit(execution_time: float, limit_seconds: float):
+    def assert_execution_time_within_limit(execution_time: float, limit_seconds: float) -> None:
         """Assert that execution time is within acceptable limits"""
         assert (
             execution_time <= limit_seconds
         ), f"Execution took {execution_time:.2f}s, limit was {limit_seconds}s"
 
     @staticmethod
-    async def run_concurrent_operations(operations: List, max_workers: int = 5):
+    async def run_concurrent_operations(operations: list, max_workers: int = 5) -> list[Any]:
         """Run multiple operations concurrently and return results"""
         semaphore = asyncio.Semaphore(max_workers)
 
-        async def run_with_semaphore(operation):
+        async def run_with_semaphore(operation) -> Any:
             async with semaphore:
                 return await operation
 
@@ -252,18 +252,18 @@ class PerformanceTestHelper:
         return await asyncio.gather(*tasks)
 
 
-def create_test_upload_file(filename: str, content: bytes, content_type: str = "application/pdf"):
+def create_test_upload_file(filename: str, content: bytes, content_type: str = "application/pdf") -> tuple[str, io.BytesIO, str]:
     """Create a test upload file for API testing"""
     return (filename, io.BytesIO(content), content_type)
 
 
-def validate_api_response_structure(response_data: dict, expected_fields: List[str]):
+def validate_api_response_structure(response_data: dict, expected_fields: list[str]) -> None:
     """Validate that API response has expected structure"""
     for field in expected_fields:
         assert field in response_data, f"Expected field '{field}' not found in response"
 
 
-def create_mock_rag_system():
+def create_mock_rag_system() -> Mock:
     """Create a comprehensive mock RAG system for testing"""
     mock_rag = Mock()
 

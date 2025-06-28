@@ -16,7 +16,7 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from config import settings
 from core import ServiceContainer
@@ -57,7 +57,7 @@ class EnhancedLabSubmissionRAG:
     - Structured logging for better observability
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize the enhanced RAG system"""
         logger.info("Initializing Enhanced Lab Submission RAG system...")
 
@@ -99,7 +99,7 @@ class EnhancedLabSubmissionRAG:
                 cause=e,
             )
 
-    async def process_document(self, file_path: Union[str, Path]) -> ExtractionResult:
+    async def process_document(self, file_path: str | Path) -> ExtractionResult:
         """
         Process a single laboratory document with enhanced error handling and monitoring.
 
@@ -156,7 +156,7 @@ class EnhancedLabSubmissionRAG:
             )
 
     async def process_documents_batch(
-        self, file_paths: List[Union[str, Path]], max_concurrent: int = 3
+        self, file_paths: list[str | Path], max_concurrent: int = 3
     ) -> BatchExtractionResult:
         """
         Process multiple laboratory documents with enhanced batch processing.
@@ -261,7 +261,7 @@ class EnhancedLabSubmissionRAG:
     async def query_submissions(
         self,
         query: str,
-        filter_metadata: Optional[Dict[str, Any]] = None,
+        filter_metadata: dict[str, Any] | None = None,
         session_id: str = "default",
     ) -> str:
         """
@@ -305,7 +305,7 @@ class EnhancedLabSubmissionRAG:
                 cause=e,
             )
 
-    async def get_submission(self, submission_id: str) -> Optional[LabSubmission]:
+    async def get_submission(self, submission_id: str) -> LabSubmission | None:
         """Get submission by ID with enhanced error handling"""
         self._ensure_initialized()
 
@@ -325,7 +325,7 @@ class EnhancedLabSubmissionRAG:
                 cause=e,
             )
 
-    async def search_submissions(self, criteria: Dict[str, Any]) -> List[LabSubmission]:
+    async def search_submissions(self, criteria: dict[str, Any]) -> list[LabSubmission]:
         """Search submissions by criteria with enhanced error handling"""
         self._ensure_initialized()
 
@@ -345,7 +345,7 @@ class EnhancedLabSubmissionRAG:
                 cause=e,
             )
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """
         Perform comprehensive health check of all system components.
 
@@ -386,7 +386,7 @@ class EnhancedLabSubmissionRAG:
                 "timestamp": datetime.utcnow().isoformat(),
             }
 
-    async def get_system_statistics(self) -> Dict[str, Any]:
+    async def get_system_statistics(self) -> dict[str, Any]:
         """Get comprehensive system statistics"""
         self._ensure_initialized()
 
@@ -446,19 +446,19 @@ class EnhancedLabSubmissionRAG:
             )
 
     # Context manager support for automatic lifecycle management
-    async def __aenter__(self):
+    async def __aenter__(self) -> None:
         """Async context manager entry"""
         await self.initialize()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Async context manager exit"""
         await self.shutdown()
 
 
 # Convenience function for easy usage
 async def create_enhanced_rag_system(
-    config: Optional[Dict[str, Any]] = None,
+    config: dict[str, Any] | None = None,
 ) -> EnhancedLabSubmissionRAG:
     """
     Create and initialize an enhanced RAG system.

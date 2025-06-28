@@ -9,7 +9,7 @@ import asyncio
 import logging
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from models.submission import BatchExtractionResult, ExtractionResult, LabSubmission
 
@@ -48,11 +48,11 @@ class SubmissionService(ISubmissionService):
         vector_store: IVectorStore,
         llm_interface: ILLMInterface,
         submission_repository: ISubmissionRepository,
-        metrics_collector: Optional[IMetricsCollector] = None,
-        circuit_breaker: Optional[ICircuitBreaker] = None,
-        retry_policy: Optional[IRetryPolicy] = None,
+        metrics_collector: IMetricsCollector | None = None,
+        circuit_breaker: ICircuitBreaker | None = None,
+        retry_policy: IRetryPolicy | None = None,
         batch_size: int = 5,
-    ):
+    ) -> None:
         self.document_processor = document_processor
         self.vector_store = vector_store
         self.llm_interface = llm_interface
@@ -64,7 +64,7 @@ class SubmissionService(ISubmissionService):
 
         logger.info("SubmissionService initialized")
 
-    async def process_document(self, file_path: Union[str, Path]) -> ExtractionResult:
+    async def process_document(self, file_path: str | Path) -> ExtractionResult:
         """Process a single laboratory document and extract submission information"""
         start_time = time.time()
         file_path = Path(file_path)
@@ -162,7 +162,7 @@ class SubmissionService(ISubmissionService):
                 )
 
     async def process_documents_batch(
-        self, file_paths: List[Union[str, Path]]
+        self, file_paths: list[str | Path]
     ) -> BatchExtractionResult:
         """Process multiple laboratory documents in batch"""
         start_time = time.time()
@@ -244,7 +244,7 @@ class SubmissionService(ISubmissionService):
     async def query_submissions(
         self,
         query: str,
-        filter_metadata: Optional[Dict[str, Any]] = None,
+        filter_metadata: dict[str, Any] | None = None,
         session_id: str = "default",
     ) -> str:
         """Query submissions using natural language"""
@@ -308,7 +308,7 @@ class SubmissionService(ISubmissionService):
                 cause=e,
             )
 
-    async def get_submission(self, submission_id: str) -> Optional[LabSubmission]:
+    async def get_submission(self, submission_id: str) -> LabSubmission | None:
         """Get submission by ID"""
         try:
             return await self._execute_with_resilience(
@@ -323,7 +323,7 @@ class SubmissionService(ISubmissionService):
                 cause=e,
             )
 
-    async def search_submissions(self, criteria: Dict[str, Any]) -> List[LabSubmission]:
+    async def search_submissions(self, criteria: dict[str, Any]) -> list[LabSubmission]:
         """Search submissions by criteria"""
         try:
             return await self._execute_with_resilience(
@@ -338,7 +338,7 @@ class SubmissionService(ISubmissionService):
                 cause=e,
             )
 
-    async def _execute_with_resilience(self, func, *args, operation: str = "unknown", **kwargs):
+    async def _execute_with_resilience(self, func, *args, operation: str = "unknown", **kwargs) -> None:
         """Execute function with circuit breaker and retry policies"""
         try:
             # Apply circuit breaker if available
@@ -356,7 +356,7 @@ class SubmissionService(ISubmissionService):
             logger.error(f"Error in {operation}: {str(e)}")
             raise
 
-    async def _get_relevant_chunks_for_extraction(self, source_document: str) -> List[tuple]:
+    async def _get_relevant_chunks_for_extraction(self, source_document: str) -> list[tuple]:
         """Get relevant chunks for information extraction"""
         category_queries = [
             "submitter name email phone contact administrative information",
@@ -387,7 +387,7 @@ class SubmissionService(ISubmissionService):
 
         return [(content, score) for content, score in unique_chunks.items()]
 
-    async def _handle_database_query(self, query: str) -> Optional[str]:
+    async def _handle_database_query(self, query: str) -> str | None:
         """Handle database-specific queries"""
         query_lower = query.lower()
 
@@ -414,7 +414,7 @@ class SubmissionService(ISubmissionService):
         return None
 
     async def _save_extraction_to_database(
-        self, extraction_result: ExtractionResult, document_chunks: List, file_path: Path
+        self, extraction_result: ExtractionResult, document_chunks: list, file_path: Path
     ):
         """Save extraction results to database"""
         try:

@@ -9,7 +9,7 @@ import os
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class Environment(Enum):
@@ -87,7 +87,7 @@ class DeploymentConfig:
     """Deployment configuration"""
 
     container_registry_url: str
-    kubernetes_config_path: Optional[str] = None
+    kubernetes_config_path: str | None = None
     default_health_timeout: int = 300
     default_replicas: int = 2
     rollback_enabled: bool = True
@@ -138,9 +138,9 @@ class ConfigManager:
     Handles configuration loading, validation, and environment-specific settings.
     """
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None) -> None:
         self.config_path = Path(config_path) if config_path else Path("mlops_config.json")
-        self._config: Optional[MLOpsConfig] = None
+        self._config: MLOpsConfig | None = None
 
     def load_config(self, environment: Environment = Environment.DEVELOPMENT) -> MLOpsConfig:
         """Load configuration for specified environment."""
@@ -164,7 +164,7 @@ class ConfigManager:
 
         return self._config
 
-    def save_config(self, config: MLOpsConfig):
+    def save_config(self, config: MLOpsConfig) -> None:
         """Save configuration to file."""
         config_data = {config.environment.value: asdict(config)}
 
@@ -177,7 +177,7 @@ class ConfigManager:
         with open(self.config_path, "w") as f:
             json.dump(config_data, f, indent=2, default=str)
 
-    def get_config(self) -> Optional[MLOpsConfig]:
+    def get_config(self) -> MLOpsConfig | None:
         """Get current configuration."""
         return self._config
 
@@ -216,12 +216,12 @@ class ConfigManager:
             print(f"Configuration validation failed: {e}")
             return False
 
-    def _load_from_file(self) -> Dict[str, Any]:
+    def _load_from_file(self) -> dict[str, Any]:
         """Load configuration from JSON file."""
         with open(self.config_path) as f:
             return json.load(f)
 
-    def _get_default_config(self) -> Dict[str, Any]:
+    def _get_default_config(self) -> dict[str, Any]:
         """Get default configuration."""
         return {
             "default": {
@@ -312,7 +312,7 @@ class ConfigManager:
             },
         }
 
-    def _merge_configs(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    def _merge_configs(self, base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
         """Merge two configuration dictionaries."""
         result = base.copy()
 
@@ -324,7 +324,7 @@ class ConfigManager:
 
         return result
 
-    def _override_with_env_vars(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _override_with_env_vars(self, config: dict[str, Any]) -> dict[str, Any]:
         """Override configuration with environment variables."""
         env_mappings = {
             "MLOPS_DATABASE_URL": ["database", "url"],
@@ -366,7 +366,7 @@ class ConfigManager:
         return config
 
     def _create_config_object(
-        self, config_data: Dict[str, Any], environment: Environment
+        self, config_data: dict[str, Any], environment: Environment
     ) -> MLOpsConfig:
         """Create MLOpsConfig object from dictionary."""
         return MLOpsConfig(

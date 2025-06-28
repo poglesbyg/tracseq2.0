@@ -8,7 +8,6 @@ import json
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 import asyncpg
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -48,10 +47,10 @@ class RagSubmissionResponse(BaseModel):
 
     id: str
     submission_id: str
-    submitter_name: Optional[str]
-    submitter_email: Optional[str]
-    sample_type: Optional[str]
-    sample_name: Optional[str]
+    submitter_name: str | None
+    submitter_email: str | None
+    sample_type: str | None
+    sample_name: str | None
     confidence_score: float
     created_at: str
     status: str = "completed"
@@ -61,7 +60,7 @@ class ProcessingResult(BaseModel):
     """Result of document processing"""
 
     success: bool
-    submission_id: Optional[str] = None
+    submission_id: str | None = None
     message: str
     processing_time: float = 0.0
 
@@ -88,7 +87,7 @@ async def health_check():
         raise HTTPException(status_code=503, detail=f"Database connection failed: {e}")
 
 
-@app.get("/api/rag/submissions", response_model=List[RagSubmissionResponse])
+@app.get("/api/rag/submissions", response_model=list[RagSubmissionResponse])
 async def get_rag_submissions(limit: int = 50, offset: int = 0):
     """Get RAG submissions for the frontend"""
     try:

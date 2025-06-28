@@ -67,7 +67,7 @@ export default function Samples() {
   };
 
   // Fetch samples
-  const { data: samplesResponse, isLoading: isLoadingSamples, isError, error, refetch } = useQuery<{ samples: Sample[], total: number }>({
+  const { data: samplesResponse, isLoading: isLoadingSamples, isError, refetch } = useQuery<{ samples: Sample[], total: number }>({
     queryKey: ['samples'],
     queryFn: async () => {
       const response = await axios.get('/api/samples');

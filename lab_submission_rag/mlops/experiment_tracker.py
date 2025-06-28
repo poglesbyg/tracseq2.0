@@ -10,13 +10,22 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import aiofiles
 import matplotlib.pyplot as plt
 import pandas as pd
 import structlog
-from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, Text, create_engine
+from sqlalchemy import (
+    JSON,
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    Text,
+    create_engine,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -37,7 +46,7 @@ class ExperimentConfig:
     experiment_id: str
     name: str
     description: str
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
     # Model configuration
     model_type: str = ""
@@ -52,18 +61,18 @@ class ExperimentConfig:
     test_split: float = 0.1
 
     # Training configuration
-    hyperparameters: Dict[str, Any] = field(default_factory=dict)
-    training_config: Dict[str, Any] = field(default_factory=dict)
+    hyperparameters: dict[str, Any] = field(default_factory=dict)
+    training_config: dict[str, Any] = field(default_factory=dict)
 
     # Environment
     python_version: str = ""
-    requirements: List[str] = field(default_factory=list)
+    requirements: list[str] = field(default_factory=list)
     gpu_enabled: bool = False
 
     # Tracking
     created_at: datetime = field(default_factory=datetime.utcnow)
     created_by: str = ""
-    parent_experiment_id: Optional[str] = None
+    parent_experiment_id: str | None = None
 
 
 @dataclass
@@ -72,29 +81,29 @@ class ExperimentMetrics:
 
     experiment_id: str
     step: int
-    epoch: Optional[int] = None
+    epoch: int | None = None
 
     # Training metrics
-    train_loss: Optional[float] = None
-    train_accuracy: Optional[float] = None
-    train_precision: Optional[float] = None
-    train_recall: Optional[float] = None
-    train_f1: Optional[float] = None
+    train_loss: float | None = None
+    train_accuracy: float | None = None
+    train_precision: float | None = None
+    train_recall: float | None = None
+    train_f1: float | None = None
 
     # Validation metrics
-    val_loss: Optional[float] = None
-    val_accuracy: Optional[float] = None
-    val_precision: Optional[float] = None
-    val_recall: Optional[float] = None
-    val_f1: Optional[float] = None
+    val_loss: float | None = None
+    val_accuracy: float | None = None
+    val_precision: float | None = None
+    val_recall: float | None = None
+    val_f1: float | None = None
 
     # Custom metrics
-    custom_metrics: Dict[str, float] = field(default_factory=dict)
+    custom_metrics: dict[str, float] = field(default_factory=dict)
 
     # System metrics
-    memory_usage_mb: Optional[float] = None
-    gpu_usage_percent: Optional[float] = None
-    training_time_seconds: Optional[float] = None
+    memory_usage_mb: float | None = None
+    gpu_usage_percent: float | None = None
+    training_time_seconds: float | None = None
 
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
@@ -110,7 +119,7 @@ class ExperimentArtifact:
     file_path: str
     file_size_bytes: int
     description: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -224,7 +233,7 @@ class ExperimentTracker:
     - Hyperparameter optimization integration
     """
 
-    def __init__(self, tracking_dir: Union[str, Path], database_url: str):
+    def __init__(self, tracking_dir: str | Path, database_url: str) -> None:
         self.tracking_dir = Path(tracking_dir)
         self.tracking_dir.mkdir(parents=True, exist_ok=True)
 
@@ -241,7 +250,7 @@ class ExperimentTracker:
         for dir_path in [self.experiments_dir, self.artifacts_dir, self.plots_dir]:
             dir_path.mkdir(parents=True, exist_ok=True)
 
-        self.current_experiment: Optional[str] = None
+        self.current_experiment: str | None = None
 
     async def start_experiment(self, config: ExperimentConfig) -> str:
         """Start a new experiment."""
@@ -296,7 +305,7 @@ class ExperimentTracker:
 
         return config.experiment_id
 
-    async def log_metrics(self, metrics: ExperimentMetrics):
+    async def log_metrics(self, metrics: ExperimentMetrics) -> None:
         """Log metrics for the current experiment."""
         if not metrics.experiment_id and self.current_experiment:
             metrics.experiment_id = self.current_experiment
@@ -333,10 +342,10 @@ class ExperimentTracker:
         self,
         name: str,
         artifact_type: str,
-        content: Union[bytes, str, Any],
-        experiment_id: Optional[str] = None,
+        content: bytes | str | Any,
+        experiment_id: str | None = None,
         description: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """Log an artifact (file, model, plot, etc.)."""
         if not experiment_id:
@@ -419,9 +428,9 @@ class ExperimentTracker:
 
     async def complete_experiment(
         self,
-        experiment_id: Optional[str] = None,
-        final_metrics: Optional[Dict[str, float]] = None,
-        notes: Optional[str] = None,
+        experiment_id: str | None = None,
+        final_metrics: dict[str, float] | None = None,
+        notes: str | None = None,
         status: ExperimentStatus = ExperimentStatus.COMPLETED,
     ):
         """Mark an experiment as completed."""
@@ -450,7 +459,7 @@ class ExperimentTracker:
 
         logger.info("Experiment completed", experiment_id=experiment_id, status=status.value)
 
-    async def get_experiment(self, experiment_id: str) -> Optional[ExperimentConfig]:
+    async def get_experiment(self, experiment_id: str) -> ExperimentConfig | None:
         """Get experiment configuration."""
         with self.SessionLocal() as session:
             record = (
@@ -531,10 +540,10 @@ class ExperimentTracker:
     async def list_experiments(
         self,
         limit: int = 50,
-        status: Optional[ExperimentStatus] = None,
-        model_type: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        status: ExperimentStatus | None = None,
+        model_type: str | None = None,
+        tags: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """List experiments with optional filtering."""
         with self.SessionLocal() as session:
             query = session.query(ExperimentRecord)
@@ -572,7 +581,7 @@ class ExperimentTracker:
             return experiments
 
     async def compare_experiments(
-        self, experiment_ids: List[str], metrics: List[str] = None
+        self, experiment_ids: list[str], metrics: list[str] = None
     ) -> pd.DataFrame:
         """Compare multiple experiments."""
         if not metrics:
@@ -608,7 +617,7 @@ class ExperimentTracker:
         return pd.DataFrame(comparison_data)
 
     async def plot_experiment_metrics(
-        self, experiment_id: str, metrics: List[str] = None, save_path: Optional[str] = None
+        self, experiment_id: str, metrics: list[str] = None, save_path: str | None = None
     ) -> str:
         """Generate plots for experiment metrics."""
         if not metrics:

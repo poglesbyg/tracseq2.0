@@ -206,7 +206,7 @@ def check_environment_config():
         print("   ⚠️  .env file not found (create one with your API keys)")
 
 
-def test_basic_imports():
+def test_basic_imports() -> None:
     """Test basic imports from the project"""
     print("\n🧪 Testing basic imports...")
 

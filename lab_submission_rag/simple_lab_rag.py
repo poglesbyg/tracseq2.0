@@ -48,7 +48,7 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 # Core dependencies
 try:
@@ -89,30 +89,30 @@ logger = logging.getLogger(__name__)
 class AdministrativeInfo(BaseModel):
     """Administrative information from lab submissions"""
 
-    submitter_name: Optional[str] = None
-    submitter_email: Optional[str] = None
-    submitter_phone: Optional[str] = None
-    project_name: Optional[str] = None
-    institution: Optional[str] = None
+    submitter_name: str | None = None
+    submitter_email: str | None = None
+    submitter_phone: str | None = None
+    project_name: str | None = None
+    institution: str | None = None
 
 
 class SampleInfo(BaseModel):
     """Sample information from lab submissions"""
 
-    sample_id: Optional[str] = None
-    sample_type: Optional[str] = None  # DNA, RNA, etc.
-    concentration: Optional[str] = None
-    volume: Optional[str] = None
-    storage_conditions: Optional[str] = None
+    sample_id: str | None = None
+    sample_type: str | None = None  # DNA, RNA, etc.
+    concentration: str | None = None
+    volume: str | None = None
+    storage_conditions: str | None = None
 
 
 class SequencingInfo(BaseModel):
     """Sequencing information from lab submissions"""
 
-    platform: Optional[str] = None  # Illumina, PacBio, etc.
-    analysis_type: Optional[str] = None  # WGS, RNA-seq, etc.
-    coverage: Optional[str] = None
-    read_length: Optional[str] = None
+    platform: str | None = None  # Illumina, PacBio, etc.
+    analysis_type: str | None = None  # WGS, RNA-seq, etc.
+    coverage: str | None = None
+    read_length: str | None = None
 
 
 class LabSubmission(BaseModel):
@@ -127,21 +127,21 @@ class LabSubmission(BaseModel):
     sequencing: SequencingInfo = Field(default_factory=SequencingInfo)
 
     # Raw extracted text and metadata
-    raw_text: Optional[str] = None
-    confidence_score: Optional[float] = None
-    source_document: Optional[str] = None
+    raw_text: str | None = None
+    confidence_score: float | None = None
+    source_document: str | None = None
 
 
 class ExtractionResult(BaseModel):
     """Result of document processing"""
 
     success: bool
-    submission: Optional[LabSubmission] = None
-    submission_id: Optional[str] = None
-    extracted_data: Optional[Dict[str, Any]] = None
-    confidence_score: Optional[float] = None
-    error: Optional[str] = None
-    warnings: List[str] = Field(default_factory=list)
+    submission: LabSubmission | None = None
+    submission_id: str | None = None
+    extracted_data: dict[str, Any] | None = None
+    confidence_score: float | None = None
+    error: str | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 # =============================================================================
@@ -152,14 +152,14 @@ class ExtractionResult(BaseModel):
 class SimpleDocumentProcessor:
     """Simplified document processor for basic file types"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.supported_extensions = {".pdf", ".docx", ".txt"}
 
-    def can_process(self, file_path: Union[str, Path]) -> bool:
+    def can_process(self, file_path: str | Path) -> bool:
         """Check if file can be processed"""
         return Path(file_path).suffix.lower() in self.supported_extensions
 
-    def extract_text(self, file_path: Union[str, Path]) -> str:
+    def extract_text(self, file_path: str | Path) -> str:
         """Extract text from document"""
         file_path = Path(file_path)
 
@@ -223,8 +223,8 @@ class SimpleLLMInterface:
         self,
         model: str = "llama3.2:3b",
         use_openai_fallback: bool = False,
-        openai_api_key: Optional[str] = None,
-    ):
+        openai_api_key: str | None = None,
+    ) -> None:
 
         self.model = model
         self.use_openai_fallback = use_openai_fallback
@@ -357,7 +357,7 @@ Text to analyze:
             logger.warning(f"Will try to use model {self.model} anyway")
             return True  # Try anyway - Ollama might still work
 
-    def extract_submission_info(self, text: str) -> Dict[str, Any]:
+    def extract_submission_info(self, text: str) -> dict[str, Any]:
         """Extract structured information from text"""
 
         # Try Ollama first if available
@@ -511,7 +511,7 @@ Answer:"""
 class DemoLLMInterface:
     """Demo LLM interface that simulates responses for demonstration"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.demo_response = {
             "administrative": {
                 "submitter_name": "Dr. Sarah Johnson",
@@ -535,7 +535,7 @@ class DemoLLMInterface:
             },
         }
 
-    def extract_submission_info(self, text: str) -> Dict[str, Any]:
+    def extract_submission_info(self, text: str) -> dict[str, Any]:
         """Demo extraction that returns simulated data"""
         return self.demo_response
 
@@ -563,7 +563,7 @@ class DemoLLMInterface:
 class SimpleVectorStore:
     """Simplified vector store using ChromaDB"""
 
-    def __init__(self, persist_directory: str = "data/vector_store"):
+    def __init__(self, persist_directory: str = "data/vector_store") -> None:
         self.persist_directory = persist_directory
         Path(persist_directory).mkdir(parents=True, exist_ok=True)
 
@@ -577,7 +577,7 @@ class SimpleVectorStore:
         print("Loading embeddings model...")
         self.embeddings_model = SentenceTransformer("all-MiniLM-L6-v2")
 
-    def add_document(self, submission_id: str, text: str, metadata: Dict[str, Any]):
+    def add_document(self, submission_id: str, text: str, metadata: dict[str, Any]) -> None:
         """Add document to vector store"""
         try:
             # Create embeddings
@@ -592,7 +592,7 @@ class SimpleVectorStore:
             logger.error(f"Failed to add document to vector store: {e}")
             raise
 
-    def search(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query: str, n_results: int = 5) -> list[dict[str, Any]]:
         """Search for similar documents"""
         try:
             # Create query embedding
@@ -628,7 +628,7 @@ class SimpleVectorStore:
 class LightweightLabRAG:
     """Lightweight Laboratory Submission RAG System for Docker deployment"""
 
-    def __init__(self, use_ollama=True, use_openai=True, data_dir="./data"):
+    def __init__(self, use_ollama=True, use_openai=True, data_dir="./data") -> None:
         """Initialize the RAG system"""
         # Check for Docker environment variables
         self.use_ollama = use_ollama or os.getenv("USE_OLLAMA", "false").lower() == "true"
@@ -652,9 +652,9 @@ class LightweightLabRAG:
 
         # Storage for submissions
         self.submissions_file = self.data_dir / "submissions.json"
-        self.submissions: Dict[str, Dict] = self._load_submissions()
+        self.submissions: dict[str, dict] = self._load_submissions()
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         """Initialize the RAG system (async version for web interface)"""
         try:
             # Initialize vector store
@@ -696,7 +696,7 @@ class LightweightLabRAG:
         except Exception:
             return False
 
-    def _load_submissions(self) -> Dict[str, Dict]:
+    def _load_submissions(self) -> dict[str, dict]:
         """Load submissions from file"""
         if self.submissions_file.exists():
             try:
@@ -706,7 +706,7 @@ class LightweightLabRAG:
                 logger.warning(f"Failed to load submissions: {e}")
         return {}
 
-    def _save_submissions(self):
+    def _save_submissions(self) -> None:
         """Save submissions to file"""
         try:
             with open(self.submissions_file, "w") as f:
@@ -714,7 +714,7 @@ class LightweightLabRAG:
         except Exception as e:
             logger.error(f"Failed to save submissions: {e}")
 
-    async def process_document(self, file_path: Union[str, Path]) -> ExtractionResult:
+    async def process_document(self, file_path: str | Path) -> ExtractionResult:
         """Process a single document and extract information"""
         try:
             file_path = Path(file_path)
@@ -858,7 +858,7 @@ Please ensure quality control metrics are included.
 class SimpleLabRAG:
     """Synchronous wrapper around LightweightLabRAG"""
 
-    def __init__(self, use_ollama=True, use_openai=True, data_dir="./data"):
+    def __init__(self, use_ollama=True, use_openai=True, data_dir="./data") -> None:
         """Initialize the simple RAG system"""
         self.rag = LightweightLabRAG(use_ollama=use_ollama, use_openai=use_openai, data_dir=data_dir)
 
@@ -878,7 +878,7 @@ class SimpleLabRAG:
             # No loop running, create one
             asyncio.run(self.rag.initialize())
 
-    def process_document(self, file_path):
+    def process_document(self, file_path) -> None:
         """Process a document synchronously"""
         import asyncio
 
@@ -924,11 +924,11 @@ class SimpleLabRAG:
                 return future.result()
 
     @property
-    def submissions(self):
+    def submissions(self) -> None:
         """Get submissions"""
         return self.rag.submissions
 
-    def get_stats(self):
+    def get_stats(self) -> None:
         """Get system statistics"""
         return {
             "total_submissions": len(self.rag.submissions),

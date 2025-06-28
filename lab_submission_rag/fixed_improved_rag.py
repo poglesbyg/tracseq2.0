@@ -10,7 +10,7 @@ import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import asyncpg
 import ollama
@@ -29,49 +29,49 @@ class FixedLabSubmission(BaseModel):
     """Fixed lab submission model that handles validation properly"""
 
     # Administrative Information
-    submitter_name: Optional[str] = Field(None, description="Person submitting the sample")
-    submitter_email: Optional[str] = Field(None, description="Contact email address")
-    submitter_phone: Optional[str] = Field(None, description="Contact phone number")
-    institution: Optional[str] = Field(None, description="Submitting institution/organization")
-    project_name: Optional[str] = Field(None, description="Research project name")
+    submitter_name: str | None = Field(None, description="Person submitting the sample")
+    submitter_email: str | None = Field(None, description="Contact email address")
+    submitter_phone: str | None = Field(None, description="Contact phone number")
+    institution: str | None = Field(None, description="Submitting institution/organization")
+    project_name: str | None = Field(None, description="Research project name")
 
     # Sample Information
-    sample_name: Optional[str] = Field(None, description="Descriptive sample name")
-    sample_barcode: Optional[str] = Field(None, description="Unique sample identifier")
-    material_type: Optional[str] = Field(None, description="Type of biological material")
-    concentration: Optional[str] = Field(None, description="Sample concentration")
-    volume: Optional[str] = Field(None, description="Sample volume")
+    sample_name: str | None = Field(None, description="Descriptive sample name")
+    sample_barcode: str | None = Field(None, description="Unique sample identifier")
+    material_type: str | None = Field(None, description="Type of biological material")
+    concentration: str | None = Field(None, description="Sample concentration")
+    volume: str | None = Field(None, description="Sample volume")
 
     # Storage Information
-    storage_location: Optional[str] = Field(None, description="Storage location name")
-    storage_temperature: Optional[str] = Field(None, description="Storage temperature requirement")
-    storage_conditions: Optional[str] = Field(None, description="Special storage conditions")
+    storage_location: str | None = Field(None, description="Storage location name")
+    storage_temperature: str | None = Field(None, description="Storage temperature requirement")
+    storage_conditions: str | None = Field(None, description="Special storage conditions")
 
     # Sequencing Requirements
-    sequencing_platform: Optional[str] = Field(None, description="Sequencing instrument/platform")
-    analysis_type: Optional[str] = Field(None, description="Type of sequencing analysis")
-    target_coverage: Optional[str] = Field(None, description="Desired sequencing coverage")
-    read_length: Optional[str] = Field(None, description="Sequencing read length")
-    library_prep: Optional[str] = Field(None, description="Library preparation method")
+    sequencing_platform: str | None = Field(None, description="Sequencing instrument/platform")
+    analysis_type: str | None = Field(None, description="Type of sequencing analysis")
+    target_coverage: str | None = Field(None, description="Desired sequencing coverage")
+    read_length: str | None = Field(None, description="Sequencing read length")
+    library_prep: str | None = Field(None, description="Library preparation method")
 
     # Quality and Priority
-    priority_level: Optional[str] = Field(None, description="Processing priority")
-    quality_metrics: Optional[str] = Field(None, description="Quality assessment data")
-    special_instructions: Optional[str] = Field(None, description="Special handling instructions")
+    priority_level: str | None = Field(None, description="Processing priority")
+    quality_metrics: str | None = Field(None, description="Quality assessment data")
+    special_instructions: str | None = Field(None, description="Special handling instructions")
 
     # Metadata
-    submission_date: Optional[datetime] = Field(default_factory=datetime.now)
+    submission_date: datetime | None = Field(default_factory=datetime.now)
     extraction_confidence: float = Field(default=0.0, description="AI extraction confidence")
-    source_document: Optional[str] = Field(None, description="Original document filename")
+    source_document: str | None = Field(None, description="Original document filename")
 
 
 class FixedExtractionResult(BaseModel):
     """Fixed result of document processing"""
 
     success: bool
-    submission: Optional[FixedLabSubmission] = None
+    submission: FixedLabSubmission | None = None
     confidence_score: float = 0.0
-    warnings: List[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
     processing_time: float = 0.0
 
 
@@ -83,7 +83,7 @@ class FixedExtractionResult(BaseModel):
 class FixedLLMInterface:
     """Fixed LLM interface that handles extraction properly"""
 
-    def __init__(self, model: str = "llama3.2:3b"):
+    def __init__(self, model: str = "llama3.2:3b") -> None:
         self.model = model
 
         # Fixed extraction prompt with proper JSON template
@@ -153,7 +153,7 @@ Document to analyze:
 {text}
 """
 
-    def extract_submission_info(self, text: str) -> Dict[str, Any]:
+    def extract_submission_info(self, text: str) -> dict[str, Any]:
         """Extract structured information with proper error handling"""
         try:
             logger.info(f"Extracting information with model: {self.model}")
@@ -206,7 +206,7 @@ Document to analyze:
 class FixedLabRAG:
     """Fixed Laboratory RAG System with proper validation handling"""
 
-    def __init__(self, model: str = "llama3.2:3b"):
+    def __init__(self, model: str = "llama3.2:3b") -> None:
         self.model = model
         self.llm = FixedLLMInterface(model)
 
@@ -219,7 +219,7 @@ class FixedLabRAG:
             "password": "postgres",
         }
 
-    async def connect_to_lab_manager(self):
+    async def connect_to_lab_manager(self) -> None:
         """Connect to lab_manager database"""
         return await asyncpg.connect(**self.db_config)
 
@@ -277,7 +277,7 @@ class FixedLabRAG:
             )
 
     def _create_safe_submission(
-        self, extracted_data: Dict[str, Any], file_path: str
+        self, extracted_data: dict[str, Any], file_path: str
     ) -> FixedLabSubmission:
         """Create submission with safe defaults for missing fields"""
         safe_data = {}
@@ -293,7 +293,7 @@ class FixedLabRAG:
 
         return FixedLabSubmission(**safe_data)
 
-    async def _store_in_lab_manager(self, submission: FixedLabSubmission):
+    async def _store_in_lab_manager(self, submission: FixedLabSubmission) -> None:
         """Store processed submission in lab_manager database"""
         try:
             conn = await self.connect_to_lab_manager()
@@ -334,7 +334,7 @@ class FixedLabRAG:
 # ============================================================================
 
 
-async def test_fixed_system():
+async def test_fixed_system() -> None:
     """Test the fixed RAG system"""
     print("🔧 Testing Fixed Laboratory RAG System")
     print("=" * 50)

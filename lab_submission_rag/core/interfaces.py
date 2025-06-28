@@ -7,7 +7,7 @@ enabling dependency injection, better testability, and loose coupling between co
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from models.rag_models import DocumentChunk
 from models.submission import BatchExtractionResult, ExtractionResult, LabSubmission
@@ -17,17 +17,17 @@ class IDocumentProcessor(ABC):
     """Interface for document processing operations"""
 
     @abstractmethod
-    async def process_document(self, file_path: Union[str, Path]) -> List[DocumentChunk]:
+    async def process_document(self, file_path: str | Path) -> list[DocumentChunk]:
         """Process a document and return chunks"""
         pass
 
     @abstractmethod
-    async def validate_document(self, file_path: Union[str, Path]) -> bool:
+    async def validate_document(self, file_path: str | Path) -> bool:
         """Validate if document can be processed"""
         pass
 
     @abstractmethod
-    def get_supported_formats(self) -> List[str]:
+    def get_supported_formats(self) -> list[str]:
         """Get list of supported file formats"""
         pass
 
@@ -36,14 +36,14 @@ class IVectorStore(ABC):
     """Interface for vector store operations"""
 
     @abstractmethod
-    async def add_chunks(self, chunks: List[DocumentChunk]) -> None:
+    async def add_chunks(self, chunks: list[DocumentChunk]) -> None:
         """Add document chunks to vector store"""
         pass
 
     @abstractmethod
     async def similarity_search(
-        self, query: str, k: int = 5, filter_metadata: Optional[Dict[str, Any]] = None
-    ) -> List[Tuple[DocumentChunk, float]]:
+        self, query: str, k: int = 5, filter_metadata: dict[str, Any] | None = None
+    ) -> list[tuple[DocumentChunk, float]]:
         """Search for similar chunks"""
         pass
 
@@ -53,7 +53,7 @@ class IVectorStore(ABC):
         pass
 
     @abstractmethod
-    async def get_collection_stats(self) -> Dict[str, Any]:
+    async def get_collection_stats(self) -> dict[str, Any]:
         """Get statistics about the vector store collection"""
         pass
 
@@ -63,7 +63,7 @@ class ILLMInterface(ABC):
 
     @abstractmethod
     async def extract_submission_info(
-        self, document_chunks: List[Tuple[str, float]], source_document: str
+        self, document_chunks: list[tuple[str, float]], source_document: str
     ) -> ExtractionResult:
         """Extract submission information from document chunks"""
         pass
@@ -72,14 +72,14 @@ class ILLMInterface(ABC):
     async def answer_query(
         self,
         query: str,
-        relevant_chunks: List[Tuple[str, float]],
-        submission_data: Optional[LabSubmission] = None,
+        relevant_chunks: list[tuple[str, float]],
+        submission_data: LabSubmission | None = None,
     ) -> str:
         """Answer questions using RAG"""
         pass
 
     @abstractmethod
-    def get_provider_info(self) -> Dict[str, Any]:
+    def get_provider_info(self) -> dict[str, Any]:
         """Get information about the LLM provider"""
         pass
 
@@ -98,7 +98,7 @@ class ISubmissionRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_submission(self, submission_id: str) -> Optional[LabSubmission]:
+    async def get_submission(self, submission_id: str) -> LabSubmission | None:
         """Get submission by ID"""
         pass
 
@@ -114,13 +114,13 @@ class ISubmissionRepository(ABC):
 
     @abstractmethod
     async def search_submissions(
-        self, criteria: Dict[str, Any], limit: int = 100, offset: int = 0
-    ) -> List[LabSubmission]:
+        self, criteria: dict[str, Any], limit: int = 100, offset: int = 0
+    ) -> list[LabSubmission]:
         """Search submissions by criteria"""
         pass
 
     @abstractmethod
-    async def get_submission_statistics(self) -> Dict[str, Any]:
+    async def get_submission_statistics(self) -> dict[str, Any]:
         """Get submission statistics"""
         pass
 
@@ -129,13 +129,13 @@ class ISubmissionService(ABC):
     """Interface for high-level submission processing operations"""
 
     @abstractmethod
-    async def process_document(self, file_path: Union[str, Path]) -> ExtractionResult:
+    async def process_document(self, file_path: str | Path) -> ExtractionResult:
         """Process a single document"""
         pass
 
     @abstractmethod
     async def process_documents_batch(
-        self, file_paths: List[Union[str, Path]]
+        self, file_paths: list[str | Path]
     ) -> BatchExtractionResult:
         """Process multiple documents in batch"""
         pass
@@ -144,19 +144,19 @@ class ISubmissionService(ABC):
     async def query_submissions(
         self,
         query: str,
-        filter_metadata: Optional[Dict[str, Any]] = None,
+        filter_metadata: dict[str, Any] | None = None,
         session_id: str = "default",
     ) -> str:
         """Query submissions using natural language"""
         pass
 
     @abstractmethod
-    async def get_submission(self, submission_id: str) -> Optional[LabSubmission]:
+    async def get_submission(self, submission_id: str) -> LabSubmission | None:
         """Get submission by ID"""
         pass
 
     @abstractmethod
-    async def search_submissions(self, criteria: Dict[str, Any]) -> List[LabSubmission]:
+    async def search_submissions(self, criteria: dict[str, Any]) -> list[LabSubmission]:
         """Search submissions by criteria"""
         pass
 
@@ -165,7 +165,7 @@ class ICircuitBreaker(ABC):
     """Interface for circuit breaker pattern"""
 
     @abstractmethod
-    async def call(self, func, *args, **kwargs):
+    async def call(self, func, *args, **kwargs) -> None:
         """Execute function with circuit breaker protection"""
         pass
 
@@ -184,7 +184,7 @@ class IRetryPolicy(ABC):
     """Interface for retry policies"""
 
     @abstractmethod
-    async def execute(self, func, *args, **kwargs):
+    async def execute(self, func, *args, **kwargs) -> None:
         """Execute function with retry policy"""
         pass
 
@@ -204,25 +204,25 @@ class IMetricsCollector(ABC):
     """Interface for metrics collection"""
 
     @abstractmethod
-    def increment_counter(self, name: str, tags: Optional[Dict[str, str]] = None) -> None:
+    def increment_counter(self, name: str, tags: dict[str, str] | None = None) -> None:
         """Increment a counter metric"""
         pass
 
     @abstractmethod
-    def record_gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
+    def record_gauge(self, name: str, value: float, tags: dict[str, str] | None = None) -> None:
         """Record a gauge metric"""
         pass
 
     @abstractmethod
     def record_timing(
-        self, name: str, duration: float, tags: Optional[Dict[str, str]] = None
+        self, name: str, duration: float, tags: dict[str, str] | None = None
     ) -> None:
         """Record a timing metric"""
         pass
 
     @abstractmethod
     def record_histogram(
-        self, name: str, value: float, tags: Optional[Dict[str, str]] = None
+        self, name: str, value: float, tags: dict[str, str] | None = None
     ) -> None:
         """Record a histogram metric"""
         pass
@@ -232,7 +232,7 @@ class IHealthChecker(ABC):
     """Interface for health checking components"""
 
     @abstractmethod
-    async def check_health(self) -> Dict[str, Any]:
+    async def check_health(self) -> dict[str, Any]:
         """Check health of the component"""
         pass
 
@@ -246,7 +246,7 @@ class IEventPublisher(ABC):
     """Interface for publishing domain events"""
 
     @abstractmethod
-    async def publish(self, event_type: str, data: Dict[str, Any]) -> None:
+    async def publish(self, event_type: str, data: dict[str, Any]) -> None:
         """Publish an event"""
         pass
 
@@ -260,12 +260,12 @@ class ICacheProvider(ABC):
     """Interface for caching operations"""
 
     @abstractmethod
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get value from cache"""
         pass
 
     @abstractmethod
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Set value in cache"""
         pass
 
@@ -299,6 +299,6 @@ class IConfigurationProvider(ABC):
         pass
 
     @abstractmethod
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         """Validate configuration and return errors"""
         pass

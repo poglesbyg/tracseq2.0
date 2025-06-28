@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import aiofiles
 import structlog
@@ -51,8 +51,8 @@ class ModelMetadata:
     # Training information
     training_data_hash: str
     training_duration_seconds: float
-    hyperparameters: Dict[str, Any]
-    feature_columns: List[str]
+    hyperparameters: dict[str, Any]
+    feature_columns: list[str]
 
     # Deployment information
     status: ModelStatus
@@ -63,7 +63,7 @@ class ModelMetadata:
     # Model artifacts
     model_path: str
     config_path: str
-    requirements_path: Optional[str] = None
+    requirements_path: str | None = None
 
     # Performance tracking
     prediction_count: int = 0
@@ -72,7 +72,7 @@ class ModelMetadata:
 
     # A/B testing
     traffic_percentage: float = 0.0
-    ab_test_id: Optional[str] = None
+    ab_test_id: str | None = None
 
 
 Base = declarative_base()
@@ -125,7 +125,7 @@ class ModelRegistry:
     Advanced model registry with versioning, metadata tracking, and lifecycle management.
     """
 
-    def __init__(self, registry_path: Union[str, Path], database_url: str):
+    def __init__(self, registry_path: str | Path, database_url: str) -> None:
         self.registry_path = Path(registry_path)
         self.registry_path.mkdir(parents=True, exist_ok=True)
 
@@ -146,8 +146,8 @@ class ModelRegistry:
         self,
         model: Any,
         metadata: ModelMetadata,
-        config: Dict[str, Any],
-        requirements: Optional[List[str]] = None,
+        config: dict[str, Any],
+        requirements: list[str] | None = None,
     ) -> str:
         """
         Register a new model with full metadata and artifacts.
@@ -198,7 +198,7 @@ class ModelRegistry:
             raise
 
     async def get_model(
-        self, model_id: str, version: Optional[str] = None
+        self, model_id: str, version: str | None = None
     ) -> tuple[Any, ModelMetadata]:
         """
         Retrieve a model and its metadata.
@@ -222,8 +222,8 @@ class ModelRegistry:
         return model, metadata
 
     async def get_model_metadata(
-        self, model_id: str, version: Optional[str] = None
-    ) -> Optional[ModelMetadata]:
+        self, model_id: str, version: str | None = None
+    ) -> ModelMetadata | None:
         """Get model metadata from registry."""
         with self.SessionLocal() as session:
             query = session.query(ModelRecord).filter(ModelRecord.model_id == model_id)
@@ -242,10 +242,10 @@ class ModelRegistry:
 
     async def list_models(
         self,
-        model_type: Optional[str] = None,
-        status: Optional[ModelStatus] = None,
+        model_type: str | None = None,
+        status: ModelStatus | None = None,
         limit: int = 50,
-    ) -> List[ModelMetadata]:
+    ) -> list[ModelMetadata]:
         """List models with optional filtering."""
         with self.SessionLocal() as session:
             query = session.query(ModelRecord)
@@ -375,7 +375,7 @@ class ModelRegistry:
         logger.info("Model deleted", model_id=model_id, version=version)
         return True
 
-    async def get_production_model(self, model_type: str) -> Optional[tuple[Any, ModelMetadata]]:
+    async def get_production_model(self, model_type: str) -> tuple[Any, ModelMetadata] | None:
         """Get current production model of specified type."""
         with self.SessionLocal() as session:
             record = (
@@ -403,10 +403,10 @@ class ModelRegistry:
         self,
         model: Any,
         model_path: Path,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         config_path: Path,
-        requirements: Optional[List[str]],
-        requirements_path: Optional[Path],
+        requirements: list[str] | None,
+        requirements_path: Path | None,
     ):
         """Save model artifacts to disk."""
         # Save model
@@ -423,7 +423,7 @@ class ModelRegistry:
             async with aiofiles.open(requirements_path, "w") as f:
                 await f.write("\n".join(requirements))
 
-    async def _store_model_metadata(self, metadata: ModelMetadata):
+    async def _store_model_metadata(self, metadata: ModelMetadata) -> None:
         """Store model metadata in database."""
         with self.SessionLocal() as session:
             record = ModelRecord(
@@ -493,7 +493,7 @@ class ModelRegistry:
             ab_test_id=record.ab_test_id,
         )
 
-    async def _demote_current_production_model(self, model_id: str):
+    async def _demote_current_production_model(self, model_id: str) -> None:
         """Demote current production model to staging."""
         with self.SessionLocal() as session:
             current_prod = (

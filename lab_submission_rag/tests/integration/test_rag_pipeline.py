@@ -23,7 +23,7 @@ class TestRAGPipeline:
     """Integration tests for the complete RAG pipeline"""
 
     @pytest.fixture
-    def mock_dependencies(self):
+    def mock_dependencies(self) -> None:
         """Mock external dependencies for integration testing"""
         with (
             patch("rag.vector_store.chromadb.PersistentClient") as mock_chromadb,
@@ -75,7 +75,7 @@ class TestRAGPipeline:
     @pytest.mark.asyncio
     async def test_document_to_vector_store_pipeline(
         self, mock_dependencies, temp_dir, sample_text_content
-    ):
+    ) -> None:
         """Test the pipeline from document processing to vector store"""
         # Create a test document
         test_doc = temp_dir / "test.pdf"
@@ -108,7 +108,7 @@ class TestRAGPipeline:
             assert chunks[0].content == sample_text_content
 
     @pytest.mark.asyncio
-    async def test_query_to_response_pipeline(self, mock_dependencies, sample_document_chunks):
+    async def test_query_to_response_pipeline(self, mock_dependencies, sample_document_chunks) -> None:
         """Test the pipeline from query to response generation"""
         # Initialize components
         vector_store = VectorStore()
@@ -131,7 +131,7 @@ class TestRAGPipeline:
             mock_search.assert_called_once_with(query, k=3)
 
     @pytest.mark.asyncio
-    async def test_enhanced_llm_conversation_flow(self, mock_dependencies):
+    async def test_enhanced_llm_conversation_flow(self, mock_dependencies) -> None:
         """Test enhanced LLM conversation flow with memory"""
         enhanced_llm = EnhancedLLMInterface()
         session_id = "test_session"
@@ -154,7 +154,7 @@ class TestRAGPipeline:
     @pytest.mark.asyncio
     async def test_full_rag_orchestrator_pipeline(
         self, mock_dependencies, temp_dir, sample_text_content
-    ):
+    ) -> None:
         """Test the complete RAG orchestrator pipeline"""
         # Create test document
         test_doc = temp_dir / "test_submission.pdf"
@@ -183,7 +183,7 @@ class TestRAGPipeline:
             assert result.processing_time > 0
 
     @pytest.mark.asyncio
-    async def test_rag_query_with_context(self, mock_dependencies, sample_document_chunks):
+    async def test_rag_query_with_context(self, mock_dependencies, sample_document_chunks) -> None:
         """Test RAG query with document context"""
         rag = LabSubmissionRAG()
 
@@ -201,7 +201,7 @@ class TestRAGPipeline:
             mock_search.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_error_handling_in_pipeline(self, mock_dependencies, temp_dir):
+    async def test_error_handling_in_pipeline(self, mock_dependencies, temp_dir) -> None:
         """Test error handling throughout the pipeline"""
         # Create invalid document
         invalid_doc = temp_dir / "invalid.pdf"
@@ -221,7 +221,7 @@ class TestRAGPipeline:
             assert "error" in result.warnings[0].lower()
 
     @pytest.mark.asyncio
-    async def test_system_status_integration(self, mock_dependencies):
+    async def test_system_status_integration(self, mock_dependencies) -> None:
         """Test system status reporting"""
         rag = LabSubmissionRAG()
 
@@ -231,7 +231,7 @@ class TestRAGPipeline:
         assert "vector_store" in status or "total_chunks" in status
 
     @pytest.mark.asyncio
-    async def test_concurrent_operations(self, mock_dependencies, sample_document_chunks):
+    async def test_concurrent_operations(self, mock_dependencies, sample_document_chunks) -> None:
         """Test concurrent operations on the RAG system"""
         rag = LabSubmissionRAG()
 
@@ -253,7 +253,7 @@ class TestRAGPipeline:
             assert all(isinstance(response, str) and len(response) > 0 for response in responses)
 
     @pytest.mark.asyncio
-    async def test_memory_management_under_load(self, mock_dependencies):
+    async def test_memory_management_under_load(self, mock_dependencies) -> None:
         """Test memory management under load"""
         enhanced_llm = EnhancedLLMInterface()
 

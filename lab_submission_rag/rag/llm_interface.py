@@ -5,7 +5,6 @@ LLM interface for information extraction and generation
 import asyncio
 import json
 import logging
-from typing import List, Optional, Tuple
 
 import anthropic
 import ollama
@@ -31,12 +30,12 @@ logger = logging.getLogger(__name__)
 class LLMInterface:
     """Interface for LLM-based information extraction and query processing"""
 
-    def __init__(self):
+    def __init__(self) -> None:
 
         self.client = None
         self._initialize_client()
 
-    def _initialize_client(self):
+    def _initialize_client(self) -> None:
         """Initialize the LLM client based on configuration"""
         try:
             # Check for Ollama first if enabled
@@ -70,7 +69,7 @@ class LLMInterface:
             self.client_type = "mock"
 
     async def extract_submission_info(
-        self, document_chunks: List[Tuple[str, float]], source_document: str
+        self, document_chunks: list[tuple[str, float]], source_document: str
     ) -> ExtractionResult:
         """Extract laboratory submission information from document chunks"""
         try:
@@ -97,7 +96,7 @@ class LLMInterface:
                 source_document=source_document,
             )
 
-    def _prepare_context(self, document_chunks: List[Tuple[str, float]]) -> str:
+    def _prepare_context(self, document_chunks: list[tuple[str, float]]) -> str:
         """Prepare context from document chunks"""
         context_parts = []
         for chunk_content, similarity_score in document_chunks:
@@ -330,8 +329,8 @@ Response format:
     async def answer_query(
         self,
         query: str,
-        relevant_chunks: List[Tuple[str, float]],
-        submission_data: Optional[LabSubmission] = None,
+        relevant_chunks: list[tuple[str, float]],
+        submission_data: LabSubmission | None = None,
     ) -> str:
         """Answer questions about laboratory submissions using RAG"""
         try:

@@ -5,7 +5,6 @@ Extracted from simple_lab_rag.py for better modularity
 """
 
 from pathlib import Path
-from typing import Union
 
 import pypdf
 from docx import Document as DocxDocument
@@ -14,14 +13,14 @@ from docx import Document as DocxDocument
 class SimpleDocumentProcessor:
     """Simplified document processor for basic file types"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.supported_extensions = {".pdf", ".docx", ".txt"}
 
-    def can_process(self, file_path: Union[str, Path]) -> bool:
+    def can_process(self, file_path: str | Path) -> bool:
         """Check if file can be processed"""
         return Path(file_path).suffix.lower() in self.supported_extensions
 
-    def extract_text(self, file_path: Union[str, Path]) -> str:
+    def extract_text(self, file_path: str | Path) -> str:
         """Extract text from document"""
         file_path = Path(file_path)
 

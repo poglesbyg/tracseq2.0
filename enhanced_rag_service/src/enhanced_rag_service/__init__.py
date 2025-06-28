@@ -7,4 +7,4 @@ and information extraction in laboratory environments.
 
 from enhanced_rag_service.__about__ import __version__
 
-__all__ = ["__version__"] 
+__all__ = ["__version__"]

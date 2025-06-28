@@ -6,7 +6,6 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
 
 import anthropic
 import ollama
@@ -20,12 +19,12 @@ logger = logging.getLogger(__name__)
 class ConversationContext:
     """Manages conversation history and context"""
 
-    def __init__(self, max_history: int = 10):
+    def __init__(self, max_history: int = 10) -> None:
         self.messages = []
         self.max_history = max_history
         self.user_context = {}
 
-    def add_message(self, role: str, content: str, metadata: Dict = None):
+    def add_message(self, role: str, content: str, metadata: dict = None) -> None:
         """Add a message to conversation history"""
         message = {
             "role": role,
@@ -54,14 +53,14 @@ class ConversationContext:
 class EnhancedLLMInterface:
     """Enhanced LLM interface with lab-specific intelligence"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.client = None
         self.client_type = None
         self.conversation_contexts = {}
         self._initialize_client()
         self.lab_system_knowledge = self._load_lab_system_knowledge()
 
-    def _initialize_client(self):
+    def _initialize_client(self) -> None:
         """Initialize the LLM client with enhanced configuration"""
         try:
             if hasattr(settings, "use_ollama") and settings.use_ollama:
@@ -159,9 +158,9 @@ STORAGE CONDITIONS:
     async def answer_query(
         self,
         query: str,
-        relevant_chunks: List[Tuple[str, float]],
+        relevant_chunks: list[tuple[str, float]],
         session_id: str = "default",
-        submission_data: Optional[dict] = None,
+        submission_data: dict | None = None,
     ) -> str:
         """Answer questions with enhanced intelligence and context"""
         try:

@@ -5,7 +5,7 @@ Allows customization of the 7 extraction categories for specific lab workflows
 """
 
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -30,7 +30,7 @@ class FieldDefinition(BaseModel):
     description: str = Field(description="What this field contains")
     data_type: str = Field(description="Expected data type (string, number, date, etc.)")
     required: bool = Field(default=False, description="Is this field required?")
-    examples: List[str] = Field(default_factory=list, description="Example values")
+    examples: list[str] = Field(default_factory=list, description="Example values")
     validation_pattern: str = Field(default="", description="Regex pattern for validation")
 
 
@@ -41,16 +41,16 @@ class CategoryDefinition(BaseModel):
     type: CategoryType = Field(description="Category type")
     description: str = Field(description="What this category extracts")
     priority: int = Field(description="Extraction priority (1=highest)")
-    fields: List[FieldDefinition] = Field(description="Fields in this category")
+    fields: list[FieldDefinition] = Field(description="Fields in this category")
 
 
 class LabCategoryConfig:
     """Laboratory category configuration manager"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.categories = self._create_default_categories()
 
-    def _create_default_categories(self) -> List[CategoryDefinition]:
+    def _create_default_categories(self) -> list[CategoryDefinition]:
         """Create default laboratory categories aligned with lab_manager"""
 
         return [
@@ -350,11 +350,11 @@ class LabCategoryConfig:
                 return category
         raise ValueError(f"Category '{name}' not found")
 
-    def get_categories_by_type(self, category_type: CategoryType) -> List[CategoryDefinition]:
+    def get_categories_by_type(self, category_type: CategoryType) -> list[CategoryDefinition]:
         """Get all categories of a specific type"""
         return [cat for cat in self.categories if cat.type == category_type]
 
-    def add_custom_category(self, category: CategoryDefinition):
+    def add_custom_category(self, category: CategoryDefinition) -> None:
         """Add a custom category"""
         self.categories.append(category)
 
@@ -393,7 +393,7 @@ Focus on these categories and fields:
 
         return prompt
 
-    def export_configuration(self) -> Dict[str, Any]:
+    def export_configuration(self) -> dict[str, Any]:
         """Export configuration as dictionary"""
         return {
             "categories": [cat.dict() for cat in self.categories],

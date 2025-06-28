@@ -14,7 +14,7 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any
 
 # Core dependencies
 try:
@@ -53,7 +53,7 @@ logger = logging.getLogger(__name__)
 class SimpleVectorStore:
     """Simple vector storage using ChromaDB"""
 
-    def __init__(self, persist_directory: str = "data/vector_store"):
+    def __init__(self, persist_directory: str = "data/vector_store") -> None:
         self.persist_directory = persist_directory
         Path(persist_directory).mkdir(parents=True, exist_ok=True)
 
@@ -67,7 +67,7 @@ class SimpleVectorStore:
         self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
         logger.info("Vector store initialized")
 
-    def add_document(self, submission_id: str, text: str, metadata: Dict[str, Any]):
+    def add_document(self, submission_id: str, text: str, metadata: dict[str, Any]) -> None:
         """Add document to vector store"""
         try:
             # Create embedding
@@ -81,7 +81,7 @@ class SimpleVectorStore:
         except Exception as e:
             logger.error(f"Failed to add document to vector store: {e}")
 
-    def search(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query: str, n_results: int = 5) -> list[dict[str, Any]]:
         """Search for similar documents"""
         try:
             # Create query embedding
@@ -111,7 +111,7 @@ class SimpleVectorStore:
 class LightweightLabRAG:
     """Lightweight Laboratory RAG System - main class"""
 
-    def __init__(self, use_ollama=True, use_openai=True, data_dir="./data"):
+    def __init__(self, use_ollama=True, use_openai=True, data_dir="./data") -> None:
         self.use_ollama = use_ollama
         self.use_openai = use_openai
         self.data_dir = Path(data_dir)
@@ -136,7 +136,7 @@ class LightweightLabRAG:
 
         logger.info("LightweightLabRAG initialized successfully")
 
-    def _load_submissions(self) -> Dict[str, Dict]:
+    def _load_submissions(self) -> dict[str, dict]:
         """Load submissions from file"""
         try:
             if self.submissions_file.exists():
@@ -146,7 +146,7 @@ class LightweightLabRAG:
             logger.warning(f"Could not load submissions: {e}")
         return {}
 
-    def _save_submissions(self):
+    def _save_submissions(self) -> None:
         """Save submissions to file"""
         try:
             with open(self.submissions_file, "w") as f:
@@ -154,7 +154,7 @@ class LightweightLabRAG:
         except Exception as e:
             logger.error(f"Could not save submissions: {e}")
 
-    def process_document(self, file_path: Union[str, Path]) -> ExtractionResult:
+    def process_document(self, file_path: str | Path) -> ExtractionResult:
         """Process a laboratory document"""
         start_time = datetime.now()
         file_path = Path(file_path)
@@ -264,7 +264,7 @@ class LightweightLabRAG:
             logger.error(f"Export failed: {e}")
             return f"Export failed: {str(e)}"
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get system statistics"""
         return {
             "total_submissions": len(self.submissions),

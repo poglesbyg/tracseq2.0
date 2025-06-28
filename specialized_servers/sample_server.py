@@ -6,9 +6,9 @@ import logging
 import time
 import uuid
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
-from fastmcp import FastMCP, Context
+from fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
 
 # Configure logging
@@ -24,7 +24,7 @@ class IntelligentSearchRequest(BaseModel):
     search_type: str = Field(default="comprehensive", description="Type of search")
 
 class SampleCreationRequest(BaseModel):
-    sample_data: Dict[str, Any] = Field(description="Sample metadata")
+    sample_data: dict[str, Any] = Field(description="Sample metadata")
     priority: str = Field(default="normal", description="Priority")
 
 # Global state
@@ -38,12 +38,12 @@ sample_state = {
 async def intelligent_sample_search(
     request: IntelligentSearchRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """AI-powered intelligent sample search."""
     await ctx.info(f"Processing search: {request.query}")
-    
+
     start_time = time.time()
-    
+
     try:
         # AI query analysis
         query_analysis = await ctx.sample(
@@ -58,7 +58,7 @@ async def intelligent_sample_search(
             }],
             model_preferences=["claude-3-sonnet-20240229"]
         )
-        
+
         # Mock search results
         mock_samples = [{
             "id": "SMPL-DNA-001",
@@ -67,10 +67,10 @@ async def intelligent_sample_search(
             "quality_score": 96.2,
             "status": "Ready"
         }] if "dna" in request.query.lower() else []
-        
+
         processing_time = time.time() - start_time
         sample_state["last_activity"] = datetime.now().isoformat()
-        
+
         return {
             "success": True,
             "query": request.query,
@@ -79,7 +79,7 @@ async def intelligent_sample_search(
             "samples": mock_samples,
             "processing_time": processing_time
         }
-        
+
     except Exception as e:
         await ctx.error(f"Search failed: {str(e)}")
         return {"success": False, "error": str(e)}
@@ -88,12 +88,12 @@ async def intelligent_sample_search(
 async def create_samples_with_ai_optimization(
     request: SampleCreationRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create samples with AI optimization."""
     await ctx.info("Creating samples with AI optimization")
-    
+
     start_time = time.time()
-    
+
     try:
         # AI optimization
         optimization = await ctx.sample(
@@ -109,10 +109,10 @@ async def create_samples_with_ai_optimization(
             }],
             model_preferences=["claude-3-sonnet-20240229"]
         )
-        
+
         # Create optimized sample
         sample_id = f"SMPL-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8]}"
-        
+
         optimized_sample = {
             "id": sample_id,
             "data": request.sample_data,
@@ -121,20 +121,20 @@ async def create_samples_with_ai_optimization(
             "created_at": datetime.now().isoformat(),
             "status": "Created"
         }
-        
+
         # Update state
         sample_state["total_samples"] += 1
         sample_state["active_samples"] += 1
         sample_state["last_activity"] = datetime.now().isoformat()
-        
+
         processing_time = time.time() - start_time
-        
+
         return {
             "success": True,
             "sample_created": optimized_sample,
             "processing_time": processing_time
         }
-        
+
     except Exception as e:
         await ctx.error(f"Creation failed: {str(e)}")
         return {"success": False, "error": str(e)}
@@ -156,10 +156,10 @@ async def sample_status(ctx: Context) -> str:
 # Main execution
 if __name__ == "__main__":
     import sys
-    
+
     logger.info("Starting Sample Management Server")
     sample_state["last_activity"] = datetime.now().isoformat()
-    
+
     if len(sys.argv) > 1 and sys.argv[1] == "--http":
         mcp.run(transport="http", port=8010)
     else:

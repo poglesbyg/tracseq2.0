@@ -8,7 +8,7 @@ A lightweight FastAPI web interface for the Docker deployment.
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -41,14 +41,14 @@ class QueryRequest(BaseModel):
 class QueryResponse(BaseModel):
     answer: str
     confidence: float
-    sources: List[str] = []
+    sources: list[str] = []
 
 
 class ProcessingResponse(BaseModel):
     success: bool
-    submission_id: Optional[str] = None
+    submission_id: str | None = None
     message: str
-    extracted_data: Optional[Dict[str, Any]] = None
+    extracted_data: dict[str, Any] | None = None
 
 
 class HealthResponse(BaseModel):

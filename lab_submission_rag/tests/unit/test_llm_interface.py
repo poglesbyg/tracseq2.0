@@ -18,7 +18,7 @@ class TestLLMInterface:
     """Test cases for LLMInterface"""
 
     @pytest.fixture
-    def mock_openai_client(self):
+    def mock_openai_client(self) -> None:
         """Mock OpenAI client"""
         mock_client = AsyncMock()
         mock_response = Mock()
@@ -28,7 +28,7 @@ class TestLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.llm_interface.openai")
-    async def test_llm_interface_initialization(self, mock_openai):
+    async def test_llm_interface_initialization(self, mock_openai) -> None:
         """Test LLMInterface initialization"""
         llm = LLMInterface()
 
@@ -36,7 +36,7 @@ class TestLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.llm_interface.openai")
-    async def test_answer_query(self, mock_openai, sample_document_chunks):
+    async def test_answer_query(self, mock_openai, sample_document_chunks) -> None:
         """Test query answering functionality"""
         llm = LLMInterface()
 
@@ -50,7 +50,7 @@ class TestLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.llm_interface.openai")
-    async def test_answer_query_empty_chunks(self, mock_openai):
+    async def test_answer_query_empty_chunks(self, mock_openai) -> None:
         """Test query answering with empty chunks"""
         llm = LLMInterface()
 
@@ -61,7 +61,7 @@ class TestLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.llm_interface.openai")
-    async def test_answer_query_exception_handling(self, mock_openai):
+    async def test_answer_query_exception_handling(self, mock_openai) -> None:
         """Test query answering with exception handling"""
         # Mock to raise an exception
         mock_openai.ChatCompletion.acreate.side_effect = Exception("API Error")
@@ -76,7 +76,7 @@ class TestLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.llm_interface.openai")
-    async def test_prepare_context(self, mock_openai, sample_document_chunks):
+    async def test_prepare_context(self, mock_openai, sample_document_chunks) -> None:
         """Test context preparation from chunks"""
         llm = LLMInterface()
 
@@ -94,7 +94,7 @@ class TestLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.llm_interface.openai")
-    async def test_prepare_context_empty_chunks(self, mock_openai):
+    async def test_prepare_context_empty_chunks(self, mock_openai) -> None:
         """Test context preparation with empty chunks"""
         llm = LLMInterface()
 
@@ -108,7 +108,7 @@ class TestEnhancedLLMInterface:
     """Test cases for EnhancedLLMInterface"""
 
     @pytest.fixture
-    def mock_openai_client(self):
+    def mock_openai_client(self) -> None:
         """Mock OpenAI client"""
         mock_client = AsyncMock()
         mock_response = Mock()
@@ -118,7 +118,7 @@ class TestEnhancedLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.enhanced_llm_interface.openai")
-    async def test_enhanced_llm_initialization(self, mock_openai):
+    async def test_enhanced_llm_initialization(self, mock_openai) -> None:
         """Test EnhancedLLMInterface initialization"""
         enhanced_llm = EnhancedLLMInterface()
 
@@ -127,7 +127,7 @@ class TestEnhancedLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.enhanced_llm_interface.openai")
-    async def test_answer_query_new_session(self, mock_openai, sample_document_chunks):
+    async def test_answer_query_new_session(self, mock_openai, sample_document_chunks) -> None:
         """Test answering query for new session"""
         enhanced_llm = EnhancedLLMInterface()
 
@@ -142,7 +142,7 @@ class TestEnhancedLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.enhanced_llm_interface.openai")
-    async def test_answer_query_existing_session(self, mock_openai):
+    async def test_answer_query_existing_session(self, mock_openai) -> None:
         """Test answering query for existing session with conversation history"""
         enhanced_llm = EnhancedLLMInterface()
 
@@ -159,7 +159,7 @@ class TestEnhancedLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.enhanced_llm_interface.openai")
-    async def test_conversation_memory_management(self, mock_openai):
+    async def test_conversation_memory_management(self, mock_openai) -> None:
         """Test conversation memory management and limits"""
         enhanced_llm = EnhancedLLMInterface()
 
@@ -173,7 +173,7 @@ class TestEnhancedLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.enhanced_llm_interface.openai")
-    async def test_multiple_sessions(self, mock_openai):
+    async def test_multiple_sessions(self, mock_openai) -> None:
         """Test handling multiple conversation sessions"""
         enhanced_llm = EnhancedLLMInterface()
 
@@ -192,7 +192,7 @@ class TestEnhancedLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.enhanced_llm_interface.openai")
-    async def test_context_integration(self, mock_openai, sample_document_chunks):
+    async def test_context_integration(self, mock_openai, sample_document_chunks) -> None:
         """Test integration of document context into responses"""
         enhanced_llm = EnhancedLLMInterface()
 
@@ -208,7 +208,7 @@ class TestEnhancedLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.enhanced_llm_interface.openai")
-    async def test_error_handling_in_enhanced_llm(self, mock_openai):
+    async def test_error_handling_in_enhanced_llm(self, mock_openai) -> None:
         """Test error handling in enhanced LLM interface"""
         # Mock to raise an exception
         mock_openai.ChatCompletion.acreate.side_effect = Exception("Enhanced API Error")
@@ -225,7 +225,7 @@ class TestEnhancedLLMInterface:
 
     @pytest.mark.asyncio
     @patch("rag.enhanced_llm_interface.openai")
-    async def test_lab_specific_responses(self, mock_openai):
+    async def test_lab_specific_responses(self, mock_openai) -> None:
         """Test that enhanced LLM provides lab-specific responses"""
         enhanced_llm = EnhancedLLMInterface()
 

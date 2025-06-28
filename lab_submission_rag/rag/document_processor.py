@@ -4,7 +4,6 @@ Document processing component for the RAG system
 
 import logging
 from pathlib import Path
-from typing import List, Union
 
 import aiofiles
 from docx import Document
@@ -13,6 +12,7 @@ from pypdf import PdfReader
 
 from config import settings
 from models.rag_models import DocumentChunk
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 class DocumentProcessor:
     """Processes various document types for RAG pipeline"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
             length_function=len,
         )
 
-    async def process_document(self, file_path: Union[str, Path]) -> List[DocumentChunk]:
+    async def process_document(self, file_path: str | Path) -> list[DocumentChunk]:
         """Process a single document and return chunks"""
         file_path = Path(file_path)
 
@@ -45,7 +45,7 @@ class DocumentProcessor:
             logger.error(f"Unsupported file type: {file_path.suffix}")
             return []
 
-    async def _process_txt(self, file_path: Path) -> List[DocumentChunk]:
+    async def _process_txt(self, file_path: Path) -> list[DocumentChunk]:
         """Process a text document and return chunks"""
         chunks = []
         try:
@@ -80,7 +80,7 @@ class DocumentProcessor:
             return []
         return chunks
 
-    async def _process_pdf(self, file_path: Path) -> List[DocumentChunk]:
+    async def _process_pdf(self, file_path: Path) -> list[DocumentChunk]:
         """Process a PDF document and return chunks"""
         chunks = []
         try:
@@ -106,7 +106,7 @@ class DocumentProcessor:
             return []
         return chunks
 
-    async def _process_docx(self, file_path: Path) -> List[DocumentChunk]:
+    async def _process_docx(self, file_path: Path) -> list[DocumentChunk]:
         """Process a DOCX document and return chunks"""
         chunks = []
         try:

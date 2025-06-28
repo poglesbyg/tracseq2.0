@@ -51,14 +51,14 @@ class DocumentProcessingSettings(BaseModel):
 
 class EnhancedRAGSettings(BaseSettings):
     """Main configuration class for Enhanced RAG Service."""
-    
+
     # Service metadata
     service_name: str = Field(default="Enhanced RAG Service", description="Service name")
     version: str = Field(default="0.1.0", description="Service version")
     environment: str = Field(default="development", description="Environment")
     host: str = Field(default="0.0.0.0", description="Server host")
     port: int = Field(default=8086, description="Server port")
-    
+
     # Component configurations
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     vector_store: VectorStoreSettings = Field(default_factory=VectorStoreSettings)
@@ -66,7 +66,7 @@ class EnhancedRAGSettings(BaseSettings):
     document_processing: DocumentProcessingSettings = Field(
         default_factory=DocumentProcessingSettings
     )
-    
+
     # Integration settings
     auth_service_url: str = Field(
         default="http://auth-service:8080",
@@ -76,7 +76,7 @@ class EnhancedRAGSettings(BaseSettings):
         default="http://enhanced-storage-service:8082",
         description="Storage service URL"
     )
-    
+
     # Security
     secret_key: str = Field(
         default="your-secret-key-change-in-production",
@@ -86,14 +86,14 @@ class EnhancedRAGSettings(BaseSettings):
         default=["http://localhost:3000", "http://localhost:8080"],
         description="CORS allowed origins"
     )
-    
+
     # Feature flags
     enable_template_matching: bool = Field(default=True, description="Enable template matching")
     enable_form_validation: bool = Field(default=True, description="Enable form validation")
     enable_intelligent_extraction: bool = Field(default=True, description="Enable intelligent extraction")
     enable_multi_modal: bool = Field(default=True, description="Enable multi-modal processing")
     enable_real_time_processing: bool = Field(default=True, description="Enable real-time processing")
-    
+
     class Config:
         """Pydantic configuration."""
         env_file = ".env"
@@ -102,7 +102,7 @@ class EnhancedRAGSettings(BaseSettings):
         case_sensitive = False
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> EnhancedRAGSettings:
     """Get cached application settings."""
     return EnhancedRAGSettings()

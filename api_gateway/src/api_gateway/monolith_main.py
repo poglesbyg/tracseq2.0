@@ -13,12 +13,12 @@ from typing import Any, Dict
 import httpx
 import structlog
 import uvicorn
-from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from api_gateway.core.monolith_config import get_monolith_config, MonolithRouterConfig
+from api_gateway.core.monolith_config import MonolithRouterConfig, get_monolith_config
 
 # Configure structured logging
 structlog.configure(
@@ -46,41 +46,41 @@ logger = structlog.get_logger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     config = get_monolith_config()
-    logger.info("🚀 Starting TracSeq API Gateway (Monolith Router)", 
+    logger.info("🚀 Starting TracSeq API Gateway (Monolith Router)",
                 version=config.version,
                 environment=config.environment,
                 monolith_url=config.monolith.base_url)
-    
+
     try:
         # Initialize HTTP client for proxying
         app.state.http_client = httpx.AsyncClient(
             timeout=httpx.Timeout(config.request_timeout),
             limits=httpx.Limits(max_connections=config.max_concurrent_requests)
         )
-        
+
         # Log current routing configuration
         service_status = config.get_service_status()
-        logger.info("✅ Service routing configuration loaded", 
+        logger.info("✅ Service routing configuration loaded",
                    monolith_active=service_status["monolith"]["active"],
                    microservices_enabled=sum(1 for s in service_status["microservices"].values() if s["enabled"]))
-        
+
         logger.info("✅ TracSeq API Gateway startup complete")
         yield
-        
+
     except Exception as e:
         logger.error("❌ Failed to initialize gateway", error=str(e))
         raise
-    
+
     finally:
         logger.info("🛑 Shutting down TracSeq API Gateway")
-        if hasattr(app.state, 'http_client'):
+        if hasattr(app.state, "http_client"):
             await app.state.http_client.aclose()
 
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     config = get_monolith_config()
-    
+
     app = FastAPI(
         title="TracSeq API Gateway (Monolith Router)",
         description="Gradual migration router between monolith and microservices",
@@ -89,7 +89,7 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         lifespan=lifespan,
     )
-    
+
     # Add middleware
     if config.cors.enabled:
         app.add_middleware(
@@ -99,9 +99,9 @@ def create_app() -> FastAPI:
             allow_methods=config.cors.allow_methods,
             allow_headers=config.cors.allow_headers,
         )
-    
+
     app.add_middleware(GZipMiddleware, minimum_size=1000)
-    
+
     # Root endpoint
     @app.get("/")
     async def root():
@@ -121,7 +121,7 @@ def create_app() -> FastAPI:
             "health": "/health",
             "routing_status": "/routing-status"
         }
-    
+
     # Health check endpoint
     @app.get("/health")
     async def health_check():
@@ -133,7 +133,7 @@ def create_app() -> FastAPI:
             "timestamp": time.time(),
             "monolith_url": config.monolith.base_url
         }
-    
+
     # Routing status endpoint
     @app.get("/routing-status")
     async def routing_status():
@@ -150,7 +150,7 @@ def create_app() -> FastAPI:
                 "rag": config.feature_flags.use_rag_service
             }
         }
-    
+
     # Main proxy handler
     @app.api_route(
         "/{path:path}",
@@ -160,10 +160,10 @@ def create_app() -> FastAPI:
         """Proxy requests to monolith or microservices based on feature flags."""
         config = get_monolith_config()
         full_path = f"/{path}"
-        
+
         # Determine routing target
         service_type, base_url = config.route_request(full_path)
-        
+
         # Build upstream URL
         if service_type == "monolith":
             # Route to monolith - keep full path
@@ -173,31 +173,31 @@ def create_app() -> FastAPI:
             # Route to microservice - may need path adjustments
             upstream_url = f"{base_url}{full_path}"
             target_service = "microservice"
-        
+
         # Get request data
         body = await request.body()
-        
+
         # Log request routing (for debugging)
         if config.monitoring.log_requests:
-            logger.info("🔀 Routing request", 
+            logger.info("🔀 Routing request",
                        path=full_path,
                        method=request.method,
                        target=target_service,
                        upstream_url=upstream_url)
-        
+
         try:
             # Proxy the request
             http_client: httpx.AsyncClient = request.app.state.http_client
-            
+
             # Forward headers but filter out hop-by-hop headers
             headers = dict(request.headers)
             hop_by_hop_headers = {
-                'connection', 'keep-alive', 'proxy-authenticate',
-                'proxy-authorization', 'te', 'trailers', 'transfer-encoding',
-                'upgrade', 'host'
+                "connection", "keep-alive", "proxy-authenticate",
+                "proxy-authorization", "te", "trailers", "transfer-encoding",
+                "upgrade", "host"
             }
             filtered_headers = {k: v for k, v in headers.items() if k.lower() not in hop_by_hop_headers}
-            
+
             response = await http_client.request(
                 method=request.method,
                 url=upstream_url,
@@ -205,7 +205,7 @@ def create_app() -> FastAPI:
                 content=body,
                 params=dict(request.query_params)
             )
-            
+
             # Log response (for debugging)
             if config.monitoring.log_responses:
                 logger.info("✅ Request completed",
@@ -213,36 +213,36 @@ def create_app() -> FastAPI:
                            method=request.method,
                            status_code=response.status_code,
                            target=target_service)
-            
+
             # Return response
             return Response(
                 content=response.content,
                 status_code=response.status_code,
                 headers=dict(response.headers)
             )
-            
+
         except httpx.TimeoutException:
-            logger.error("⏱️ Request timeout", 
+            logger.error("⏱️ Request timeout",
                         path=full_path,
                         target=target_service,
                         upstream_url=upstream_url)
             raise HTTPException(status_code=504, detail="Gateway timeout")
-            
+
         except httpx.ConnectError as e:
-            logger.error("🔌 Connection error", 
+            logger.error("🔌 Connection error",
                         path=full_path,
                         target=target_service,
                         upstream_url=upstream_url,
                         error=str(e))
             raise HTTPException(status_code=503, detail=f"Service unavailable: {target_service}")
-            
+
         except Exception as e:
-            logger.error("❌ Proxy error", 
+            logger.error("❌ Proxy error",
                         path=full_path,
                         target=target_service,
                         error=str(e))
             raise HTTPException(status_code=502, detail="Bad gateway")
-    
+
     return app
 
 
@@ -252,17 +252,17 @@ app = create_app()
 
 if __name__ == "__main__":
     config = get_monolith_config()
-    
+
     logger.info("🚀 Starting TracSeq API Gateway (Monolith Router)",
                 host=config.host,
                 port=config.port,
                 environment=config.environment,
                 monolith_url=config.monolith.base_url)
-    
+
     uvicorn.run(
         "api_gateway.monolith_main:app",
         host=config.host,
         port=config.port,
         reload=config.is_development,
         log_config=None,
-    ) 
+    )

@@ -7,7 +7,7 @@ Extracted from simple_lab_rag.py for better modularity
 import json
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 # Core dependencies
 try:
@@ -42,8 +42,8 @@ class SimpleLLMInterface:
         self,
         model: str = "llama3.2:3b",
         use_openai_fallback: bool = False,
-        openai_api_key: Optional[str] = None,
-    ):
+        openai_api_key: str | None = None,
+    ) -> None:
 
         self.model = model
         self.use_openai_fallback = use_openai_fallback
@@ -134,7 +134,7 @@ Text to analyze:
         if not OLLAMA_AVAILABLE:
             logger.info("Ollama module not available")
             return False
-            
+
         try:
             # Try to list models to check if Ollama is running
             response = ollama.list()
@@ -157,7 +157,7 @@ Text to analyze:
         if not OLLAMA_AVAILABLE:
             logger.warning("Ollama module not available, cannot check model")
             return False
-            
+
         try:
             models_response = ollama.list()
             models = models_response.models if hasattr(models_response, "models") else []
@@ -192,7 +192,7 @@ Text to analyze:
             logger.warning(f"Will try to use model {self.model} anyway")
             return True  # Try anyway - Ollama might still work
 
-    def extract_submission_info(self, text: str) -> Dict[str, Any]:
+    def extract_submission_info(self, text: str) -> dict[str, Any]:
         """Extract structured information from text"""
         # Use demo mode if no LLM is available
         if self.demo_mode:
@@ -365,7 +365,7 @@ Answer:"""
 class DemoLLMInterface:
     """Demo LLM interface that simulates responses for demonstration"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.demo_response = {
             "administrative": {
                 "submitter_name": "Dr. Sarah Johnson",
@@ -389,7 +389,7 @@ class DemoLLMInterface:
             },
         }
 
-    def extract_submission_info(self, text: str) -> Dict[str, Any]:
+    def extract_submission_info(self, text: str) -> dict[str, Any]:
         """Demo extraction that returns simulated data"""
         return self.demo_response
 

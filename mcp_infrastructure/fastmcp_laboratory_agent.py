@@ -5,14 +5,13 @@ An intelligent laboratory assistant agent using FastMCP for superior
 multi-service coordination, context management, and AI-powered workflows.
 """
 
-import asyncio
 import logging
 import time
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastmcp import FastMCP, Context, Client
+from fastmcp import Client, Context, FastMCP
 from pydantic import BaseModel, Field
 
 # Configure logging
@@ -29,13 +28,13 @@ class SubmissionProcessingRequest(BaseModel):
     notify_submitter: bool = Field(default=True, description="Whether to notify the submitter")
 
 class QualityControlRequest(BaseModel):
-    sample_ids: List[str] = Field(description="List of sample IDs for quality control")
+    sample_ids: list[str] = Field(description="List of sample IDs for quality control")
     assessment_type: str = Field(default="comprehensive", description="Type of QC assessment")
     automated: bool = Field(default=True, description="Whether to run automated QC")
 
 class WorkflowCoordinationRequest(BaseModel):
     workflow_type: str = Field(description="Type of workflow to coordinate")
-    workflow_data: Dict[str, Any] = Field(description="Workflow-specific data")
+    workflow_data: dict[str, Any] = Field(description="Workflow-specific data")
 
 class SampleSearchRequest(BaseModel):
     query: str = Field(description="Natural language search query for samples")
@@ -60,7 +59,7 @@ agent_state = {
 async def coordinate_laboratory_workflow(
     request: WorkflowCoordinationRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Coordinate complete laboratory workflow using multiple FastMCP services.
     
@@ -68,10 +67,10 @@ async def coordinate_laboratory_workflow(
     laboratory operations with intelligent coordination and error handling.
     """
     await ctx.info(f"Starting workflow coordination: {request.workflow_type}")
-    
+
     start_time = time.time()
     workflow_id = str(uuid.uuid4())
-    
+
     try:
         # Step 1: Initialize workflow tracking
         agent_state["active_workflows"][workflow_id] = {
@@ -79,7 +78,7 @@ async def coordinate_laboratory_workflow(
             "started_at": datetime.now().isoformat(),
             "status": "initializing"
         }
-        
+
         if request.workflow_type == "sample_submission":
             result = await _coordinate_sample_submission_workflow(request.workflow_data, ctx)
         elif request.workflow_type == "quality_control":
@@ -89,19 +88,19 @@ async def coordinate_laboratory_workflow(
         else:
             # Use AI to understand custom workflow types
             result = await _coordinate_custom_workflow(request, ctx)
-        
+
         processing_time = time.time() - start_time
-        
+
         # Update workflow status
         agent_state["active_workflows"][workflow_id]["status"] = "completed" if result["success"] else "failed"
         agent_state["active_workflows"][workflow_id]["completed_at"] = datetime.now().isoformat()
         agent_state["active_workflows"][workflow_id]["processing_time"] = processing_time
-        
+
         # Update agent performance metrics
         await _update_agent_performance(result["success"], processing_time)
-        
+
         await ctx.info(f"Workflow coordination completed in {processing_time:.2f}s")
-        
+
         return {
             "success": result["success"],
             "workflow_id": workflow_id,
@@ -110,7 +109,7 @@ async def coordinate_laboratory_workflow(
             "processing_time": processing_time,
             "agent_session": agent_state["session_id"]
         }
-        
+
     except Exception as e:
         await ctx.error(f"Workflow coordination failed: {str(e)}")
         agent_state["active_workflows"][workflow_id]["status"] = "error"
@@ -125,7 +124,7 @@ async def coordinate_laboratory_workflow(
 async def process_laboratory_submission(
     request: SubmissionProcessingRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Complete laboratory submission processing with multi-service coordination.
     
@@ -133,19 +132,19 @@ async def process_laboratory_submission(
     and workflow initiation using FastMCP's enhanced service communication.
     """
     await ctx.info(f"Processing laboratory submission: {request.document_path}")
-    
+
     start_time = time.time()
     operation_id = str(uuid.uuid4())
-    
+
     try:
         # Connect to multiple FastMCP servers for coordinated processing
         async with Client("fastmcp_laboratory_server.py") as lab_client:
             async with Client("enhanced_rag_service/fastmcp_enhanced_rag_server.py") as rag_client:
-                
+
                 # Step 1: Process document using Enhanced RAG Service
                 await ctx.info("Step 1: Processing document with Enhanced RAG Service")
                 await ctx.report_progress(token="submission", progress=0.1, total=1.0)
-                
+
                 doc_result = await rag_client.call_tool(
                     "extract_laboratory_data",
                     {
@@ -154,7 +153,7 @@ async def process_laboratory_submission(
                         "confidence_threshold": 0.85
                     }
                 )
-                
+
                 if not doc_result.get("success", False):
                     await ctx.error("Document processing failed")
                     return {
@@ -163,14 +162,14 @@ async def process_laboratory_submission(
                         "error": "Document processing failed",
                         "processing_time": time.time() - start_time
                     }
-                
+
                 # Step 2: Use AI to analyze and plan next steps
                 await ctx.info("Step 2: AI-powered workflow planning")
                 await ctx.report_progress(token="submission", progress=0.3, total=1.0)
-                
+
                 workflow_plan = await ctx.sample(
                     messages=[{
-                        "role": "user", 
+                        "role": "user",
                         "content": f"""
                         Analyze this laboratory submission extraction and create an optimal workflow plan:
                         
@@ -190,11 +189,11 @@ async def process_laboratory_submission(
                     }],
                     model_preferences=["claude-3-sonnet-20240229", "gpt-4"]
                 )
-                
+
                 # Step 3: Execute sample creation
                 await ctx.info("Step 3: Creating samples from extracted data")
                 await ctx.report_progress(token="submission", progress=0.5, total=1.0)
-                
+
                 sample_result = await lab_client.call_tool(
                     "create_laboratory_samples",
                     {
@@ -203,11 +202,11 @@ async def process_laboratory_submission(
                         "priority": request.priority
                     }
                 )
-                
+
                 # Step 4: Assign storage with AI optimization
                 await ctx.info("Step 4: Optimizing storage assignments")
                 await ctx.report_progress(token="submission", progress=0.7, total=1.0)
-                
+
                 storage_result = await lab_client.call_tool(
                     "optimize_sample_storage",
                     {
@@ -216,11 +215,11 @@ async def process_laboratory_submission(
                         "optimization_strategy": "ai_enhanced"
                     }
                 )
-                
+
                 # Step 5: Generate comprehensive summary
                 await ctx.info("Step 5: Generating submission summary")
                 await ctx.report_progress(token="submission", progress=0.9, total=1.0)
-                
+
                 summary = await ctx.sample(
                     messages=[{
                         "role": "user",
@@ -247,18 +246,18 @@ async def process_laboratory_submission(
                     }],
                     model_preferences=["claude-3-sonnet-20240229"]
                 )
-                
+
                 processing_time = time.time() - start_time
-                
+
                 # Complete progress reporting
                 await ctx.report_progress(token="submission", progress=1.0, total=1.0)
-                
+
                 # Update global state
                 agent_state["operations_completed"] += 1
                 agent_state["last_activity"] = datetime.now().isoformat()
-                
+
                 await ctx.info(f"Laboratory submission processing completed in {processing_time:.2f}s")
-                
+
                 return {
                     "success": True,
                     "operation_id": operation_id,
@@ -274,7 +273,7 @@ async def process_laboratory_submission(
                     "priority": request.priority,
                     "notify_submitter": request.notify_submitter
                 }
-        
+
     except Exception as e:
         await ctx.error(f"Laboratory submission processing failed: {str(e)}")
         return {
@@ -288,7 +287,7 @@ async def process_laboratory_submission(
 async def automated_quality_control(
     request: QualityControlRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Run comprehensive automated quality control with AI analysis and recommendations.
     
@@ -296,22 +295,22 @@ async def automated_quality_control(
     analysis and actionable recommendations for laboratory staff.
     """
     await ctx.info(f"Starting automated QC for {len(request.sample_ids)} samples")
-    
+
     start_time = time.time()
     qc_session_id = str(uuid.uuid4())
-    
+
     try:
         # Connect to laboratory and QC services
         async with Client("fastmcp_laboratory_server.py") as lab_client:
-            
+
             # Step 1: Retrieve sample details
             await ctx.info("Retrieving sample details for QC analysis")
-            
+
             sample_details = await lab_client.call_tool(
                 "get_sample_details_batch",
                 {"sample_ids": request.sample_ids}
             )
-            
+
             if not sample_details.get("success", False):
                 return {
                     "success": False,
@@ -319,10 +318,10 @@ async def automated_quality_control(
                     "error": "Failed to retrieve sample details",
                     "processing_time": time.time() - start_time
                 }
-            
+
             # Step 2: AI-powered QC strategy planning
             await ctx.info("Planning QC strategy with AI analysis")
-            
+
             qc_strategy = await ctx.sample(
                 messages=[{
                     "role": "user",
@@ -345,18 +344,18 @@ async def automated_quality_control(
                 }],
                 model_preferences=["claude-3-sonnet-20240229", "gpt-4"]
             )
-            
+
             # Step 3: Execute QC assessments
             await ctx.info("Executing quality control assessments")
-            
+
             qc_results = []
             overall_scores = []
-            
+
             for i, sample_id in enumerate(request.sample_ids):
                 # Report progress for each sample
                 progress = (i + 1) / len(request.sample_ids)
                 await ctx.report_progress(token="qc_assessment", progress=progress, total=1.0)
-                
+
                 # Run QC for individual sample
                 sample_qc = await lab_client.call_tool(
                     "assess_sample_quality",
@@ -367,14 +366,14 @@ async def automated_quality_control(
                         "automated": request.automated
                     }
                 )
-                
+
                 qc_results.append(sample_qc)
                 if sample_qc.get("success", False):
                     overall_scores.append(sample_qc.get("quality_score", 0.0))
-            
+
             # Step 4: AI-powered analysis of QC results
             await ctx.info("Analyzing QC results with AI")
-            
+
             qc_analysis = await ctx.sample(
                 messages=[{
                     "role": "user",
@@ -401,16 +400,16 @@ async def automated_quality_control(
                 }],
                 model_preferences=["claude-3-sonnet-20240229"]
             )
-            
+
             processing_time = time.time() - start_time
             average_quality = sum(overall_scores) / len(overall_scores) if overall_scores else 0.0
-            
+
             # Update agent state
             agent_state["operations_completed"] += 1
             agent_state["last_activity"] = datetime.now().isoformat()
-            
+
             await ctx.info(f"Automated QC completed in {processing_time:.2f}s")
-            
+
             return {
                 "success": True,
                 "qc_session_id": qc_session_id,
@@ -423,7 +422,7 @@ async def automated_quality_control(
                 "processing_time": processing_time,
                 "automated": request.automated
             }
-        
+
     except Exception as e:
         await ctx.error(f"Automated QC failed: {str(e)}")
         return {
@@ -437,7 +436,7 @@ async def automated_quality_control(
 async def intelligent_sample_search(
     request: SampleSearchRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Intelligent sample search with AI-powered query interpretation and result enhancement.
     
@@ -445,12 +444,12 @@ async def intelligent_sample_search(
     and provides enhanced results with AI-generated insights.
     """
     await ctx.info(f"Processing intelligent sample search: {request.query}")
-    
+
     try:
         # Step 1: AI-powered query interpretation
         if request.use_ai_interpretation:
             await ctx.info("Interpreting search query with AI")
-            
+
             query_analysis = await ctx.sample(
                 messages=[{
                     "role": "user",
@@ -474,11 +473,11 @@ async def intelligent_sample_search(
                 }],
                 model_preferences=["claude-3-sonnet-20240229", "gpt-4"]
             )
-            
+
             search_criteria = query_analysis.text
         else:
             search_criteria = request.query
-        
+
         # Step 2: Execute search using laboratory service
         async with Client("fastmcp_laboratory_server.py") as lab_client:
             search_results = await lab_client.call_tool(
@@ -489,11 +488,11 @@ async def intelligent_sample_search(
                     "include_metadata": True
                 }
             )
-        
+
         # Step 3: AI-enhanced result analysis
         if search_results.get("success", False) and search_results.get("samples", []):
             await ctx.info("Enhancing search results with AI analysis")
-            
+
             result_enhancement = await ctx.sample(
                 messages=[{
                     "role": "user",
@@ -518,13 +517,13 @@ async def intelligent_sample_search(
                 }],
                 model_preferences=["claude-3-sonnet-20240229"]
             )
-            
+
             enhanced_analysis = result_enhancement.text
         else:
             enhanced_analysis = "No samples found matching the search criteria."
-        
+
         await ctx.info("Intelligent sample search completed")
-        
+
         return {
             "success": True,
             "original_query": request.query,
@@ -533,7 +532,7 @@ async def intelligent_sample_search(
             "ai_enhanced_analysis": enhanced_analysis,
             "use_ai_interpretation": request.use_ai_interpretation
         }
-        
+
     except Exception as e:
         await ctx.error(f"Intelligent sample search failed: {str(e)}")
         return {
@@ -572,9 +571,9 @@ async def agent_status(ctx: Context) -> str:
 ---
 *Status updated: {datetime.now().isoformat()}*
         """
-        
+
         return status_info.strip()
-        
+
     except Exception as e:
         await ctx.error(f"Error generating agent status: {str(e)}")
         return f"Agent status unavailable: {str(e)}"
@@ -585,9 +584,9 @@ async def active_workflows(ctx: Context) -> str:
     try:
         if not agent_state['active_workflows']:
             return "No active workflows currently running."
-        
+
         workflow_info = "# Active Laboratory Workflows\n\n"
-        
+
         for workflow_id, workflow_data in agent_state['active_workflows'].items():
             workflow_info += f"""
 ## Workflow: {workflow_id}
@@ -597,20 +596,20 @@ async def active_workflows(ctx: Context) -> str:
 - **Processing Time**: {workflow_data.get('processing_time', 'In progress')}
 
 """
-        
+
         workflow_info += f"\n---\n*Last updated: {datetime.now().isoformat()}*"
-        
+
         return workflow_info.strip()
-        
+
     except Exception as e:
         await ctx.error(f"Error generating active workflows info: {str(e)}")
         return f"Active workflows information unavailable: {str(e)}"
 
 # Helper functions for workflow coordination
-async def _coordinate_sample_submission_workflow(workflow_data: Dict[str, Any], ctx: Context) -> Dict[str, Any]:
+async def _coordinate_sample_submission_workflow(workflow_data: dict[str, Any], ctx: Context) -> dict[str, Any]:
     """Coordinate sample submission workflow."""
     await ctx.info("Coordinating sample submission workflow")
-    
+
     # Mock implementation - would coordinate actual services
     return {
         "success": True,
@@ -621,10 +620,10 @@ async def _coordinate_sample_submission_workflow(workflow_data: Dict[str, Any], 
         "storage_assigned": True
     }
 
-async def _coordinate_quality_control_workflow(workflow_data: Dict[str, Any], ctx: Context) -> Dict[str, Any]:
+async def _coordinate_quality_control_workflow(workflow_data: dict[str, Any], ctx: Context) -> dict[str, Any]:
     """Coordinate quality control workflow."""
     await ctx.info("Coordinating quality control workflow")
-    
+
     # Mock implementation
     return {
         "success": True,
@@ -635,10 +634,10 @@ async def _coordinate_quality_control_workflow(workflow_data: Dict[str, Any], ct
         "average_quality": 94.2
     }
 
-async def _coordinate_storage_optimization_workflow(workflow_data: Dict[str, Any], ctx: Context) -> Dict[str, Any]:
+async def _coordinate_storage_optimization_workflow(workflow_data: dict[str, Any], ctx: Context) -> dict[str, Any]:
     """Coordinate storage optimization workflow."""
     await ctx.info("Coordinating storage optimization workflow")
-    
+
     # Mock implementation
     return {
         "success": True,
@@ -649,10 +648,10 @@ async def _coordinate_storage_optimization_workflow(workflow_data: Dict[str, Any
         "samples_relocated": workflow_data.get("sample_count", 0)
     }
 
-async def _coordinate_custom_workflow(request: WorkflowCoordinationRequest, ctx: Context) -> Dict[str, Any]:
+async def _coordinate_custom_workflow(request: WorkflowCoordinationRequest, ctx: Context) -> dict[str, Any]:
     """Use AI to coordinate custom workflow types."""
     await ctx.info(f"Coordinating custom workflow: {request.workflow_type}")
-    
+
     # Use AI to understand and coordinate custom workflows
     coordination_plan = await ctx.sample(
         messages=[{
@@ -670,7 +669,7 @@ async def _coordinate_custom_workflow(request: WorkflowCoordinationRequest, ctx:
         }],
         model_preferences=["claude-3-sonnet-20240229"]
     )
-    
+
     return {
         "success": True,
         "workflow_type": request.workflow_type,
@@ -681,10 +680,10 @@ async def _coordinate_custom_workflow(request: WorkflowCoordinationRequest, ctx:
 async def _update_agent_performance(success: bool, processing_time: float):
     """Update agent performance metrics."""
     perf = agent_state["agent_performance"]
-    
+
     # Update total operations
     perf["total_operations"] += 1
-    
+
     # Update success rate
     if perf["total_operations"] == 1:
         perf["success_rate"] = 100.0 if success else 0.0
@@ -693,7 +692,7 @@ async def _update_agent_performance(success: bool, processing_time: float):
         if success:
             current_successes += 1
         perf["success_rate"] = (current_successes / perf["total_operations"]) * 100.0
-    
+
     # Update average processing time
     if perf["total_operations"] == 1:
         perf["average_processing_time"] = processing_time
@@ -707,10 +706,10 @@ if __name__ == "__main__":
     # Initialize agent
     logger.info("Initializing Laboratory Assistant Agent with FastMCP")
     agent_state["last_activity"] = datetime.now().isoformat()
-    
+
     # Run FastMCP server with multiple transport options
     import sys
-    
+
     if len(sys.argv) > 1 and sys.argv[1] == "--http":
         # HTTP mode for web integration
         mcp.run(transport="http", port=8003)
@@ -719,4 +718,4 @@ if __name__ == "__main__":
         mcp.run(transport="sse", port=8004)
     else:
         # Default STDIO mode for MCP clients
-        mcp.run(transport="stdio") 
+        mcp.run(transport="stdio")

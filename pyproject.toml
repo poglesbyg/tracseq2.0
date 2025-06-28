@@ -19,7 +19,7 @@ dependencies = [
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
     # Data validation and modeling
-    "pydantic>=2.0.0",
+    "pydantic[email]>=2.0.0",
     # HTTP client for API integration
     "httpx>=0.24.0",
     # Database integration (for laboratory data)
@@ -30,6 +30,9 @@ dependencies = [
     "pandas>=2.0.0",
     "email-validator>=2.2.0",
     "pydantic-settings>=2.10.1",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.2.1",
 ]
 
 [project.optional-dependencies]

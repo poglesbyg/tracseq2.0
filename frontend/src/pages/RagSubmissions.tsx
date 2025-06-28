@@ -281,7 +281,7 @@ export default function RagSubmissions() {
                     </div>
                     <div className="flex items-center space-x-2">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getConfidenceColor(submission.confidence || 0)}`}>
-                        {(submission.confidence || 0 * 100).toFixed(1)}%
+                        {((submission.confidence || 0) * 100).toFixed(1)}%
                       </span>
                     </div>
                   </div>

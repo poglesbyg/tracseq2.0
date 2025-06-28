@@ -21,7 +21,9 @@ impl TestServer {
             .build();
             
         let server = AxumTestServer::new_with_config(app, config)?;
-        let base_url = server.server_address().to_string();
+        let base_url = server.server_address()
+            .map(|url| url.to_string())
+            .unwrap_or_else(|| "http://localhost".to_string());
         
         Ok(Self {
             inner: server,
@@ -121,7 +123,10 @@ impl<'a> TestRequest<'a> {
         };
         
         for (key, value) in self.headers {
-            req = req.add_header(key.parse().unwrap(), value.parse().unwrap());
+            req = req.add_header(
+                key.parse::<hyper::header::HeaderName>().unwrap(), 
+                value.parse::<hyper::header::HeaderValue>().unwrap()
+            );
         }
         
         if let Some(body) = self.body {
@@ -164,7 +169,7 @@ impl TestResponse {
     
     /// Get response body as bytes
     pub async fn bytes(&self) -> Vec<u8> {
-        self.inner.bytes()
+        self.inner.as_bytes().to_vec()
     }
     
     /// Get a header value
@@ -247,7 +252,6 @@ pub mod assertions {
 pub fn create_test_router() -> Router {
     Router::new()
         .layer(tower_http::trace::TraceLayer::new_for_http())
-        .layer(tower_http::compression::CompressionLayer::new())
 }
 
 #[cfg(test)]

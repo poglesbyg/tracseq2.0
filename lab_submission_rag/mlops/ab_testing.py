@@ -10,12 +10,22 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 import structlog
 from scipy import stats
-from sqlalchemy import JSON, Boolean, Column, DateTime, Float, Integer, String, Text, create_engine
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    Text,
+    create_engine,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -49,15 +59,15 @@ class ABTestConfig:
     # Models being tested
     control_model_id: str
     control_model_version: str
-    treatment_models: List[Dict[str, str]]  # [{"model_id": "...", "version": "..."}]
+    treatment_models: list[dict[str, str]]  # [{"model_id": "...", "version": "..."}]
 
     # Traffic allocation
-    traffic_allocation: Dict[str, float]  # {"control": 0.5, "treatment_1": 0.3, "treatment_2": 0.2}
+    traffic_allocation: dict[str, float]  # {"control": 0.5, "treatment_1": 0.3, "treatment_2": 0.2}
 
     # Test parameters
     hypothesis: str
     primary_metric: str
-    secondary_metrics: List[str] = field(default_factory=list)
+    secondary_metrics: list[str] = field(default_factory=list)
     minimum_detectable_effect: float = 0.05  # 5% improvement
     confidence_level: float = 0.95
     statistical_power: float = 0.8
@@ -65,22 +75,22 @@ class ABTestConfig:
     # Duration and sample size
     planned_duration_days: int = 14
     minimum_sample_size: int = 1000
-    maximum_sample_size: Optional[int] = None
+    maximum_sample_size: int | None = None
 
     # Filtering criteria
-    user_filters: Dict[str, Any] = field(default_factory=dict)
-    feature_flags: List[str] = field(default_factory=list)
+    user_filters: dict[str, Any] = field(default_factory=dict)
+    feature_flags: list[str] = field(default_factory=list)
 
     # Safety controls
-    guardrail_metrics: List[str] = field(default_factory=list)
+    guardrail_metrics: list[str] = field(default_factory=list)
     error_rate_threshold: float = 0.1
     latency_threshold_ms: float = 1000
 
     # Metadata
     created_at: datetime = field(default_factory=datetime.utcnow)
     created_by: str = ""
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
     status: TestStatus = TestStatus.PLANNING
 
 
@@ -93,18 +103,18 @@ class ABTestResult:
 
     # Sample statistics
     sample_size: int
-    conversion_rate: Optional[float] = None
-    mean_value: Optional[float] = None
-    std_deviation: Optional[float] = None
+    conversion_rate: float | None = None
+    mean_value: float | None = None
+    std_deviation: float | None = None
 
     # Performance metrics
-    accuracy: Optional[float] = None
-    precision: Optional[float] = None
-    recall: Optional[float] = None
-    f1_score: Optional[float] = None
+    accuracy: float | None = None
+    precision: float | None = None
+    recall: float | None = None
+    f1_score: float | None = None
 
     # Custom metrics
-    custom_metrics: Dict[str, float] = field(default_factory=dict)
+    custom_metrics: dict[str, float] = field(default_factory=dict)
 
     # System performance
     average_latency_ms: float = 0.0
@@ -112,9 +122,9 @@ class ABTestResult:
     throughput_rps: float = 0.0
 
     # Statistical significance
-    p_value: Optional[float] = None
-    confidence_interval: Optional[Tuple[float, float]] = None
-    effect_size: Optional[float] = None
+    p_value: float | None = None
+    confidence_interval: tuple[float, float] | None = None
+    effect_size: float | None = None
     is_statistically_significant: bool = False
 
     # Timestamps
@@ -131,22 +141,22 @@ class ABTestInteraction:
     user_id: str
 
     # Request details
-    request_data: Dict[str, Any]
-    response_data: Dict[str, Any]
+    request_data: dict[str, Any]
+    response_data: dict[str, Any]
 
     # Performance metrics
     latency_ms: float
     success: bool
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     # Business metrics
-    conversion: Optional[bool] = None
-    value: Optional[float] = None
+    conversion: bool | None = None
+    value: float | None = None
 
     # Metadata
     timestamp: datetime = field(default_factory=datetime.utcnow)
-    user_agent: Optional[str] = None
-    ip_address: Optional[str] = None
+    user_agent: str | None = None
+    ip_address: str | None = None
 
 
 Base = declarative_base()
@@ -244,7 +254,7 @@ class ABTestManager:
     - Automated test conclusion
     """
 
-    def __init__(self, database_url: str, results_dir: Union[str, Path]):
+    def __init__(self, database_url: str, results_dir: str | Path) -> None:
         self.results_dir = Path(results_dir)
         self.results_dir.mkdir(parents=True, exist_ok=True)
 
@@ -253,7 +263,7 @@ class ABTestManager:
         Base.metadata.create_all(self.engine)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
 
-        self.active_tests: Dict[str, ABTestConfig] = {}
+        self.active_tests: dict[str, ABTestConfig] = {}
         self._load_active_tests()
 
     async def create_test(self, config: ABTestConfig) -> str:
@@ -343,7 +353,7 @@ class ABTestManager:
 
         return True
 
-    async def assign_variant(self, test_id: str, user_id: str) -> Optional[str]:
+    async def assign_variant(self, test_id: str, user_id: str) -> str | None:
         """Assign a user to a test variant."""
         if test_id not in self.active_tests:
             return None
@@ -367,7 +377,7 @@ class ABTestManager:
 
         return "control"  # Fallback
 
-    async def log_interaction(self, interaction: ABTestInteraction):
+    async def log_interaction(self, interaction: ABTestInteraction) -> None:
         """Log a user interaction in an A/B test."""
         # Store in database
         with self.SessionLocal() as session:
@@ -393,7 +403,7 @@ class ABTestManager:
         # Check guardrails
         await self._check_guardrails(interaction.test_id)
 
-    async def calculate_results(self, test_id: str) -> Dict[str, ABTestResult]:
+    async def calculate_results(self, test_id: str) -> dict[str, ABTestResult]:
         """Calculate current test results with statistical analysis."""
         config = await self.get_test_config(test_id)
         if not config:
@@ -503,7 +513,7 @@ class ABTestManager:
 
         return True
 
-    async def get_test_config(self, test_id: str) -> Optional[ABTestConfig]:
+    async def get_test_config(self, test_id: str) -> ABTestConfig | None:
         """Get test configuration."""
         with self.SessionLocal() as session:
             record = session.query(ABTestRecord).filter(ABTestRecord.test_id == test_id).first()
@@ -542,8 +552,8 @@ class ABTestManager:
             )
 
     async def list_tests(
-        self, status: Optional[TestStatus] = None, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+        self, status: TestStatus | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
         """List A/B tests with optional filtering."""
         with self.SessionLocal() as session:
             query = session.query(ABTestRecord)
@@ -597,7 +607,7 @@ class ABTestManager:
         return max(1000, int(sample_size))
 
     def _calculate_variant_results(
-        self, variant_id: str, interactions: List[ABTestInteractionRecord], config: ABTestConfig
+        self, variant_id: str, interactions: list[ABTestInteractionRecord], config: ABTestConfig
     ) -> ABTestResult:
         """Calculate results for a single variant."""
         if not interactions:
@@ -684,7 +694,7 @@ class ABTestManager:
                     treatment_value + margin_error,
                 )
 
-    def _determine_winner(self, results: Dict[str, ABTestResult], metric: str) -> Optional[str]:
+    def _determine_winner(self, results: dict[str, ABTestResult], metric: str) -> str | None:
         """Determine the winning variant based on the primary metric."""
         if len(results) < 2:
             return None
@@ -700,7 +710,7 @@ class ABTestManager:
 
         return best_variant
 
-    async def _validate_test_config(self, config: ABTestConfig):
+    async def _validate_test_config(self, config: ABTestConfig) -> None:
         """Validate A/B test configuration."""
         # Check traffic allocation sums to 1.0
         total_traffic = sum(config.traffic_allocation.values())
@@ -715,8 +725,8 @@ class ABTestManager:
         self,
         test_id: str,
         status: TestStatus,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ):
         """Update test status in database."""
         with self.SessionLocal() as session:
@@ -730,7 +740,7 @@ class ABTestManager:
                     record.end_date = end_date
                 session.commit()
 
-    async def _store_test_results(self, test_id: str, results: Dict[str, ABTestResult]):
+    async def _store_test_results(self, test_id: str, results: dict[str, ABTestResult]) -> None:
         """Store test results in database."""
         results_data = {variant_id: asdict(result) for variant_id, result in results.items()}
 
@@ -741,7 +751,7 @@ class ABTestManager:
                 record.final_results = results_data
                 session.commit()
 
-    async def _check_guardrails(self, test_id: str):
+    async def _check_guardrails(self, test_id: str) -> None:
         """Check guardrail metrics and pause test if necessary."""
         config = await self.get_test_config(test_id)
         if not config or not config.guardrail_metrics:
@@ -774,7 +784,7 @@ class ABTestManager:
                 await self._pause_test(test_id, f"High latency in {variant_id}")
                 return
 
-    async def _pause_test(self, test_id: str, reason: str):
+    async def _pause_test(self, test_id: str, reason: str) -> None:
         """Pause a test due to guardrail violations."""
         await self._update_test_status(test_id, TestStatus.PAUSED)
 
@@ -783,13 +793,13 @@ class ABTestManager:
 
         logger.error("A/B test paused due to guardrail violation", test_id=test_id, reason=reason)
 
-    async def _user_matches_filters(self, user_id: str, filters: Dict[str, Any]) -> bool:
+    async def _user_matches_filters(self, user_id: str, filters: dict[str, Any]) -> bool:
         """Check if user matches test filters."""
         # Implement user filtering logic based on your user data
         # For now, return True (no filtering)
         return True
 
-    def _load_active_tests(self):
+    def _load_active_tests(self) -> None:
         """Load active tests into memory on startup."""
         with self.SessionLocal() as session:
             active_records = (

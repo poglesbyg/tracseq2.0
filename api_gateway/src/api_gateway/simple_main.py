@@ -4,15 +4,16 @@ Simple API Gateway for TracSeq 2.0
 Minimal working implementation for demonstration
 """
 
-import os
 import json
+import os
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
+import httpx
+import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import httpx
-import uvicorn
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -52,7 +53,7 @@ MOCK_USERS = {
         "password": "admin123"  # In production, this would be hashed
     },
     "user@tracseq.com": {
-        "id": "2", 
+        "id": "2",
         "email": "user@tracseq.com",
         "name": "Lab User",
         "role": "user",
@@ -86,22 +87,22 @@ async def login(request: Request):
     try:
         # Try to get JSON body
         body = await request.json()
-        
+
         # Handle different payload formats
         email = body.get("email") or body.get("username")
         password = body.get("password")
-        
+
         if not email or not password:
             raise HTTPException(status_code=400, detail="Email and password are required")
-        
+
         user = MOCK_USERS.get(email)
-        
+
         if not user or user["password"] != password:
             raise HTTPException(status_code=401, detail="Invalid credentials")
-        
+
         # In production, generate a proper JWT token
         mock_token = f"mock_jwt_token_for_{user['id']}"
-        
+
         return {
             "token": mock_token,
             "user": {
@@ -111,11 +112,11 @@ async def login(request: Request):
                 "role": user["role"]
             }
         }
-        
-    except ValueError as e:
+
+    except ValueError:
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Login error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Login error: {e!s}")
 
 @app.get("/api/auth/me")
 async def get_current_user(request: Request):
@@ -162,7 +163,7 @@ async def get_samples(request: Request):
     """Get all samples - with support for filtering by extraction method"""
     # Check for extraction_method query parameter
     extraction_method = request.query_params.get("extraction_method")
-    
+
     if extraction_method == "ai_rag":
         # Return RAG-processed samples when specifically requested
         rag_samples_data = [
@@ -196,7 +197,7 @@ async def get_samples(request: Request):
             },
             {
                 "id": "SMPL-RAG-002",
-                "originalId": "SMPL-002", 
+                "originalId": "SMPL-002",
                 "name": "Sample 002 (RAG Processed)",
                 "type": "RNA",
                 "status": "RAG_Processing",
@@ -243,7 +244,7 @@ async def get_samples(request: Request):
                 "extractionMethod": "ai_rag"
             }
         ]
-        
+
         # Return RAG samples with enhanced metadata
         return {
             "data": rag_samples_data,  # For frontend expecting .data.filter()
@@ -259,7 +260,7 @@ async def get_samples(request: Request):
                 "failed": 0
             }
         }
-    
+
     else:
         # Return regular samples for normal requests
         samples_data = [
@@ -273,7 +274,7 @@ async def get_samples(request: Request):
                 "location": "Freezer A1-B2"
             },
             {
-                "id": "SMPL-002", 
+                "id": "SMPL-002",
                 "name": "Sample 002",
                 "type": "RNA",
                 "status": "Completed",
@@ -283,7 +284,7 @@ async def get_samples(request: Request):
             },
             {
                 "id": "SMPL-003",
-                "name": "Sample 003", 
+                "name": "Sample 003",
                 "type": "Protein",
                 "status": "Pending",
                 "submittedBy": "Dr. Williams",
@@ -291,7 +292,7 @@ async def get_samples(request: Request):
                 "location": "Intake Bay"
             }
         ]
-        
+
         # Return both formats for compatibility
         return {
             "data": samples_data,  # For frontend expecting .data.filter()
@@ -311,7 +312,7 @@ async def create_sample(request: Request):
         "message": "Sample created successfully"
     }
 
-# Templates endpoints  
+# Templates endpoints
 @app.get("/api/templates")
 async def get_templates():
     """Get all templates"""
@@ -327,7 +328,7 @@ async def get_templates():
         },
         {
             "id": "TPL-002",
-            "name": "RNA Sequencing Template", 
+            "name": "RNA Sequencing Template",
             "description": "RNA-seq analysis pipeline",
             "category": "Sequencing",
             "version": "2.1",
@@ -338,13 +339,13 @@ async def get_templates():
             "id": "TPL-003",
             "name": "Protein Analysis Template",
             "description": "Protein characterization workflow",
-            "category": "Analysis", 
+            "category": "Analysis",
             "version": "1.0",
             "isActive": False,
             "createdDate": (datetime.now() - timedelta(days=60)).isoformat()
         }
     ]
-    
+
     # Return both formats for compatibility
     return {
         "data": templates_data,  # For frontend expecting .data.filter()
@@ -388,7 +389,7 @@ async def get_sequencing_jobs():
             "instrument": "Ion Torrent"
         }
     ]
-    
+
     # Return both formats for compatibility
     return {
         "data": jobs_data,  # For frontend expecting .data.filter()
@@ -421,7 +422,7 @@ async def get_storage_locations():
             "status": "Normal"
         },
         {
-            "id": "STOR-002", 
+            "id": "STOR-002",
             "name": "Refrigerator B2",
             "temperature": 4,
             "capacity": 500,
@@ -429,7 +430,7 @@ async def get_storage_locations():
             "status": "Normal"
         }
     ]
-    
+
     # Return both formats for compatibility
     return {
         "data": locations_data,  # For frontend expecting .data.filter()
@@ -468,7 +469,7 @@ async def get_rag_submissions():
             "submittedBy": "Dr. Williams"
         }
     ]
-    
+
     # Return both formats for compatibility
     return {
         "data": submissions_data,  # For frontend expecting .data.filter()
@@ -485,10 +486,10 @@ async def process_rag_document(request: Request):
     try:
         # Get the request body
         body = await request.json()
-        
+
         # Mock document processing response
         document_id = body.get("documentId", f"DOC-{datetime.now().strftime('%Y%m%d%H%M%S')}")
-        
+
         return {
             "id": document_id,
             "status": "processing",
@@ -501,9 +502,9 @@ async def process_rag_document(request: Request):
                 {"step": "indexing", "status": "pending", "timestamp": None}
             ]
         }
-        
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid request: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid request: {e!s}")
 
 @app.post("/api/samples/rag/query")
 async def query_rag_samples(request: Request):
@@ -512,7 +513,7 @@ async def query_rag_samples(request: Request):
         # Get the request body
         body = await request.json()
         query = body.get("query", "")
-        
+
         # Mock RAG response based on query
         if "samples" in query.lower():
             response_text = f"Based on your query '{query}', I found information about laboratory samples. Currently, there are 1,247 samples in the system with 89 active samples and 1,158 completed samples. The most recent samples were submitted by Dr. Smith and include DNA, RNA, and protein samples."
@@ -526,7 +527,7 @@ async def query_rag_samples(request: Request):
                     "relevance": 0.95
                 },
                 {
-                    "id": "SMPL-002", 
+                    "id": "SMPL-002",
                     "name": "Sample 002",
                     "type": "RNA",
                     "status": "Completed",
@@ -558,7 +559,7 @@ async def query_rag_samples(request: Request):
         else:
             response_text = f"I understand you're asking about '{query}'. While I don't have specific information about this topic, I can help you with questions about samples, storage, sequencing, or other laboratory management topics."
             related_samples = []
-        
+
         query_result = {
             "id": f"QRES-{datetime.now().strftime('%Y%m%d%H%M%S')}",
             "query": query,
@@ -574,16 +575,16 @@ async def query_rag_samples(request: Request):
             "relatedItems": related_samples,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         # Return both single result and data array format for compatibility
         return {
             "data": [query_result],  # For frontend expecting .data.filter()
             "result": query_result,  # Single result for other consumers
             "relatedSamples": related_samples  # Direct access to related items
         }
-        
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid query: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid query: {e!s}")
 
 @app.post("/api/rag/submissions")
 async def create_rag_submission(request: Request):
@@ -600,7 +601,7 @@ async def debug_routes():
     """Debug endpoint to see all registered routes"""
     routes = []
     for route in app.routes:
-        if hasattr(route, 'path') and hasattr(route, 'methods'):
+        if hasattr(route, "path") and hasattr(route, "methods"):
             routes.append({
                 "path": route.path,
                 "methods": list(route.methods) if route.methods else ["GET"]
@@ -616,7 +617,7 @@ async def api_status():
         "api-gateway": "healthy",
         "rag-service": "unknown"
     }
-    
+
     # Check RAG service health
     try:
         async with httpx.AsyncClient() as client:
@@ -627,7 +628,7 @@ async def api_status():
                 services["rag-service"] = "unhealthy"
     except Exception:
         services["rag-service"] = "unreachable"
-    
+
     return {
         "services": services,
         "overall": "healthy" if all(s in ["healthy", "unknown"] for s in services.values()) else "degraded"
@@ -640,12 +641,12 @@ async def proxy_rag(path: str, request: Request):
         async with httpx.AsyncClient() as client:
             # Forward the request to RAG service
             url = f"{RAG_SERVICE_URL}/{path}"
-            
+
             # Get request body if present
             body = None
             if request.method in ["POST", "PUT", "PATCH"]:
                 body = await request.body()
-            
+
             response = await client.request(
                 method=request.method,
                 url=url,
@@ -654,11 +655,11 @@ async def proxy_rag(path: str, request: Request):
                 content=body,
                 timeout=30.0
             )
-            
+
             return response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text
-    
+
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Service unavailable: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Service unavailable: {e!s}")
 
 # Add dedicated endpoint for RAG samples search
 @app.get("/api/rag/samples")
@@ -685,7 +686,7 @@ async def get_rag_samples():
         },
         {
             "id": "SMPL-RAG-002",
-            "originalId": "SMPL-002", 
+            "originalId": "SMPL-002",
             "name": "Sample 002 (RAG Processed)",
             "type": "RNA",
             "status": "RAG_Processing",
@@ -714,7 +715,7 @@ async def get_rag_samples():
             "ragStatus": "Pending"
         }
     ]
-    
+
     # Return both formats for compatibility
     return {
         "data": rag_samples_data,  # For frontend expecting .data.filter()
@@ -731,7 +732,7 @@ async def search_rag_samples(request: Request):
     try:
         body = await request.json()
         search_term = body.get("searchTerm", "")
-        
+
         # Mock search results
         search_results = [
             {
@@ -748,7 +749,7 @@ async def search_rag_samples(request: Request):
                 }
             }
         ] if search_term else []
-        
+
         return {
             "data": search_results,  # For frontend expecting .data.filter()
             "searchResults": search_results,  # For other consumers
@@ -756,9 +757,9 @@ async def search_rag_samples(request: Request):
             "totalResults": len(search_results),
             "timestamp": datetime.now().isoformat()
         }
-        
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid search request: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid search request: {e!s}")
 
 # Spreadsheet endpoints for dataset management
 @app.get("/api/spreadsheets/datasets")
@@ -826,7 +827,7 @@ async def get_spreadsheet_datasets():
             ]
         }
     ]
-    
+
     # Return both formats for compatibility
     return {
         "data": datasets_data,  # For frontend expecting .data.filter()
@@ -842,7 +843,7 @@ async def create_spreadsheet_dataset(request: Request):
     try:
         body = await request.json()
         dataset_name = body.get("name", f"Dataset-{datetime.now().strftime('%Y%m%d%H%M%S')}")
-        
+
         return {
             "id": f"DS-{datetime.now().strftime('%Y%m%d%H%M%S')}",
             "name": dataset_name,
@@ -851,9 +852,9 @@ async def create_spreadsheet_dataset(request: Request):
             "version": "1.0",
             "createdDate": datetime.now().isoformat()
         }
-        
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid dataset creation request: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid dataset creation request: {e!s}")
 
 @app.get("/api/spreadsheets/datasets/{dataset_id}")
 async def get_spreadsheet_dataset(dataset_id: str):
@@ -877,7 +878,7 @@ async def get_spreadsheet_dataset(dataset_id: str):
                 },
                 {
                     "Sample_ID": "SMPL-002",
-                    "Type": "RNA", 
+                    "Type": "RNA",
                     "Concentration": 75.0,
                     "Volume": 50.0,
                     "Quality_Score": 88,
@@ -917,7 +918,7 @@ async def redirect_sequencing_jobs():
 async def debug_problematic_endpoints():
     """Debug endpoint to test all data formats"""
     test_results = {}
-    
+
     # Test each endpoint's data format
     endpoints_to_test = [
         ("/api/samples", "samples"),
@@ -928,7 +929,7 @@ async def debug_problematic_endpoints():
         ("/api/rag/samples", "rag samples"),
         ("/api/spreadsheets/datasets", "spreadsheet datasets")
     ]
-    
+
     for endpoint, name in endpoints_to_test:
         try:
             # Simulate a request to test data format
@@ -936,7 +937,7 @@ async def debug_problematic_endpoints():
                 # Create a mock request for testing
                 from fastapi import Request
                 from starlette.datastructures import QueryParams
-                mock_request = type('MockRequest', (), {'query_params': QueryParams('')})()
+                mock_request = type("MockRequest", (), {"query_params": QueryParams("")})()
                 response = await get_samples(mock_request)
             elif endpoint == "/api/templates":
                 response = await get_templates()
@@ -950,7 +951,7 @@ async def debug_problematic_endpoints():
                 response = await get_rag_samples()
             elif endpoint == "/api/spreadsheets/datasets":
                 response = await get_spreadsheet_datasets()
-            
+
             test_results[name] = {
                 "endpoint": endpoint,
                 "has_data_field": "data" in response,
@@ -965,7 +966,7 @@ async def debug_problematic_endpoints():
                 "error": str(e),
                 "status": "❌ ERROR"
             }
-    
+
     return {
         "debug_info": "Testing all endpoints for proper array data format",
         "test_results": test_results,
@@ -977,10 +978,10 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
     log_level = os.getenv("LOG_LEVEL", "info").lower()
-    
+
     print(f"🚀 Starting TracSeq 2.0 API Gateway on {host}:{port}")
     print(f"📊 RAG Service URL: {RAG_SERVICE_URL}")
-    
+
     # Run the application
     uvicorn.run(
         app,
@@ -988,4 +989,4 @@ if __name__ == "__main__":
         port=port,
         log_level=log_level,
         access_log=True
-    ) 
+    )

@@ -6,9 +6,9 @@ import logging
 import time
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
-from fastmcp import FastMCP, Context
+from fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
 
 # Configure logging
@@ -20,17 +20,17 @@ mcp = FastMCP("TracSeq Storage Optimization Server", version="2.0.0")
 
 # Pydantic models
 class StorageOptimizationRequest(BaseModel):
-    sample_requirements: List[Dict[str, Any]] = Field(description="Sample storage requirements")
+    sample_requirements: list[dict[str, Any]] = Field(description="Sample storage requirements")
     optimization_strategy: str = Field(default="efficiency", description="Optimization strategy")
     consider_access_frequency: bool = Field(default=True, description="Consider access patterns")
 
 class CapacityAnalysisRequest(BaseModel):
-    storage_zones: List[str] = Field(description="Storage zones to analyze")
+    storage_zones: list[str] = Field(description="Storage zones to analyze")
     forecast_period: int = Field(default=30, description="Forecast period in days")
     include_predictions: bool = Field(default=True, description="Include predictive analysis")
 
 class StorageMaintenanceRequest(BaseModel):
-    equipment_ids: List[str] = Field(description="Equipment IDs for maintenance analysis")
+    equipment_ids: list[str] = Field(description="Equipment IDs for maintenance analysis")
     maintenance_type: str = Field(default="predictive", description="Maintenance type")
 
 # Global state
@@ -52,13 +52,13 @@ storage_state = {
 async def optimize_storage_with_ai(
     request: StorageOptimizationRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """AI-powered storage optimization for laboratory samples."""
     await ctx.info(f"Optimizing storage for {len(request.sample_requirements)} samples")
-    
+
     start_time = time.time()
     optimization_id = str(uuid.uuid4())
-    
+
     try:
         # AI optimization analysis
         optimization_analysis = await ctx.sample(
@@ -88,17 +88,17 @@ async def optimize_storage_with_ai(
             }],
             model_preferences=["claude-3-sonnet-20240229", "gpt-4"]
         )
-        
+
         # Generate optimized assignments
         optimized_assignments = []
         efficiency_improvement = 0
-        
+
         for i, sample_req in enumerate(request.sample_requirements):
             # Simulate optimal assignment
             optimal_zone = "freezer_minus_80"  # Mock assignment
             if sample_req.get("temperature_requirement", -80) > -80:
                 optimal_zone = "refrigerator_4c"
-            
+
             assignment = {
                 "sample_id": sample_req.get("sample_id", f"SAMPLE-{i+1}"),
                 "optimal_zone": optimal_zone,
@@ -110,7 +110,7 @@ async def optimize_storage_with_ai(
             }
             optimized_assignments.append(assignment)
             efficiency_improvement += 15 + (i * 2)
-        
+
         # AI-powered improvement recommendations
         improvement_recommendations = await ctx.sample(
             messages=[{
@@ -132,16 +132,16 @@ async def optimize_storage_with_ai(
             }],
             model_preferences=["claude-3-sonnet-20240229"]
         )
-        
+
         processing_time = time.time() - start_time
-        
+
         # Update storage state
         new_efficiency = storage_state["efficiency_score"] + (efficiency_improvement / len(request.sample_requirements) * 0.1)
         storage_state["efficiency_score"] = min(new_efficiency, 98.0)
         storage_state["last_optimization"] = datetime.now().isoformat()
-        
+
         await ctx.info(f"Storage optimization completed in {processing_time:.2f}s")
-        
+
         return {
             "success": True,
             "optimization_id": optimization_id,
@@ -154,7 +154,7 @@ async def optimize_storage_with_ai(
             "processing_time": processing_time,
             "new_efficiency_score": storage_state["efficiency_score"]
         }
-        
+
     except Exception as e:
         await ctx.error(f"Storage optimization failed: {str(e)}")
         return {
@@ -168,13 +168,13 @@ async def optimize_storage_with_ai(
 async def analyze_storage_capacity(
     request: CapacityAnalysisRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Comprehensive storage capacity analysis with predictive insights."""
     await ctx.info(f"Analyzing storage capacity for {len(request.storage_zones)} zones")
-    
+
     start_time = time.time()
     analysis_id = str(uuid.uuid4())
-    
+
     try:
         # Generate capacity analysis
         capacity_data = {}
@@ -189,7 +189,7 @@ async def analyze_storage_capacity(
                     "status": "optimal" if utilization < 85 else "near_capacity",
                     "projected_full_date": "2024-03-15" if utilization > 80 else "2024-06-01"
                 }
-        
+
         # AI-powered capacity prediction
         if request.include_predictions:
             capacity_prediction = await ctx.sample(
@@ -218,11 +218,11 @@ async def analyze_storage_capacity(
             )
         else:
             capacity_prediction = None
-        
+
         processing_time = time.time() - start_time
-        
+
         await ctx.info(f"Capacity analysis completed in {processing_time:.2f}s")
-        
+
         return {
             "success": True,
             "analysis_id": analysis_id,
@@ -234,7 +234,7 @@ async def analyze_storage_capacity(
             "recommendations": "Expand freezer capacity within 60 days",
             "processing_time": processing_time
         }
-        
+
     except Exception as e:
         await ctx.error(f"Capacity analysis failed: {str(e)}")
         return {
@@ -248,13 +248,13 @@ async def analyze_storage_capacity(
 async def predictive_maintenance_analysis(
     request: StorageMaintenanceRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """AI-powered predictive maintenance analysis for storage equipment."""
     await ctx.info(f"Analyzing maintenance for {len(request.equipment_ids)} equipment units")
-    
+
     start_time = time.time()
     maintenance_id = str(uuid.uuid4())
-    
+
     try:
         # AI maintenance prediction
         maintenance_analysis = await ctx.sample(
@@ -284,7 +284,7 @@ async def predictive_maintenance_analysis(
             }],
             model_preferences=["claude-3-sonnet-20240229"]
         )
-        
+
         # Generate maintenance recommendations
         maintenance_recommendations = []
         for equipment_id in request.equipment_ids:
@@ -298,11 +298,11 @@ async def predictive_maintenance_analysis(
                 "priority": "medium"
             }
             maintenance_recommendations.append(recommendation)
-        
+
         processing_time = time.time() - start_time
-        
+
         await ctx.info(f"Maintenance analysis completed in {processing_time:.2f}s")
-        
+
         return {
             "success": True,
             "maintenance_id": maintenance_id,
@@ -314,7 +314,7 @@ async def predictive_maintenance_analysis(
             "estimated_total_cost": f"${len(request.equipment_ids) * 500}",
             "processing_time": processing_time
         }
-        
+
     except Exception as e:
         await ctx.error(f"Maintenance analysis failed: {str(e)}")
         return {
@@ -345,11 +345,11 @@ async def storage_optimization_status(ctx: Context) -> str:
 
 ## Zone Status
 """
-        
+
         for zone, info in storage_state['available_zones'].items():
             utilization = (info['used'] / info['capacity']) * 100
             status_info += f"- **{zone.replace('_', ' ').title()}**: {utilization:.1f}% used ({info['temperature']}°C)\n"
-        
+
         status_info += f"""
 ## Available Operations
 - **AI Storage Optimization**: Intelligent assignment with efficiency analysis
@@ -359,9 +359,9 @@ async def storage_optimization_status(ctx: Context) -> str:
 ---
 *Status updated: {datetime.now().isoformat()}*
         """
-        
+
         return status_info.strip()
-        
+
     except Exception as e:
         await ctx.error(f"Error generating status: {str(e)}")
         return f"Status unavailable: {str(e)}"
@@ -369,11 +369,11 @@ async def storage_optimization_status(ctx: Context) -> str:
 # Main execution
 if __name__ == "__main__":
     import sys
-    
+
     logger.info("Starting Storage Optimization Server")
     storage_state["last_optimization"] = datetime.now().isoformat()
-    
+
     if len(sys.argv) > 1 and sys.argv[1] == "--http":
         mcp.run(transport="http", port=8011)
     else:
-        mcp.run(transport="stdio") 
+        mcp.run(transport="stdio")

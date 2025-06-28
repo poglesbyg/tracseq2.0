@@ -18,12 +18,12 @@ class TestDocumentProcessor:
     """Test cases for DocumentProcessor"""
 
     @pytest.fixture
-    def processor(self):
+    def processor(self) -> None:
         """Create a DocumentProcessor instance for testing"""
         return DocumentProcessor()
 
     @pytest.fixture
-    def create_test_pdf(self, temp_dir):
+    def create_test_pdf(self, temp_dir) -> None:
         """Create a test PDF file"""
         pdf_path = temp_dir / "test.pdf"
         # Create a mock PDF-like file for testing
@@ -32,7 +32,7 @@ class TestDocumentProcessor:
         return pdf_path
 
     @pytest.fixture
-    def create_test_docx(self, temp_dir):
+    def create_test_docx(self, temp_dir) -> None:
         """Create a test DOCX file"""
         docx_path = temp_dir / "test.docx"
         # Create a mock DOCX-like file for testing
@@ -41,13 +41,13 @@ class TestDocumentProcessor:
         return docx_path
 
     @pytest.mark.asyncio
-    async def test_process_document_nonexistent_file(self, processor):
+    async def test_process_document_nonexistent_file(self, processor) -> None:
         """Test processing a file that doesn't exist"""
         result = await processor.process_document("nonexistent_file.pdf")
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_process_document_unsupported_format(self, processor, temp_dir):
+    async def test_process_document_unsupported_format(self, processor, temp_dir) -> None:
         """Test processing an unsupported file format"""
         txt_file = temp_dir / "test.txt"
         with open(txt_file, "w") as f:
@@ -58,7 +58,7 @@ class TestDocumentProcessor:
 
     @pytest.mark.asyncio
     @patch("rag.document_processor.PdfReader")
-    async def test_process_pdf_success(self, mock_pdf_reader, processor, create_test_pdf):
+    async def test_process_pdf_success(self, mock_pdf_reader, processor, create_test_pdf) -> None:
         """Test successful PDF processing"""
         # Mock PDF reader
         mock_page = Mock()
@@ -80,7 +80,7 @@ class TestDocumentProcessor:
 
     @pytest.mark.asyncio
     @patch("rag.document_processor.Document")
-    async def test_process_docx_success(self, mock_document, processor, create_test_docx):
+    async def test_process_docx_success(self, mock_document, processor, create_test_docx) -> None:
         """Test successful DOCX processing"""
         # Mock DOCX document
         mock_paragraph = Mock()
@@ -100,7 +100,7 @@ class TestDocumentProcessor:
 
     @pytest.mark.asyncio
     @patch("rag.document_processor.PdfReader")
-    async def test_process_pdf_empty_pages(self, mock_pdf_reader, processor, create_test_pdf):
+    async def test_process_pdf_empty_pages(self, mock_pdf_reader, processor, create_test_pdf) -> None:
         """Test PDF processing with empty pages"""
         # Mock PDF reader with empty pages
         mock_page = Mock()
@@ -120,7 +120,7 @@ class TestDocumentProcessor:
 
     @pytest.mark.asyncio
     @patch("rag.document_processor.Document")
-    async def test_process_docx_empty_paragraphs(self, mock_document, processor, create_test_docx):
+    async def test_process_docx_empty_paragraphs(self, mock_document, processor, create_test_docx) -> None:
         """Test DOCX processing with empty paragraphs"""
         # Mock DOCX document with empty paragraphs
         mock_paragraph = Mock()
@@ -138,7 +138,7 @@ class TestDocumentProcessor:
 
     @pytest.mark.asyncio
     @patch("rag.document_processor.PdfReader")
-    async def test_process_pdf_multiple_pages(self, mock_pdf_reader, processor, create_test_pdf):
+    async def test_process_pdf_multiple_pages(self, mock_pdf_reader, processor, create_test_pdf) -> None:
         """Test PDF processing with multiple pages"""
         # Mock PDF reader with multiple pages
         mock_page1 = Mock()
@@ -160,7 +160,7 @@ class TestDocumentProcessor:
         assert all(isinstance(chunk, DocumentChunk) for chunk in result)
         assert result[0].content != result[1].content
 
-    def test_create_chunk(self, processor, temp_dir):
+    def test_create_chunk(self, processor, temp_dir) -> None:
         """Test chunk creation"""
         test_file = temp_dir / "test.pdf"
         test_text = "This is a test document for chunk creation."
@@ -175,7 +175,7 @@ class TestDocumentProcessor:
         assert chunk.chunk_index == 0
 
     @pytest.mark.asyncio
-    async def test_process_pdf_exception_handling(self, processor, temp_dir):
+    async def test_process_pdf_exception_handling(self, processor, temp_dir) -> None:
         """Test PDF processing with exceptions"""
         # Create a malformed PDF file
         malformed_pdf = temp_dir / "malformed.pdf"
@@ -188,7 +188,7 @@ class TestDocumentProcessor:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_process_docx_exception_handling(self, processor, temp_dir):
+    async def test_process_docx_exception_handling(self, processor, temp_dir) -> None:
         """Test DOCX processing with exceptions"""
         # Create a malformed DOCX file
         malformed_docx = temp_dir / "malformed.docx"
@@ -200,7 +200,7 @@ class TestDocumentProcessor:
         # Should handle exception gracefully and return empty list
         assert result == []
 
-    def test_processor_initialization(self):
+    def test_processor_initialization(self) -> None:
         """Test DocumentProcessor initialization"""
         processor = DocumentProcessor()
 
@@ -208,7 +208,7 @@ class TestDocumentProcessor:
         assert hasattr(processor.text_splitter, "split_text")
 
     @pytest.mark.asyncio
-    async def test_process_document_with_path_object(self, processor, temp_dir):
+    async def test_process_document_with_path_object(self, processor, temp_dir) -> None:
         """Test processing with Path object vs string"""
         # Test with Path object for unsupported format (should return empty list)
         txt_path = temp_dir / "test.txt"
@@ -221,7 +221,7 @@ class TestDocumentProcessor:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_process_document_case_insensitive_extensions(self, processor, temp_dir):
+    async def test_process_document_case_insensitive_extensions(self, processor, temp_dir) -> None:
         """Test processing with different case extensions"""
         # Test with uppercase extension
         pdf_path = temp_dir / "test.PDF"

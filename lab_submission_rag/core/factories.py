@@ -7,7 +7,7 @@ components, allowing for easy configuration and testing.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 from config import settings
 
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class ComponentFactory:
     """Base factory class for creating components"""
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         self.config = config or {}
         self._validate_config()
 
@@ -177,7 +177,7 @@ class CircuitBreakerFactory(ComponentFactory):
         self,
         failure_threshold: int = 5,
         timeout: float = 60.0,
-        expected_exception: Type[Exception] = Exception,
+        expected_exception: type[Exception] = Exception,
     ) -> ICircuitBreaker:
         """Create a circuit breaker instance"""
         try:
@@ -205,14 +205,14 @@ class CircuitBreakerFactory(ComponentFactory):
 class EnhancedDocumentProcessor(IDocumentProcessor):
     """Enhanced document processor with better error handling"""
 
-    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
+    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200) -> None:
         from rag.document_processor import DocumentProcessor
 
         self._processor = DocumentProcessor()
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
-    async def process_document(self, file_path):
+    async def process_document(self, file_path) -> None:
         """Process document with enhanced error handling"""
         try:
             return await self._processor.process_document(file_path)
@@ -220,7 +220,7 @@ class EnhancedDocumentProcessor(IDocumentProcessor):
             logger.error(f"Error in enhanced document processing: {str(e)}")
             raise
 
-    async def validate_document(self, file_path):
+    async def validate_document(self, file_path) -> None:
         """Validate if document can be processed"""
         try:
             file_path = Path(file_path)
@@ -246,7 +246,7 @@ class EnhancedDocumentProcessor(IDocumentProcessor):
             logger.error(f"Error validating document {file_path}: {str(e)}")
             return False
 
-    def get_supported_formats(self):
+    def get_supported_formats(self) -> None:
         """Get list of supported file formats"""
         return [".pdf", ".docx", ".txt"]
 
@@ -254,13 +254,13 @@ class EnhancedDocumentProcessor(IDocumentProcessor):
 class EnhancedVectorStore(IVectorStore):
     """Enhanced vector store with better error handling"""
 
-    def __init__(self, store_path: str):
+    def __init__(self, store_path: str) -> None:
         from rag.vector_store import VectorStore
 
         self._vector_store = VectorStore()
         self.store_path = store_path
 
-    async def add_chunks(self, chunks):
+    async def add_chunks(self, chunks) -> None:
         """Add chunks with enhanced error handling"""
         try:
             return await self._vector_store.add_chunks(chunks)
@@ -268,7 +268,7 @@ class EnhancedVectorStore(IVectorStore):
             logger.error(f"Error adding chunks to vector store: {str(e)}")
             raise
 
-    async def similarity_search(self, query, k=5, filter_metadata=None):
+    async def similarity_search(self, query, k=5, filter_metadata=None) -> None:
         """Search with enhanced error handling"""
         try:
             return await self._vector_store.similarity_search(query, k, filter_metadata)
@@ -276,7 +276,7 @@ class EnhancedVectorStore(IVectorStore):
             logger.error(f"Error in vector store search: {str(e)}")
             raise
 
-    async def delete_by_source(self, source_document):
+    async def delete_by_source(self, source_document) -> None:
         """Delete by source with enhanced error handling"""
         try:
             # Implementation would depend on the specific vector store
@@ -285,7 +285,7 @@ class EnhancedVectorStore(IVectorStore):
             logger.error(f"Error deleting chunks: {str(e)}")
             raise
 
-    async def get_collection_stats(self):
+    async def get_collection_stats(self) -> None:
         """Get collection statistics"""
         try:
             # Implementation would depend on the specific vector store
@@ -298,12 +298,12 @@ class EnhancedVectorStore(IVectorStore):
 class EnhancedLLMInterface(ILLMInterface):
     """Enhanced LLM interface with better error handling"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         from rag.llm_interface import LLMInterface
 
         self._llm_interface = LLMInterface()
 
-    async def extract_submission_info(self, document_chunks, source_document):
+    async def extract_submission_info(self, document_chunks, source_document) -> None:
         """Extract submission info with enhanced error handling"""
         try:
             return await self._llm_interface.extract_submission_info(
@@ -313,7 +313,7 @@ class EnhancedLLMInterface(ILLMInterface):
             logger.error(f"Error in LLM extraction: {str(e)}")
             raise
 
-    async def answer_query(self, query, relevant_chunks, submission_data=None):
+    async def answer_query(self, query, relevant_chunks, submission_data=None) -> None:
         """Answer query with enhanced error handling"""
         try:
             return await self._llm_interface.answer_query(query, relevant_chunks, submission_data)
@@ -321,7 +321,7 @@ class EnhancedLLMInterface(ILLMInterface):
             logger.error(f"Error in LLM query: {str(e)}")
             raise
 
-    def get_provider_info(self):
+    def get_provider_info(self) -> None:
         """Get provider information"""
         try:
             return {
@@ -332,7 +332,7 @@ class EnhancedLLMInterface(ILLMInterface):
             logger.error(f"Error getting provider info: {str(e)}")
             return {"provider": "unknown", "status": "error"}
 
-    async def health_check(self):
+    async def health_check(self) -> None:
         """Check LLM provider health"""
         try:
             # Simple health check - could be enhanced based on provider
@@ -358,20 +358,20 @@ class ExponentialBackoffRetryPolicy(IRetryPolicy):
         base_delay: float = 1.0,
         max_delay: float = 60.0,
         exponential_base: float = 2.0,
-    ):
+    ) -> None:
         self.max_retries = max_retries
         self.base_delay = base_delay
         self.max_delay = max_delay
         self.exponential_base = exponential_base
 
-    def configure(self, max_retries=3, base_delay=1.0, max_delay=60.0, exponential_base=2.0):
+    def configure(self, max_retries=3, base_delay=1.0, max_delay=60.0, exponential_base=2.0) -> None:
         """Configure retry parameters"""
         self.max_retries = max_retries
         self.base_delay = base_delay
         self.max_delay = max_delay
         self.exponential_base = exponential_base
 
-    async def execute(self, func, *args, **kwargs):
+    async def execute(self, func, *args, **kwargs) -> None:
         """Execute function with retry policy"""
         last_exception = None
 
@@ -404,8 +404,8 @@ class SimpleCircuitBreaker(ICircuitBreaker):
         self,
         failure_threshold: int = 5,
         timeout: float = 60.0,
-        expected_exception: Type[Exception] = Exception,
-    ):
+        expected_exception: type[Exception] = Exception,
+    ) -> None:
         self.failure_threshold = failure_threshold
         self.timeout = timeout
         self.expected_exception = expected_exception
@@ -414,7 +414,7 @@ class SimpleCircuitBreaker(ICircuitBreaker):
         self.last_failure_time = None
         self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
 
-    async def call(self, func, *args, **kwargs):
+    async def call(self, func, *args, **kwargs) -> None:
         """Execute function with circuit breaker protection"""
         if self.state == "OPEN":
             if self._should_attempt_reset():
@@ -442,12 +442,12 @@ class SimpleCircuitBreaker(ICircuitBreaker):
 
         return datetime.utcnow() - self.last_failure_time > timedelta(seconds=self.timeout)
 
-    def _on_success(self):
+    def _on_success(self) -> None:
         """Handle successful execution"""
         self.failure_count = 0
         self.state = "CLOSED"
 
-    def _on_failure(self):
+    def _on_failure(self) -> None:
         """Handle failed execution"""
         self.failure_count += 1
         self.last_failure_time = datetime.utcnow()
@@ -459,7 +459,7 @@ class SimpleCircuitBreaker(ICircuitBreaker):
         """Get current circuit breaker state"""
         return self.state
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset circuit breaker"""
         self.failure_count = 0
         self.last_failure_time = None

@@ -20,7 +20,7 @@ class TestVectorStore:
     """Test cases for VectorStore"""
 
     @pytest.fixture
-    def mock_chromadb_client(self):
+    def mock_chromadb_client(self) -> None:
         """Mock ChromaDB client"""
         mock_client = Mock()
         mock_collection = Mock()
@@ -54,7 +54,7 @@ class TestVectorStore:
         return mock_client, mock_collection
 
     @pytest.fixture
-    def mock_embedding_model(self):
+    def mock_embedding_model(self) -> None:
         """Mock sentence transformer model"""
         mock_model = Mock()
         mock_model.encode.return_value = np.array([[0.1, 0.2, 0.3, 0.4, 0.5]])
@@ -65,7 +65,7 @@ class TestVectorStore:
     @patch("rag.vector_store.SentenceTransformer")
     async def test_vector_store_initialization(
         self, mock_transformer, mock_chromadb, mock_chromadb_client
-    ):
+    ) -> None:
         """Test VectorStore initialization"""
         mock_client, mock_collection = mock_chromadb_client
         mock_chromadb.return_value = mock_client
@@ -82,7 +82,7 @@ class TestVectorStore:
     @patch("rag.vector_store.SentenceTransformer")
     async def test_add_chunks_success(
         self, mock_transformer, mock_chromadb, mock_chromadb_client, sample_document_chunks
-    ):
+    ) -> None:
         """Test successful chunk addition"""
         mock_client, mock_collection = mock_chromadb_client
         mock_chromadb.return_value = mock_client
@@ -103,7 +103,7 @@ class TestVectorStore:
     @pytest.mark.asyncio
     @patch("rag.vector_store.chromadb.PersistentClient")
     @patch("rag.vector_store.SentenceTransformer")
-    async def test_add_empty_chunks(self, mock_transformer, mock_chromadb, mock_chromadb_client):
+    async def test_add_empty_chunks(self, mock_transformer, mock_chromadb, mock_chromadb_client) -> None:
         """Test adding empty chunks list"""
         mock_client, mock_collection = mock_chromadb_client
         mock_chromadb.return_value = mock_client
@@ -121,7 +121,7 @@ class TestVectorStore:
     @patch("rag.vector_store.SentenceTransformer")
     async def test_similarity_search_success(
         self, mock_transformer, mock_chromadb, mock_chromadb_client
-    ):
+    ) -> None:
         """Test successful similarity search"""
         mock_client, mock_collection = mock_chromadb_client
         mock_chromadb.return_value = mock_client
@@ -145,7 +145,7 @@ class TestVectorStore:
     @patch("rag.vector_store.SentenceTransformer")
     async def test_similarity_search_with_filter(
         self, mock_transformer, mock_chromadb, mock_chromadb_client
-    ):
+    ) -> None:
         """Test similarity search with metadata filter"""
         mock_client, mock_collection = mock_chromadb_client
         mock_chromadb.return_value = mock_client
@@ -171,7 +171,7 @@ class TestVectorStore:
     @patch("rag.vector_store.SentenceTransformer")
     async def test_similarity_search_no_results(
         self, mock_transformer, mock_chromadb, mock_chromadb_client
-    ):
+    ) -> None:
         """Test similarity search with no results"""
         mock_client, mock_collection = mock_chromadb_client
         mock_collection.query.return_value = {
@@ -195,7 +195,7 @@ class TestVectorStore:
     @pytest.mark.asyncio
     @patch("rag.vector_store.chromadb.PersistentClient")
     @patch("rag.vector_store.SentenceTransformer")
-    async def test_generate_embeddings(self, mock_transformer, mock_chromadb, mock_chromadb_client):
+    async def test_generate_embeddings(self, mock_transformer, mock_chromadb, mock_chromadb_client) -> None:
         """Test embedding generation"""
         mock_client, mock_collection = mock_chromadb_client
         mock_chromadb.return_value = mock_client
@@ -218,7 +218,7 @@ class TestVectorStore:
     @patch("rag.vector_store.SentenceTransformer")
     async def test_delete_by_source_success(
         self, mock_transformer, mock_chromadb, mock_chromadb_client
-    ):
+    ) -> None:
         """Test successful deletion by source document"""
         mock_client, mock_collection = mock_chromadb_client
         mock_chromadb.return_value = mock_client
@@ -237,7 +237,7 @@ class TestVectorStore:
     @patch("rag.vector_store.SentenceTransformer")
     async def test_delete_by_source_no_chunks(
         self, mock_transformer, mock_chromadb, mock_chromadb_client
-    ):
+    ) -> None:
         """Test deletion by source when no chunks exist"""
         mock_client, mock_collection = mock_chromadb_client
         mock_collection.get.return_value = {"ids": []}
@@ -254,7 +254,7 @@ class TestVectorStore:
     @pytest.mark.asyncio
     @patch("rag.vector_store.chromadb.PersistentClient")
     @patch("rag.vector_store.SentenceTransformer")
-    async def test_get_store_info(self, mock_transformer, mock_chromadb, mock_chromadb_client):
+    async def test_get_store_info(self, mock_transformer, mock_chromadb, mock_chromadb_client) -> None:
         """Test getting vector store information"""
         mock_client, mock_collection = mock_chromadb_client
         mock_chromadb.return_value = mock_client
@@ -273,7 +273,7 @@ class TestVectorStore:
     @pytest.mark.asyncio
     @patch("rag.vector_store.chromadb.PersistentClient")
     @patch("rag.vector_store.SentenceTransformer")
-    async def test_reset_store(self, mock_transformer, mock_chromadb, mock_chromadb_client):
+    async def test_reset_store(self, mock_transformer, mock_chromadb, mock_chromadb_client) -> None:
         """Test resetting the vector store"""
         mock_client, mock_collection = mock_chromadb_client
         mock_chromadb.return_value = mock_client
@@ -291,7 +291,7 @@ class TestVectorStore:
     @patch("rag.vector_store.SentenceTransformer")
     async def test_add_chunks_exception_handling(
         self, mock_transformer, mock_chromadb, mock_chromadb_client, sample_document_chunks
-    ):
+    ) -> None:
         """Test chunk addition with exception handling"""
         mock_client, mock_collection = mock_chromadb_client
         mock_collection.add.side_effect = Exception("Database error")
@@ -314,7 +314,7 @@ class TestVectorStore:
     @patch("rag.vector_store.SentenceTransformer")
     async def test_similarity_search_exception_handling(
         self, mock_transformer, mock_chromadb, mock_chromadb_client
-    ):
+    ) -> None:
         """Test similarity search with exception handling"""
         mock_client, mock_collection = mock_chromadb_client
         mock_collection.query.side_effect = Exception("Query error")
@@ -330,7 +330,7 @@ class TestVectorStore:
 
         assert result == []
 
-    def test_get_storage_size(self, temp_dir):
+    def test_get_storage_size(self, temp_dir) -> None:
         """Test storage size calculation"""
         with patch("rag.vector_store.settings") as mock_settings:
             mock_settings.vector_store_path = str(temp_dir)

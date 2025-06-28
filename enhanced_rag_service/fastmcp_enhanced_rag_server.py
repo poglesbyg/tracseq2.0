@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from fastmcp import FastMCP, Context
+from fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
 
 # Configure logging
@@ -66,16 +66,16 @@ async def extract_laboratory_data(
     advanced AI models with confidence scoring and validation.
     """
     await ctx.info(f"Starting enhanced document extraction: {request.document_path}")
-    
+
     start_time = time.time()
     document_path = Path(request.document_path)
-    
+
     try:
         # Validate document existence
         if not document_path.exists():
             await ctx.error(f"Document not found: {document_path}")
             return {"success": False, "error": "Document not found", "processing_time": 0}
-        
+
         # Generate extraction prompt
         extraction_prompt = f"""
         Extract laboratory information from this document: {document_path.name}
@@ -89,18 +89,18 @@ async def extract_laboratory_data(
         
         Return structured JSON with confidence scores for each field.
         """
-        
+
         # Use FastMCP's LLM sampling for extraction
         await ctx.info("Performing AI-powered information extraction")
-        
+
         extraction_result = await ctx.sample(
             messages=[{"role": "user", "content": extraction_prompt}],
             model_preferences=["claude-3-sonnet-20240229", "gpt-4", "gpt-3.5-turbo"]
         )
-        
+
         # Report progress
         await ctx.report_progress(token="extraction", progress=1.0, total=1.0)
-        
+
         # Structure the results
         processing_time = time.time() - start_time
         structured_data = {
@@ -109,23 +109,23 @@ async def extract_laboratory_data(
             "overall_confidence": 0.93,
             "validation_passed": True
         }
-        
+
         # Update service state
         await _update_service_state(structured_data.get("overall_confidence", 0.0), processing_time)
-        
+
         await ctx.info(f"Extraction completed successfully in {processing_time:.2f}s")
-        
+
         return {
             "success": True,
             "document_path": str(document_path),
             "extraction_type": request.extraction_type,
             "extracted_data": structured_data,
             "processing_time": processing_time,
-            "model_used": extraction_result.model if hasattr(extraction_result, 'model') else "unknown"
+            "model_used": extraction_result.model if hasattr(extraction_result, "model") else "unknown"
         }
-        
+
     except Exception as e:
-        await ctx.error(f"Extraction failed for {document_path}: {str(e)}")
+        await ctx.error(f"Extraction failed for {document_path}: {e!s}")
         return {
             "success": False,
             "document_path": str(document_path),
@@ -145,22 +145,22 @@ async def batch_extract_documents(
     load balancing and progress tracking.
     """
     await ctx.info(f"Starting batch extraction of {len(request.document_paths)} documents")
-    
+
     start_time = time.time()
     results = []
     successful_extractions = 0
-    
+
     try:
         # Process documents in batches
         total_documents = len(request.document_paths)
-        
+
         for i in range(0, total_documents, request.batch_size):
             batch = request.document_paths[i:i + request.batch_size]
             batch_num = (i // request.batch_size) + 1
             total_batches = (total_documents + request.batch_size - 1) // request.batch_size
-            
+
             await ctx.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} documents)")
-            
+
             # Create extraction tasks for batch
             batch_tasks = []
             for doc_path in batch:
@@ -170,14 +170,14 @@ async def batch_extract_documents(
                     confidence_threshold=0.85
                 )
                 batch_tasks.append(extract_laboratory_data(doc_request, ctx))
-            
+
             # Execute batch in parallel
             batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
-            
+
             # Process batch results
             for j, result in enumerate(batch_results):
                 if isinstance(result, Exception):
-                    await ctx.error(f"Batch processing error for {batch[j]}: {str(result)}")
+                    await ctx.error(f"Batch processing error for {batch[j]}: {result!s}")
                     results.append({
                         "success": False,
                         "document_path": batch[j],
@@ -187,7 +187,7 @@ async def batch_extract_documents(
                     results.append(result)
                     if result.get("success", False):
                         successful_extractions += 1
-            
+
             # Report batch progress
             progress = (i + len(batch)) / total_documents
             await ctx.report_progress(
@@ -195,12 +195,12 @@ async def batch_extract_documents(
                 progress=progress,
                 total=1.0
             )
-        
+
         processing_time = time.time() - start_time
         success_rate = successful_extractions / total_documents if total_documents > 0 else 0
-        
+
         await ctx.info(f"Batch extraction completed: {successful_extractions}/{total_documents} successful")
-        
+
         return {
             "success": True,
             "total_documents": total_documents,
@@ -210,9 +210,9 @@ async def batch_extract_documents(
             "results": results,
             "processing_time": processing_time
         }
-        
+
     except Exception as e:
-        await ctx.error(f"Batch extraction failed: {str(e)}")
+        await ctx.error(f"Batch extraction failed: {e!s}")
         return {
             "success": False,
             "error": str(e),
@@ -231,7 +231,7 @@ async def query_laboratory_knowledge(
     protocols, and analysis results using RAG and domain knowledge.
     """
     await ctx.info(f"Processing laboratory query: {request.query}")
-    
+
     try:
         # Generate context-aware query prompt
         query_prompt = f"""
@@ -243,20 +243,20 @@ async def query_laboratory_knowledge(
         Provide accurate, helpful laboratory information based on TracSeq 2.0 context.
         Include specific data and recommendations when relevant.
         """
-        
+
         # Use FastMCP's LLM sampling for intelligent response
         response = await ctx.sample(
             messages=[{"role": "user", "content": query_prompt}],
             model_preferences=["claude-3-sonnet-20240229", "gpt-4"]
         )
-        
+
         enhanced_response = f"{response.text}\n\n*Enhanced by TracSeq 2.0 Laboratory Assistant*"
-        
+
         await ctx.info("Laboratory query processed successfully")
         return enhanced_response
-        
+
     except Exception as e:
-        await ctx.error(f"Query processing failed: {str(e)}")
+        await ctx.error(f"Query processing failed: {e!s}")
         return "I apologize, but I encountered an error processing your query. Please try rephrasing or contact support."
 
 @mcp.tool
@@ -271,37 +271,37 @@ async def validate_laboratory_document(
     and contain all necessary information for processing.
     """
     await ctx.info(f"Validating laboratory document: {request.document_path}")
-    
+
     try:
         document_path = Path(request.document_path)
-        
+
         if not document_path.exists():
             return {
                 "valid": False,
                 "error": "Document not found",
                 "validation_rules_passed": []
             }
-        
+
         # Generate validation prompt
         validation_prompt = await _generate_validation_prompt(
             document_path,
             request.validation_rules
         )
-        
+
         # Use LLM for intelligent validation
         validation_result = await ctx.sample(
             messages=[{"role": "user", "content": validation_prompt}],
             model_preferences=["claude-3-sonnet-20240229"]
         )
-        
+
         # Structure validation results
         validation_data = await _process_validation_result(validation_result.text, ctx)
-        
+
         await ctx.info("Document validation completed")
         return validation_data
-        
+
     except Exception as e:
-        await ctx.error(f"Document validation failed: {str(e)}")
+        await ctx.error(f"Document validation failed: {e!s}")
         return {
             "valid": False,
             "error": str(e),
@@ -333,12 +333,12 @@ async def recent_documents(ctx: Context) -> str:
 ---
 *Last updated: {datetime.now().isoformat()}*
         """
-        
+
         return recent_info.strip()
-        
+
     except Exception as e:
-        await ctx.error(f"Error generating recent documents resource: {str(e)}")
-        return f"Error generating recent documents information: {str(e)}"
+        await ctx.error(f"Error generating recent documents resource: {e!s}")
+        return f"Error generating recent documents information: {e!s}"
 
 @mcp.resource("rag://service/health")
 async def service_health(ctx: Context) -> str:
@@ -367,12 +367,12 @@ async def service_health(ctx: Context) -> str:
 ---
 *Health check performed: {datetime.now().isoformat()}*
         """
-        
+
         return health_info.strip()
-        
+
     except Exception as e:
-        await ctx.error(f"Error generating health status: {str(e)}")
-        return f"Health status unavailable: {str(e)}"
+        await ctx.error(f"Error generating health status: {e!s}")
+        return f"Health status unavailable: {e!s}"
 
 @mcp.prompt
 async def laboratory_extraction_prompt(
@@ -405,7 +405,7 @@ async def _update_service_state(confidence_score: float, processing_time: float)
     rag_service_state["total_extractions"] += 1
     rag_service_state["last_activity"] = datetime.now().isoformat()
     rag_service_state["initialized"] = True
-    
+
     # Update average confidence
     if rag_service_state["average_confidence"] == 0.0:
         rag_service_state["average_confidence"] = confidence_score
@@ -442,10 +442,10 @@ async def initialize_rag_service():
 if __name__ == "__main__":
     # Initialize service
     asyncio.run(initialize_rag_service())
-    
+
     # Run FastMCP server with multiple transport options
     import sys
-    
+
     if len(sys.argv) > 1 and sys.argv[1] == "--http":
         # HTTP mode for web integration
         mcp.run(transport="http", port=8001)
@@ -454,4 +454,4 @@ if __name__ == "__main__":
         mcp.run(transport="sse", port=8002)
     else:
         # Default STDIO mode for MCP clients
-        mcp.run(transport="stdio") 
+        mcp.run(transport="stdio")

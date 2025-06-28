@@ -3,7 +3,7 @@ Data models for RAG system components
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -12,13 +12,13 @@ class DocumentChunk(BaseModel):
     """Represents a chunk of text from a document"""
 
     content: str = Field(..., description="The text content of the chunk")
-    metadata: Dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         default_factory=dict, description="Metadata associated with the chunk"
     )
     chunk_id: str = Field(..., description="Unique identifier for the chunk")
     source_document: str = Field(..., description="Source document identifier")
-    chunk_index: Optional[int] = Field(None, description="Index of the chunk in the document")
-    embedding: Optional[List[float]] = Field(None, description="Embedding vector for the chunk")
+    chunk_index: int | None = Field(None, description="Index of the chunk in the document")
+    embedding: list[float] | None = Field(None, description="Embedding vector for the chunk")
     created_at: datetime = Field(
         default_factory=datetime.utcnow, description="Timestamp when the chunk was created"
     )
@@ -31,18 +31,18 @@ class ExtractionResult(BaseModel):
     confidence_score: float = Field(
         ..., description="Confidence score of the extraction (0-1)", ge=0.0, le=1.0
     )
-    missing_fields: List[str] = Field(
+    missing_fields: list[str] = Field(
         default_factory=list, description="List of required fields that were not found"
     )
-    warnings: List[str] = Field(
+    warnings: list[str] = Field(
         default_factory=list, description="List of warnings generated during extraction"
     )
     processing_time: float = Field(
         ..., description="Time taken to process the document in seconds", ge=0.0
     )
     source_document: str = Field(..., description="Source document identifier")
-    submission_id: Optional[str] = Field(None, description="Unique identifier for the submission")
-    extracted_data: Dict[str, Any] = Field(
+    submission_id: str | None = Field(None, description="Unique identifier for the submission")
+    extracted_data: dict[str, Any] = Field(
         default_factory=dict, description="Extracted data from the document"
     )
 
@@ -61,8 +61,8 @@ class QueryResult(BaseModel):
     """Result of a RAG query"""
 
     query: str
-    relevant_chunks: List[DocumentChunk]
-    confidence_scores: List[float]
+    relevant_chunks: list[DocumentChunk]
+    confidence_scores: list[float]
     generated_response: str
     processing_time: float
 

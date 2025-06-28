@@ -99,7 +99,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: data.answer || "I apologize, but I couldn't process your request at the moment. Please try again.",
+        content: data.response || data.answer || "I apologize, but I couldn't process your request at the moment. Please try again.",
         type: 'assistant',
         timestamp: new Date(),
       };

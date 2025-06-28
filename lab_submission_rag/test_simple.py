@@ -33,7 +33,7 @@ def check_environment():
     return True
 
 
-def test_imports():
+def test_imports() -> None:
     """Test if all imports work"""
     print("\n🔍 Testing imports...")
 
@@ -52,7 +52,7 @@ def test_imports():
         return False
 
 
-def test_basic_functionality():
+def test_basic_functionality() -> None:
     """Test basic functionality"""
     print("\n🔍 Testing basic functionality...")
 
@@ -79,7 +79,7 @@ def test_basic_functionality():
         return False
 
 
-def test_document_processing():
+def test_document_processing() -> None:
     """Test document processing with demo document"""
     print("\n🔍 Testing document processing...")
 

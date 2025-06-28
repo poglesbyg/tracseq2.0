@@ -10,12 +10,20 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import aiofiles
 import docker
 import structlog
-from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String, Text, create_engine
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Integer,
+    String,
+    Text,
+    create_engine,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -57,10 +65,10 @@ class DeploymentConfig:
 
     # Deployment settings
     replicas: int = 1
-    resource_requests: Dict[str, str] = field(
+    resource_requests: dict[str, str] = field(
         default_factory=lambda: {"cpu": "500m", "memory": "1Gi"}
     )
-    resource_limits: Dict[str, str] = field(
+    resource_limits: dict[str, str] = field(
         default_factory=lambda: {"cpu": "1000m", "memory": "2Gi"}
     )
 
@@ -80,7 +88,7 @@ class DeploymentConfig:
     monitoring_window_minutes: int = 15
 
     # Environment variables
-    environment_variables: Dict[str, str] = field(default_factory=dict)
+    environment_variables: dict[str, str] = field(default_factory=dict)
 
     # Metadata
     created_at: datetime = field(default_factory=datetime.utcnow)
@@ -100,8 +108,8 @@ class DeploymentRecord:
 
     # Status and timing
     status: DeploymentStatus
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
     # Deployment details
     service_name: str = ""
@@ -109,19 +117,19 @@ class DeploymentRecord:
     replicas_deployed: int = 0
 
     # Previous deployment for rollback
-    previous_deployment_id: Optional[str] = None
+    previous_deployment_id: str | None = None
 
     # Health and performance
     health_check_passed: bool = False
     performance_validated: bool = False
 
     # Logs and errors
-    deployment_logs: List[str] = field(default_factory=list)
-    error_message: Optional[str] = None
+    deployment_logs: list[str] = field(default_factory=list)
+    error_message: str | None = None
 
     # Metrics
     deployment_duration_seconds: float = 0.0
-    validation_metrics: Dict[str, float] = field(default_factory=dict)
+    validation_metrics: dict[str, float] = field(default_factory=dict)
 
     created_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -142,7 +150,7 @@ class ServiceEndpoint:
 
     # Health status
     is_healthy: bool = True
-    last_health_check: Optional[datetime] = None
+    last_health_check: datetime | None = None
 
     # Traffic
     traffic_percentage: float = 0.0
@@ -279,8 +287,8 @@ class ModelDeploymentManager:
         self,
         database_url: str,
         container_registry_url: str,
-        kubernetes_config_path: Optional[str] = None,
-        docker_client: Optional[docker.DockerClient] = None,
+        kubernetes_config_path: str | None = None,
+        docker_client: docker.DockerClient | None = None,
     ):
         # Database setup
         self.engine = create_engine(database_url)
@@ -293,10 +301,10 @@ class ModelDeploymentManager:
         self.kubernetes_config_path = kubernetes_config_path
 
         # Service registry
-        self.active_services: Dict[str, ServiceEndpoint] = {}
+        self.active_services: dict[str, ServiceEndpoint] = {}
 
         # Background tasks
-        self._monitoring_tasks: List[asyncio.Task] = []
+        self._monitoring_tasks: list[asyncio.Task] = []
 
     async def start_monitoring(self):
         """Start background monitoring tasks."""
@@ -394,7 +402,7 @@ class ModelDeploymentManager:
 
         return success
 
-    async def get_deployment_record(self, deployment_id: str) -> Optional[DeploymentRecord]:
+    async def get_deployment_record(self, deployment_id: str) -> DeploymentRecord | None:
         """Get deployment record by ID."""
         with self.SessionLocal() as session:
             record = (
@@ -430,11 +438,11 @@ class ModelDeploymentManager:
 
     async def list_deployments(
         self,
-        model_id: Optional[str] = None,
-        environment: Optional[DeploymentEnvironment] = None,
-        status: Optional[DeploymentStatus] = None,
+        model_id: str | None = None,
+        environment: DeploymentEnvironment | None = None,
+        status: DeploymentStatus | None = None,
         limit: int = 50,
-    ) -> List[DeploymentRecord]:
+    ) -> list[DeploymentRecord]:
         """List deployment records."""
         with self.SessionLocal() as session:
             query = session.query(DeploymentRecordTable)
@@ -458,8 +466,8 @@ class ModelDeploymentManager:
             return deployments
 
     async def get_active_services(
-        self, environment: Optional[DeploymentEnvironment] = None
-    ) -> List[ServiceEndpoint]:
+        self, environment: DeploymentEnvironment | None = None
+    ) -> list[ServiceEndpoint]:
         """Get active service endpoints."""
         with self.SessionLocal() as session:
             query = session.query(ServiceEndpointRecord)
@@ -971,7 +979,7 @@ CMD ["python", "main.py"]
 
     async def _get_current_deployment(
         self, model_id: str, environment: DeploymentEnvironment
-    ) -> Optional[DeploymentRecord]:
+    ) -> DeploymentRecord | None:
         """Get current active deployment for model in environment."""
         deployments = await self.list_deployments(
             model_id=model_id, environment=environment, status=DeploymentStatus.DEPLOYED, limit=1

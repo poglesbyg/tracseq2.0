@@ -2,12 +2,13 @@
 Alembic environment script for Enhanced RAG Service.
 """
 
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-from alembic import context
 import os
 import sys
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -40,7 +41,7 @@ def get_url():
     url = os.environ.get("DATABASE_URL")
     if url:
         return url
-    
+
     # Fallback to config
     return config.get_main_option("sqlalchemy.url")
 
@@ -78,7 +79,7 @@ def run_migrations_online() -> None:
     # Override the sqlalchemy.url in the alembic config
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = get_url()
-    
+
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
@@ -97,4 +98,4 @@ def run_migrations_online() -> None:
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    run_migrations_online() 
+    run_migrations_online()

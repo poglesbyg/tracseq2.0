@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from rag.enhanced_llm_interface import enhanced_llm
 
 
-async def test_enhanced_intelligence():
+async def test_enhanced_intelligence() -> None:
     """Test the enhanced LLM interface with lab-specific queries"""
 
     print("🧠 Testing Enhanced Lab Assistant Intelligence")

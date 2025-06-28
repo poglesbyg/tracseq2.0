@@ -6,7 +6,7 @@ handling, debugging capabilities, and allows for specific error recovery strateg
 """
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class LabSubmissionException(Exception):
@@ -15,10 +15,10 @@ class LabSubmissionException(Exception):
     def __init__(
         self,
         message: str,
-        error_code: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
-        cause: Optional[Exception] = None,
-    ):
+        error_code: str | None = None,
+        context: dict[str, Any] | None = None,
+        cause: Exception | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.error_code = error_code
@@ -26,7 +26,7 @@ class LabSubmissionException(Exception):
         self.cause = cause
         self.timestamp = datetime.utcnow()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert exception to dictionary for structured logging"""
         return {
             "exception_type": self.__class__.__name__,
@@ -44,10 +44,10 @@ class DocumentProcessingException(LabSubmissionException):
     def __init__(
         self,
         message: str,
-        file_path: Optional[str] = None,
-        file_type: Optional[str] = None,
+        file_path: str | None = None,
+        file_type: str | None = None,
         **kwargs,
-    ):
+    ) -> None:
         context = kwargs.get("context", {})
         context.update({"file_path": file_path, "file_type": file_type})
         kwargs["context"] = context
@@ -78,10 +78,10 @@ class ExtractionException(LabSubmissionException):
     def __init__(
         self,
         message: str,
-        extraction_stage: Optional[str] = None,
-        confidence_score: Optional[float] = None,
+        extraction_stage: str | None = None,
+        confidence_score: float | None = None,
         **kwargs,
-    ):
+    ) -> None:
         context = kwargs.get("context", {})
         context.update({"extraction_stage": extraction_stage, "confidence_score": confidence_score})
         kwargs["context"] = context
@@ -92,8 +92,8 @@ class LLMProviderException(ExtractionException):
     """Exception raised when LLM provider fails"""
 
     def __init__(
-        self, message: str, provider: Optional[str] = None, model: Optional[str] = None, **kwargs
-    ):
+        self, message: str, provider: str | None = None, model: str | None = None, **kwargs
+    ) -> None:
         context = kwargs.get("context", {})
         context.update({"provider": provider, "model": model})
         kwargs["context"] = context
@@ -103,7 +103,7 @@ class LLMProviderException(ExtractionException):
 class RateLimitException(LLMProviderException):
     """Exception raised when hitting rate limits"""
 
-    def __init__(self, message: str, retry_after: Optional[int] = None, **kwargs):
+    def __init__(self, message: str, retry_after: int | None = None, **kwargs) -> None:
         context = kwargs.get("context", {})
         context.update({"retry_after": retry_after})
         kwargs["context"] = context
@@ -113,7 +113,7 @@ class RateLimitException(LLMProviderException):
 class ValidationException(ExtractionException):
     """Exception raised when extracted data fails validation"""
 
-    def __init__(self, message: str, validation_errors: Optional[list] = None, **kwargs):
+    def __init__(self, message: str, validation_errors: list | None = None, **kwargs) -> None:
         context = kwargs.get("context", {})
         context.update({"validation_errors": validation_errors or []})
         kwargs["context"] = context
@@ -126,10 +126,10 @@ class VectorStoreException(LabSubmissionException):
     def __init__(
         self,
         message: str,
-        operation: Optional[str] = None,
-        vector_store_type: Optional[str] = None,
+        operation: str | None = None,
+        vector_store_type: str | None = None,
         **kwargs,
-    ):
+    ) -> None:
         context = kwargs.get("context", {})
         context.update({"operation": operation, "vector_store_type": vector_store_type})
         kwargs["context"] = context
@@ -152,8 +152,8 @@ class DatabaseException(LabSubmissionException):
     """Exceptions related to database operations"""
 
     def __init__(
-        self, message: str, operation: Optional[str] = None, table: Optional[str] = None, **kwargs
-    ):
+        self, message: str, operation: str | None = None, table: str | None = None, **kwargs
+    ) -> None:
         context = kwargs.get("context", {})
         context.update({"operation": operation, "table": table})
         kwargs["context"] = context
@@ -175,7 +175,7 @@ class TransactionException(DatabaseException):
 class ConfigurationException(LabSubmissionException):
     """Exception raised for configuration-related errors"""
 
-    def __init__(self, message: str, config_key: Optional[str] = None, **kwargs):
+    def __init__(self, message: str, config_key: str | None = None, **kwargs) -> None:
         context = kwargs.get("context", {})
         context.update({"config_key": config_key})
         kwargs["context"] = context
@@ -188,10 +188,10 @@ class ServiceException(LabSubmissionException):
     def __init__(
         self,
         message: str,
-        service_name: Optional[str] = None,
-        operation: Optional[str] = None,
+        service_name: str | None = None,
+        operation: str | None = None,
         **kwargs,
-    ):
+    ) -> None:
         context = kwargs.get("context", {})
         context.update({"service_name": service_name, "operation": operation})
         kwargs["context"] = context
@@ -201,7 +201,7 @@ class ServiceException(LabSubmissionException):
 class CircuitBreakerException(ServiceException):
     """Exception raised when circuit breaker is open"""
 
-    def __init__(self, message: str, failure_count: Optional[int] = None, **kwargs):
+    def __init__(self, message: str, failure_count: int | None = None, **kwargs) -> None:
         context = kwargs.get("context", {})
         context.update({"failure_count": failure_count})
         kwargs["context"] = context

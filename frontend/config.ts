@@ -33,9 +33,9 @@ const isDevelopment = (import.meta as { env: Record<string, string | boolean | u
 // Default configuration
 const defaultConfig: AppConfig = {
   api: {
-    gatewayUrl: isDevelopment ? 'http://localhost:8089' : 'https://api.tracseq.com',
-    baseUrl: isDevelopment ? 'http://localhost:8089/api' : 'https://api.tracseq.com/api',
-    wsUrl: isDevelopment ? 'ws://localhost:8089/ws' : 'wss://api.tracseq.com/ws',
+    gatewayUrl: isDevelopment ? 'http://localhost:8089' : '/api',
+    baseUrl: isDevelopment ? 'http://localhost:8089/api' : '/api',
+    wsUrl: isDevelopment ? 'ws://localhost:8089/ws' : `ws://${typeof window !== 'undefined' ? window.location.host : 'localhost'}/ws`,
     timeout: 30000,
     retries: 3,
   },

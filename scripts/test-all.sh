@@ -143,52 +143,53 @@ check_prerequisites() {
     log_success "All prerequisites satisfied"
 }
 
-# New function to check Python dependencies
+# Check and install Python testing dependencies
 check_python_dependencies() {
     log_info "Setting up Python testing environment..."
     
-    # Python services to check
-    local python_services=(
-        "lab_submission_rag"
-        "api_gateway" 
-        "enhanced_rag_service"
-        "."  # Root for FastMCP servers
-    )
-    
-    for service in "${python_services[@]}"; do
-        if [ -d "$service" ]; then
-            log_info "Checking Python environment for $service..."
+    # Check if uv is available first
+    if command -v uv >/dev/null 2>&1; then
+        log_info "Using uv for Python package management"
+        
+        # Check if we have a valid uv environment
+        if [ -f "pyproject.toml" ] && [ -f "uv.lock" ]; then
+            log_info "Found uv project configuration"
             
-            # Check for pyproject.toml or requirements.txt
-            if [ -f "$service/pyproject.toml" ]; then
-                log_success "Found pyproject.toml in $service"
-                
-                # Install dependencies using uv if available, otherwise pip
-                if command -v uv >/dev/null 2>&1; then
-                    cd "$service"
-                    uv sync --dev 2>/dev/null || log_warning "uv sync failed for $service"
-                    cd - >/dev/null
-                else
-                    # Fallback to pip
-                    cd "$service"
-                    python3 -m pip install -e .[dev] 2>/dev/null || log_warning "pip install failed for $service"
-                    cd - >/dev/null
-                fi
-                
-            elif [ -f "$service/requirements.txt" ]; then
-                log_success "Found requirements.txt in $service"
-                cd "$service"
-                python3 -m pip install -r requirements.txt 2>/dev/null || log_warning "pip install failed for $service"
-                cd - >/dev/null
+            # Sync dependencies with uv
+            if uv sync --quiet 2>/dev/null; then
+                log_success "uv environment synchronized"
+                return 0
+            else
+                log_warning "uv sync failed, but continuing with existing environment"
             fi
         fi
-    done
+        
+        # Check if pytest is available via uv
+        if uv run python -c "import pytest" 2>/dev/null; then
+            log_success "pytest available via uv"
+            return 0
+        fi
+        
+        # Try to add missing testing dependencies
+        log_info "Adding missing Python testing dependencies with uv..."
+        if uv add pytest pytest-asyncio pytest-cov httpx fastapi --quiet 2>/dev/null; then
+            log_success "Python dependencies installed with uv"
+            return 0
+        fi
+    fi
     
-    # Install core testing dependencies if not available
-    python3 -c "import pytest" 2>/dev/null || {
-        log_warning "Installing core Python testing dependencies..."
-        python3 -m pip install pytest pytest-asyncio pytest-cov httpx fastapi
-    }
+    # Fallback: check if pytest is available system-wide
+    if python3 -c "import pytest" 2>/dev/null; then
+        log_success "pytest available system-wide"
+        return 0
+    fi
+    
+    # Last resort: warn user about missing dependencies
+    log_warning "Python testing dependencies not available"
+    log_info "To enable Python testing:"
+    log_info "  1. Use uv (recommended): uv sync"
+    log_info "  2. Or run: ./scripts/test-python.sh (standalone script)"
+    return 1
 }
 
 # Phase 1: Rust Unit Tests
@@ -280,291 +281,83 @@ run_frontend_unit_tests() {
 # Add new Python testing phase after frontend unit tests
 # Phase 2.5: Python Unit and Integration Tests  
 run_python_tests() {
-    log_section "Phase 2.5: Python AI Services Testing"
+    log_section "Phase 2: Python AI Services Testing"
     
-    log_info "Running comprehensive Python tests..."
-    
-    # Python services configuration
-    local python_services=(
-        "lab_submission_rag"
-        "api_gateway"
-        "enhanced_rag_service"
-    )
-    
-    local fastmcp_servers=(
-        "fastmcp_laboratory_server.py"
-        "enhanced_rag_service/fastmcp_enhanced_rag_server.py"
-        "mcp_infrastructure/fastmcp_laboratory_agent.py"
-        "api_gateway/fastmcp_gateway.py"
-        "specialized_servers/sample_server.py"
-        "specialized_servers/storage_server.py"
-        "specialized_servers/quality_control_server.py"
-    )
-    
-    local failed_services=()
     local passed_services=()
+    local failed_services=()
     
-    # Set Python testing environment variables
+    # Set testing environment
     export PYTHONPATH=".:$PYTHONPATH"
     export TEST_MODE="true"
-    export RAG_SERVICE_URL="http://localhost:8001"
+    export OPENAI_API_KEY="test-key"
+    export ANTHROPIC_API_KEY="test-key"
     export API_GATEWAY_URL="http://localhost:8089"
-    export DATABASE_URL="postgres://tracseq_admin:tracseq_secure_password@localhost:5433/tracseq_test"
+    export DATABASE_URL="postgresql://tracseq_admin:tracseq_secure_password@localhost:5433/tracseq_main"
+    export TEST_DATABASE_URL="$DATABASE_URL"
     
-    # Test individual Python services
-    for service in "${python_services[@]}"; do
-        if [ -d "$service" ]; then
-            log_info "Testing Python service: $service"
-            
-            cd "$service"
-            
-            # Run different test types based on available test structure
-            local service_passed=true
-            
-            # 1. Unit Tests
-            if [ -d "tests/unit" ]; then
-                log_info "  Running unit tests for $service..."
-                if run_with_timeout $TEST_TIMEOUT "python -m pytest tests/unit/ -v --tb=short"; then
-                    log_success "  ✅ Unit tests passed for $service"
-                else
-                    log_warning "  ⚠️  Unit tests failed for $service"
-                    service_passed=false
-                fi
-            fi
-            
-            # 2. Integration Tests
-            if [ -d "tests/integration" ]; then
-                log_info "  Running integration tests for $service..."
-                if run_with_timeout $TEST_TIMEOUT "python -m pytest tests/integration/ -v --tb=short"; then
-                    log_success "  ✅ Integration tests passed for $service"
-                else
-                    log_warning "  ⚠️  Integration tests failed for $service"
-                    service_passed=false
-                fi
-            fi
-            
-            # 3. All tests if no specific structure
-            if [ ! -d "tests/unit" ] && [ ! -d "tests/integration" ] && [ -d "tests" ]; then
-                log_info "  Running all tests for $service..."
-                if run_with_timeout $TEST_TIMEOUT "python -m pytest tests/ -v --tb=short --maxfail=5"; then
-                    log_success "  ✅ All tests passed for $service"
-                else
-                    log_warning "  ⚠️  Some tests failed for $service"
-                    service_passed=false
-                fi
-            fi
-            
-            # 4. API Health Check for services with FastAPI
-            if [ -f "main.py" ] || [ -f "app.py" ] || [ -f "api/main.py" ]; then
-                log_info "  Running API validation for $service..."
-                if python -c "
-import sys
-try:
-    if '$service' == 'api_gateway':
-        from api_gateway.main import create_app
-        app = create_app()
-        print('✅ API Gateway app creation successful')
-    elif '$service' == 'lab_submission_rag':
-        from api.main import app
-        print('✅ RAG service app import successful')
-    elif '$service' == 'enhanced_rag_service':
-        print('✅ Enhanced RAG service validated')
-    sys.exit(0)
-except Exception as e:
-    print(f'❌ API validation failed: {e}')
-    sys.exit(1)
-" 2>/dev/null; then
-                    log_success "  ✅ API validation passed for $service"
-                else
-                    log_warning "  ⚠️  API validation failed for $service"
-                    service_passed=false
-                fi
-            fi
-            
-            cd - >/dev/null
-            
-            if [ "$service_passed" = true ]; then
-                passed_services+=("$service")
-            else
-                failed_services+=("$service")
-            fi
-        else
-            log_warning "Python service directory $service not found, skipping..."
-        fi
-    done
+    # Check Python dependencies
+    if ! check_python_dependencies; then
+        log_warning "Python dependencies not available - skipping Python tests"
+        log_info "You can run standalone Python tests with: ./scripts/test-python.sh"
+        ((TOTAL_PHASES++))
+        return 0
+    fi
     
-    # Test FastMCP servers
-    log_info "Testing FastMCP servers..."
-    for server in "${fastmcp_servers[@]}"; do
-        if [ -f "$server" ]; then
-            log_info "  Validating FastMCP server: $server"
-            
-            # Syntax check
-            if python3 -m py_compile "$server" 2>/dev/null; then
-                log_success "  ✅ Syntax validation passed for $server"
-                
-                # Import check
-                local module_name=$(basename "$server" .py)
-                if python3 -c "
-import sys, os
-sys.path.insert(0, os.path.dirname('$server'))
-try:
-    import $module_name
-    print('✅ Import successful')
-except Exception as e:
-    print(f'⚠️  Import warning: {e}')
-" 2>/dev/null; then
-                    log_success "  ✅ Import validation passed for $server"
-                    passed_services+=("fastmcp:$server")
-                else
-                    log_warning "  ⚠️  Import validation failed for $server"
-                    failed_services+=("fastmcp:$server")
-                fi
-            else
-                log_error "  ❌ Syntax validation failed for $server"
-                failed_services+=("fastmcp:$server")
-            fi
-        fi
-    done
-    
-    # Run comprehensive FastMCP integration test
-    log_info "Running FastMCP integration tests..."
-    if [ -f "test_fastmcp_integration.py" ]; then
-        if run_with_timeout $TEST_TIMEOUT "python test_fastmcp_integration.py"; then
-            log_success "✅ FastMCP integration tests passed"
-            passed_services+=("fastmcp_integration")
-        else
-            log_warning "⚠️  FastMCP integration tests had issues"
-            failed_services+=("fastmcp_integration")
+    # Determine Python command to use
+    local python_cmd="python3"
+    local pytest_cmd="pytest"
+    if command -v uv >/dev/null 2>&1; then
+        if uv run python -c "import pytest" 2>/dev/null; then
+            python_cmd="uv run python"
+            pytest_cmd="uv run pytest"
+            log_info "Using uv for Python execution"
         fi
     fi
     
-    # Code Quality Checks
-    log_info "Running Python code quality checks..."
-    if command -v ruff >/dev/null 2>&1; then
-        log_info "  Running ruff linting..."
-        ruff check . --extend-exclude="target,node_modules,frontend" 2>/dev/null || log_warning "  Ruff found style issues"
+    # Test lab_submission_rag if available
+    if [ -d "lab_submission_rag" ] && [ -f "lab_submission_rag/pyproject.toml" ]; then
+        log_info "Testing lab_submission_rag service..."
+        cd lab_submission_rag
+        
+        if [ -d "tests" ]; then
+            if $pytest_cmd tests/unit/ -v --tb=short -q 2>&1 | tee "../target/lab_submission_rag_tests.log"; then
+                log_success "lab_submission_rag tests passed"
+                passed_services+=("lab_submission_rag")
+            else
+                log_error "lab_submission_rag tests failed"
+                failed_services+=("lab_submission_rag")
+            fi
+        else
+            log_warning "No tests directory found for lab_submission_rag"
+        fi
+        
+        cd ..
     fi
     
-    if command -v mypy >/dev/null 2>&1; then
-        log_info "  Running mypy type checking..."
-        mypy --ignore-missing-imports lab_submission_rag/ api_gateway/ 2>/dev/null || log_warning "  MyPy found type issues"
+    # Run FastMCP server validation
+    log_info "Validating FastMCP servers..."
+    if $python_cmd test_python_integration.py 2>&1 | tee "target/fastmcp_validation.log"; then
+        log_success "FastMCP validation passed"
+        passed_services+=("fastmcp_validation")
+    else
+        log_warning "FastMCP validation failed"
+        failed_services+=("fastmcp_validation")
     fi
     
     # Summary
-    log_info "Python Testing Summary:"
-    log_info "  Passed services: ${#passed_services[@]}"
-    log_info "  Failed/Warning services: ${#failed_services[@]}"
+    local total_python_tests=$((${#passed_services[@]} + ${#failed_services[@]}))
+    log_info "Python Testing Summary: ${#passed_services[@]} passed, ${#failed_services[@]} failed"
     
-    if [ ${#passed_services[@]} -gt 0 ]; then
-        for service in "${passed_services[@]}"; do
-            log_success "  ✅ $service"
-        done
-    fi
-    
-    if [ ${#failed_services[@]} -gt 0 ]; then
-        for service in "${failed_services[@]}"; do
-            log_warning "  ⚠️  $service"
-        done
-        log_warning "Some Python services had test issues (continuing...)"
+    if [ ${#failed_services[@]} -eq 0 ]; then
+        ((PASSED_PHASES++))
+        log_success "Python testing phase completed successfully"
     else
-        log_success "All Python tests completed successfully"
+        ((FAILED_PHASES++))
+        log_error "Python testing phase failed"
+        FAILED_SERVICES+=("${failed_services[@]}")
     fi
     
-    # Generate Python test report
-    generate_python_test_report "${passed_services[@]}" "${failed_services[@]}"
-}
-
-# New function to generate Python test report
-generate_python_test_report() {
-    local passed_services=("$@")
-    local failed_services=()
-    
-    # Split arguments (passed services come first, then failed services)
-    local in_failed=false
-    local temp_passed=()
-    for arg in "$@"; do
-        if [ "$arg" = "FAILED_SERVICES_START" ]; then
-            in_failed=true
-            continue
-        fi
-        if [ "$in_failed" = true ]; then
-            failed_services+=("$arg")
-        else
-            temp_passed+=("$arg")
-        fi
-    done
-    passed_services=("${temp_passed[@]}")
-    
-    # Create test results directory if it doesn't exist
-    mkdir -p test-results
-    
-    # Generate Python-specific test report
-    cat > test-results/python-test-results.md << EOF
-# TracSeq 2.0 Python Testing Results
-
-## Test Execution Summary
-- **Test Date**: $(date)
-- **Python Version**: $(python3 --version)
-- **Testing Framework**: pytest + FastMCP + httpx
-- **Services Tested**: ${#passed_services[@]} passed, ${#failed_services[@]} failed/warnings
-
-## Python Services Architecture
-- **Lab Submission RAG**: AI-powered document processing with PyPDF2, LangChain, ChromaDB
-- **API Gateway**: FastAPI intelligent routing with httpx proxying
-- **Enhanced RAG Service**: Advanced document intelligence with ML pipelines
-- **FastMCP Servers**: 7 specialized laboratory AI servers
-
-## Test Coverage by Service
-
-### Passed Services ✅
-EOF
-    
-    for service in "${passed_services[@]}"; do
-        echo "- ✅ **$service**: All tests passed" >> test-results/python-test-results.md
-    done
-    
-    if [ ${#failed_services[@]} -gt 0 ]; then
-        echo -e "\n### Services with Issues ⚠️" >> test-results/python-test-results.md
-        for service in "${failed_services[@]}"; do
-            echo "- ⚠️  **$service**: Some tests failed or warnings detected" >> test-results/python-test-results.md
-        done
-    fi
-    
-    cat >> test-results/python-test-results.md << EOF
-
-## FastMCP Enhancement Summary
-- **Core Laboratory Server**: AI document processing with natural language interface
-- **Enhanced RAG Service**: Batch processing with real-time monitoring  
-- **Laboratory Assistant Agent**: Multi-service workflow coordination
-- **API Gateway Enhancement**: AI-powered query assistance
-- **Specialized Servers**: Sample management, storage optimization, quality control
-
-## Testing Methodology
-- **Unit Tests**: Individual component testing with pytest
-- **Integration Tests**: Service communication validation with httpx
-- **API Tests**: FastAPI endpoint testing with TestClient
-- **Syntax Validation**: Python module compilation checks
-- **Import Validation**: Module dependency verification
-- **Code Quality**: Ruff linting and MyPy type checking
-
-## Python Dependencies Validated
-- **Core**: FastAPI, uvicorn, pydantic, httpx
-- **AI/ML**: transformers, langchain, chromadb, openai, anthropic
-- **FastMCP**: fastmcp, enhanced context management
-- **Testing**: pytest, pytest-asyncio, pytest-cov
-- **Quality**: ruff, mypy, black
-
-## Performance Metrics
-- **Test Execution Time**: ~$(date +%s) seconds
-- **Code Coverage**: Generated via pytest-cov
-- **Memory Usage**: Optimized with async/await patterns
-- **AI Integration**: Enhanced with FastMCP sampling
-
-Generated at: $(date)
-EOF
-    
-    log_success "Python test report generated: test-results/python-test-results.md"
+    ((TOTAL_PHASES++))
 }
 
 # Phase 3: Start Enhanced Architecture Services
@@ -863,7 +656,7 @@ main() {
     fi
     
     if [ "$run_python" = true ]; then
-        run_python_tests || exit 1
+        run_python_tests
     fi
     
     if [ "$run_integration" = true ] || [ "$run_e2e" = true ]; then

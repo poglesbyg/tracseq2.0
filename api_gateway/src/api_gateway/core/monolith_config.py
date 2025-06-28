@@ -13,9 +13,14 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
 from .config import (
-    ServiceEndpoint, AuthenticationConfig, RateLimitConfig, 
-    LoadBalancerConfig, CircuitBreakerConfig, MonitoringConfig, 
-    CORSConfig, SecurityConfig
+    AuthenticationConfig,
+    CircuitBreakerConfig,
+    CORSConfig,
+    LoadBalancerConfig,
+    MonitoringConfig,
+    RateLimitConfig,
+    SecurityConfig,
+    ServiceEndpoint,
 )
 
 
@@ -26,12 +31,12 @@ class MonolithEndpoint(BaseModel):
     port: int = 3000
     health_check_path: str = "/health"
     timeout: int = 30
-    
+
     @property
     def base_url(self) -> str:
         """Get the base URL for the monolith."""
         return f"http://{self.host}:{self.port}"
-    
+
     @property
     def health_url(self) -> str:
         """Get the health check URL for the monolith."""
@@ -47,7 +52,7 @@ class ServiceFeatureFlags(BaseSettings):
     use_sequencing_service: bool = Field(default=False)
     use_notification_service: bool = Field(default=False)
     use_rag_service: bool = Field(default=False)
-    
+
     class Config:
         """Pydantic configuration for reading environment variables."""
         env_file = ".env"
@@ -57,20 +62,20 @@ class ServiceFeatureFlags(BaseSettings):
 
 class MonolithRouterConfig(BaseSettings):
     """Configuration for routing between monolith and microservices."""
-    
+
     # Service metadata
     service_name: str = "TracSeq API Gateway (Monolith Router)"
     version: str = "0.1.0"
     environment: str = Field(default="development")
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000)
-    
+
     # Monolith configuration
     monolith: MonolithEndpoint = Field(default_factory=MonolithEndpoint)
-    
+
     # Feature flags for service extraction
     feature_flags: ServiceFeatureFlags = Field(default_factory=ServiceFeatureFlags)
-    
+
     # Microservice endpoints (only used when feature flags are enabled)
     microservices: Dict[str, ServiceEndpoint] = Field(
         default={
@@ -125,7 +130,7 @@ class MonolithRouterConfig(BaseSettings):
             ),
         }
     )
-    
+
     # Component configurations
     authentication: AuthenticationConfig = Field(default_factory=AuthenticationConfig)
     rate_limiting: RateLimitConfig = Field(default_factory=RateLimitConfig)
@@ -134,11 +139,11 @@ class MonolithRouterConfig(BaseSettings):
     monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
     cors: CORSConfig = Field(default_factory=CORSConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
-    
+
     # Gateway-specific settings
     request_timeout: int = 30
     max_concurrent_requests: int = 1000
-    
+
     def route_request(self, path: str) -> tuple[str, str]:
         """
         Determine where to route a request based on path and feature flags.
@@ -156,17 +161,17 @@ class MonolithRouterConfig(BaseSettings):
             ("/api/notifications", "notifications", self.feature_flags.use_notification_service),
             ("/api/rag", "rag", self.feature_flags.use_rag_service),
         ]
-        
+
         # Check if any microservice should handle this request
         for path_prefix, service_name, is_enabled in routing_rules:
             if path.startswith(path_prefix) and is_enabled:
                 service = self.microservices.get(service_name)
                 if service:
                     return ("microservice", service.base_url)
-        
+
         # Default: route to monolith
         return ("monolith", self.monolith.base_url)
-    
+
     def get_service_status(self) -> Dict[str, Any]:
         """Get the current routing status of all services."""
         return {
@@ -207,17 +212,17 @@ class MonolithRouterConfig(BaseSettings):
                 }
             }
         }
-    
+
     @property
     def is_production(self) -> bool:
         """Check if running in production environment."""
         return self.environment == "production"
-    
+
     @property
     def is_development(self) -> bool:
         """Check if running in development environment."""
         return self.environment == "development"
-    
+
     class Config:
         """Pydantic configuration."""
         env_file = ".env"
@@ -226,7 +231,7 @@ class MonolithRouterConfig(BaseSettings):
         case_sensitive = False
 
 
-@lru_cache()
+@lru_cache
 def get_monolith_config() -> MonolithRouterConfig:
     """Get cached monolith router configuration."""
-    return MonolithRouterConfig() 
+    return MonolithRouterConfig()

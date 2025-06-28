@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 # FastAPI imports available for future integration
-from fastmcp import FastMCP, Context, Client
+from fastmcp import Client, Context, FastMCP
 from pydantic import BaseModel, Field
 
 # Note: Integration with existing FastAPI app available when needed
@@ -65,13 +65,13 @@ async def laboratory_query_assistant(
     workflows, and system status using natural language processing.
     """
     await ctx.info(f"Processing laboratory query: {request.query}")
-    
+
     start_time = time.time()
-    
+
     try:
         # Connect to relevant FastMCP services based on query context
         service_responses = {}
-        
+
         if request.context in ["samples", "general"]:
             # Connect to laboratory server for sample information
             async with Client("fastmcp_laboratory_server.py") as lab_client:
@@ -83,7 +83,7 @@ async def laboratory_query_assistant(
                     service_responses["laboratory"] = sample_info
                 except Exception as e:
                     await ctx.warning(f"Laboratory service unavailable: {e}")
-        
+
         if request.context in ["rag", "documents", "general"]:
             # Connect to enhanced RAG service
             async with Client("enhanced_rag_service/fastmcp_enhanced_rag_server.py") as rag_client:
@@ -95,7 +95,7 @@ async def laboratory_query_assistant(
                     service_responses["rag"] = rag_info
                 except Exception as e:
                     await ctx.warning(f"RAG service unavailable: {e}")
-        
+
         if request.context in ["workflows", "coordination", "general"]:
             # Connect to laboratory assistant agent
             async with Client("mcp_infrastructure/fastmcp_laboratory_agent.py") as agent_client:
@@ -104,7 +104,7 @@ async def laboratory_query_assistant(
                     service_responses["agent"] = agent_info
                 except Exception as e:
                     await ctx.warning(f"Agent service unavailable: {e}")
-        
+
         # Use AI to synthesize comprehensive response
         synthesis_prompt = f"""
         You are an intelligent API Gateway assistant for TracSeq 2.0 laboratory management system.
@@ -125,33 +125,33 @@ async def laboratory_query_assistant(
         
         Keep the response conversational but informative, suitable for laboratory professionals.
         """
-        
+
         ai_response = await ctx.sample(
             messages=[{"role": "user", "content": synthesis_prompt}],
             model_preferences=["claude-3-sonnet-20240229", "gpt-4"]
         )
-        
+
         processing_time = time.time() - start_time
-        
+
         # Update gateway state
         gateway_state["ai_queries_processed"] += 1
         gateway_state["last_ai_query"] = datetime.now().isoformat()
         gateway_state["gateway_performance"]["ai_enhanced_requests"] += 1
-        
+
         await ctx.info(f"Laboratory query processed in {processing_time:.2f}s")
-        
+
         enhanced_response = f"""{ai_response.text}
 
 ---
 *Response enhanced by TracSeq 2.0 AI Gateway Assistant*
 *Query processed in {processing_time:.2f}s | Connected services: {len(service_responses)}*
         """
-        
+
         return enhanced_response.strip()
-        
+
     except Exception as e:
-        await ctx.error(f"Laboratory query assistant failed: {str(e)}")
-        return f"I apologize, but I encountered an error processing your query: {str(e)}. Please try rephrasing your question or contact support."
+        await ctx.error(f"Laboratory query assistant failed: {e!s}")
+        return f"I apologize, but I encountered an error processing your query: {e!s}. Please try rephrasing your question or contact support."
 
 @mcp.tool
 async def orchestrate_laboratory_workflow(
@@ -165,10 +165,10 @@ async def orchestrate_laboratory_workflow(
     progress tracking for comprehensive laboratory management.
     """
     await ctx.info(f"Orchestrating workflow: {request.workflow_type}")
-    
+
     start_time = time.time()
     orchestration_id = f"ORCH-{int(time.time())}"
-    
+
     try:
         # Use AI to plan workflow orchestration
         orchestration_plan = await ctx.sample(
@@ -193,10 +193,10 @@ async def orchestrate_laboratory_workflow(
             }],
             model_preferences=["claude-3-sonnet-20240229"]
         )
-        
+
         # Execute workflow based on type
         workflow_results = {}
-        
+
         if request.workflow_type == "sample_submission":
             # Coordinate sample submission workflow
             async with Client("mcp_infrastructure/fastmcp_laboratory_agent.py") as agent_client:
@@ -209,7 +209,7 @@ async def orchestrate_laboratory_workflow(
                     }
                 )
                 workflow_results["submission"] = result
-        
+
         elif request.workflow_type == "quality_control":
             # Coordinate quality control workflow
             async with Client("mcp_infrastructure/fastmcp_laboratory_agent.py") as agent_client:
@@ -221,7 +221,7 @@ async def orchestrate_laboratory_workflow(
                     }
                 )
                 workflow_results["quality_control"] = result
-        
+
         elif request.workflow_type == "document_processing":
             # Coordinate document processing workflow
             async with Client("enhanced_rag_service/fastmcp_enhanced_rag_server.py") as rag_client:
@@ -233,7 +233,7 @@ async def orchestrate_laboratory_workflow(
                     }
                 )
                 workflow_results["document_processing"] = result
-        
+
         else:
             # Handle custom workflows with AI assistance
             workflow_results["custom"] = {
@@ -242,14 +242,14 @@ async def orchestrate_laboratory_workflow(
                 "status": "planned",
                 "note": "Custom workflow plan generated - manual execution required"
             }
-        
+
         processing_time = time.time() - start_time
-        
+
         # Update gateway performance metrics
         gateway_state["gateway_performance"]["total_requests"] += 1
-        
+
         await ctx.info(f"Workflow orchestration completed in {processing_time:.2f}s")
-        
+
         return {
             "success": True,
             "orchestration_id": orchestration_id,
@@ -259,9 +259,9 @@ async def orchestrate_laboratory_workflow(
             "processing_time": processing_time,
             "priority": request.priority
         }
-        
+
     except Exception as e:
-        await ctx.error(f"Workflow orchestration failed: {str(e)}")
+        await ctx.error(f"Workflow orchestration failed: {e!s}")
         return {
             "success": False,
             "orchestration_id": orchestration_id,
@@ -282,7 +282,7 @@ async def enhanced_system_status(
     metrics, and intelligent recommendations for system optimization.
     """
     await ctx.info("Gathering enhanced system status information")
-    
+
     try:
         system_status = {
             "gateway": {
@@ -293,11 +293,11 @@ async def enhanced_system_status(
                 "performance": gateway_state["gateway_performance"]
             }
         }
-        
+
         if request.include_services:
             # Check connected services status
             service_status = {}
-            
+
             # Check Laboratory Server
             try:
                 async with Client("fastmcp_laboratory_server.py") as lab_client:
@@ -305,7 +305,7 @@ async def enhanced_system_status(
                     service_status["laboratory_server"] = {"status": "connected", "details": lab_status}
             except Exception as e:
                 service_status["laboratory_server"] = {"status": "unavailable", "error": str(e)}
-            
+
             # Check Enhanced RAG Service
             try:
                 async with Client("enhanced_rag_service/fastmcp_enhanced_rag_server.py") as rag_client:
@@ -313,7 +313,7 @@ async def enhanced_system_status(
                     service_status["rag_service"] = {"status": "connected", "details": rag_status}
             except Exception as e:
                 service_status["rag_service"] = {"status": "unavailable", "error": str(e)}
-            
+
             # Check Laboratory Assistant Agent
             try:
                 async with Client("mcp_infrastructure/fastmcp_laboratory_agent.py") as agent_client:
@@ -321,9 +321,9 @@ async def enhanced_system_status(
                     service_status["laboratory_agent"] = {"status": "connected", "details": agent_status}
             except Exception as e:
                 service_status["laboratory_agent"] = {"status": "unavailable", "error": str(e)}
-            
+
             system_status["connected_services"] = service_status
-        
+
         if request.include_metrics:
             # AI-powered system analysis
             analysis_prompt = f"""
@@ -341,16 +341,16 @@ async def enhanced_system_status(
             
             Focus on actionable insights for laboratory operations.
             """
-            
+
             ai_analysis = await ctx.sample(
                 messages=[{"role": "user", "content": analysis_prompt}],
                 model_preferences=["claude-3-sonnet-20240229"]
             )
-            
+
             system_status["ai_analysis"] = ai_analysis.text
-        
+
         await ctx.info("Enhanced system status generated successfully")
-        
+
         return {
             "success": True,
             "timestamp": datetime.now().isoformat(),
@@ -358,9 +358,9 @@ async def enhanced_system_status(
             "include_services": request.include_services,
             "include_metrics": request.include_metrics
         }
-        
+
     except Exception as e:
-        await ctx.error(f"Enhanced system status failed: {str(e)}")
+        await ctx.error(f"Enhanced system status failed: {e!s}")
         return {
             "success": False,
             "error": str(e),
@@ -399,12 +399,12 @@ async def gateway_services_status(ctx: Context) -> str:
 ---
 *Status updated: {datetime.now().isoformat()}*
         """
-        
+
         return status_info.strip()
-        
+
     except Exception as e:
-        await ctx.error(f"Error generating gateway services status: {str(e)}")
-        return f"Gateway services status unavailable: {str(e)}"
+        await ctx.error(f"Error generating gateway services status: {e!s}")
+        return f"Gateway services status unavailable: {e!s}"
 
 @mcp.resource("gateway://ai/statistics")
 async def gateway_ai_statistics(ctx: Context) -> str:
@@ -437,12 +437,12 @@ async def gateway_ai_statistics(ctx: Context) -> str:
 ---
 *Statistics updated: {datetime.now().isoformat()}*
         """
-        
+
         return ai_stats.strip()
-        
+
     except Exception as e:
-        await ctx.error(f"Error generating AI statistics: {str(e)}")
-        return f"AI statistics unavailable: {str(e)}"
+        await ctx.error(f"Error generating AI statistics: {e!s}")
+        return f"AI statistics unavailable: {e!s}"
 
 # FastAPI integration available when needed - see migration documentation
 
@@ -458,10 +458,10 @@ async def initialize_enhanced_gateway():
 if __name__ == "__main__":
     # Initialize enhanced gateway
     asyncio.run(initialize_enhanced_gateway())
-    
+
     # Run with multiple transport options
     import sys
-    
+
     if len(sys.argv) > 1 and sys.argv[1] == "--http":
         # Pure FastMCP HTTP mode
         mcp.run(transport="http", port=8005)
@@ -470,4 +470,4 @@ if __name__ == "__main__":
         mcp.run(transport="sse", port=8006)
     else:
         # Default FastMCP STDIO mode
-        mcp.run(transport="stdio") 
+        mcp.run(transport="stdio")

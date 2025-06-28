@@ -66,29 +66,50 @@ const statusConfig = {
 
 export default function ProcessDashboard({ metrics, className = '' }: ProcessDashboardProps) {
   
+  // Add defensive programming to handle undefined values
+  const safeMetrics = {
+    totalSamples: metrics?.totalSamples || 0,
+    byStatus: metrics?.byStatus || {},
+    averageProcessingTime: {
+      validation: metrics?.averageProcessingTime?.validation || 0,
+      storage: metrics?.averageProcessingTime?.storage || 0,
+      sequencing: metrics?.averageProcessingTime?.sequencing || 0,
+      overall: metrics?.averageProcessingTime?.overall || 0,
+    },
+    recentThroughput: {
+      last24h: metrics?.recentThroughput?.last24h || 0,
+      last7d: metrics?.recentThroughput?.last7d || 0,
+      last30d: metrics?.recentThroughput?.last30d || 0,
+    },
+    bottlenecks: metrics?.bottlenecks || [],
+  };
+  
   const processFlow = useMemo(() => {
     const flow = [
-      { stage: 'Pending', count: metrics.byStatus.Pending || 0 },
-      { stage: 'Validated', count: metrics.byStatus.Validated || 0 },
-      { stage: 'InStorage', count: metrics.byStatus.InStorage || 0 },
-      { stage: 'InSequencing', count: metrics.byStatus.InSequencing || 0 },
-      { stage: 'Completed', count: metrics.byStatus.Completed || 0 },
+      { stage: 'Pending', count: safeMetrics.byStatus.Pending || 0 },
+      { stage: 'Validated', count: safeMetrics.byStatus.Validated || 0 },
+      { stage: 'InStorage', count: safeMetrics.byStatus.InStorage || 0 },
+      { stage: 'InSequencing', count: safeMetrics.byStatus.InSequencing || 0 },
+      { stage: 'Completed', count: safeMetrics.byStatus.Completed || 0 },
     ];
     return flow;
-  }, [metrics.byStatus]);
+  }, [safeMetrics.byStatus]);
 
-  const totalActive = metrics.totalSamples - (metrics.byStatus.Completed || 0);
+  const totalActive = safeMetrics.totalSamples - (safeMetrics.byStatus.Completed || 0);
   
   const formatTime = (hours: number) => {
-    if (hours < 24) return `${Math.round(hours)}h`;
-    const days = Math.floor(hours / 24);
-    const remainingHours = Math.round(hours % 24);
+    // Handle undefined, null, or NaN values
+    const safeHours = Number(hours) || 0;
+    if (safeHours < 24) return `${Math.round(safeHours)}h`;
+    const days = Math.floor(safeHours / 24);
+    const remainingHours = Math.round(safeHours % 24);
     return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
   };
 
   const getBottleneckSeverity = (waitTime: number) => {
-    if (waitTime > 72) return 'high'; // > 3 days
-    if (waitTime > 24) return 'medium'; // > 1 day
+    const safeWaitTime = Number(waitTime) || 0;
+    if (safeWaitTime > 72) return 'high'; // > 3 days
+    if (safeWaitTime > 24) return 'medium'; // > 1 day
     return 'low';
   };
 
@@ -115,7 +136,7 @@ export default function ProcessDashboard({ metrics, className = '' }: ProcessDas
             <BeakerIcon className="h-8 w-8 text-blue-600" />
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-500">Total Samples</p>
-              <p className="text-2xl font-semibold text-gray-900">{metrics.totalSamples}</p>
+              <p className="text-2xl font-semibold text-gray-900">{safeMetrics.totalSamples}</p>
             </div>
           </div>
         </div>
@@ -136,7 +157,7 @@ export default function ProcessDashboard({ metrics, className = '' }: ProcessDas
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-500">Avg. Processing</p>
               <p className="text-2xl font-semibold text-gray-900">
-                {formatTime(metrics.averageProcessingTime.overall)}
+                {formatTime(safeMetrics.averageProcessingTime.overall)}
               </p>
             </div>
           </div>
@@ -147,7 +168,7 @@ export default function ProcessDashboard({ metrics, className = '' }: ProcessDas
             <CalendarIcon className="h-8 w-8 text-indigo-600" />
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-500">Last 24h</p>
-              <p className="text-2xl font-semibold text-gray-900">{metrics.recentThroughput.last24h}</p>
+              <p className="text-2xl font-semibold text-gray-900">{safeMetrics.recentThroughput.last24h}</p>
             </div>
           </div>
         </div>
@@ -194,26 +215,26 @@ export default function ProcessDashboard({ metrics, className = '' }: ProcessDas
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Validation</span>
               <span className="text-sm font-medium text-gray-900">
-                {formatTime(metrics.averageProcessingTime.validation)}
+                {formatTime(safeMetrics.averageProcessingTime.validation)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Storage</span>
               <span className="text-sm font-medium text-gray-900">
-                {formatTime(metrics.averageProcessingTime.storage)}
+                {formatTime(safeMetrics.averageProcessingTime.storage)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Sequencing</span>
               <span className="text-sm font-medium text-gray-900">
-                {formatTime(metrics.averageProcessingTime.sequencing)}
+                {formatTime(safeMetrics.averageProcessingTime.sequencing)}
               </span>
             </div>
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-900">Overall</span>
                 <span className="text-sm font-semibold text-gray-900">
-                  {formatTime(metrics.averageProcessingTime.overall)}
+                  {formatTime(safeMetrics.averageProcessingTime.overall)}
                 </span>
               </div>
             </div>
@@ -226,26 +247,26 @@ export default function ProcessDashboard({ metrics, className = '' }: ProcessDas
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Last 24 hours</span>
               <span className="text-sm font-medium text-gray-900">
-                {metrics.recentThroughput.last24h} samples
+                {safeMetrics.recentThroughput.last24h} samples
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Last 7 days</span>
               <span className="text-sm font-medium text-gray-900">
-                {metrics.recentThroughput.last7d} samples
+                {safeMetrics.recentThroughput.last7d} samples
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Last 30 days</span>
               <span className="text-sm font-medium text-gray-900">
-                {metrics.recentThroughput.last30d} samples
+                {safeMetrics.recentThroughput.last30d} samples
               </span>
             </div>
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-900">Daily Average</span>
                 <span className="text-sm font-semibold text-gray-900">
-                  {Math.round(metrics.recentThroughput.last30d / 30)} samples/day
+                  {Math.round(safeMetrics.recentThroughput.last30d / 30)} samples/day
                 </span>
               </div>
             </div>
@@ -254,7 +275,7 @@ export default function ProcessDashboard({ metrics, className = '' }: ProcessDas
       </div>
 
       {/* Bottlenecks */}
-      {metrics.bottlenecks && metrics.bottlenecks.length > 0 && (
+      {safeMetrics.bottlenecks && safeMetrics.bottlenecks.length > 0 && (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
           <div className="flex items-center mb-4">
             <ExclamationTriangleIcon className="h-5 w-5 text-yellow-500 mr-2" />
@@ -262,7 +283,7 @@ export default function ProcessDashboard({ metrics, className = '' }: ProcessDas
           </div>
           
           <div className="space-y-3">
-            {metrics.bottlenecks.map((bottleneck, index) => {
+            {safeMetrics.bottlenecks.map((bottleneck, index) => {
               const severity = getBottleneckSeverity(bottleneck.avgWaitTime);
               return (
                 <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">

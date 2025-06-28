@@ -4,9 +4,10 @@ Pydantic models for API Gateway configuration, requests, and responses
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Union
 from enum import Enum
-from pydantic import BaseModel, Field, ConfigDict, validator
+from typing import Any, Dict, List, Optional, Union
+
+from pydantic import BaseModel, ConfigDict, Field, validator
 from pydantic_settings import BaseSettings
 
 
@@ -59,30 +60,30 @@ class RouteConfig(BaseModel):
 class GatewayConfig(BaseSettings):
     """Main gateway configuration"""
     model_config = ConfigDict(env_prefix="GATEWAY_")
-    
+
     host: str = Field(default="0.0.0.0", description="Gateway host")
     port: int = Field(default=8089, description="Gateway port")
     debug: bool = Field(default=False, description="Debug mode")
-    
+
     # Services configuration
     services: Dict[str, ServiceConfig] = Field(default_factory=dict)
     routes: List[RouteConfig] = Field(default_factory=list)
-    
+
     # Load balancing
     load_balancing_strategy: LoadBalancingStrategy = Field(
         default=LoadBalancingStrategy.ROUND_ROBIN,
         description="Load balancing strategy"
     )
-    
+
     # Circuit breaker configuration
     circuit_breaker_enabled: bool = Field(default=True, description="Enable circuit breaker")
     circuit_breaker_failure_threshold: int = Field(default=5, description="Failure threshold")
     circuit_breaker_recovery_timeout: int = Field(default=60, description="Recovery timeout in seconds")
-    
+
     # Rate limiting
     rate_limiting_enabled: bool = Field(default=True, description="Enable rate limiting")
     default_rate_limit: int = Field(default=100, description="Default rate limit per minute")
-    
+
     # Authentication
     jwt_secret_key: str = Field(..., description="JWT secret key")
     jwt_algorithm: str = Field(default="HS256", description="JWT algorithm")
@@ -244,21 +245,21 @@ class Alert(BaseModel):
 
 
 # Custom validators
-@validator('url', pre=True)
+@validator("url", pre=True)
 def validate_url(cls, v):
     """Validate URL format"""
-    if not v.startswith(('http://', 'https://')):
-        raise ValueError('URL must start with http:// or https://')
+    if not v.startswith(("http://", "https://")):
+        raise ValueError("URL must start with http:// or https://")
     return v
 
 
-@validator('methods', pre=True)
+@validator("methods", pre=True)
 def validate_methods(cls, v):
     """Validate HTTP methods"""
-    valid_methods = {'GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'}
+    valid_methods = {"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
     if isinstance(v, list):
         for method in v:
             if method.upper() not in valid_methods:
-                raise ValueError(f'Invalid HTTP method: {method}')
+                raise ValueError(f"Invalid HTTP method: {method}")
         return [method.upper() for method in v]
-    return v 
+    return v

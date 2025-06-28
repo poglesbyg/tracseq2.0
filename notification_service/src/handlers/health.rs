@@ -61,7 +61,7 @@ pub async fn health_check(State(state): State<AppState>) -> Result<Json<HealthRe
     let start_time = std::time::Instant::now();
     
     // Test database connection
-    let db_status = match state.db_pool.health_check().await {
+    let db_status = match sqlx::query("SELECT 1").execute(&state.notification_service.database.pool).await {
         Ok(_) => HealthStatus {
             status: "healthy".to_string(),
             response_time_ms: start_time.elapsed().as_millis() as u64,
@@ -106,7 +106,7 @@ pub async fn health_check(State(state): State<AppState>) -> Result<Json<HealthRe
 /// GET /health/ready
 pub async fn readiness_check(State(state): State<AppState>) -> Result<Json<serde_json::Value>> {
     // Check if all dependencies are ready
-    let db_ready = state.db_pool.health_check().await.is_ok();
+    let db_ready = sqlx::query("SELECT 1").execute(&state.notification_service.database.pool).await.is_ok();
     
     if !db_ready {
         return Err(crate::error::NotificationError::ServiceUnavailable(

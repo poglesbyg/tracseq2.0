@@ -42,7 +42,7 @@ logger = structlog.get_logger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     logger.info("🚀 Starting Enhanced RAG Service")
-    
+
     # Initialize services here
     try:
         logger.info("✅ Enhanced RAG Service startup complete")
@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
-    
+
     app = FastAPI(
         title="Enhanced RAG Service",
         description="AI-Powered Laboratory Document Processing Microservice",
@@ -65,7 +65,7 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         lifespan=lifespan,
     )
-    
+
     # Add middleware
     app.add_middleware(
         CORSMiddleware,
@@ -74,9 +74,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     app.add_middleware(GZipMiddleware, minimum_size=1000)
-    
+
     # Root endpoint
     @app.get("/")
     async def root():
@@ -88,7 +88,7 @@ def create_app() -> FastAPI:
             "docs": "/docs",
             "health": "/api/v1/health"
         }
-    
+
     # Health check endpoint
     @app.get("/api/v1/health")
     async def health_check():
@@ -98,7 +98,7 @@ def create_app() -> FastAPI:
             "service": "Enhanced RAG Service",
             "version": "0.1.0"
         }
-    
+
     return app
 
 
@@ -108,7 +108,7 @@ app = create_app()
 
 if __name__ == "__main__":
     logger.info("🚀 Starting Enhanced RAG Service", host="0.0.0.0", port=8000)
-    
+
     uvicorn.run(
         app,
         host="0.0.0.0",

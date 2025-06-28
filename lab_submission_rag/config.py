@@ -3,7 +3,6 @@ Configuration settings for the RAG system
 """
 
 from pathlib import Path
-from typing import Optional
 
 from pydantic import ConfigDict, Field
 from pydantic_settings import BaseSettings
@@ -13,8 +12,8 @@ class Settings(BaseSettings):
     """Application settings"""
 
     # API Keys (optional when using Ollama)
-    openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
-    anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
+    openai_api_key: str | None = Field(None, description="OpenAI API key")
+    anthropic_api_key: str | None = Field(None, description="Anthropic API key")
 
     # LLM Settings
     llm_provider: str = Field(
@@ -90,7 +89,7 @@ class Settings(BaseSettings):
     )
 
     # Schema name for RAG tables (optional)
-    database_schema: Optional[str] = Field(
+    database_schema: str | None = Field(
         default=None, description="Database schema name for RAG tables (optional)"
     )
 

@@ -6,7 +6,7 @@ Extracted from simple_lab_rag.py for better modularity
 
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -14,30 +14,30 @@ from pydantic import BaseModel, Field
 class AdministrativeInfo(BaseModel):
     """Administrative information from lab submissions"""
 
-    submitter_name: Optional[str] = None
-    submitter_email: Optional[str] = None
-    submitter_phone: Optional[str] = None
-    project_name: Optional[str] = None
-    institution: Optional[str] = None
+    submitter_name: str | None = None
+    submitter_email: str | None = None
+    submitter_phone: str | None = None
+    project_name: str | None = None
+    institution: str | None = None
 
 
 class SampleInfo(BaseModel):
     """Sample information from lab submissions"""
 
-    sample_id: Optional[str] = None
-    sample_type: Optional[str] = None  # DNA, RNA, etc.
-    concentration: Optional[str] = None
-    volume: Optional[str] = None
-    storage_conditions: Optional[str] = None
+    sample_id: str | None = None
+    sample_type: str | None = None  # DNA, RNA, etc.
+    concentration: str | None = None
+    volume: str | None = None
+    storage_conditions: str | None = None
 
 
 class SequencingInfo(BaseModel):
     """Sequencing information from lab submissions"""
 
-    platform: Optional[str] = None  # Illumina, PacBio, etc.
-    analysis_type: Optional[str] = None  # WGS, RNA-seq, etc.
-    coverage: Optional[str] = None
-    read_length: Optional[str] = None
+    platform: str | None = None  # Illumina, PacBio, etc.
+    analysis_type: str | None = None  # WGS, RNA-seq, etc.
+    coverage: str | None = None
+    read_length: str | None = None
 
 
 class LabSubmission(BaseModel):
@@ -52,18 +52,18 @@ class LabSubmission(BaseModel):
     sequencing: SequencingInfo = Field(default_factory=SequencingInfo)
 
     # Raw extracted text and metadata
-    raw_text: Optional[str] = None
-    confidence_score: Optional[float] = None
-    source_document: Optional[str] = None
+    raw_text: str | None = None
+    confidence_score: float | None = None
+    source_document: str | None = None
 
 
 class ExtractionResult(BaseModel):
     """Result of document processing"""
 
     success: bool
-    submission: Optional[LabSubmission] = None
-    submission_id: Optional[str] = None
-    extracted_data: Optional[Dict[str, Any]] = None
-    confidence_score: Optional[float] = None
-    error: Optional[str] = None
-    warnings: List[str] = Field(default_factory=list)
+    submission: LabSubmission | None = None
+    submission_id: str | None = None
+    extracted_data: dict[str, Any] | None = None
+    confidence_score: float | None = None
+    error: str | None = None
+    warnings: list[str] = Field(default_factory=list)

@@ -9,7 +9,6 @@ Laboratory Submission RAG System with all the architectural enhancements.
 import asyncio
 import logging
 from pathlib import Path
-from typing import List
 
 from core.exceptions import (
     DocumentProcessingException,
@@ -159,7 +158,7 @@ async def demonstrate_advanced_features():
         logger.error(f"Error in advanced features demo: {str(e)}")
 
 
-def create_test_documents() -> List[Path]:
+def create_test_documents() -> list[Path]:
     """Create simple test documents for demonstration"""
     test_files = []
 
@@ -228,7 +227,7 @@ Sequencing Requirements:
     return test_files
 
 
-def cleanup_test_documents(test_files: List[Path]):
+def cleanup_test_documents(test_files: list[Path]):
     """Clean up test documents"""
     for file_path in test_files:
         try:
@@ -316,6 +315,7 @@ async def main():
 
 if __name__ == "__main__":
     import sys
+from typing import Any
 
     # Set up proper event loop policy for Windows
     if sys.platform.startswith("win"):

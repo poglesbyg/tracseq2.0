@@ -7,6 +7,7 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
+from typing import Iterator, AsyncGenerator
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -21,7 +22,7 @@ from rag.vector_store import VectorStore
 
 
 @pytest.fixture(scope="session")
-def event_loop():
+def event_loop() -> Iterator[asyncio.AbstractEventLoop]:
     """Create an instance of the default event loop for the test session."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
@@ -29,7 +30,7 @@ def event_loop():
 
 
 @pytest.fixture
-def temp_dir():
+def temp_dir() -> Iterator[Path]:
     """Create a temporary directory for test files"""
     temp_dir = tempfile.mkdtemp()
     yield Path(temp_dir)
@@ -37,7 +38,7 @@ def temp_dir():
 
 
 @pytest.fixture
-def sample_text_content():
+def sample_text_content() -> str:
     """Sample text content for testing document processing"""
     return """
     Laboratory Submission Form
@@ -71,7 +72,7 @@ def sample_text_content():
 
 
 @pytest.fixture
-def sample_document_chunk():
+def sample_document_chunk() -> DocumentChunk:
     """Create a sample DocumentChunk for testing"""
     return DocumentChunk(
         chunk_id="test_chunk_001",
@@ -89,7 +90,7 @@ def sample_document_chunk():
 
 
 @pytest.fixture
-def sample_document_chunks():
+def sample_document_chunks() -> list[DocumentChunk]:
     """Create multiple sample DocumentChunks for testing"""
     chunks = []
     for i in range(5):
@@ -111,7 +112,7 @@ def sample_document_chunks():
 
 
 @pytest.fixture
-def sample_lab_submission():
+def sample_lab_submission() -> LabSubmission:
     """Create a sample LabSubmission for testing"""
     return LabSubmission(
         patient_name="John Doe",
@@ -129,7 +130,7 @@ def sample_lab_submission():
 
 
 @pytest.fixture
-def mock_embedding_model():
+def mock_embedding_model() -> Mock:
     """Mock embedding model for testing"""
     mock_model = Mock()
     mock_model.encode.return_value = [[0.1, 0.2, 0.3, 0.4, 0.5]]
@@ -137,7 +138,7 @@ def mock_embedding_model():
 
 
 @pytest.fixture
-def mock_chromadb_client():
+def mock_chromadb_client() -> Mock:
     """Mock ChromaDB client for testing"""
     mock_client = Mock()
     mock_collection = Mock()
@@ -169,7 +170,7 @@ def mock_chromadb_client():
 
 
 @pytest.fixture
-def mock_llm_client():
+def mock_llm_client() -> AsyncMock:
     """Mock LLM client for testing"""
     mock_client = AsyncMock()
     mock_client.chat.completions.create = AsyncMock(
@@ -181,7 +182,7 @@ def mock_llm_client():
 
 
 @pytest.fixture
-def sample_pdf_file(temp_dir):
+def sample_pdf_file(temp_dir) -> Path:
     """Create a sample PDF file for testing"""
     # For testing purposes, we'll create a simple text file
     # In a real scenario, you'd want to create an actual PDF
@@ -192,7 +193,7 @@ def sample_pdf_file(temp_dir):
 
 
 @pytest.fixture
-def sample_docx_file(temp_dir):
+def sample_docx_file(temp_dir) -> Path:
     """Create a sample DOCX file for testing"""
     # For testing purposes, we'll create a simple text file
     # In a real scenario, you'd want to create an actual DOCX
@@ -203,7 +204,7 @@ def sample_docx_file(temp_dir):
 
 
 @pytest.fixture
-def sample_extraction_result():
+def sample_extraction_result() -> ExtractionResult:
     """Create a sample ExtractionResult for testing"""
     return ExtractionResult(
         success=True,
@@ -222,7 +223,7 @@ def sample_extraction_result():
 
 
 @pytest.fixture
-def mock_document_processor():
+def mock_document_processor() -> Mock:
     """Mock DocumentProcessor for testing"""
     processor = Mock(spec=DocumentProcessor)
     processor.process_document = AsyncMock(return_value=[])
@@ -230,7 +231,7 @@ def mock_document_processor():
 
 
 @pytest.fixture
-def mock_vector_store():
+def mock_vector_store() -> Mock:
     """Mock VectorStore for testing"""
     store = Mock(spec=VectorStore)
     store.add_chunks = AsyncMock(return_value=True)
@@ -242,7 +243,7 @@ def mock_vector_store():
 
 
 @pytest.fixture
-def mock_rag_system():
+def mock_rag_system() -> Mock:
     """Mock RAG system for integration testing"""
     from rag_orchestrator import LabSubmissionRAG
 

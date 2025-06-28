@@ -18,12 +18,12 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """Manages database connections and sessions"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.engine = None
         self.async_session_maker = None
         self._initialized = False
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         """Initialize database connection"""
         if self._initialized:
             return
@@ -50,7 +50,7 @@ class DatabaseManager:
             logger.error(f"Failed to initialize database connection: {e}")
             raise
 
-    async def create_tables(self):
+    async def create_tables(self) -> None:
         """Create all database tables"""
         if not self._initialized:
             await self.initialize()
@@ -63,7 +63,7 @@ class DatabaseManager:
             logger.error(f"Failed to create database tables: {e}")
             raise
 
-    async def drop_tables(self):
+    async def drop_tables(self) -> None:
         """Drop all database tables"""
         if not self._initialized:
             await self.initialize()
@@ -93,7 +93,7 @@ class DatabaseManager:
             finally:
                 await session.close()
 
-    async def close(self):
+    async def close(self) -> None:
         """Close database connections"""
         if self.engine:
             await self.engine.dispose()

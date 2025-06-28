@@ -12,17 +12,15 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
-from fastmcp import FastMCP, Context
+from fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
 
 # Import existing components to reuse business logic
 from lab_submission_rag.config import settings
 from lab_submission_rag.database import db_manager
-from lab_submission_rag.models.submission import BatchExtractionResult, ExtractionResult, LabSubmission
 from lab_submission_rag.rag.document_processor import DocumentProcessor
-from lab_submission_rag.rag.enhanced_llm_interface import enhanced_llm
 from lab_submission_rag.rag.vector_store import VectorStore
 from lab_submission_rag.repositories.submission_repository import SubmissionRepository
 
@@ -39,21 +37,21 @@ mcp = FastMCP("TracSeq Laboratory RAG Server", version="2.0.0")
 # Pydantic models for tool inputs
 class DocumentProcessingRequest(BaseModel):
     file_path: str = Field(description="Path to the laboratory document to process")
-    confidence_threshold: Optional[float] = Field(default=0.7, description="Minimum confidence threshold for extraction")
-    additional_context: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional processing context")
+    confidence_threshold: float | None = Field(default=0.7, description="Minimum confidence threshold for extraction")
+    additional_context: dict[str, Any] | None = Field(default_factory=dict, description="Additional processing context")
 
 class BatchProcessingRequest(BaseModel):
-    file_paths: List[str] = Field(description="List of document paths to process in batch")
-    batch_size: Optional[int] = Field(default=5, description="Number of documents to process simultaneously")
+    file_paths: list[str] = Field(description="List of document paths to process in batch")
+    batch_size: int | None = Field(default=5, description="Number of documents to process simultaneously")
 
 class QueryRequest(BaseModel):
     query: str = Field(description="Natural language query about laboratory submissions")
-    session_id: Optional[str] = Field(default="default", description="Session ID for conversation context")
-    filter_metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Optional metadata filters")
+    session_id: str | None = Field(default="default", description="Session ID for conversation context")
+    filter_metadata: dict[str, Any] | None = Field(default_factory=dict, description="Optional metadata filters")
 
 class SampleSearchRequest(BaseModel):
-    search_criteria: Dict[str, Any] = Field(description="Search criteria for samples")
-    include_rag_processed: Optional[bool] = Field(default=True, description="Include RAG-processed samples")
+    search_criteria: dict[str, Any] = Field(description="Search criteria for samples")
+    include_rag_processed: bool | None = Field(default=True, description="Include RAG-processed samples")
 
 # Global components - initialized once
 document_processor = None
@@ -64,7 +62,7 @@ database_initialized = False
 async def process_laboratory_document(
     request: DocumentProcessingRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Process a laboratory document using advanced RAG techniques.
     
@@ -72,18 +70,18 @@ async def process_laboratory_document(
     containing laboratory submission data, sample information, and protocols.
     """
     await ctx.info(f"Starting laboratory document processing: {request.file_path}")
-    
+
     try:
         # Initialize components if needed
         await _ensure_components_initialized(ctx)
-        
+
         start_time = time.time()
         file_path = Path(request.file_path)
-        
+
         # Step 1: Process document into chunks
         await ctx.info(f"Processing document into chunks: {file_path.name}")
         document_chunks = await document_processor.process_document(file_path)
-        
+
         if not document_chunks:
             await ctx.error(f"No content extracted from {file_path}")
             return {
@@ -92,26 +90,26 @@ async def process_laboratory_document(
                 "error": "No content could be extracted from document",
                 "processing_time": time.time() - start_time
             }
-        
+
         await ctx.info(f"Extracted {len(document_chunks)} chunks from document")
-        
+
         # Step 2: Add to vector store with progress reporting
         await ctx.info("Adding chunks to vector store")
         await vector_store.add_chunks(document_chunks)
-        
+
         # Report progress
         await ctx.report_progress(
             token="processing",
             progress=0.4,
             total=1.0
         )
-        
+
         # Step 3: Extract submission information using enhanced LLM
         await ctx.info("Extracting laboratory submission information")
-        
+
         # Get relevant chunks for extraction
         relevant_chunks = await _get_relevant_chunks_for_extraction(str(file_path), ctx)
-        
+
         # Use context's LLM sampling for extraction
         extraction_prompt = f"""
         Extract laboratory submission information from the following document chunks.
@@ -131,46 +129,46 @@ async def process_laboratory_document(
         
         Return structured JSON with confidence scores for each field.
         """
-        
+
         # Sample the LLM via MCP context
         llm_response = await ctx.sample(
             messages=[{"role": "user", "content": extraction_prompt}],
             model_preferences=["claude-3-sonnet-20240229", "gpt-4"]
         )
-        
+
         # Process LLM response into extraction result
         extraction_result = await _process_llm_extraction_response(
-            llm_response.text, 
-            relevant_chunks, 
+            llm_response.text,
+            relevant_chunks,
             str(file_path),
             ctx
         )
-        
+
         # Report progress
         await ctx.report_progress(
             token="processing",
             progress=0.8,
             total=1.0
         )
-        
+
         # Step 4: Save to database if successful
         if extraction_result.get("success", False):
             await _save_extraction_to_database(extraction_result, document_chunks, file_path, ctx)
             await ctx.info("Successfully saved extraction results to database")
-        
+
         processing_time = time.time() - start_time
         extraction_result["processing_time"] = processing_time
-        
+
         # Complete progress
         await ctx.report_progress(
             token="processing",
             progress=1.0,
             total=1.0
         )
-        
+
         await ctx.info(f"Document processing completed in {processing_time:.2f}s")
         return extraction_result
-        
+
     except Exception as e:
         await ctx.error(f"Error processing document: {str(e)}")
         return {
@@ -184,7 +182,7 @@ async def process_laboratory_document(
 async def process_documents_batch(
     request: BatchProcessingRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Process multiple laboratory documents in an optimized batch operation.
     
@@ -192,24 +190,24 @@ async def process_documents_batch(
     and intelligent error handling for large-scale laboratory operations.
     """
     await ctx.info(f"Starting batch processing of {len(request.file_paths)} documents")
-    
+
     try:
         await _ensure_components_initialized(ctx)
-        
+
         start_time = time.time()
         results = []
         successful_extractions = 0
-        
+
         # Process in smaller batches to avoid overwhelming the system
         total_documents = len(request.file_paths)
-        
+
         for i in range(0, total_documents, request.batch_size):
             batch = request.file_paths[i:i + request.batch_size]
             batch_num = (i // request.batch_size) + 1
             total_batches = (total_documents + request.batch_size - 1) // request.batch_size
-            
+
             await ctx.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} documents)")
-            
+
             # Process batch documents in parallel
             batch_tasks = []
             for file_path in batch:
@@ -218,9 +216,9 @@ async def process_documents_batch(
                     confidence_threshold=0.7
                 )
                 batch_tasks.append(process_laboratory_document(doc_request, ctx))
-            
+
             batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
-            
+
             # Process batch results
             for j, result in enumerate(batch_results):
                 if isinstance(result, Exception):
@@ -234,7 +232,7 @@ async def process_documents_batch(
                     results.append(result)
                     if result.get("success", False):
                         successful_extractions += 1
-            
+
             # Report batch progress
             progress = (i + len(batch)) / total_documents
             await ctx.report_progress(
@@ -242,13 +240,13 @@ async def process_documents_batch(
                 progress=progress,
                 total=1.0
             )
-        
+
         # Calculate overall statistics
         processing_time = time.time() - start_time
         success_rate = successful_extractions / total_documents if total_documents > 0 else 0
-        
+
         await ctx.info(f"Batch processing completed: {successful_extractions}/{total_documents} successful")
-        
+
         return {
             "success": True,
             "total_documents": total_documents,
@@ -258,7 +256,7 @@ async def process_documents_batch(
             "results": results,
             "processing_time": processing_time
         }
-        
+
     except Exception as e:
         await ctx.error(f"Batch processing error: {str(e)}")
         return {
@@ -279,25 +277,25 @@ async def query_laboratory_submissions(
     quality metrics, and other laboratory management information.
     """
     await ctx.info(f"Processing laboratory query: {request.query}")
-    
+
     try:
         await _ensure_components_initialized(ctx)
-        
+
         # Check for database-specific queries first
         db_answer = await _handle_database_query(request.query, ctx)
         if db_answer:
             return db_answer
-        
+
         # Search vector store for relevant information
         relevant_chunks = await vector_store.similarity_search(
             request.query,
             k=settings.max_search_results if hasattr(settings, "max_search_results") else 5,
             filter_metadata=request.filter_metadata
         )
-        
+
         # Prepare context for LLM
         context_chunks = [(chunk.content, score) for chunk, score in relevant_chunks]
-        
+
         # Use MCP context to sample LLM for enhanced answer
         enhanced_prompt = f"""
         You are an expert laboratory management assistant for TracSeq 2.0.
@@ -306,7 +304,7 @@ async def query_laboratory_submissions(
         Query: {request.query}
         
         Relevant Laboratory Data:
-        {chr(10).join([f"Source {i+1} (relevance: {score:.2f}): {content[:500]}..." 
+        {chr(10).join([f"Source {i+1} (relevance: {score:.2f}): {content[:500]}..."
                       for i, (content, score) in enumerate(context_chunks)])}
         
         Provide a comprehensive, accurate response that:
@@ -316,20 +314,20 @@ async def query_laboratory_submissions(
         4. Suggests next steps or related actions when helpful
         5. Indicates confidence level in the response
         """
-        
+
         llm_response = await ctx.sample(
             messages=[{"role": "user", "content": enhanced_prompt}],
             model_preferences=["claude-3-sonnet-20240229", "gpt-4"]
         )
-        
+
         answer = llm_response.text
-        
+
         # Log the query for analytics
         await _log_query_interaction(request.query, answer, request.session_id, ctx)
-        
+
         await ctx.info("Laboratory query processed successfully")
         return answer
-        
+
     except Exception as e:
         await ctx.error(f"Error processing query: {str(e)}")
         return "I apologize, but I encountered an error while processing your query. Please try rephrasing your question or contact support if the issue persists."
@@ -338,7 +336,7 @@ async def query_laboratory_submissions(
 async def search_laboratory_samples(
     request: SampleSearchRequest,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Search laboratory samples with advanced filtering and AI-enhanced results.
     
@@ -346,28 +344,28 @@ async def search_laboratory_samples(
     processing status, quality metrics, and RAG-extracted metadata.
     """
     await ctx.info(f"Searching laboratory samples with criteria: {request.search_criteria}")
-    
+
     try:
         await _ensure_components_initialized(ctx)
-        
+
         async with db_manager.get_session() as session:
             repo = SubmissionRepository(session)
-            
+
             # Perform database search
             samples = await repo.search_samples_advanced(
                 criteria=request.search_criteria,
                 include_rag_data=request.include_rag_processed,
                 limit=100
             )
-            
+
             # Enhance results with AI analysis if requested
             if samples and len(samples) > 0:
                 enhanced_results = await _enhance_search_results_with_ai(
-                    request.search_criteria, 
-                    samples, 
+                    request.search_criteria,
+                    samples,
                     ctx
                 )
-                
+
                 return {
                     "success": True,
                     "samples_found": len(samples),
@@ -383,7 +381,7 @@ async def search_laboratory_samples(
                     "message": "No samples found matching the specified criteria",
                     "search_criteria": request.search_criteria
                 }
-                
+
     except Exception as e:
         await ctx.error(f"Error searching samples: {str(e)}")
         return {
@@ -402,13 +400,13 @@ async def laboratory_submissions_status(ctx: Context) -> str:
     """
     try:
         await _ensure_components_initialized(ctx)
-        
+
         async with db_manager.get_session() as session:
             repo = SubmissionRepository(session)
-            
+
             # Get comprehensive status information
             stats = await repo.get_comprehensive_statistics()
-            
+
             status_report = f"""
 # TracSeq 2.0 Laboratory Submissions Status
 
@@ -438,9 +436,9 @@ async def laboratory_submissions_status(ctx: Context) -> str:
 ---
 *Generated by TracSeq 2.0 Laboratory RAG Server*
             """
-            
+
             return status_report.strip()
-            
+
     except Exception as e:
         await ctx.error(f"Error generating status report: {str(e)}")
         return f"Error generating laboratory status report: {str(e)}"
@@ -455,16 +453,16 @@ async def recent_laboratory_samples(ctx: Context) -> str:
     """
     try:
         await _ensure_components_initialized(ctx)
-        
+
         async with db_manager.get_session() as session:
             repo = SubmissionRepository(session)
-            
+
             # Get recent samples (last 24 hours)
             recent_samples = await repo.get_recent_samples(hours=24, limit=20)
-            
+
             if not recent_samples:
                 return "No samples processed in the last 24 hours."
-            
+
             samples_info = []
             for sample in recent_samples:
                 info = f"""
@@ -475,7 +473,7 @@ async def recent_laboratory_samples(ctx: Context) -> str:
 - Storage: {sample.storage_location or 'Not assigned'}
 """
                 samples_info.append(info.strip())
-            
+
             report = f"""
 # Recent Laboratory Samples (Last 24 Hours)
 
@@ -486,9 +484,9 @@ Found **{len(recent_samples)}** recently processed samples:
 ---
 *Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
             """
-            
+
             return report.strip()
-            
+
     except Exception as e:
         await ctx.error(f"Error fetching recent samples: {str(e)}")
         return f"Error fetching recent laboratory samples: {str(e)}"
@@ -520,7 +518,7 @@ async def laboratory_document_analysis_prompt(
         Provide confidence scores (0-1) for each extracted field.
         Flag any inconsistencies or missing critical information.
         """,
-        
+
         "quality_report": f"""
         Analyze this laboratory quality control report with focus on {analysis_focus}.
         
@@ -534,7 +532,7 @@ async def laboratory_document_analysis_prompt(
         
         Identify critical quality failures that require immediate attention.
         """,
-        
+
         "protocol": f"""
         Analyze this laboratory protocol document with focus on {analysis_focus}.
         
@@ -549,7 +547,7 @@ async def laboratory_document_analysis_prompt(
         Highlight any protocol deviations or special instructions.
         """
     }
-    
+
     return base_prompts.get(document_type, f"""
     Analyze this laboratory document with focus on {analysis_focus}.
     
@@ -568,22 +566,22 @@ async def laboratory_document_analysis_prompt(
 async def _ensure_components_initialized(ctx: Context):
     """Initialize core components if not already done"""
     global document_processor, vector_store, database_initialized
-    
+
     if not database_initialized:
         await ctx.info("Initializing database connection")
         await db_manager.initialize()
         await db_manager.create_tables()
         database_initialized = True
-    
+
     if document_processor is None:
         await ctx.info("Initializing document processor")
         document_processor = DocumentProcessor()
-    
+
     if vector_store is None:
         await ctx.info("Initializing vector store")
         vector_store = VectorStore()
 
-async def _get_relevant_chunks_for_extraction(source_document: str, ctx: Context) -> List[tuple]:
+async def _get_relevant_chunks_for_extraction(source_document: str, ctx: Context) -> list[tuple]:
     """Get relevant document chunks for information extraction"""
     # Implementation similar to original but with context logging
     extraction_queries = [
@@ -595,30 +593,30 @@ async def _get_relevant_chunks_for_extraction(source_document: str, ctx: Context
         "timeline priority schedule dates",
         "special instructions notes protocols"
     ]
-    
+
     all_chunks = []
     for query in extraction_queries:
         chunks = await vector_store.similarity_search(query, k=3)
         all_chunks.extend(chunks)
-    
+
     # Remove duplicates and return top chunks
-    unique_chunks = list({chunk.chunk_id: (chunk.content, score) 
+    unique_chunks = list({chunk.chunk_id: (chunk.content, score)
                          for chunk, score in all_chunks}.values())
-    
+
     await ctx.info(f"Retrieved {len(unique_chunks)} unique chunks for extraction")
     return unique_chunks[:15]  # Limit to top 15
 
 async def _process_llm_extraction_response(
-    llm_text: str, 
-    chunks: List[tuple], 
+    llm_text: str,
+    chunks: list[tuple],
     source_document: str,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Process LLM response into structured extraction result"""
     try:
         # Try to parse JSON response from LLM
         import json
-        
+
         # Simple implementation - in production, would have more sophisticated parsing
         if llm_text.strip().startswith('{'):
             extracted_data = json.loads(llm_text)
@@ -630,12 +628,12 @@ async def _process_llm_extraction_response(
             
             Return JSON with fields: success, confidence_score, extracted_data, warnings
             """
-            
+
             structure_response = await ctx.sample(
                 messages=[{"role": "user", "content": structure_prompt}]
             )
             extracted_data = json.loads(structure_response.text)
-        
+
         return {
             "success": extracted_data.get("success", True),
             "confidence_score": extracted_data.get("confidence_score", 0.8),
@@ -644,7 +642,7 @@ async def _process_llm_extraction_response(
             "source_document": source_document,
             "chunks_used": len(chunks)
         }
-        
+
     except Exception as e:
         await ctx.error(f"Error processing LLM extraction: {str(e)}")
         return {
@@ -655,8 +653,8 @@ async def _process_llm_extraction_response(
         }
 
 async def _save_extraction_to_database(
-    extraction_result: Dict[str, Any], 
-    document_chunks: List, 
+    extraction_result: dict[str, Any],
+    document_chunks: list,
     file_path: Path,
     ctx: Context
 ):
@@ -664,7 +662,7 @@ async def _save_extraction_to_database(
     try:
         async with db_manager.get_session() as session:
             repo = SubmissionRepository(session)
-            
+
             # Create extraction record
             extraction_data = {
                 "extraction_id": str(uuid.uuid4()),
@@ -676,35 +674,35 @@ async def _save_extraction_to_database(
                 "processing_time": extraction_result.get("processing_time", 0),
                 "chunks_processed": len(document_chunks)
             }
-            
+
             await repo.create_extraction_result(extraction_data)
             await ctx.info("Extraction results saved to database")
-            
+
     except Exception as e:
         await ctx.error(f"Failed to save to database: {str(e)}")
         raise
 
-async def _handle_database_query(query: str, ctx: Context) -> Optional[str]:
+async def _handle_database_query(query: str, ctx: Context) -> str | None:
     """Handle database-specific queries"""
     query_lower = query.lower()
-    
+
     try:
         async with db_manager.get_session() as session:
             repo = SubmissionRepository(session)
-            
+
             if "how many samples" in query_lower or "sample count" in query_lower:
                 count = await repo.get_total_sample_count()
                 return f"There are **{count}** total samples in the TracSeq 2.0 system."
-            
+
             elif "submission" in query_lower and "count" in query_lower:
                 submissions = await repo.get_submissions(limit=1000)
                 return f"There are **{len(submissions)}** laboratory submissions in the system."
-            
+
             # Add more database query patterns as needed
-            
+
     except Exception as e:
         await ctx.error(f"Database query error: {str(e)}")
-    
+
     return None
 
 async def _log_query_interaction(query: str, response: str, session_id: str, ctx: Context):
@@ -712,7 +710,7 @@ async def _log_query_interaction(query: str, response: str, session_id: str, ctx
     try:
         async with db_manager.get_session() as session:
             repo = SubmissionRepository(session)
-            
+
             query_data = {
                 "query_id": str(uuid.uuid4()),
                 "query_text": query,
@@ -720,17 +718,17 @@ async def _log_query_interaction(query: str, response: str, session_id: str, ctx
                 "response_text": response,
                 "timestamp": datetime.now()
             }
-            
+
             await repo.log_query(query_data)
-            
+
     except Exception as e:
         await ctx.error(f"Failed to log query: {str(e)}")
 
 async def _enhance_search_results_with_ai(
-    search_criteria: Dict[str, Any], 
-    samples: List, 
+    search_criteria: dict[str, Any],
+    samples: list,
     ctx: Context
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Enhance search results with AI analysis"""
     try:
         # Use AI to analyze search results and provide insights
@@ -741,7 +739,7 @@ async def _enhance_search_results_with_ai(
         Results Found: {len(samples)} samples
         
         Sample Summary:
-        {chr(10).join([f"- {sample.sample_id}: {sample.sample_type}, Status: {sample.status}" 
+        {chr(10).join([f"- {sample.sample_id}: {sample.sample_type}, Status: {sample.status}"
                       for sample in samples[:10]])}
         
         Provide:
@@ -750,18 +748,18 @@ async def _enhance_search_results_with_ai(
         3. Recommendations for further analysis
         4. Any notable patterns or anomalies
         """
-        
+
         ai_analysis = await ctx.sample(
             messages=[{"role": "user", "content": analysis_prompt}]
         )
-        
+
         return {
             "ai_insights": ai_analysis.text,
             "result_summary": f"Found {len(samples)} samples matching criteria",
             "patterns_detected": [],  # Could be enhanced with more analysis
             "recommendations": []  # Could be enhanced with more analysis
         }
-        
+
     except Exception as e:
         await ctx.error(f"Error enhancing search results: {str(e)}")
         return {"error": str(e)}
@@ -769,7 +767,7 @@ async def _enhance_search_results_with_ai(
 if __name__ == "__main__":
     # Run the FastMCP server
     import sys
-    
+
     if len(sys.argv) > 1 and sys.argv[1] == "--stdio":
         # Run with STDIO transport for MCP clients
         mcp.run(transport="stdio")
@@ -784,4 +782,4 @@ if __name__ == "__main__":
         print("  python fastmcp_rag_server.py --http    # For web integration")
         print("")
         print("Starting with STDIO transport...")
-        mcp.run() 
+        mcp.run()

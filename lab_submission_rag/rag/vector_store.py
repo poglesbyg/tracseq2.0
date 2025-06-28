@@ -6,7 +6,7 @@ import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import chromadb
 import numpy as np
@@ -22,13 +22,13 @@ logger = logging.getLogger(__name__)
 class VectorStore:
     """Manages vector embeddings and similarity search"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.client = None
         self.collection = None
         self.embedding_model = SentenceTransformer(settings.embedding_model)
         self._initialize_store()
 
-    def _initialize_store(self):
+    def _initialize_store(self) -> None:
         """Initialize ChromaDB client and collection"""
         try:
             # Create vector database directory if it doesn't exist
@@ -51,7 +51,7 @@ class VectorStore:
             logger.error(f"Failed to initialize vector store: {str(e)}")
             raise
 
-    async def add_chunks(self, chunks: List[DocumentChunk]) -> bool:
+    async def add_chunks(self, chunks: list[DocumentChunk]) -> bool:
         """Add document chunks to the vector store"""
         try:
             if not chunks:
@@ -87,8 +87,8 @@ class VectorStore:
             return False
 
     async def similarity_search(
-        self, query: str, k: int = 5, filter_metadata: Optional[Dict[str, Any]] = None
-    ) -> List[Tuple[DocumentChunk, float]]:
+        self, query: str, k: int = 5, filter_metadata: dict[str, Any] | None = None
+    ) -> list[tuple[DocumentChunk, float]]:
         """Perform similarity search and return relevant chunks with scores"""
         try:
             # Generate query embedding
@@ -126,7 +126,7 @@ class VectorStore:
             logger.error(f"Error in similarity search: {str(e)}")
             return []
 
-    async def _generate_embeddings(self, texts: List[str]) -> np.ndarray:
+    async def _generate_embeddings(self, texts: list[str]) -> np.ndarray:
         """Generate embeddings for a list of texts"""
         try:
             # Run embedding generation in thread pool to avoid blocking

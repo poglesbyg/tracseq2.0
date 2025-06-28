@@ -4,7 +4,7 @@ Repository for laboratory submission database operations
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class SubmissionRepository:
     """Repository for laboratory submission operations"""
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
     async def create_submission(self, submission: LabSubmission) -> LabSubmissionDB:
@@ -60,7 +60,7 @@ class SubmissionRepository:
             logger.error(f"Error creating submission: {e}")
             raise
 
-    async def get_submission(self, submission_id: str) -> Optional[LabSubmissionDB]:
+    async def get_submission(self, submission_id: str) -> LabSubmissionDB | None:
         """Get a submission by ID"""
         try:
             result = await self.session.execute(
@@ -81,10 +81,10 @@ class SubmissionRepository:
         self,
         limit: int = 100,
         offset: int = 0,
-        client_id: Optional[str] = None,
-        status: Optional[str] = None,
-        sample_type: Optional[str] = None,
-    ) -> List[LabSubmissionDB]:
+        client_id: str | None = None,
+        status: str | None = None,
+        sample_type: str | None = None,
+    ) -> list[LabSubmissionDB]:
         """Get submissions with optional filtering"""
         try:
             query = select(LabSubmissionDB).options(selectinload(LabSubmissionDB.samples))
@@ -130,7 +130,7 @@ class SubmissionRepository:
             logger.error(f"Error deleting submission: {e}")
             raise
 
-    async def create_sample(self, sample_data: Dict[str, Any]) -> SampleDB:
+    async def create_sample(self, sample_data: dict[str, Any]) -> SampleDB:
         """Create a new sample"""
         try:
             db_sample = SampleDB(**sample_data)
@@ -147,12 +147,12 @@ class SubmissionRepository:
 
     async def get_samples(
         self,
-        submission_id: Optional[str] = None,
-        patient_id: Optional[str] = None,
-        sample_type: Optional[str] = None,
+        submission_id: str | None = None,
+        patient_id: str | None = None,
+        sample_type: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[SampleDB]:
+    ) -> list[SampleDB]:
         """Get samples with optional filtering"""
         try:
             query = select(SampleDB).options(
@@ -180,9 +180,9 @@ class SubmissionRepository:
 
     async def get_sample_count(
         self,
-        submission_id: Optional[str] = None,
-        sample_type: Optional[str] = None,
-        storage_condition: Optional[str] = None,
+        submission_id: str | None = None,
+        sample_type: str | None = None,
+        storage_condition: str | None = None,
     ) -> int:
         """Get count of samples with optional filtering"""
         try:
@@ -203,7 +203,7 @@ class SubmissionRepository:
             logger.error(f"Error getting sample count: {e}")
             raise
 
-    async def get_sample_statistics(self) -> Dict[str, Any]:
+    async def get_sample_statistics(self) -> dict[str, Any]:
         """Get comprehensive sample statistics"""
         try:
             # Total samples
@@ -241,7 +241,7 @@ class SubmissionRepository:
             logger.error(f"Error getting sample statistics: {e}")
             raise
 
-    async def create_document(self, document_data: Dict[str, Any]) -> DocumentDB:
+    async def create_document(self, document_data: dict[str, Any]) -> DocumentDB:
         """Create a new document record"""
         try:
             db_document = DocumentDB(**document_data)
@@ -256,7 +256,7 @@ class SubmissionRepository:
             logger.error(f"Error creating document: {e}")
             raise
 
-    async def create_document_chunk(self, chunk_data: Dict[str, Any]) -> DocumentChunkDB:
+    async def create_document_chunk(self, chunk_data: dict[str, Any]) -> DocumentChunkDB:
         """Create a new document chunk"""
         try:
             db_chunk = DocumentChunkDB(**chunk_data)
@@ -270,7 +270,7 @@ class SubmissionRepository:
             logger.error(f"Error creating document chunk: {e}")
             raise
 
-    async def create_extraction_result(self, extraction_data: Dict[str, Any]) -> ExtractionResultDB:
+    async def create_extraction_result(self, extraction_data: dict[str, Any]) -> ExtractionResultDB:
         """Create a new extraction result"""
         try:
             db_extraction = ExtractionResultDB(**extraction_data)
@@ -285,7 +285,7 @@ class SubmissionRepository:
             logger.error(f"Error creating extraction result: {e}")
             raise
 
-    async def log_query(self, query_data: Dict[str, Any]) -> QueryLogDB:
+    async def log_query(self, query_data: dict[str, Any]) -> QueryLogDB:
         """Log a query for analytics"""
         try:
             db_query_log = QueryLogDB(**query_data)
@@ -299,7 +299,7 @@ class SubmissionRepository:
             logger.error(f"Error logging query: {e}")
             raise
 
-    async def search_samples(self, search_term: str, limit: int = 50) -> List[SampleDB]:
+    async def search_samples(self, search_term: str, limit: int = 50) -> list[SampleDB]:
         """Search samples by various fields"""
         try:
             search_pattern = f"%{search_term}%"

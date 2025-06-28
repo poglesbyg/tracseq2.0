@@ -224,7 +224,7 @@ def create_directories():
         print(f"✅ Created directory: {dir_name}")
 
 
-def test_imports():
+def test_imports() -> None:
     """Test if all required packages can be imported"""
     print("\n🔍 Testing imports...")
 

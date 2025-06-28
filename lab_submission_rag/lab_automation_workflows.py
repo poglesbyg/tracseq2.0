@@ -9,11 +9,12 @@ import json
 import logging
 import shutil
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
@@ -55,14 +56,14 @@ class ProcessingJob:
     status: WorkflowStatus = WorkflowStatus.PENDING
     priority: ProcessingPriority = ProcessingPriority.MEDIUM
     created_at: datetime = field(default_factory=datetime.now)
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    result: Optional[ExtractionResult] = None
-    error_message: Optional[str] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    result: ExtractionResult | None = None
+    error_message: str | None = None
     retry_count: int = 0
     max_retries: int = 3
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         return {
             "job_id": self.job_id,
@@ -86,11 +87,11 @@ class ProcessingJob:
 class DocumentWatcher(FileSystemEventHandler):
     """File system watcher for automatic document processing"""
 
-    def __init__(self, automation_manager):
+    def __init__(self, automation_manager) -> None:
         self.automation_manager = automation_manager
         self.supported_extensions = {".txt", ".pdf", ".docx", ".doc", ".rtf"}
 
-    def on_created(self, event):
+    def on_created(self, event) -> None:
         """Handle new file creation"""
         if not event.is_directory:
             file_path = Path(event.src_path)
@@ -103,7 +104,7 @@ class DocumentWatcher(FileSystemEventHandler):
                 self.automation_manager.background_tasks.add(task)
                 task.add_done_callback(self.automation_manager.background_tasks.discard)
 
-    def on_moved(self, event):
+    def on_moved(self, event) -> None:
         """Handle file moves (like drag & drop)"""
         if not event.is_directory:
             file_path = Path(event.dest_path)
@@ -120,7 +121,7 @@ class DocumentWatcher(FileSystemEventHandler):
 class LabAutomationManager:
     """Main automation manager for lab document processing"""
 
-    def __init__(self, config: Optional[LabCategoryConfig] = None):
+    def __init__(self, config: LabCategoryConfig | None = None) -> None:
         self.config = config or LabCategoryConfig()
         self.rag_system = ImprovedLabRAG()
 
@@ -143,9 +144,9 @@ class LabAutomationManager:
             dir_path.mkdir(parents=True, exist_ok=True)
 
         # Job management
-        self.job_queue: List[ProcessingJob] = []
-        self.active_jobs: Dict[str, ProcessingJob] = {}
-        self.completed_jobs: List[ProcessingJob] = []
+        self.job_queue: list[ProcessingJob] = []
+        self.active_jobs: dict[str, ProcessingJob] = {}
+        self.completed_jobs: list[ProcessingJob] = []
 
         # Processing settings
         self.max_concurrent_jobs = 3
@@ -160,10 +161,10 @@ class LabAutomationManager:
         self.background_tasks: set = set()
 
         # Callbacks for custom processing
-        self.pre_processing_callbacks: List[Callable] = []
-        self.post_processing_callbacks: List[Callable] = []
+        self.pre_processing_callbacks: list[Callable] = []
+        self.post_processing_callbacks: list[Callable] = []
 
-    async def start_automation(self):
+    async def start_automation(self) -> None:
         """Start the automation system"""
         logger.info("🚀 Starting Laboratory Document Automation System")
 
@@ -193,7 +194,7 @@ class LabAutomationManager:
         print(f"📊 Categories configured: {len(self.config.categories)}")
         print("=" * 60)
 
-    async def stop_automation(self):
+    async def stop_automation(self) -> None:
         """Stop the automation system"""
         logger.info("🛑 Stopping automation system...")
         self.observer.stop()
@@ -254,7 +255,7 @@ class LabAutomationManager:
         except Exception as e:
             logger.error(f"❌ Failed to queue document {file_path}: {e}")
 
-    async def _processing_loop(self):
+    async def _processing_loop(self) -> None:
         """Main processing loop"""
         while True:
             try:
@@ -273,7 +274,7 @@ class LabAutomationManager:
                 logger.error(f"❌ Error in processing loop: {e}")
                 await asyncio.sleep(10)
 
-    async def _process_job(self, job: ProcessingJob):
+    async def _process_job(self, job: ProcessingJob) -> None:
         """Process a single job"""
         job.started_at = datetime.now()
         job.status = WorkflowStatus.PROCESSING
@@ -341,7 +342,7 @@ class LabAutomationManager:
             self.completed_jobs.append(job)
             await self._save_job_status()
 
-    async def _cleanup_loop(self):
+    async def _cleanup_loop(self) -> None:
         """Periodic cleanup of old files and jobs"""
         while True:
             try:
@@ -371,7 +372,7 @@ class LabAutomationManager:
             except Exception as e:
                 logger.error(f"❌ Error in cleanup loop: {e}")
 
-    async def _save_job_status(self):
+    async def _save_job_status(self) -> None:
         """Save job status to file"""
         try:
             status_file = self.base_dir / "job_status.json"
@@ -390,7 +391,7 @@ class LabAutomationManager:
         except Exception as e:
             logger.warning(f"⚠️ Could not save job status: {e}")
 
-    def get_system_status(self) -> Dict[str, Any]:
+    def get_system_status(self) -> dict[str, Any]:
         """Get current system status"""
         return {
             "system_status": "running",
@@ -416,11 +417,11 @@ class LabAutomationManager:
             },
         }
 
-    def add_pre_processing_callback(self, callback: Callable):
+    def add_pre_processing_callback(self, callback: Callable) -> None:
         """Add callback to run before processing each document"""
         self.pre_processing_callbacks.append(callback)
 
-    def add_post_processing_callback(self, callback: Callable):
+    def add_post_processing_callback(self, callback: Callable) -> None:
         """Add callback to run after processing each document"""
         self.post_processing_callbacks.append(callback)
 
@@ -442,7 +443,7 @@ async def lab_manager_integration_callback(job: ProcessingJob):
 
 
 # Testing and demo
-async def test_automation_system():
+async def test_automation_system() -> None:
     """Test the automation system"""
     print("🧬 Testing Laboratory Automation System")
     print("=" * 50)

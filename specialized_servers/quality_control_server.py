@@ -4,7 +4,8 @@ Quality Control Server - FastMCP Implementation
 
 import logging
 from datetime import datetime
-from fastmcp import FastMCP, Context
+
+from fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
 
 logging.basicConfig(level=logging.INFO)
@@ -26,15 +27,15 @@ qc_state = {
 async def ai_quality_assessment(request: QualityAssessmentRequest, ctx: Context):
     """AI-powered quality assessment."""
     await ctx.info(f"Assessing quality for: {request.sample_id}")
-    
+
     analysis = await ctx.sample(
         messages=[{"role": "user", "content": f"Assess quality for sample {request.sample_id}"}],
         model_preferences=["claude-3-sonnet-20240229"]
     )
-    
+
     qc_state["total_assessments"] += 1
     qc_state["last_assessment"] = datetime.now().isoformat()
-    
+
     return {
         "success": True,
         "sample_id": request.sample_id,
@@ -56,7 +57,7 @@ async def qc_status(ctx: Context) -> str:
 if __name__ == "__main__":
     import sys
     logger.info("Starting Quality Control Server")
-    
+
     if len(sys.argv) > 1 and sys.argv[1] == "--http":
         mcp.run(transport="http", port=8012)
     else:

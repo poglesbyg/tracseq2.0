@@ -8,7 +8,7 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from config import settings
 from database import db_manager
@@ -38,7 +38,7 @@ class LabSubmissionRAG:
     4. Store and retrieve submission data from PostgreSQL
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the RAG system components"""
         logger.info("Initializing Lab Submission RAG system...")
 
@@ -59,7 +59,7 @@ class LabSubmissionRAG:
 
         logger.info("Lab Submission RAG system initialized successfully")
 
-    async def initialize_database(self):
+    async def initialize_database(self) -> None:
         """Initialize database connection and create tables"""
         if self._database_initialized:
             return
@@ -73,7 +73,7 @@ class LabSubmissionRAG:
             logger.error(f"Failed to initialize database: {e}")
             raise
 
-    def _ensure_directories(self):
+    def _ensure_directories(self) -> None:
         """Ensure all required directories exist"""
         directories = [
             settings.vector_store_path,
@@ -85,7 +85,7 @@ class LabSubmissionRAG:
         for directory in directories:
             Path(directory).mkdir(parents=True, exist_ok=True)
 
-    async def process_document(self, file_path: Union[str, Path]) -> ExtractionResult:
+    async def process_document(self, file_path: str | Path) -> ExtractionResult:
         """
         Process a single laboratory document and extract submission information.
 
@@ -171,7 +171,7 @@ class LabSubmissionRAG:
             )
 
     async def _save_extraction_to_database(
-        self, extraction_result: ExtractionResult, document_chunks: List, file_path: Path
+        self, extraction_result: ExtractionResult, document_chunks: list, file_path: Path
     ):
         """Save extraction results to PostgreSQL database"""
         async with db_manager.get_session() as session:
@@ -225,7 +225,7 @@ class LabSubmissionRAG:
             await repo.create_extraction_result(extraction_data)
 
     async def process_documents_batch(
-        self, file_paths: List[Union[str, Path]]
+        self, file_paths: list[str | Path]
     ) -> BatchExtractionResult:
         """
         Process multiple laboratory documents in batch.
@@ -292,7 +292,7 @@ class LabSubmissionRAG:
     async def query_submissions(
         self,
         query: str,
-        filter_metadata: Optional[Dict[str, Any]] = None,
+        filter_metadata: dict[str, Any] | None = None,
         session_id: str = "default",
     ) -> str:
         """
@@ -351,7 +351,7 @@ class LabSubmissionRAG:
             await self._log_query(query, error_message, session_id, time.time() - start_time)
             return error_message
 
-    async def _handle_database_query(self, query: str) -> Optional[str]:
+    async def _handle_database_query(self, query: str) -> str | None:
         """Handle database-specific queries like sample counts and statistics"""
         query_lower = query.lower()
 
@@ -499,7 +499,7 @@ class LabSubmissionRAG:
             logger.error(f"Failed to log query: {e}")
             # Don't fail the main operation if logging fails
 
-    async def _get_relevant_chunks_for_extraction(self, source_document: str) -> List[tuple]:
+    async def _get_relevant_chunks_for_extraction(self, source_document: str) -> list[tuple]:
         """Get relevant chunks for information extraction from a specific document"""
         # Define search queries for each category
         category_queries = [
@@ -534,7 +534,7 @@ class LabSubmissionRAG:
         sorted_chunks = sorted(unique_chunks.items(), key=lambda x: x[1], reverse=True)
         return sorted_chunks[:10]  # Limit to top 10 most relevant chunks
 
-    async def get_system_status(self) -> Dict[str, Any]:
+    async def get_system_status(self) -> dict[str, Any]:
         """Get status information about the RAG system"""
         try:
             vector_store_info = self.vector_store.get_store_info()

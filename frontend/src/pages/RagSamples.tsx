@@ -83,23 +83,64 @@ export default function RagSamples() {
     queryKey: ['rag-samples', searchTerm, statusFilter, confidenceFilter],
     queryFn: async () => {
       try {
-        const params = new URLSearchParams();
-        if (searchTerm) params.append('search', searchTerm);
-        if (statusFilter) params.append('status', statusFilter);
-        if (confidenceFilter) params.append('confidence', confidenceFilter);
-        params.append('extraction_method', 'ai_rag'); // Only show RAG-created samples
-
-        const response = await axios.get(`/api/samples?${params}`);
+        // Use the dedicated RAG samples endpoint first
+        console.log('🔍 Fetching RAG samples...');
+        const response = await axios.get('/api/rag/samples');
+        console.log('📊 RAG samples response:', response.data);
         
-        // Filter samples to only show those created from RAG submissions
-        const allSamples = response.data || [];
-        return allSamples.filter((sample: RagSample) => 
-          sample.metadata?.extraction_method === 'ai_rag' || 
-          sample.metadata?.rag_submission_id ||
-          sample.metadata?.source_document
-        );
+        let samples = response.data || [];
+        
+        // If no data from RAG endpoint, try the filtered samples endpoint
+        if (!samples || samples.length === 0) {
+          console.log('🔄 Trying filtered samples endpoint...');
+          const params = new URLSearchParams();
+          params.append('extraction_method', 'ai_rag');
+          const fallbackResponse = await axios.get(`/api/samples?${params}`);
+          console.log('📊 Filtered samples response:', fallbackResponse.data);
+          samples = Array.isArray(fallbackResponse.data) ? fallbackResponse.data : [];
+        }
+        
+        // Apply client-side filtering
+        if (searchTerm || statusFilter || confidenceFilter) {
+          samples = samples.filter((sample: RagSample) => {
+            let matches = true;
+            
+            if (searchTerm) {
+              const searchLower = searchTerm.toLowerCase();
+              matches = matches && (
+                sample.name.toLowerCase().includes(searchLower) ||
+                sample.barcode.toLowerCase().includes(searchLower) ||
+                (sample.metadata?.submitter_name && typeof sample.metadata.submitter_name === 'string' && sample.metadata.submitter_name.toLowerCase().includes(searchLower))
+              );
+            }
+            
+            if (statusFilter) {
+              matches = matches && sample.status === statusFilter;
+            }
+            
+            if (confidenceFilter) {
+              const confidence = sample.metadata?.confidence_score || 0;
+              switch (confidenceFilter) {
+                case 'high':
+                  matches = matches && confidence >= 0.8;
+                  break;
+                case 'medium':
+                  matches = matches && confidence >= 0.6 && confidence < 0.8;
+                  break;
+                case 'low':
+                  matches = matches && confidence < 0.6;
+                  break;
+              }
+            }
+            
+            return matches;
+          });
+        }
+        
+        console.log(`✅ Final RAG samples count: ${samples.length}`);
+        return samples;
       } catch (error) {
-        console.error('Failed to fetch RAG samples:', error);
+        console.error('❌ Failed to fetch RAG samples:', error);
         return [];
       }
     },

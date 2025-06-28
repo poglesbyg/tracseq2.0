@@ -8,7 +8,7 @@ use uuid::Uuid;
 // Core Notification Models
 // ================================
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Notification {
     pub id: Uuid,
     pub title: String,
@@ -29,7 +29,7 @@ pub struct Notification {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "notification_type", rename_all = "snake_case")]
 pub enum NotificationType {
     Alert,
@@ -340,9 +340,4 @@ impl Default for NotificationPreferences {
 // Trait Implementations
 // ================================
 
-// PostgreSQL array support for Channel enum
-impl sqlx::postgres::PgHasArrayType for Channel {
-    fn array_type_info() -> sqlx::postgres::PgTypeInfo {
-        sqlx::postgres::PgTypeInfo::with_name("_channel")
-    }
-}
+// PostgreSQL array support is now handled by sqlx::Type derive macro
