@@ -1,35 +1,31 @@
-# Multi-stage build for TracSeq Authentication Service
-
-# Build stage
 FROM rustlang/rust:nightly-slim as builder
 
-# Install build dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
 WORKDIR /app
 
-# Copy manifest files
-COPY Cargo.toml ./
+# Copy service-specific Cargo.toml
+COPY auth_service/Cargo.toml ./
 
-# Create a dummy main.rs to build dependencies
+# Create dummy source for dependency caching
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
-# Build dependencies (this will be cached if Cargo.toml doesn't change)
+# Set offline mode for SQLx
 ENV DATABASE_URL=postgres://postgres:postgres@localhost:5432/lab_manager
 ENV SQLX_OFFLINE=true
+
+# Build dependencies (this will be cached)
 RUN cargo build --release
 RUN rm src/main.rs
 
-# Copy source code
-COPY src ./src
+# Copy actual source code
+COPY auth_service/src ./src
 
 # Build the application
-ENV DATABASE_URL=postgres://postgres:postgres@localhost:5432/lab_manager
-ENV SQLX_OFFLINE=true
 RUN cargo build --release
 
 # Runtime stage
@@ -44,28 +40,20 @@ RUN apt-get update && apt-get install -y \
 # Create app user
 RUN useradd -r -s /bin/false -m -d /app appuser
 
-# Set working directory
 WORKDIR /app
 
-# Copy the binary from builder stage
-COPY --from=builder /app/target/release/auth_service ./auth-service
+# Copy binary from builder stage
+COPY --from=builder /app/target/release/auth_service /app/auth_service
 
 # Change ownership
 RUN chown -R appuser:appuser /app
 
-# Switch to app user
 USER appuser
 
-# Expose port
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# Set environment variables
-ENV RUST_LOG=info
-ENV PORT=8080
-
-# Run the application
-CMD ["./auth-service"] 
+CMD ["./auth_service"]

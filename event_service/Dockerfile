@@ -1,26 +1,29 @@
-# TracSeq Event Service Dockerfile
-FROM rustlang/rust:nightly-slim AS builder
+FROM rustlang/rust:nightly-slim as builder
 
-# Install dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set work directory
 WORKDIR /app
 
-# Copy Cargo files
-COPY Cargo.toml ./
+# Copy service-specific Cargo.toml
+COPY event_service/Cargo.toml ./
 
-# Create src directory and a dummy main.rs
+# Create dummy source for dependency caching
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
-# Build dependencies (this will be cached)
-RUN cargo build --release && rm src/main.rs
+# Set offline mode for SQLx
+ENV DATABASE_URL=postgres://postgres:postgres@localhost:5432/lab_manager
+ENV SQLX_OFFLINE=true
 
-# Copy source code
-COPY src/ ./src/
+# Build dependencies (cached layer)
+RUN cargo build --release
+RUN rm src/main.rs
+
+# Copy actual source code
+COPY event_service/src ./src
 
 # Build the application
 RUN cargo build --release
@@ -31,29 +34,26 @@ FROM debian:bookworm-slim
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user
-RUN useradd -m -u 1001 appuser
+RUN useradd -r -s /bin/false -m -d /app appuser
 
-# Set work directory
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /app/target/release/event-service /app/event-service
+COPY --from=builder /app/target/release/event_service /app/event_service
 
 # Change ownership
-RUN chown appuser:appuser /app/event-service
+RUN chown -R appuser:appuser /app
 
-# Switch to app user
 USER appuser
 
-# Expose port
-EXPOSE 8087
+EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8087/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
-# Run the application
-CMD ["./event-service"] 
+CMD ["./event_service"]

@@ -1,78 +1,59 @@
-# Sample Service Dockerfile
-# Multi-stage build for production-ready container
-
-# Stage 1: Build environment
 FROM rustlang/rust:nightly-slim as builder
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
-    libpq-dev \
-    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app user for security
-RUN useradd -m -u 1001 appuser
+WORKDIR /app
 
-# Set working directory
-WORKDIR /usr/src/app
+# Copy service-specific Cargo.toml
+COPY sample_service/Cargo.toml ./
 
-# Copy dependency manifests
-COPY Cargo.toml ./
+# Create dummy source for dependency caching
+RUN mkdir src && echo "fn main() {}" > src/main.rs
 
-# Create dummy source to cache dependencies
-RUN mkdir src && \
-    echo "fn main() {}" > src/main.rs && \
-    cargo build --release && \
-    rm -rf src
+# Set offline mode for SQLx
+ENV DATABASE_URL=postgres://postgres:postgres@localhost:5432/lab_manager
+ENV SQLX_OFFLINE=true
 
-# Copy source code
-COPY src ./src
+# Build dependencies (cached layer)
+RUN cargo build --release
+RUN rm src/main.rs
+
+# Copy actual source code
+COPY sample_service/src ./src
 
 # Build the application
-RUN cargo build --release --bin sample_service
+RUN cargo build --release
 
-# Stage 2: Runtime environment
+# Runtime stage
 FROM debian:bookworm-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
-    libssl3 \
-    libpq5 \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create app user
-RUN useradd -m -u 1001 appuser
+RUN useradd -r -s /bin/false -m -d /app appuser
 
-# Create app directory
 WORKDIR /app
 
-# Copy binary from builder stage
-COPY --from=builder /usr/src/app/target/release/sample_service .
+# Copy binary from builder
+COPY --from=builder /app/target/release/sample_service /app/sample_service
 
-# Copy any additional files needed
-COPY --from=builder /usr/src/app/Cargo.toml .
-
-# Change ownership to app user
+# Change ownership
 RUN chown -R appuser:appuser /app
 
-# Switch to non-root user
 USER appuser
 
-# Expose port
-EXPOSE 8081
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8081/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
-# Set environment variables
-ENV RUST_LOG=info
-ENV SAMPLE_SERVICE_PORT=8081
-ENV SAMPLE_SERVICE_HOST=0.0.0.0
-
-# Run the application
-CMD ["./sample_service"] 
+CMD ["./sample_service"]

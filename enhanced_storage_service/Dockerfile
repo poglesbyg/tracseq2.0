@@ -1,84 +1,62 @@
-# Multi-stage build for TracSeq Enhanced Storage Service
-# Stage 1: Build stage
 FROM rustlang/rust:nightly-slim as builder
 
-# Install build dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     libpq-dev \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app user for security
-RUN useradd -m -u 1001 appuser
+WORKDIR /app
 
-# Set work directory
-WORKDIR /usr/src/app
+# Copy service-specific Cargo.toml
+COPY enhanced_storage_service/Cargo.toml ./
 
-# Copy manifest files
-COPY Cargo.toml ./
+# Create dummy source for dependency caching
+RUN mkdir src && echo "fn main() {}" > src/main.rs
 
-# Create dummy source to cache dependencies
-RUN mkdir src && \
-    echo "fn main() {}" > src/main.rs
+# Set offline mode for SQLx
+ENV DATABASE_URL=postgres://postgres:postgres@localhost:5432/lab_manager
+ENV SQLX_OFFLINE=true
 
-# Build dependencies (this layer will be cached unless Cargo.toml changes)
-RUN cargo build --release && \
-    rm -rf src target/release/deps/enhanced_storage_service*
+# Build dependencies (cached layer)
+RUN cargo build --release
+RUN rm src/main.rs
 
 # Copy actual source code
-COPY src ./src
+COPY enhanced_storage_service/src ./src
 
 # Build the application
 RUN cargo build --release
 
-# Verify the binary was built correctly
-RUN ls -la target/release/ && \
-    ldd target/release/enhanced-storage-service || true
-
-# Stage 2: Runtime stage
+# Runtime stage
 FROM debian:bookworm-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    curl \
     libssl3 \
     libpq5 \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user
-RUN useradd -m -u 1001 appuser
+RUN useradd -r -s /bin/false -m -d /app appuser
 
-# Create necessary directories
-RUN mkdir -p /app/logs /app/config && \
-    chown -R appuser:appuser /app
-
-# Copy the binary from builder stage
-COPY --from=builder /usr/src/app/target/release/enhanced-storage-service /app/enhanced-storage-service
-
-# Set permissions
-RUN chmod +x /app/enhanced-storage-service && \
-    chown appuser:appuser /app/enhanced-storage-service
-
-# Switch to non-root user
-USER appuser
-
-# Set work directory
 WORKDIR /app
 
-# Expose port
-EXPOSE 8082
+# Copy binary from builder
+COPY --from=builder /app/target/release/enhanced_storage_service /app/enhanced_storage_service
+
+# Change ownership
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
+EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8082/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
-# Environment variables
-ENV RUST_LOG=info \
-    RUST_BACKTRACE=1 \
-    PORT=8082
-
-# Run the binary
-CMD ["./enhanced-storage-service"] 
+CMD ["./enhanced_storage_service"]
