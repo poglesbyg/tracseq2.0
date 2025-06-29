@@ -445,7 +445,7 @@ services:
     image: provectuslabs/kafka-ui:latest
     container_name: tracseq-kafka-ui
     ports:
-      - "8090:8080"
+      - "8095:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
@@ -468,6 +468,42 @@ services:
       - mosquitto-logs:/mosquitto/log
     networks:
       - tracseq-network
+
+  # =============================================================================
+  # PHASE 10: NEXT-GENERATION INTELLIGENCE SERVICES
+  # =============================================================================
+  
+  # Cognitive Laboratory Assistant - AI Brain of the System
+  cognitive-assistant:
+    build:
+      context: ./cognitive_assistant_service
+      dockerfile: Dockerfile
+    container_name: tracseq-cognitive-assistant
+    ports:
+      - "8090:8090"
+    environment:
+      - PORT=8090
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - RUST_LOG=debug
+      - SERVICE_NAME=Cognitive Laboratory Assistant
+      - VERSION=1.0.0
+    depends_on:
+      - postgres
+      - redis
+      - ollama
+    volumes:
+      - ./logs/cognitive-assistant:/app/logs
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
 
 volumes:
   postgres-data:

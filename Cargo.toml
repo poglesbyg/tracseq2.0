@@ -14,6 +14,8 @@ members = [
     "qaqc_service",
     "library_details_service",
     "temp_auth_test",
+    # Phase 10 Services - Next-Generation Intelligence
+    "cognitive_assistant_service",
     # Test utilities
     "test-helpers"
 ]
