@@ -57,6 +57,7 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_samples
       AUTH_SERVICE_URL: http://auth-service:8080
       STORAGE_SERVICE_URL: http://enhanced-storage-service:8080
+      SAMPLE_PORT: 8080
       RUST_LOG: sample_service=debug
     depends_on:
       postgres:
@@ -99,6 +100,7 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_templates
       AUTH_SERVICE_URL: http://auth-service:8080
+      TEMPLATE_PORT: 8080
       RUST_LOG: template_service=debug
     depends_on:
       postgres:
