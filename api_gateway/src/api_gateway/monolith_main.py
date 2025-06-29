@@ -170,8 +170,13 @@ def create_app() -> FastAPI:
             upstream_url = f"{base_url}{full_path}"
             target_service = "monolith"
         else:
-            # Route to microservice - may need path adjustments
-            upstream_url = f"{base_url}{full_path}"
+            # Route to microservice - strip /api prefix
+            # Convert /api/templates -> /templates for microservice
+            if full_path.startswith('/api/'):
+                microservice_path = full_path[4:]  # Remove '/api' prefix
+            else:
+                microservice_path = full_path
+            upstream_url = f"{base_url}{microservice_path}"
             target_service = "microservice"
 
         # Get request data
