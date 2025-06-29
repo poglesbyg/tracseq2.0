@@ -1,0 +1,117 @@
+# TracSeq 2.0 - Falco Security Rules
+# Laboratory Management System Security Monitoring
+
+- rule: Unexpected Spawned Process
+  desc: Detect unexpected spawned processes in containers
+  condition: >
+    spawned_process and
+    not proc.pname in (shell_binaries) and
+    not proc.name in (expected_processes)
+  output: >
+    Unexpected spawned process in container
+    (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline
+    pid=%proc.pid ppid=%proc.ppid pcmdline=%proc.pcmdline gparent=%proc.aname[2]
+    ggparent=%proc.aname[3] aname[4]=%proc.aname[4] aname[5]=%proc.aname[5]
+    aname[6]=%proc.aname[6] aname[7]=%proc.aname[7] container_id=%container.id image=%container.image.repository)
+  priority: WARNING
+  tags: [container, process]
+
+- rule: Suspicious Network Activity
+  desc: Detect suspicious network connections from TracSeq containers
+  condition: >
+    (inbound_outbound) and
+    container and
+    container.image.repository startswith "tracseq" and
+    not fd.sport in (3000, 8000, 8080, 8085, 8086, 8087, 5432, 6379, 9090, 9093) and
+    not fd.dport in (3000, 8000, 8080, 8085, 8086, 8087, 5432, 6379, 9090, 9093)
+  output: >
+    Suspicious network activity from TracSeq container
+    (container=%container.name connection=%fd.name proto=%fd.l4proto 
+    sport=%fd.sport dport=%fd.dport)
+  priority: WARNING
+  tags: [container, network, tracseq]
+
+- rule: Lab Data Access Outside Business Hours
+  desc: Detect access to laboratory data outside business hours
+  condition: >
+    open_write and
+    container and
+    container.image.repository startswith "tracseq" and
+    (fd.name contains "/lab_data" or fd.name contains "/samples" or fd.name contains "/storage") and
+    not (evt.hour >= 8 and evt.hour <= 18)
+  output: >
+    Laboratory data access outside business hours
+    (user=%user.name file=%fd.name container=%container.name time=%evt.time)
+  priority: NOTICE
+  tags: [container, filesystem, laboratory, compliance]
+
+- rule: Privileged Container Spawned
+  desc: Detect spawning of privileged containers
+  condition: >
+    container and
+    container.privileged=true and
+    not container.image.repository in (allowed_privileged_images)
+  output: >
+    Privileged container spawned
+    (user=%user.name command=%proc.cmdline container=%container.name 
+    image=%container.image.repository privileged=%container.privileged)
+  priority: WARNING
+  tags: [container, privilege_escalation]
+
+- rule: Sample Storage Temperature Alert
+  desc: Detect potential temperature monitoring issues
+  condition: >
+    spawned_process and
+    proc.name in (temperature_monitor, sensor_reader) and
+    proc.args contains "error" or proc.args contains "fault" or proc.args contains "alarm"
+  output: >
+    Sample storage temperature monitoring alert
+    (command=%proc.cmdline container=%container.name args=%proc.args)
+  priority: CRITICAL
+  tags: [laboratory, storage, temperature, compliance]
+
+- rule: Database Access Pattern Anomaly
+  desc: Detect unusual database access patterns
+  condition: >
+    spawned_process and
+    proc.name in (psql, postgres, pg_dump) and
+    not user.name in (postgres, tracseq-db, tracseq-api)
+  output: >
+    Unusual database access detected
+    (user=%user.name command=%proc.cmdline database_command=%proc.name)
+  priority: WARNING
+  tags: [database, access_control, tracseq]
+
+- rule: File System Write in Read-Only Mount
+  desc: Detect writes to supposedly read-only mounted filesystems
+  condition: >
+    open_write and
+    container and
+    fd.name startswith "/etc/" and
+    container.image.repository startswith "tracseq"
+  output: >
+    Write attempt to read-only filesystem
+    (file=%fd.name container=%container.name user=%user.name)
+  priority: WARNING
+  tags: [filesystem, container, security]
+
+# Lists for rule conditions
+- list: shell_binaries
+  items: [ash, bash, csh, ksh, sh, tcsh, zsh, dash]
+
+- list: expected_processes
+  items: [
+    node, npm, yarn, cargo, rustc, python, python3, pip, pip3,
+    postgres, redis-server, nginx, ollama, 
+    prometheus, grafana-server, jaeger, elasticsearch, kibana, logstash,
+    docker, dockerd, containerd, runc
+  ]
+
+- list: allowed_privileged_images
+  items: [
+    falcosecurity/falco, prom/node-exporter,
+    docker.elastic.co/elasticsearch/elasticsearch
+  ]
+
+- list: temperature_monitor
+  items: [temp_monitor, sensor_daemon, iot_collector] 

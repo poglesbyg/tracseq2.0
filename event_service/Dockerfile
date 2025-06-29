@@ -9,10 +9,10 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy service-specific Cargo.toml
-COPY event_service/Cargo.toml ./
+COPY Cargo.toml ./
 
 # Create dummy source for dependency caching
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN mkdir src && echo "fn main() {}" > src/main.rs && echo "// dummy lib" > src/lib.rs
 
 # Set offline mode for SQLx
 ENV DATABASE_URL=postgres://postgres:postgres@localhost:5432/lab_manager
@@ -20,10 +20,10 @@ ENV SQLX_OFFLINE=true
 
 # Build dependencies (cached layer)
 RUN cargo build --release
-RUN rm src/main.rs
+RUN rm src/main.rs src/lib.rs
 
 # Copy actual source code
-COPY event_service/src ./src
+COPY src ./src
 
 # Build the application
 RUN cargo build --release

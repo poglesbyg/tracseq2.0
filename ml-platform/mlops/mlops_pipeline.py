@@ -1,728 +1,449 @@
-# TracSeq 2.0 - MLOps Pipeline
-# Complete ML lifecycle management for laboratory predictions
+#!/usr/bin/env python3
+"""
+TracSeq 2.0 - MLOps Pipeline Service
+End-to-end ML lifecycle management for laboratory models
+"""
 
-import asyncio
+import os
 import json
 import logging
-import os
-import shutil
-from datetime import datetime, timedelta
+from typing import Dict, Any, List, Optional
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Union
-from uuid import UUID, uuid4
 
-import mlflow
-import mlflow.sklearn
-import mlflow.pyfunc
-from mlflow.tracking import MlflowClient
-from mlflow.models import infer_signature
-import numpy as np
-import pandas as pd
-import joblib
-from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-import docker
-from sqlalchemy import create_engine, Column, String, Float, Integer, DateTime, JSON, Boolean
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-import boto3
-from prometheus_client import Counter, Histogram, Gauge
-import yaml
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Database Models
-Base = declarative_base()
+# Initialize FastAPI app
+app = FastAPI(
+    title="TracSeq MLOps Pipeline API",
+    description="End-to-end ML lifecycle management for laboratory models",
+    version="1.0.0"
+)
 
-class ModelStage(str, Enum):
-    DEVELOPMENT = "development"
-    STAGING = "staging"
-    PRODUCTION = "production"
-    ARCHIVED = "archived"
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-class DeploymentTarget(str, Enum):
-    KUBERNETES = "kubernetes"
-    DOCKER = "docker"
-    SAGEMAKER = "sagemaker"
-    EDGE = "edge"
+# Enums
+class PipelineStatus(str, Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
 
-class DeploymentStatus(str, Enum):
-    PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    DEPLOYED = "deployed"
-    FAILED = "failed"
-    ROLLBACK = "rollback"
+class DeploymentStage(str, Enum):
+    development = "development"
+    staging = "staging"
+    production = "production"
 
-# Database Models
-class MLModel(Base):
-    __tablename__ = "ml_models"
-    
-    id = Column(String, primary_key=True)
-    name = Column(String, nullable=False)
-    version = Column(String, nullable=False)
-    model_type = Column(String, nullable=False)
-    framework = Column(String)
-    stage = Column(String, default=ModelStage.DEVELOPMENT)
-    mlflow_run_id = Column(String)
-    model_uri = Column(String)
-    metrics = Column(JSON)
-    parameters = Column(JSON)
-    tags = Column(JSON)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    created_by = Column(String)
+class ModelStatus(str, Enum):
+    training = "training"
+    testing = "testing"
+    deployed = "deployed"
+    deprecated = "deprecated"
 
-class ModelDeployment(Base):
-    __tablename__ = "model_deployments"
-    
-    id = Column(String, primary_key=True)
-    model_id = Column(String, nullable=False)
-    deployment_name = Column(String, nullable=False)
-    target = Column(String, nullable=False)
-    endpoint_url = Column(String)
-    configuration = Column(JSON)
-    status = Column(String, default=DeploymentStatus.PENDING)
-    health_check_url = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    deployed_at = Column(DateTime)
-    retired_at = Column(DateTime)
+# Pydantic models
+class MLPipeline(BaseModel):
+    name: str = Field(..., description="Pipeline name")
+    description: Optional[str] = Field(None, description="Pipeline description")
+    model_config: Dict[str, Any] = Field(..., description="Model configuration")
+    data_config: Dict[str, Any] = Field(..., description="Data pipeline configuration")
+    deployment_config: Dict[str, Any] = Field(..., description="Deployment configuration")
+    created_by: str = Field(..., description="User who created the pipeline")
 
-class ExperimentRun(Base):
-    __tablename__ = "experiment_runs"
-    
-    id = Column(String, primary_key=True)
-    experiment_name = Column(String, nullable=False)
-    mlflow_experiment_id = Column(String)
-    mlflow_run_id = Column(String)
-    status = Column(String)
-    parameters = Column(JSON)
-    metrics = Column(JSON)
-    artifacts = Column(JSON)
-    tags = Column(JSON)
-    started_at = Column(DateTime)
-    completed_at = Column(DateTime)
-    created_by = Column(String)
-
-# Request/Response Models
-class ExperimentRequest(BaseModel):
-    name: str
-    description: Optional[str] = None
-    parameters: Dict[str, Any] = {}
-    tags: Dict[str, str] = {}
-    user_id: str
-
-class ModelRegistrationRequest(BaseModel):
+class PipelineRun(BaseModel):
+    pipeline_id: str
     run_id: str
-    model_name: str
-    model_type: str
-    tags: Dict[str, str] = {}
-    description: Optional[str] = None
+    status: PipelineStatus
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    model_version: Optional[str] = None
+    metrics: Optional[Dict[str, Any]] = None
+    logs: List[str] = Field(default_factory=list)
 
-class ModelDeploymentRequest(BaseModel):
-    model_id: str
-    deployment_name: str
-    target: DeploymentTarget
-    configuration: Dict[str, Any] = {}
-    auto_scale: bool = True
-    min_replicas: int = Field(default=1, ge=1, le=10)
-    max_replicas: int = Field(default=3, ge=1, le=20)
+class ModelDeployment(BaseModel):
+    model_id: str = Field(..., description="Model identifier")
+    model_version: str = Field(..., description="Model version")
+    stage: DeploymentStage = Field(..., description="Deployment stage")
+    endpoint_url: Optional[str] = Field(None, description="Model serving endpoint")
+    status: ModelStatus = Field(..., description="Current model status")
+    deployed_at: datetime = Field(default_factory=datetime.utcnow)
+    config: Dict[str, Any] = Field(default={}, description="Deployment configuration")
 
-class ModelPromotionRequest(BaseModel):
+class ModelMetrics(BaseModel):
     model_id: str
-    target_stage: ModelStage
-    approval_notes: Optional[str] = None
-    approved_by: str
-
-class ModelMetricsResponse(BaseModel):
-    model_id: str
-    model_name: str
     version: str
-    stage: str
     metrics: Dict[str, float]
-    created_at: datetime
-    comparison_metrics: Optional[Dict[str, float]] = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
 
-# MLOps Pipeline Manager
-class MLOpsPipeline:
-    """Complete MLOps pipeline for model lifecycle management"""
-    
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-        self.db_session = None
-        self.mlflow_client = None
-        self.docker_client = None
-        self.metrics = self._init_metrics()
-        
-    def _init_metrics(self):
-        """Initialize Prometheus metrics"""
-        return {
-            "experiments_total": Counter(
-                "mlops_experiments_total",
-                "Total number of experiments",
-                ["status"]
-            ),
-            "model_deployments": Counter(
-                "mlops_model_deployments_total",
-                "Total number of model deployments",
-                ["target", "status"]
-            ),
-            "deployment_duration": Histogram(
-                "mlops_deployment_duration_seconds",
-                "Deployment duration",
-                ["target"]
-            ),
-            "active_deployments": Gauge(
-                "mlops_active_deployments",
-                "Number of active deployments",
-                ["stage"]
-            )
-        }
-    
-    async def initialize(self):
-        """Initialize MLOps pipeline"""
-        # Initialize MLflow
-        mlflow.set_tracking_uri(self.config["mlflow_tracking_uri"])
-        self.mlflow_client = MlflowClient()
-        
-        # Initialize database
-        engine = create_engine(self.config["database_url"])
-        Base.metadata.create_all(engine)
-        Session = sessionmaker(bind=engine)
-        self.db_session = Session()
-        
-        # Initialize Docker client
-        self.docker_client = docker.from_env()
-        
-        logger.info("MLOps pipeline initialized")
-    
-    async def create_experiment(self, request: ExperimentRequest) -> str:
-        """Create a new ML experiment"""
-        try:
-            # Create MLflow experiment
-            experiment_id = mlflow.create_experiment(
-                request.name,
-                tags={**request.tags, "created_by": request.user_id}
-            )
-            
-            # Create database record
-            experiment_run = ExperimentRun(
-                id=str(uuid4()),
-                experiment_name=request.name,
-                mlflow_experiment_id=experiment_id,
-                status="created",
-                parameters=request.parameters,
-                tags=request.tags,
-                created_by=request.user_id,
-                started_at=datetime.utcnow()
-            )
-            
-            self.db_session.add(experiment_run)
-            self.db_session.commit()
-            
-            self.metrics["experiments_total"].labels(status="created").inc()
-            
-            return experiment_run.id
-            
-        except Exception as e:
-            logger.error(f"Failed to create experiment: {e}")
-            self.metrics["experiments_total"].labels(status="failed").inc()
-            raise
-    
-    async def register_model(self, request: ModelRegistrationRequest) -> str:
-        """Register a trained model"""
-        try:
-            # Get run info from MLflow
-            run = self.mlflow_client.get_run(request.run_id)
-            
-            # Register model in MLflow
-            model_version = mlflow.register_model(
-                f"runs:/{request.run_id}/model",
-                request.model_name
-            )
-            
-            # Create database record
-            model = MLModel(
-                id=str(uuid4()),
-                name=request.model_name,
-                version=str(model_version.version),
-                model_type=request.model_type,
-                framework=run.data.tags.get("framework", "unknown"),
-                stage=ModelStage.DEVELOPMENT,
-                mlflow_run_id=request.run_id,
-                model_uri=f"models:/{request.model_name}/{model_version.version}",
-                metrics=dict(run.data.metrics),
-                parameters=dict(run.data.params),
-                tags={**dict(run.data.tags), **request.tags},
-                created_by=run.data.tags.get("mlflow.user", "system")
-            )
-            
-            self.db_session.add(model)
-            self.db_session.commit()
-            
-            logger.info(f"Registered model {model.name} version {model.version}")
-            return model.id
-            
-        except Exception as e:
-            logger.error(f"Failed to register model: {e}")
-            raise
-    
-    async def deploy_model(self, request: ModelDeploymentRequest) -> str:
-        """Deploy a model to production"""
-        deployment_id = str(uuid4())
-        start_time = datetime.utcnow()
-        
-        try:
-            # Get model info
-            model = self.db_session.query(MLModel).get(request.model_id)
-            if not model:
-                raise ValueError(f"Model {request.model_id} not found")
-            
-            # Create deployment record
-            deployment = ModelDeployment(
-                id=deployment_id,
-                model_id=request.model_id,
-                deployment_name=request.deployment_name,
-                target=request.target.value,
-                configuration=request.configuration,
-                status=DeploymentStatus.IN_PROGRESS
-            )
-            
-            self.db_session.add(deployment)
-            self.db_session.commit()
-            
-            # Deploy based on target
-            if request.target == DeploymentTarget.DOCKER:
-                endpoint_url = await self._deploy_to_docker(model, deployment, request)
-            elif request.target == DeploymentTarget.KUBERNETES:
-                endpoint_url = await self._deploy_to_kubernetes(model, deployment, request)
-            elif request.target == DeploymentTarget.SAGEMAKER:
-                endpoint_url = await self._deploy_to_sagemaker(model, deployment, request)
-            else:
-                raise ValueError(f"Unsupported deployment target: {request.target}")
-            
-            # Update deployment status
-            deployment.endpoint_url = endpoint_url
-            deployment.health_check_url = f"{endpoint_url}/health"
-            deployment.status = DeploymentStatus.DEPLOYED
-            deployment.deployed_at = datetime.utcnow()
-            self.db_session.commit()
-            
-            # Update metrics
-            duration = (datetime.utcnow() - start_time).total_seconds()
-            self.metrics["deployment_duration"].labels(target=request.target.value).observe(duration)
-            self.metrics["model_deployments"].labels(
-                target=request.target.value,
-                status="success"
-            ).inc()
-            self.metrics["active_deployments"].labels(stage=model.stage).inc()
-            
-            logger.info(f"Successfully deployed model {model.name} to {request.target}")
-            return deployment_id
-            
-        except Exception as e:
-            logger.error(f"Deployment failed: {e}")
-            
-            # Update deployment status
-            deployment = self.db_session.query(ModelDeployment).get(deployment_id)
-            deployment.status = DeploymentStatus.FAILED
-            self.db_session.commit()
-            
-            self.metrics["model_deployments"].labels(
-                target=request.target.value,
-                status="failed"
-            ).inc()
-            
-            raise
-    
-    async def _deploy_to_docker(self, model: MLModel, deployment: ModelDeployment, request: ModelDeploymentRequest) -> str:
-        """Deploy model as Docker container"""
-        try:
-            # Load model
-            model_uri = model.model_uri
-            loaded_model = mlflow.pyfunc.load_model(model_uri)
-            
-            # Create serving script
-            serving_script = self._create_serving_script(model)
-            
-            # Build Docker image
-            image_tag = f"tracseq-model-{model.name}:{model.version}"
-            
-            dockerfile_content = f"""
-FROM python:3.9-slim
+# In-memory storage
+pipelines = {}
+pipeline_runs = {}
+model_deployments = {}
+model_metrics = {}
 
-WORKDIR /app
+def generate_id() -> str:
+    """Generate unique ID"""
+    import uuid
+    return str(uuid.uuid4())
 
-# Install dependencies
-RUN pip install mlflow scikit-learn xgboost lightgbm fastapi uvicorn
-
-# Copy model and serving script
-COPY model /app/model
-COPY serve.py /app/serve.py
-
-# Expose port
-EXPOSE 8000
-
-# Run serving script
-CMD ["uvicorn", "serve:app", "--host", "0.0.0.0", "--port", "8000"]
-"""
-            
-            # Create temporary directory
-            temp_dir = f"/tmp/model-deploy-{deployment.id}"
-            os.makedirs(temp_dir, exist_ok=True)
-            
-            # Save model
-            mlflow.pyfunc.save_model(
-                path=os.path.join(temp_dir, "model"),
-                python_model=loaded_model
-            )
-            
-            # Save serving script
-            with open(os.path.join(temp_dir, "serve.py"), "w") as f:
-                f.write(serving_script)
-            
-            # Save Dockerfile
-            with open(os.path.join(temp_dir, "Dockerfile"), "w") as f:
-                f.write(dockerfile_content)
-            
-            # Build image
-            image, logs = self.docker_client.images.build(
-                path=temp_dir,
-                tag=image_tag,
-                rm=True
-            )
-            
-            # Run container
-            container = self.docker_client.containers.run(
-                image_tag,
-                name=f"model-{deployment.deployment_name}",
-                detach=True,
-                ports={'8000/tcp': None},
-                environment={
-                    "MODEL_NAME": model.name,
-                    "MODEL_VERSION": model.version
-                },
-                restart_policy={"Name": "unless-stopped"}
-            )
-            
-            # Get container port
-            container.reload()
-            port = container.ports['8000/tcp'][0]['HostPort']
-            
-            # Clean up
-            shutil.rmtree(temp_dir)
-            
-            return f"http://localhost:{port}"
-            
-        except Exception as e:
-            logger.error(f"Docker deployment failed: {e}")
-            raise
+def simulate_pipeline_execution(pipeline: MLPipeline) -> Dict[str, Any]:
+    """Simulate ML pipeline execution"""
+    import random
+    import time
     
-    async def _deploy_to_kubernetes(self, model: MLModel, deployment: ModelDeployment, request: ModelDeploymentRequest) -> str:
-        """Deploy model to Kubernetes"""
-        # This would use kubectl or Kubernetes Python client
-        # For now, return a placeholder
-        return f"http://{request.deployment_name}.models.svc.cluster.local"
+    logger.info(f"Executing pipeline: {pipeline.name}")
     
-    async def _deploy_to_sagemaker(self, model: MLModel, deployment: ModelDeployment, request: ModelDeploymentRequest) -> str:
-        """Deploy model to AWS SageMaker"""
-        # This would use boto3 to deploy to SageMaker
-        # For now, return a placeholder
-        return f"https://{request.deployment_name}.sagemaker.aws.com"
+    # Simulate pipeline steps
+    steps = [
+        "Data validation",
+        "Feature engineering", 
+        "Model training",
+        "Model validation",
+        "Model testing",
+        "Performance evaluation"
+    ]
     
-    def _create_serving_script(self, model: MLModel) -> str:
-        """Create FastAPI serving script for model"""
-        return f"""
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import mlflow.pyfunc
-import numpy as np
-import pandas as pd
-from typing import Dict, Any, List
-import os
-
-app = FastAPI(title="{model.name} Model Server", version="{model.version}")
-
-# Load model
-model = mlflow.pyfunc.load_model("/app/model")
-
-class PredictionRequest(BaseModel):
-    features: Dict[str, Any]
-
-class PredictionResponse(BaseModel):
-    prediction: Any
-    model_name: str = "{model.name}"
-    model_version: str = "{model.version}"
-
-@app.post("/predict", response_model=PredictionResponse)
-async def predict(request: PredictionRequest):
-    try:
-        # Convert features to DataFrame
-        df = pd.DataFrame([request.features])
-        
-        # Make prediction
-        prediction = model.predict(df)
-        
-        # Convert numpy types to Python types
-        if isinstance(prediction, np.ndarray):
-            prediction = prediction.tolist()
-            if len(prediction) == 1:
-                prediction = prediction[0]
-        
-        return PredictionResponse(prediction=prediction)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/health")
-async def health():
-    return {{"status": "healthy", "model": "{model.name}", "version": "{model.version}"}}
-
-@app.get("/metrics")
-async def metrics():
-    return {{"requests_total": 0, "prediction_errors": 0}}
-"""
+    logs = []
+    for step in steps:
+        logs.append(f"[{datetime.utcnow().isoformat()}] Starting {step}")
+        time.sleep(0.5)  # Simulate processing time
+        logs.append(f"[{datetime.utcnow().isoformat()}] Completed {step}")
     
-    async def promote_model(self, request: ModelPromotionRequest) -> bool:
-        """Promote model to different stage"""
-        try:
-            # Get model
-            model = self.db_session.query(MLModel).get(request.model_id)
-            if not model:
-                raise ValueError(f"Model {request.model_id} not found")
-            
-            # Validate promotion rules
-            if request.target_stage == ModelStage.PRODUCTION:
-                # Check if model has been in staging
-                if model.stage != ModelStage.STAGING:
-                    raise ValueError("Model must be in staging before promotion to production")
-                
-                # Check model performance metrics
-                if not self._validate_model_metrics(model):
-                    raise ValueError("Model does not meet performance criteria for production")
-            
-            # Update model stage in MLflow
-            self.mlflow_client.transition_model_version_stage(
-                name=model.name,
-                version=model.version,
-                stage=request.target_stage.value.capitalize(),
-                archive_existing_versions=True
-            )
-            
-            # Update database
-            old_stage = model.stage
-            model.stage = request.target_stage.value
-            model.updated_at = datetime.utcnow()
-            
-            # Add promotion history
-            if not model.tags:
-                model.tags = {}
-            model.tags[f"promoted_to_{request.target_stage.value}"] = datetime.utcnow().isoformat()
-            model.tags[f"promoted_by_{request.target_stage.value}"] = request.approved_by
-            
-            self.db_session.commit()
-            
-            logger.info(f"Promoted model {model.name} from {old_stage} to {request.target_stage}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Model promotion failed: {e}")
-            raise
-    
-    def _validate_model_metrics(self, model: MLModel) -> bool:
-        """Validate model meets performance criteria"""
-        if not model.metrics:
-            return False
-        
-        # Check minimum performance thresholds
-        thresholds = self.config.get("production_thresholds", {
-            "accuracy": 0.85,
-            "f1_score": 0.80,
-            "precision": 0.80,
-            "recall": 0.80
-        })
-        
-        for metric, threshold in thresholds.items():
-            if metric in model.metrics and model.metrics[metric] < threshold:
-                logger.warning(f"Model {model.name} {metric}={model.metrics[metric]} below threshold {threshold}")
-                return False
-        
-        return True
-    
-    async def get_model_metrics(self, model_id: str) -> ModelMetricsResponse:
-        """Get model performance metrics"""
-        model = self.db_session.query(MLModel).get(model_id)
-        if not model:
-            raise ValueError(f"Model {model_id} not found")
-        
-        # Get comparison metrics from production model if exists
-        comparison_metrics = None
-        if model.stage != ModelStage.PRODUCTION:
-            prod_model = self.db_session.query(MLModel).filter(
-                MLModel.name == model.name,
-                MLModel.stage == ModelStage.PRODUCTION
-            ).first()
-            
-            if prod_model:
-                comparison_metrics = prod_model.metrics
-        
-        return ModelMetricsResponse(
-            model_id=model.id,
-            model_name=model.name,
-            version=model.version,
-            stage=model.stage,
-            metrics=model.metrics or {},
-            created_at=model.created_at,
-            comparison_metrics=comparison_metrics
-        )
-    
-    async def rollback_deployment(self, deployment_id: str) -> bool:
-        """Rollback a failed deployment"""
-        try:
-            deployment = self.db_session.query(ModelDeployment).get(deployment_id)
-            if not deployment:
-                raise ValueError(f"Deployment {deployment_id} not found")
-            
-            # Stop current deployment
-            if deployment.target == DeploymentTarget.DOCKER:
-                container_name = f"model-{deployment.deployment_name}"
-                try:
-                    container = self.docker_client.containers.get(container_name)
-                    container.stop()
-                    container.remove()
-                except docker.errors.NotFound:
-                    pass
-            
-            # Update status
-            deployment.status = DeploymentStatus.ROLLBACK
-            deployment.retired_at = datetime.utcnow()
-            self.db_session.commit()
-            
-            self.metrics["active_deployments"].labels(stage="production").dec()
-            
-            logger.info(f"Rolled back deployment {deployment_id}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Rollback failed: {e}")
-            raise
-    
-    async def create_ab_test(self, model_a_id: str, model_b_id: str, traffic_split: float = 0.5) -> str:
-        """Create A/B test between two models"""
-        # Implementation for A/B testing
-        # This would set up routing rules to split traffic between models
-        ab_test_id = str(uuid4())
-        logger.info(f"Created A/B test {ab_test_id} between models {model_a_id} and {model_b_id}")
-        return ab_test_id
-
-# Model Monitoring
-class ModelMonitor:
-    """Monitor deployed models for drift and performance degradation"""
-    
-    def __init__(self, mlops_pipeline: MLOpsPipeline):
-        self.pipeline = mlops_pipeline
-        self.monitoring_tasks = {}
-    
-    async def start_monitoring(self, deployment_id: str, interval_minutes: int = 5):
-        """Start monitoring a deployed model"""
-        if deployment_id in self.monitoring_tasks:
-            return
-        
-        task = asyncio.create_task(self._monitor_deployment(deployment_id, interval_minutes))
-        self.monitoring_tasks[deployment_id] = task
-    
-    async def _monitor_deployment(self, deployment_id: str, interval_minutes: int):
-        """Monitor deployment health and performance"""
-        while True:
-            try:
-                deployment = self.pipeline.db_session.query(ModelDeployment).get(deployment_id)
-                if not deployment or deployment.status != DeploymentStatus.DEPLOYED:
-                    break
-                
-                # Check health
-                # This would make HTTP request to health endpoint
-                is_healthy = True  # Placeholder
-                
-                if not is_healthy:
-                    logger.warning(f"Deployment {deployment_id} is unhealthy")
-                    # Could trigger auto-recovery or alerts
-                
-                await asyncio.sleep(interval_minutes * 60)
-                
-            except Exception as e:
-                logger.error(f"Monitoring error for deployment {deployment_id}: {e}")
-                await asyncio.sleep(60)
-
-# FastAPI Application
-app = FastAPI(title="TracSeq MLOps Service", version="1.0.0")
-
-# Global instances
-mlops_pipeline = None
-model_monitor = None
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize MLOps pipeline on startup"""
-    global mlops_pipeline, model_monitor
-    
-    config = {
-        "mlflow_tracking_uri": "postgresql://ml_user:ml_pass@localhost:5436/mlflow",
-        "database_url": "postgresql://ml_user:ml_pass@localhost:5436/ml_platform",
-        "production_thresholds": {
-            "accuracy": 0.85,
-            "f1_score": 0.80
-        }
+    # Generate mock metrics
+    metrics = {
+        "training_accuracy": random.uniform(0.85, 0.95),
+        "validation_accuracy": random.uniform(0.80, 0.92),
+        "test_accuracy": random.uniform(0.75, 0.90),
+        "training_time_minutes": random.uniform(5, 30),
+        "model_size_mb": random.uniform(10, 100)
     }
     
-    mlops_pipeline = MLOpsPipeline(config)
-    await mlops_pipeline.initialize()
+    model_version = f"v{random.randint(1, 10)}.{random.randint(0, 9)}.{random.randint(0, 9)}"
     
-    model_monitor = ModelMonitor(mlops_pipeline)
-
-@app.post("/experiments")
-async def create_experiment(request: ExperimentRequest):
-    """Create a new ML experiment"""
-    experiment_id = await mlops_pipeline.create_experiment(request)
-    return {"experiment_id": experiment_id, "status": "created"}
-
-@app.post("/models/register")
-async def register_model(request: ModelRegistrationRequest):
-    """Register a trained model"""
-    model_id = await mlops_pipeline.register_model(request)
-    return {"model_id": model_id, "status": "registered"}
-
-@app.post("/models/deploy")
-async def deploy_model(request: ModelDeploymentRequest, background_tasks: BackgroundTasks):
-    """Deploy a model to production"""
-    deployment_id = await mlops_pipeline.deploy_model(request)
-    
-    # Start monitoring in background
-    background_tasks.add_task(model_monitor.start_monitoring, deployment_id)
-    
-    return {"deployment_id": deployment_id, "status": "deploying"}
-
-@app.post("/models/promote")
-async def promote_model(request: ModelPromotionRequest):
-    """Promote model to different stage"""
-    success = await mlops_pipeline.promote_model(request)
-    return {"success": success, "new_stage": request.target_stage}
-
-@app.get("/models/{model_id}/metrics")
-async def get_model_metrics(model_id: str):
-    """Get model performance metrics"""
-    return await mlops_pipeline.get_model_metrics(model_id)
-
-@app.post("/deployments/{deployment_id}/rollback")
-async def rollback_deployment(deployment_id: str):
-    """Rollback a deployment"""
-    success = await mlops_pipeline.rollback_deployment(deployment_id)
-    return {"success": success, "status": "rolled_back"}
+    return {
+        "metrics": metrics,
+        "model_version": model_version,
+        "logs": logs
+    }
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    return {
+        "status": "healthy",
+        "service": "mlops-pipeline",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow(),
+        "pipelines_count": len(pipelines),
+        "active_runs": len([r for r in pipeline_runs.values() if r.status == PipelineStatus.running])
+    }
+
+@app.post("/pipelines", response_model=Dict[str, str])
+async def create_pipeline(pipeline: MLPipeline):
+    """Create a new ML pipeline"""
+    pipeline_id = generate_id()
+    
+    # Store pipeline
+    pipelines[pipeline_id] = {
+        **pipeline.dict(),
+        "pipeline_id": pipeline_id,
+        "created_at": datetime.utcnow()
+    }
+    
+    logger.info(f"Created ML pipeline: {pipeline_id}")
+    return {
+        "pipeline_id": pipeline_id,
+        "status": "created",
+        "message": "ML pipeline created successfully"
+    }
+
+@app.get("/pipelines", response_model=List[Dict[str, Any]])
+async def list_pipelines():
+    """List all ML pipelines"""
+    return list(pipelines.values())
+
+@app.get("/pipelines/{pipeline_id}")
+async def get_pipeline(pipeline_id: str):
+    """Get pipeline details"""
+    if pipeline_id not in pipelines:
+        raise HTTPException(status_code=404, detail=f"Pipeline {pipeline_id} not found")
+    
+    return pipelines[pipeline_id]
+
+@app.post("/pipelines/{pipeline_id}/run", response_model=Dict[str, str])
+async def run_pipeline(pipeline_id: str, background_tasks: BackgroundTasks):
+    """Execute a pipeline"""
+    if pipeline_id not in pipelines:
+        raise HTTPException(status_code=404, detail=f"Pipeline {pipeline_id} not found")
+    
+    run_id = generate_id()
+    
+    # Create pipeline run
+    pipeline_run = PipelineRun(
+        pipeline_id=pipeline_id,
+        run_id=run_id,
+        status=PipelineStatus.pending,
+        started_at=datetime.utcnow()
+    )
+    
+    pipeline_runs[run_id] = pipeline_run
+    
+    # Start execution in background
+    pipeline_config = pipelines[pipeline_id]
+    background_tasks.add_task(execute_pipeline, run_id, pipeline_config)
+    
+    logger.info(f"Started pipeline run: {run_id}")
+    return {
+        "run_id": run_id,
+        "pipeline_id": pipeline_id,
+        "status": "started"
+    }
+
+async def execute_pipeline(run_id: str, pipeline_config: Dict[str, Any]):
+    """Execute pipeline in background"""
+    try:
+        # Update status to running
+        pipeline_runs[run_id].status = PipelineStatus.running
+        
+        # Create MLPipeline object from config
+        pipeline = MLPipeline(**{k: v for k, v in pipeline_config.items() 
+                                if k in MLPipeline.__fields__})
+        
+        # Execute pipeline
+        results = simulate_pipeline_execution(pipeline)
+        
+        # Update run results
+        run = pipeline_runs[run_id]
+        run.status = PipelineStatus.completed
+        run.completed_at = datetime.utcnow()
+        run.metrics = results["metrics"]
+        run.model_version = results["model_version"]
+        run.logs = results["logs"]
+        
+        logger.info(f"Pipeline run {run_id} completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Pipeline run {run_id} failed: {e}")
+        pipeline_runs[run_id].status = PipelineStatus.failed
+        pipeline_runs[run_id].logs.append(f"ERROR: {str(e)}")
+
+@app.get("/pipelines/{pipeline_id}/runs", response_model=List[PipelineRun])
+async def get_pipeline_runs(pipeline_id: str):
+    """Get all runs for a pipeline"""
+    if pipeline_id not in pipelines:
+        raise HTTPException(status_code=404, detail=f"Pipeline {pipeline_id} not found")
+    
+    runs = [run for run in pipeline_runs.values() if run.pipeline_id == pipeline_id]
+    return runs
+
+@app.get("/runs/{run_id}", response_model=PipelineRun)
+async def get_run(run_id: str):
+    """Get details of a specific run"""
+    if run_id not in pipeline_runs:
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+    
+    return pipeline_runs[run_id]
+
+@app.post("/models/deploy", response_model=Dict[str, str])
+async def deploy_model(deployment: ModelDeployment, background_tasks: BackgroundTasks):
+    """Deploy a model to specified stage"""
+    deployment_id = generate_id()
+    
+    # Store deployment
+    model_deployments[deployment_id] = {
+        **deployment.dict(),
+        "deployment_id": deployment_id,
+        "deployed_at": datetime.utcnow()
+    }
+    
+    # Simulate deployment in background
+    background_tasks.add_task(execute_deployment, deployment_id, deployment)
+    
+    logger.info(f"Deploying model {deployment.model_id} to {deployment.stage}")
+    return {
+        "deployment_id": deployment_id,
+        "status": "deploying",
+        "message": f"Model deployment to {deployment.stage} initiated"
+    }
+
+async def execute_deployment(deployment_id: str, deployment: ModelDeployment):
+    """Execute model deployment"""
+    try:
+        import time
+        import random
+        
+        # Simulate deployment time
+        time.sleep(2)
+        
+        # Generate endpoint URL
+        endpoint_url = f"http://model-server:8094/models/{deployment.model_id}/predict"
+        
+        # Update deployment
+        model_deployments[deployment_id]["endpoint_url"] = endpoint_url
+        model_deployments[deployment_id]["status"] = ModelStatus.deployed
+        
+        logger.info(f"Model deployment {deployment_id} completed")
+        
+    except Exception as e:
+        logger.error(f"Model deployment {deployment_id} failed: {e}")
+        model_deployments[deployment_id]["status"] = ModelStatus.deprecated
+
+@app.get("/models/deployments", response_model=List[Dict[str, Any]])
+async def list_deployments():
+    """List all model deployments"""
+    return list(model_deployments.values())
+
+@app.get("/models/{model_id}/deployments")
+async def get_model_deployments(model_id: str):
+    """Get deployments for a specific model"""
+    deployments = [d for d in model_deployments.values() if d["model_id"] == model_id]
+    return deployments
+
+@app.post("/models/{model_id}/metrics")
+async def log_model_metrics(model_id: str, metrics: ModelMetrics):
+    """Log metrics for a deployed model"""
+    metric_id = generate_id()
+    
+    model_metrics[metric_id] = {
+        **metrics.dict(),
+        "metric_id": metric_id
+    }
+    
+    logger.info(f"Logged metrics for model {model_id}")
+    return {"message": "Metrics logged successfully", "metric_id": metric_id}
+
+@app.get("/models/{model_id}/metrics")
+async def get_model_metrics(model_id: str):
+    """Get metrics for a model"""
+    metrics = [m for m in model_metrics.values() if m["model_id"] == model_id]
+    return {"model_id": model_id, "metrics": metrics}
+
+@app.post("/experiments")
+async def create_experiment(experiment_data: Dict[str, Any]):
+    """Create a new ML experiment"""
+    experiment_id = generate_id()
+    
+    # Store experiment (simplified for this demo)
+    experiment = {
+        "experiment_id": experiment_id,
+        "name": experiment_data.get("name"),
+        "description": experiment_data.get("description"),
+        "parameters": experiment_data.get("parameters", {}),
+        "tags": experiment_data.get("tags", {}),
+        "user_id": experiment_data.get("user_id", "system"),
+        "created_at": datetime.utcnow(),
+        "status": "active"
+    }
+    
+    # In production, this would be stored in MLflow or similar
+    logger.info(f"Created experiment: {experiment_id}")
+    
+    return {
+        "experiment_id": experiment_id,
+        "status": "created",
+        "message": "Experiment created successfully"
+    }
+
+@app.get("/templates")
+async def get_pipeline_templates():
+    """Get predefined pipeline templates for laboratory use cases"""
+    templates = [
+        {
+            "name": "quality_prediction_pipeline",
+            "description": "End-to-end pipeline for sample quality prediction",
+            "model_config": {
+                "algorithm": "gradient_boosting",
+                "hyperparameters": {
+                    "n_estimators": 100,
+                    "learning_rate": 0.1,
+                    "max_depth": 6
+                }
+            },
+            "data_config": {
+                "features": ["sample_age_hours", "storage_temperature", "volume_ml"],
+                "target": "quality_score",
+                "validation_split": 0.2
+            },
+            "deployment_config": {
+                "auto_deploy": True,
+                "staging_threshold": 0.85,
+                "production_threshold": 0.90
+            }
+        },
+        {
+            "name": "temperature_optimization_pipeline",
+            "description": "Pipeline for storage temperature optimization",
+            "model_config": {
+                "algorithm": "neural_network",
+                "hyperparameters": {
+                    "hidden_layers": [64, 32],
+                    "activation": "relu",
+                    "epochs": 100
+                }
+            },
+            "data_config": {
+                "features": ["sample_type", "volume_ml", "concentration"],
+                "target": "optimal_temperature",
+                "normalization": "standard_scaler"
+            },
+            "deployment_config": {
+                "auto_deploy": False,
+                "manual_approval": True
+            }
+        }
+    ]
+    
+    return {"templates": templates}
+
+@app.get("/stats")
+async def get_mlops_stats():
+    """Get MLOps system statistics"""
+    total_pipelines = len(pipelines)
+    total_runs = len(pipeline_runs)
+    successful_runs = len([r for r in pipeline_runs.values() if r.status == PipelineStatus.completed])
+    deployed_models = len([d for d in model_deployments.values() if d["status"] == ModelStatus.deployed])
+    
+    return {
+        "total_pipelines": total_pipelines,
+        "total_runs": total_runs,
+        "successful_runs": successful_runs,
+        "success_rate": successful_runs / total_runs if total_runs > 0 else 0,
+        "deployed_models": deployed_models,
+        "active_experiments": len(model_metrics)
+    }
+
+@app.delete("/pipelines/{pipeline_id}")
+async def delete_pipeline(pipeline_id: str):
+    """Delete a pipeline"""
+    if pipeline_id not in pipelines:
+        raise HTTPException(status_code=404, detail=f"Pipeline {pipeline_id} not found")
+    
+    # Remove pipeline and associated runs
+    del pipelines[pipeline_id]
+    runs_to_delete = [run_id for run_id, run in pipeline_runs.items() if run.pipeline_id == pipeline_id]
+    for run_id in runs_to_delete:
+        del pipeline_runs[run_id]
+    
+    logger.info(f"Deleted pipeline: {pipeline_id}")
+    return {"message": f"Pipeline {pipeline_id} deleted successfully"}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8097)
+    
+    port = int(os.getenv('PORT', '8097'))
+    host = os.getenv('HOST', '0.0.0.0')
+    
+    logger.info(f"Starting TracSeq MLOps Pipeline API on {host}:{port}")
+    uvicorn.run(app, host=host, port=port)

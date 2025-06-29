@@ -1,7 +1,7 @@
 global:
   resolve_timeout: 5m
-  smtp_from: 'tracseq-alerts@example.com'
-  smtp_smarthost: 'smtp.example.com:587'
+  smtp_from: 'tracseq-alerts@localhost'
+  smtp_smarthost: 'localhost:587'
   smtp_auth_username: 'tracseq-alerts@example.com'
   smtp_auth_password: 'your-smtp-password'
 
@@ -9,76 +9,20 @@ templates:
   - '/etc/alertmanager/templates/*.tmpl'
 
 route:
-  receiver: 'default'
-  group_by: ['alertname', 'cluster', 'service']
+  group_by: ['alertname']
   group_wait: 10s
   group_interval: 10s
   repeat_interval: 1h
-  routes:
-    # Critical alerts - immediate notification
-    - receiver: 'critical'
-      match:
-        severity: critical
-      continue: true
-      
-    # Laboratory-specific alerts
-    - receiver: 'laboratory-team'
-      match_re:
-        alertname: '^(TemperatureDeviation|SampleProcessingBacklog|StorageCapacityLow)$'
-      
-    # Security alerts
-    - receiver: 'security-team'
-      match_re:
-        alertname: '^(HighAuthenticationFailures|SuspiciousAPIActivity|JWTExpirationIssues)$'
-      
-    # Database alerts
-    - receiver: 'database-team'
-      match_re:
-        alertname: '^(PostgreSQL.*|Redis.*)$'
+  receiver: 'web.hook'
 
 receivers:
-  - name: 'default'
-    email_configs:
-      - to: 'tracseq-ops@example.com'
-        send_resolved: true
-        headers:
-          Subject: 'TracSeq Alert: {{ .GroupLabels.alertname }}'
-        
-  - name: 'critical'
-    email_configs:
-      - to: 'tracseq-critical@example.com'
-        send_resolved: true
-        headers:
-          Subject: 'CRITICAL - TracSeq: {{ .GroupLabels.alertname }}'
-    slack_configs:
-      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
-        channel: '#tracseq-critical'
-        title: 'Critical Alert'
-        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
-        
-  - name: 'laboratory-team'
-    email_configs:
-      - to: 'lab-team@example.com'
-        send_resolved: true
-    slack_configs:
-      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
-        channel: '#lab-operations'
-        
-  - name: 'security-team'
-    email_configs:
-      - to: 'security@example.com'
-        send_resolved: true
-    pagerduty_configs:
-      - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
-        
-  - name: 'database-team'
-    email_configs:
-      - to: 'database-team@example.com'
-        send_resolved: true
+  - name: 'web.hook'
+    webhook_configs:
+      - url: 'http://localhost:5001/'
 
 inhibit_rules:
   - source_match:
       severity: 'critical'
     target_match:
       severity: 'warning'
-    equal: ['alertname', 'service']
+    equal: ['alertname', 'dev', 'instance']

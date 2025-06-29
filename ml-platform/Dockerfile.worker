@@ -1,0 +1,21 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    numpy pandas scikit-learn \
+    xgboost lightgbm \
+    tensorflow torch \
+    mlflow optuna \
+    ray[default]
+
+# Create directories
+RUN mkdir -p /data /checkpoints
+
+CMD ["python", "-m", "ray.worker"]

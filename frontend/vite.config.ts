@@ -8,11 +8,22 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
-      // Proxy API requests to the real API gateway
+      // Proxy API requests to the API Gateway
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8089',
         changeOrigin: true,
         secure: false,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('🚨 Proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('📤 Proxying request:', req.method, req.url, '→', proxyReq.getHeader('host') + proxyReq.path);
+          });
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log('📥 Proxy response:', proxyRes.statusCode, req.url);
+          });
+        },
       },
     },
   },

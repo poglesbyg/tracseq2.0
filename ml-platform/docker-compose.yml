@@ -1,0 +1,154 @@
+services:
+  # Feature Store for ML Feature Management
+  feature-store:
+    build: ./feature-store
+    container_name: tracseq-feature-store
+    ports:
+      - "8090:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@tracseq20-postgres-1:5432/lab_manager
+      - REDIS_URL=redis://tracseq20-redis-1:6379
+      - FEATURE_STORE_ENV=production
+    volumes:
+      - feature_store_data:/app/data
+      - ./logs/feature-store:/app/logs
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Model Serving for ML Model Inference
+  model-serving:
+    build: ./model-serving
+    container_name: tracseq-model-serving
+    ports:
+      - "8091:8000"
+    environment:
+      - MODEL_REGISTRY_URL=http://tracseq-mlops:8000
+      - FEATURE_STORE_URL=http://tracseq-feature-store:8000
+      - OLLAMA_URL=http://lab_submission_rag-ollama-1:11434
+      - SERVING_ENV=production
+      - MAX_WORKERS=4
+    volumes:
+      - model_store:/app/models
+      - ./logs/model-serving:/app/logs
+    depends_on:
+      - feature-store
+      - mlops
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MLOps Pipeline for Model Management
+  mlops:
+    build: ./mlops
+    container_name: tracseq-mlops
+    ports:
+      - "8092:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@tracseq20-postgres-1:5432/lab_manager
+      - FEATURE_STORE_URL=http://tracseq-feature-store:8000
+      - MODEL_REGISTRY_PATH=/app/model_registry
+      - EXPERIMENT_TRACKING_URL=http://tracseq-mlops:8000
+      - MLOPS_ENV=production
+    volumes:
+      - model_registry:/app/model_registry
+      - experiment_data:/app/experiments
+      - ./logs/mlops:/app/logs
+    depends_on:
+      - feature-store
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AutoML for Automated Model Training
+  automl:
+    build: ./automl
+    container_name: tracseq-automl
+    ports:
+      - "8093:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@tracseq20-postgres-1:5432/lab_manager
+      - FEATURE_STORE_URL=http://tracseq-feature-store:8000
+      - MLOPS_URL=http://tracseq-mlops:8000
+      - MODEL_SERVING_URL=http://tracseq-model-serving:8000
+      - AUTOML_ENV=production
+      - MAX_TRAINING_TIME=3600  # 1 hour max training
+    volumes:
+      - automl_workspace:/app/workspace
+      - ./logs/automl:/app/logs
+    depends_on:
+      - feature-store
+      - mlops
+      - model-serving
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 4GB
+          cpus: '2.0'
+        reservations:
+          memory: 2GB
+          cpus: '1.0'
+
+  # ML Platform Worker for Background Tasks
+  ml-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      - WORKER_QUEUE=tracseq_ml_tasks
+      - REDIS_URL=redis://tracseq20-redis-1:6379
+      - DATABASE_URL=postgresql://postgres:postgres@tracseq20-postgres-1:5432/lab_manager
+      - FEATURE_STORE_URL=http://tracseq-feature-store:8000
+      - MLOPS_URL=http://tracseq-mlops:8000
+    volumes:
+      - worker_data:/app/data
+      - ./logs/worker:/app/logs
+    depends_on:
+      - feature-store
+      - mlops
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2GB
+          cpus: '1.0'
+        reservations:
+          memory: 1GB
+          cpus: '0.5'
+
+volumes:
+  feature_store_data:
+  model_store:
+  model_registry:
+  experiment_data:
+  automl_workspace:
+  worker_data:
+
+networks:
+  tracseq-network:
+    external: true 

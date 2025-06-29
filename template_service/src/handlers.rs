@@ -1,9 +1,14 @@
 use axum::{
-    extract::Path,
+    extract::{Path, State},
     http::StatusCode,
     response::Json,
 };
 use serde_json::{json, Value};
+use uuid::Uuid;
+use crate::{
+    AppState,
+    models::{CreateTemplateRequest, UpdateTemplateRequest, TemplateSearchFilters, CreateFieldRequest, UpdateFieldRequest}
+};
 
 pub mod health {
     use super::*;
@@ -24,28 +29,255 @@ pub mod health {
 pub mod templates {
     use super::*;
 
-    pub async fn create_template(Json(_payload): Json<Value>) -> Result<Json<Value>, StatusCode> {
-        Ok(Json(json!({"message": "Template created"})))
+    pub async fn create_template(
+        State(state): State<AppState>,
+        Json(payload): Json<CreateTemplateRequest>
+    ) -> Result<Json<Value>, StatusCode> {
+        // TODO: Extract user from authentication middleware
+        let created_by = "system"; // Temporary - should come from auth
+
+        match state.template_service.create_template(payload, created_by).await {
+            Ok(template) => Ok(Json(json!({
+                "success": true,
+                "template": template,
+                "message": "Template created successfully"
+            }))),
+            Err(e) => {
+                eprintln!("Error creating template: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
     }
 
-    pub async fn list_templates() -> Result<Json<Value>, StatusCode> {
-        Ok(Json(json!({"templates": []})))
+    pub async fn list_templates(
+        State(state): State<AppState>
+    ) -> Result<Json<Value>, StatusCode> {
+        let filters = TemplateSearchFilters::default();
+        
+        match state.template_service.list_templates(filters).await {
+            Ok(response) => Ok(Json(json!({
+                "success": true,
+                "data": response.templates,
+                "pagination": {
+                    "total_count": response.total_count,
+                    "page": response.page,
+                    "page_size": response.page_size,
+                    "total_pages": response.total_pages
+                }
+            }))),
+            Err(e) => {
+                eprintln!("Error listing templates: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
     }
 
-    pub async fn get_template(Path(_template_id): Path<String>) -> Result<Json<Value>, StatusCode> {
-        Ok(Json(json!({"template": {}})))
+    pub async fn get_template(
+        State(state): State<AppState>,
+        Path(template_id): Path<String>
+    ) -> Result<Json<Value>, StatusCode> {
+        let template_uuid = match Uuid::parse_str(&template_id) {
+            Ok(uuid) => uuid,
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        };
+
+        match state.template_service.get_template(template_uuid).await {
+            Ok(Some(template)) => Ok(Json(json!({
+                "success": true,
+                "template": template
+            }))),
+            Ok(None) => Err(StatusCode::NOT_FOUND),
+            Err(e) => {
+                eprintln!("Error getting template: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
     }
 
-    pub async fn update_template(Path(_template_id): Path<String>, Json(_payload): Json<Value>) -> Result<Json<Value>, StatusCode> {
-        Ok(Json(json!({"message": "Template updated"})))
+    pub async fn update_template(
+        State(state): State<AppState>,
+        Path(template_id): Path<String>,
+        Json(payload): Json<UpdateTemplateRequest>
+    ) -> Result<Json<Value>, StatusCode> {
+        let template_uuid = match Uuid::parse_str(&template_id) {
+            Ok(uuid) => uuid,
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        };
+
+        // TODO: Extract user from authentication middleware
+        let updated_by = "system"; // Temporary - should come from auth
+
+        match state.template_service.update_template(template_uuid, payload, updated_by).await {
+            Ok(Some(template)) => Ok(Json(json!({
+                "success": true,
+                "template": template,
+                "message": "Template updated successfully"
+            }))),
+            Ok(None) => Err(StatusCode::NOT_FOUND),
+            Err(e) => {
+                eprintln!("Error updating template: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
     }
 
-    pub async fn delete_template(Path(_template_id): Path<String>) -> Result<Json<Value>, StatusCode> {
-        Ok(Json(json!({"message": "Template deleted"})))
+    pub async fn delete_template(
+        State(state): State<AppState>,
+        Path(template_id): Path<String>
+    ) -> Result<Json<Value>, StatusCode> {
+        let template_uuid = match Uuid::parse_str(&template_id) {
+            Ok(uuid) => uuid,
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        };
+
+        match state.template_service.delete_template(template_uuid).await {
+            Ok(true) => Ok(Json(json!({
+                "success": true,
+                "message": "Template deleted successfully"
+            }))),
+            Ok(false) => Err(StatusCode::NOT_FOUND),
+            Err(e) => {
+                eprintln!("Error deleting template: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
     }
 
     pub async fn clone_template(Path(_template_id): Path<String>) -> Result<Json<Value>, StatusCode> {
-        Ok(Json(json!({"message": "Template cloned"})))
+        // TODO: Implement template cloning
+        Ok(Json(json!({"message": "Template cloning not yet implemented"})))
+    }
+}
+
+pub mod template_fields {
+    use super::*;
+
+    pub async fn create_field(
+        State(state): State<AppState>,
+        Path(template_id): Path<String>,
+        Json(payload): Json<CreateFieldRequest>
+    ) -> Result<Json<Value>, StatusCode> {
+        let template_uuid = match Uuid::parse_str(&template_id) {
+            Ok(uuid) => uuid,
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        };
+
+        match state.template_service.create_field(template_uuid, payload).await {
+            Ok(field) => Ok(Json(json!({
+                "success": true,
+                "field": field,
+                "message": "Field created successfully"
+            }))),
+            Err(e) => {
+                eprintln!("Error creating field: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    }
+
+    pub async fn list_fields(
+        State(state): State<AppState>,
+        Path(template_id): Path<String>
+    ) -> Result<Json<Value>, StatusCode> {
+        let template_uuid = match Uuid::parse_str(&template_id) {
+            Ok(uuid) => uuid,
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        };
+
+        match state.template_service.list_fields(template_uuid).await {
+            Ok(fields) => Ok(Json(json!({
+                "success": true,
+                "fields": fields,
+                "count": fields.len()
+            }))),
+            Err(e) => {
+                eprintln!("Error listing fields: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    }
+
+    pub async fn get_field(
+        State(state): State<AppState>,
+        Path((template_id, field_id)): Path<(String, String)>
+    ) -> Result<Json<Value>, StatusCode> {
+        let template_uuid = match Uuid::parse_str(&template_id) {
+            Ok(uuid) => uuid,
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        };
+
+        let field_uuid = match Uuid::parse_str(&field_id) {
+            Ok(uuid) => uuid,
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        };
+
+        match state.template_service.get_field(template_uuid, field_uuid).await {
+            Ok(Some(field)) => Ok(Json(json!({
+                "success": true,
+                "field": field
+            }))),
+            Ok(None) => Err(StatusCode::NOT_FOUND),
+            Err(e) => {
+                eprintln!("Error getting field: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    }
+
+    pub async fn update_field(
+        State(state): State<AppState>,
+        Path((template_id, field_id)): Path<(String, String)>,
+        Json(payload): Json<UpdateFieldRequest>
+    ) -> Result<Json<Value>, StatusCode> {
+        let template_uuid = match Uuid::parse_str(&template_id) {
+            Ok(uuid) => uuid,
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        };
+
+        let field_uuid = match Uuid::parse_str(&field_id) {
+            Ok(uuid) => uuid,
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        };
+
+        match state.template_service.update_field(template_uuid, field_uuid, payload).await {
+            Ok(Some(field)) => Ok(Json(json!({
+                "success": true,
+                "field": field,
+                "message": "Field updated successfully"
+            }))),
+            Ok(None) => Err(StatusCode::NOT_FOUND),
+            Err(e) => {
+                eprintln!("Error updating field: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    }
+
+    pub async fn delete_field(
+        State(state): State<AppState>,
+        Path((template_id, field_id)): Path<(String, String)>
+    ) -> Result<Json<Value>, StatusCode> {
+        let template_uuid = match Uuid::parse_str(&template_id) {
+            Ok(uuid) => uuid,
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        };
+
+        let field_uuid = match Uuid::parse_str(&field_id) {
+            Ok(uuid) => uuid,
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        };
+
+        match state.template_service.delete_field(template_uuid, field_uuid).await {
+            Ok(true) => Ok(Json(json!({
+                "success": true,
+                "message": "Field deleted successfully"
+            }))),
+            Ok(false) => Err(StatusCode::NOT_FOUND),
+            Err(e) => {
+                eprintln!("Error deleting field: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
     }
 }
 

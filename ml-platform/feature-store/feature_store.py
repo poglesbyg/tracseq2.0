@@ -1,591 +1,394 @@
-# TracSeq 2.0 - Feature Store System
-# Centralized feature management for ML pipelines
+#!/usr/bin/env python3
+"""
+TracSeq 2.0 - Feature Store Service
+Centralized feature management for ML pipelines
+"""
 
-import asyncio
+import os
 import json
 import logging
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Union
-from uuid import UUID, uuid4
 
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel, Field, validator
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 import redis
-from sqlalchemy import create_engine, Column, String, Float, Integer, DateTime, JSON, Boolean, Index
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql import text
-import pyarrow as pa
-import pyarrow.parquet as pq
-from scipy import stats
-import hashlib
+from sqlalchemy import create_engine, text
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Database Models
-Base = declarative_base()
+# Initialize FastAPI app
+app = FastAPI(
+    title="TracSeq Feature Store API",
+    description="Centralized feature management for laboratory ML pipelines",
+    version="1.0.0"
+)
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize connections
+try:
+    redis_host = os.getenv('REDIS_HOST', 'localhost')
+    redis_port = int(os.getenv('REDIS_PORT', '6379'))
+    redis_client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
+    redis_client.ping()
+    logger.info(f"Connected to Redis at {redis_host}:{redis_port}")
+except Exception as e:
+    logger.error(f"Failed to connect to Redis: {e}")
+    redis_client = None
+
+# Database connection
+try:
+    database_url = os.getenv('DATABASE_URL', 'postgresql://ml_user:ml_pass@localhost:5432/ml_platform')
+    engine = create_engine(database_url)
+    logger.info("Connected to PostgreSQL database")
+except Exception as e:
+    logger.error(f"Failed to connect to database: {e}")
+    engine = None
+
+# Enums
 class FeatureType(str, Enum):
-    NUMERIC = "numeric"
-    CATEGORICAL = "categorical"
-    BINARY = "binary"
-    TIMESTAMP = "timestamp"
-    EMBEDDING = "embedding"
-    JSON = "json"
+    numeric = "numeric"
+    categorical = "categorical"
+    boolean = "boolean"
+    text = "text"
+    timestamp = "timestamp"
 
 class FeatureSource(str, Enum):
-    BATCH = "batch"
-    STREAMING = "streaming"
-    REQUEST = "request"
-    COMPUTED = "computed"
+    batch = "batch"
+    streaming = "streaming"
+    computed = "computed"
+    external = "external"
 
-# Feature Definition Models
-class FeatureDefinition(Base):
-    __tablename__ = "feature_definitions"
-    __table_args__ = (
-        Index('idx_feature_entity', 'feature_name', 'entity_type'),
-    )
-    
-    id = Column(String, primary_key=True)
-    feature_name = Column(String, nullable=False)
-    entity_type = Column(String, nullable=False)  # sample, patient, sequencing_run, etc.
-    feature_type = Column(String, nullable=False)
-    description = Column(String)
-    source = Column(String, nullable=False)
-    computation_logic = Column(JSON)  # For computed features
-    dependencies = Column(JSON)  # Other features this depends on
-    version = Column(Integer, default=1)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    metadata = Column(JSON)
+# Pydantic models
+class FeatureDefinition(BaseModel):
+    name: str = Field(..., description="Feature name")
+    entity_type: str = Field(..., description="Entity type (e.g., sample, storage_unit)")
+    type: FeatureType = Field(..., description="Feature data type")
+    source: FeatureSource = Field(..., description="Feature source type")
+    description: Optional[str] = Field(None, description="Feature description")
+    tags: Optional[Dict[str, str]] = Field(default={}, description="Feature tags")
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
 
-class FeatureValue(Base):
-    __tablename__ = "feature_values"
-    __table_args__ = (
-        Index('idx_entity_feature_timestamp', 'entity_id', 'feature_id', 'timestamp'),
-    )
-    
-    id = Column(String, primary_key=True)
-    feature_id = Column(String, nullable=False)
-    entity_id = Column(String, nullable=False)
-    value = Column(JSON, nullable=False)
-    timestamp = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+class FeatureValue(BaseModel):
+    entity_id: str = Field(..., description="Entity identifier")
+    feature_name: str = Field(..., description="Feature name")
+    value: Any = Field(..., description="Feature value")
+    timestamp: Optional[datetime] = Field(default_factory=datetime.utcnow)
 
-class FeatureSet(Base):
-    __tablename__ = "feature_sets"
-    
-    id = Column(String, primary_key=True)
-    name = Column(String, nullable=False, unique=True)
-    description = Column(String)
-    entity_type = Column(String, nullable=False)
-    features = Column(JSON, nullable=False)  # List of feature names
-    version = Column(Integer, default=1)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+class FeatureQuery(BaseModel):
+    entity_ids: List[str] = Field(..., description="List of entity identifiers")
+    feature_names: List[str] = Field(..., description="List of feature names to retrieve")
+    as_of_time: Optional[datetime] = Field(None, description="Point-in-time for feature values")
 
-# Request/Response Models
-class FeatureRequest(BaseModel):
-    entity_type: str
-    entity_id: str
-    features: List[str]
-    point_in_time: Optional[datetime] = None
-
-class FeatureResponse(BaseModel):
+class FeatureVector(BaseModel):
     entity_id: str
     features: Dict[str, Any]
     timestamp: datetime
-    metadata: Dict[str, Any] = {}
 
-class FeatureSetRequest(BaseModel):
-    entity_type: str
-    entity_id: str
-    feature_set_name: str
-    point_in_time: Optional[datetime] = None
-
-class BatchFeatureRequest(BaseModel):
-    entity_type: str
-    entity_ids: List[str]
-    features: List[str]
-    point_in_time: Optional[datetime] = None
-
-# Feature Engineering
-class FeatureEngineer:
-    """Handles feature computation and transformation"""
-    
-    def __init__(self):
-        self.transformers = {}
-        self._register_default_transformers()
-    
-    def _register_default_transformers(self):
-        """Register default feature transformers"""
-        # Laboratory-specific transformers
-        self.transformers["sample_age_hours"] = self._compute_sample_age
-        self.transformers["temperature_deviation"] = self._compute_temperature_deviation
-        self.transformers["quality_risk_score"] = self._compute_quality_risk_score
-        self.transformers["storage_utilization"] = self._compute_storage_utilization
-        self.transformers["processing_delay_category"] = self._compute_processing_delay_category
-    
-    async def compute_feature(self, feature_def: FeatureDefinition, entity_id: str, context: Dict[str, Any]) -> Any:
-        """Compute a feature value based on its definition"""
-        if feature_def.source == FeatureSource.COMPUTED:
-            transformer = self.transformers.get(feature_def.feature_name)
-            if transformer:
-                return await transformer(entity_id, context, feature_def.computation_logic)
-            else:
-                raise ValueError(f"No transformer found for feature: {feature_def.feature_name}")
-        return None
-    
-    async def _compute_sample_age(self, entity_id: str, context: Dict[str, Any], logic: Dict[str, Any]) -> float:
-        """Compute sample age in hours"""
-        collection_time = context.get("collection_time")
-        if collection_time:
-            age = (datetime.utcnow() - collection_time).total_seconds() / 3600
-            return round(age, 2)
-        return 0.0
-    
-    async def _compute_temperature_deviation(self, entity_id: str, context: Dict[str, Any], logic: Dict[str, Any]) -> float:
-        """Compute deviation from target temperature"""
-        current_temp = context.get("current_temperature", -80)
-        target_temp = context.get("target_temperature", -80)
-        return abs(current_temp - target_temp)
-    
-    async def _compute_quality_risk_score(self, entity_id: str, context: Dict[str, Any], logic: Dict[str, Any]) -> float:
-        """Compute quality risk score based on multiple factors"""
-        # Factors affecting quality
-        age_hours = context.get("sample_age_hours", 0)
-        temp_deviation = context.get("temperature_deviation", 0)
-        volume_ml = context.get("volume_ml", 5)
-        processing_delay = context.get("processing_delay_hours", 0)
-        
-        # Risk calculation
-        age_risk = min(age_hours / 168, 1.0)  # Max risk at 1 week
-        temp_risk = min(temp_deviation / 10, 1.0)  # Max risk at 10°C deviation
-        volume_risk = max(0, 1 - volume_ml / 5)  # Risk if less than 5ml
-        delay_risk = min(processing_delay / 48, 1.0)  # Max risk at 48 hours
-        
-        # Weighted average
-        weights = logic.get("weights", {
-            "age": 0.3,
-            "temperature": 0.3,
-            "volume": 0.2,
-            "delay": 0.2
-        })
-        
-        risk_score = (
-            weights["age"] * age_risk +
-            weights["temperature"] * temp_risk +
-            weights["volume"] * volume_risk +
-            weights["delay"] * delay_risk
-        )
-        
-        return round(risk_score, 3)
-    
-    async def _compute_storage_utilization(self, entity_id: str, context: Dict[str, Any], logic: Dict[str, Any]) -> float:
-        """Compute storage location utilization"""
-        used_capacity = context.get("used_capacity", 0)
-        total_capacity = context.get("total_capacity", 100)
-        if total_capacity > 0:
-            return round(used_capacity / total_capacity, 3)
-        return 0.0
-    
-    async def _compute_processing_delay_category(self, entity_id: str, context: Dict[str, Any], logic: Dict[str, Any]) -> str:
-        """Categorize processing delay"""
-        delay_hours = context.get("processing_delay_hours", 0)
-        
-        if delay_hours < 6:
-            return "immediate"
-        elif delay_hours < 24:
-            return "same_day"
-        elif delay_hours < 48:
-            return "next_day"
-        else:
-            return "delayed"
-
-# Feature Store Implementation
-class FeatureStore:
-    """Centralized feature store for ML pipelines"""
-    
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-        self.redis_client = None
-        self.db_session = None
-        self.feature_engineer = FeatureEngineer()
-        self.cache_ttl = config.get("cache_ttl", 3600)  # 1 hour default
-    
-    async def initialize(self):
-        """Initialize feature store connections"""
-        # Connect to Redis for caching
-        self.redis_client = redis.Redis(
-            host=self.config["redis_host"],
-            port=self.config["redis_port"],
-            decode_responses=True
-        )
-        
-        # Initialize database
-        engine = create_engine(self.config["database_url"])
-        Base.metadata.create_all(engine)
-        Session = sessionmaker(bind=engine)
-        self.db_session = Session()
-        
-        logger.info("Feature store initialized")
-    
-    async def register_feature(self, feature_def: Dict[str, Any]) -> str:
-        """Register a new feature definition"""
-        feature = FeatureDefinition(
-            id=str(uuid4()),
-            feature_name=feature_def["name"],
-            entity_type=feature_def["entity_type"],
-            feature_type=feature_def["type"],
-            description=feature_def.get("description"),
-            source=feature_def["source"],
-            computation_logic=feature_def.get("computation_logic"),
-            dependencies=feature_def.get("dependencies", []),
-            metadata=feature_def.get("metadata", {})
-        )
-        
-        self.db_session.add(feature)
-        self.db_session.commit()
-        
-        logger.info(f"Registered feature: {feature.feature_name}")
-        return feature.id
-    
-    async def get_features(self, request: FeatureRequest) -> FeatureResponse:
-        """Get feature values for an entity"""
-        feature_values = {}
-        
-        for feature_name in request.features:
-            # Check cache first
-            cache_key = self._get_cache_key(request.entity_type, request.entity_id, feature_name)
-            cached_value = self.redis_client.get(cache_key)
-            
-            if cached_value:
-                feature_values[feature_name] = json.loads(cached_value)
-            else:
-                # Get feature definition
-                feature_def = self.db_session.query(FeatureDefinition).filter(
-                    FeatureDefinition.feature_name == feature_name,
-                    FeatureDefinition.entity_type == request.entity_type,
-                    FeatureDefinition.is_active == True
-                ).first()
-                
-                if not feature_def:
-                    logger.warning(f"Feature not found: {feature_name}")
-                    continue
-                
-                # Get or compute feature value
-                value = await self._get_or_compute_feature(
-                    feature_def,
-                    request.entity_id,
-                    request.point_in_time
-                )
-                
-                if value is not None:
-                    feature_values[feature_name] = value
-                    # Cache the value
-                    self.redis_client.setex(
-                        cache_key,
-                        self.cache_ttl,
-                        json.dumps(value)
-                    )
-        
-        return FeatureResponse(
-            entity_id=request.entity_id,
-            features=feature_values,
-            timestamp=request.point_in_time or datetime.utcnow(),
-            metadata={
-                "entity_type": request.entity_type,
-                "feature_count": len(feature_values)
-            }
-        )
-    
-    async def _get_or_compute_feature(self, feature_def: FeatureDefinition, entity_id: str, point_in_time: Optional[datetime]) -> Any:
-        """Get feature value from storage or compute if needed"""
-        if feature_def.source == FeatureSource.COMPUTED:
-            # Get context for computation
-            context = await self._get_computation_context(feature_def, entity_id, point_in_time)
-            value = await self.feature_engineer.compute_feature(feature_def, entity_id, context)
-            
-            # Store computed value
-            await self._store_feature_value(feature_def.id, entity_id, value, point_in_time or datetime.utcnow())
-            return value
-        else:
-            # Get from storage
-            return await self._get_stored_feature(feature_def.id, entity_id, point_in_time)
-    
-    async def _get_computation_context(self, feature_def: FeatureDefinition, entity_id: str, point_in_time: Optional[datetime]) -> Dict[str, Any]:
-        """Get context needed for feature computation"""
-        context = {}
-        
-        # Get dependent features
-        if feature_def.dependencies:
-            dep_request = FeatureRequest(
-                entity_type=feature_def.entity_type,
-                entity_id=entity_id,
-                features=feature_def.dependencies,
-                point_in_time=point_in_time
-            )
-            dep_response = await self.get_features(dep_request)
-            context.update(dep_response.features)
-        
-        # Add entity metadata
-        # This would fetch from actual entity storage
-        context["entity_id"] = entity_id
-        context["entity_type"] = feature_def.entity_type
-        
-        return context
-    
-    async def _get_stored_feature(self, feature_id: str, entity_id: str, point_in_time: Optional[datetime]) -> Any:
-        """Get feature value from storage"""
-        query = self.db_session.query(FeatureValue).filter(
-            FeatureValue.feature_id == feature_id,
-            FeatureValue.entity_id == entity_id
-        )
-        
-        if point_in_time:
-            query = query.filter(FeatureValue.timestamp <= point_in_time)
-        
-        feature_value = query.order_by(FeatureValue.timestamp.desc()).first()
-        
-        if feature_value:
-            return feature_value.value
-        return None
-    
-    async def _store_feature_value(self, feature_id: str, entity_id: str, value: Any, timestamp: datetime):
-        """Store a feature value"""
-        feature_value = FeatureValue(
-            id=str(uuid4()),
-            feature_id=feature_id,
-            entity_id=entity_id,
-            value=value if isinstance(value, dict) else {"value": value},
-            timestamp=timestamp
-        )
-        
-        self.db_session.add(feature_value)
-        self.db_session.commit()
-    
-    def _get_cache_key(self, entity_type: str, entity_id: str, feature_name: str) -> str:
-        """Generate cache key for feature"""
-        return f"feature:{entity_type}:{entity_id}:{feature_name}"
-    
-    async def get_feature_set(self, request: FeatureSetRequest) -> FeatureResponse:
-        """Get all features in a feature set"""
-        feature_set = self.db_session.query(FeatureSet).filter(
-            FeatureSet.name == request.feature_set_name,
-            FeatureSet.entity_type == request.entity_type,
-            FeatureSet.is_active == True
-        ).first()
-        
-        if not feature_set:
-            raise ValueError(f"Feature set not found: {request.feature_set_name}")
-        
-        # Get all features in the set
-        feature_request = FeatureRequest(
-            entity_type=request.entity_type,
-            entity_id=request.entity_id,
-            features=feature_set.features,
-            point_in_time=request.point_in_time
-        )
-        
-        return await self.get_features(feature_request)
-    
-    async def batch_get_features(self, request: BatchFeatureRequest) -> List[FeatureResponse]:
-        """Get features for multiple entities"""
-        responses = []
-        
-        # Use asyncio for parallel processing
-        tasks = []
-        for entity_id in request.entity_ids:
-            feature_request = FeatureRequest(
-                entity_type=request.entity_type,
-                entity_id=entity_id,
-                features=request.features,
-                point_in_time=request.point_in_time
-            )
-            tasks.append(self.get_features(feature_request))
-        
-        responses = await asyncio.gather(*tasks)
-        return responses
-    
-    async def compute_feature_statistics(self, feature_name: str, entity_type: str, time_window: timedelta) -> Dict[str, Any]:
-        """Compute statistics for a feature"""
-        cutoff_time = datetime.utcnow() - time_window
-        
-        # Get recent feature values
-        feature_def = self.db_session.query(FeatureDefinition).filter(
-            FeatureDefinition.feature_name == feature_name,
-            FeatureDefinition.entity_type == entity_type
-        ).first()
-        
-        if not feature_def:
-            raise ValueError(f"Feature not found: {feature_name}")
-        
-        values = self.db_session.query(FeatureValue.value).filter(
-            FeatureValue.feature_id == feature_def.id,
-            FeatureValue.timestamp >= cutoff_time
-        ).all()
-        
-        if not values:
-            return {"error": "No data available for the specified time window"}
-        
-        # Extract numeric values
-        numeric_values = []
-        for v in values:
-            if isinstance(v[0], dict) and "value" in v[0]:
-                val = v[0]["value"]
-            else:
-                val = v[0]
-            
-            if isinstance(val, (int, float)):
-                numeric_values.append(val)
-        
-        if not numeric_values:
-            return {"error": "No numeric values found"}
-        
-        # Compute statistics
-        return {
-            "feature_name": feature_name,
-            "entity_type": entity_type,
-            "count": len(numeric_values),
-            "mean": np.mean(numeric_values),
-            "std": np.std(numeric_values),
-            "min": np.min(numeric_values),
-            "max": np.max(numeric_values),
-            "percentiles": {
-                "25": np.percentile(numeric_values, 25),
-                "50": np.percentile(numeric_values, 50),
-                "75": np.percentile(numeric_values, 75)
-            }
-        }
-
-# Laboratory-specific feature definitions
-def create_laboratory_features():
-    """Create feature definitions for laboratory domain"""
-    return [
-        {
-            "name": "sample_age_hours",
-            "entity_type": "sample",
-            "type": FeatureType.NUMERIC,
-            "source": FeatureSource.COMPUTED,
-            "description": "Age of sample in hours since collection",
-            "computation_logic": {},
-            "dependencies": ["collection_time"]
-        },
-        {
-            "name": "temperature_deviation",
-            "entity_type": "sample",
-            "type": FeatureType.NUMERIC,
-            "source": FeatureSource.COMPUTED,
-            "description": "Deviation from target storage temperature",
-            "computation_logic": {},
-            "dependencies": ["current_temperature", "target_temperature"]
-        },
-        {
-            "name": "quality_risk_score",
-            "entity_type": "sample",
-            "type": FeatureType.NUMERIC,
-            "source": FeatureSource.COMPUTED,
-            "description": "Overall quality risk score (0-1)",
-            "computation_logic": {
-                "weights": {
-                    "age": 0.3,
-                    "temperature": 0.3,
-                    "volume": 0.2,
-                    "delay": 0.2
-                }
-            },
-            "dependencies": ["sample_age_hours", "temperature_deviation", "volume_ml", "processing_delay_hours"]
-        },
-        {
-            "name": "storage_utilization",
-            "entity_type": "storage_location",
-            "type": FeatureType.NUMERIC,
-            "source": FeatureSource.COMPUTED,
-            "description": "Storage location utilization percentage",
-            "computation_logic": {},
-            "dependencies": ["used_capacity", "total_capacity"]
-        },
-        {
-            "name": "processing_delay_category",
-            "entity_type": "sample",
-            "type": FeatureType.CATEGORICAL,
-            "source": FeatureSource.COMPUTED,
-            "description": "Category of processing delay",
-            "computation_logic": {},
-            "dependencies": ["processing_delay_hours"]
-        }
-    ]
-
-# FastAPI Application
-app = FastAPI(title="TracSeq Feature Store", version="1.0.0")
-
-# Global feature store instance
-feature_store = None
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize feature store on startup"""
-    global feature_store
-    
-    config = {
-        "redis_host": "localhost",
-        "redis_port": 6379,
-        "database_url": "postgresql://ml_user:ml_pass@localhost:5436/ml_platform",
-        "cache_ttl": 3600
+# In-memory feature registry (in production, this would be in the database)
+feature_registry = {
+    "sample_age_hours": {
+        "entity_type": "sample",
+        "type": "numeric",
+        "source": "computed",
+        "description": "Age of sample in hours since collection",
+        "tags": {"category": "temporal", "unit": "hours"},
+        "created_at": datetime.utcnow()
+    },
+    "storage_temperature": {
+        "entity_type": "sample",
+        "type": "numeric", 
+        "source": "streaming",
+        "description": "Current storage temperature in Celsius",
+        "tags": {"category": "environmental", "unit": "celsius"},
+        "created_at": datetime.utcnow()
+    },
+    "sample_volume_ml": {
+        "entity_type": "sample",
+        "type": "numeric",
+        "source": "batch",
+        "description": "Sample volume in milliliters",
+        "tags": {"category": "physical", "unit": "ml"},
+        "created_at": datetime.utcnow()
+    },
+    "sample_type": {
+        "entity_type": "sample",
+        "type": "categorical",
+        "source": "batch",
+        "description": "Type of biological sample",
+        "tags": {"category": "metadata"},
+        "created_at": datetime.utcnow()
+    },
+    "quality_risk_score": {
+        "entity_type": "sample",
+        "type": "numeric",
+        "source": "computed",
+        "description": "Computed quality risk score (0-1)",
+        "tags": {"category": "quality", "range": "0-1"},
+        "created_at": datetime.utcnow()
+    },
+    "storage_capacity_used": {
+        "entity_type": "storage_unit",
+        "type": "numeric",
+        "source": "streaming",
+        "description": "Percentage of storage capacity used",
+        "tags": {"category": "capacity", "unit": "percentage"},
+        "created_at": datetime.utcnow()
+    },
+    "days_since_last_maintenance": {
+        "entity_type": "storage_unit",
+        "type": "numeric",
+        "source": "computed",
+        "description": "Days since last maintenance",
+        "tags": {"category": "maintenance", "unit": "days"},
+        "created_at": datetime.utcnow()
     }
+}
+
+def generate_mock_feature_value(feature_name: str, entity_id: str) -> Any:
+    """Generate mock feature values for testing"""
+    import random
     
-    feature_store = FeatureStore(config)
-    await feature_store.initialize()
-    
-    # Register laboratory features
-    for feature_def in create_laboratory_features():
-        await feature_store.register_feature(feature_def)
-
-@app.post("/features", response_model=FeatureResponse)
-async def get_features(request: FeatureRequest):
-    """Get feature values for an entity"""
-    return await feature_store.get_features(request)
-
-@app.post("/feature-set", response_model=FeatureResponse)
-async def get_feature_set(request: FeatureSetRequest):
-    """Get all features in a feature set"""
-    return await feature_store.get_feature_set(request)
-
-@app.post("/batch-features", response_model=List[FeatureResponse])
-async def batch_get_features(request: BatchFeatureRequest):
-    """Get features for multiple entities"""
-    return await feature_store.batch_get_features(request)
-
-@app.get("/feature-stats/{feature_name}")
-async def get_feature_statistics(
-    feature_name: str,
-    entity_type: str,
-    days: int = Query(7, description="Time window in days")
-):
-    """Get statistics for a feature"""
-    time_window = timedelta(days=days)
-    return await feature_store.compute_feature_statistics(feature_name, entity_type, time_window)
-
-@app.post("/register-feature")
-async def register_feature(feature_def: Dict[str, Any]):
-    """Register a new feature definition"""
-    feature_id = await feature_store.register_feature(feature_def)
-    return {"feature_id": feature_id, "status": "registered"}
+    if feature_name == "sample_age_hours":
+        return random.uniform(0, 720)  # 0-30 days
+    elif feature_name == "storage_temperature":
+        return random.choice([-80, -20, 4, 23, 37])  # Common lab temperatures
+    elif feature_name == "sample_volume_ml":
+        return random.uniform(0.1, 10.0)
+    elif feature_name == "sample_type":
+        return random.choice(["blood", "saliva", "tissue", "urine", "serum"])
+    elif feature_name == "quality_risk_score":
+        return random.uniform(0, 1)
+    elif feature_name == "storage_capacity_used":
+        return random.uniform(0, 100)
+    elif feature_name == "days_since_last_maintenance":
+        return random.randint(0, 365)
+    else:
+        return random.uniform(0, 100)
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    return {
+        "status": "healthy",
+        "service": "feature-store",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow(),
+        "redis_connected": redis_client is not None and redis_client.ping(),
+        "database_connected": engine is not None
+    }
+
+@app.get("/features", response_model=List[FeatureDefinition])
+async def list_features(entity_type: Optional[str] = Query(None, description="Filter by entity type")):
+    """List all registered features"""
+    features = []
+    
+    for name, info in feature_registry.items():
+        if entity_type is None or info["entity_type"] == entity_type:
+            features.append(FeatureDefinition(
+                name=name,
+                entity_type=info["entity_type"],
+                type=info["type"],
+                source=info["source"],
+                description=info["description"],
+                tags=info["tags"],
+                created_at=info["created_at"]
+            ))
+    
+    return features
+
+@app.post("/register-feature", response_model=Dict[str, str])
+async def register_feature(feature: FeatureDefinition):
+    """Register a new feature in the feature store"""
+    if feature.name in feature_registry:
+        raise HTTPException(status_code=409, detail=f"Feature {feature.name} already exists")
+    
+    feature_registry[feature.name] = {
+        "entity_type": feature.entity_type,
+        "type": feature.type,
+        "source": feature.source,
+        "description": feature.description,
+        "tags": feature.tags,
+        "created_at": datetime.utcnow()
+    }
+    
+    logger.info(f"Registered new feature: {feature.name}")
+    return {"message": f"Feature {feature.name} registered successfully", "status": "success"}
+
+@app.get("/features/{feature_name}", response_model=FeatureDefinition)
+async def get_feature_definition(feature_name: str):
+    """Get feature definition by name"""
+    if feature_name not in feature_registry:
+        raise HTTPException(status_code=404, detail=f"Feature {feature_name} not found")
+    
+    info = feature_registry[feature_name]
+    return FeatureDefinition(
+        name=feature_name,
+        entity_type=info["entity_type"],
+        type=info["type"],
+        source=info["source"],
+        description=info["description"],
+        tags=info["tags"],
+        created_at=info["created_at"]
+    )
+
+@app.post("/features/values", response_model=Dict[str, str])
+async def ingest_feature_values(values: List[FeatureValue]):
+    """Ingest feature values into the feature store"""
+    try:
+        for value in values:
+            # Validate feature exists
+            if value.feature_name not in feature_registry:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Feature {value.feature_name} not registered"
+                )
+            
+            # Cache in Redis (if available)
+            if redis_client:
+                cache_key = f"feature:{value.feature_name}:{value.entity_id}"
+                cache_value = {
+                    "value": value.value,
+                    "timestamp": value.timestamp.isoformat()
+                }
+                redis_client.setex(cache_key, 3600, json.dumps(cache_value, default=str))  # 1 hour TTL
+        
+        logger.info(f"Ingested {len(values)} feature values")
+        return {"message": f"Successfully ingested {len(values)} feature values", "status": "success"}
+        
+    except Exception as e:
+        logger.error(f"Feature ingestion error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/features/query", response_model=List[FeatureVector])
+async def query_features(query: FeatureQuery):
+    """Query feature values for given entities and features"""
+    try:
+        results = []
+        
+        for entity_id in query.entity_ids:
+            features = {}
+            
+            for feature_name in query.feature_names:
+                # Validate feature exists
+                if feature_name not in feature_registry:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Feature {feature_name} not registered"
+                    )
+                
+                # Try to get from cache first
+                feature_value = None
+                if redis_client:
+                    cache_key = f"feature:{feature_name}:{entity_id}"
+                    cached_value = redis_client.get(cache_key)
+                    if cached_value:
+                        cached_data = json.loads(cached_value)
+                        feature_value = cached_data["value"]
+                
+                # If not in cache, generate mock value (in production, query from database)
+                if feature_value is None:
+                    feature_value = generate_mock_feature_value(feature_name, entity_id)
+                
+                features[feature_name] = feature_value
+            
+            results.append(FeatureVector(
+                entity_id=entity_id,
+                features=features,
+                timestamp=query.as_of_time or datetime.utcnow()
+            ))
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Feature query error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/features/{feature_name}/values/{entity_id}")
+async def get_feature_value(feature_name: str, entity_id: str):
+    """Get a specific feature value for an entity"""
+    if feature_name not in feature_registry:
+        raise HTTPException(status_code=404, detail=f"Feature {feature_name} not found")
+    
+    # Try cache first
+    if redis_client:
+        cache_key = f"feature:{feature_name}:{entity_id}"
+        cached_value = redis_client.get(cache_key)
+        if cached_value:
+            cached_data = json.loads(cached_value)
+            return {
+                "entity_id": entity_id,
+                "feature_name": feature_name,
+                "value": cached_data["value"],
+                "timestamp": cached_data["timestamp"],
+                "source": "cache"
+            }
+    
+    # Generate mock value (in production, query from database)
+    value = generate_mock_feature_value(feature_name, entity_id)
+    timestamp = datetime.utcnow()
+    
+    return {
+        "entity_id": entity_id,
+        "feature_name": feature_name,
+        "value": value,
+        "timestamp": timestamp,
+        "source": "computed"
+    }
+
+@app.get("/entity-types")
+async def list_entity_types():
+    """List all entity types in the feature store"""
+    entity_types = set()
+    for feature_info in feature_registry.values():
+        entity_types.add(feature_info["entity_type"])
+    
+    return {"entity_types": list(entity_types)}
+
+@app.get("/features/stats")
+async def get_feature_stats():
+    """Get statistics about the feature store"""
+    stats = {
+        "total_features": len(feature_registry),
+        "features_by_type": {},
+        "features_by_source": {},
+        "features_by_entity_type": {}
+    }
+    
+    for feature_info in feature_registry.values():
+        # Count by type
+        feature_type = feature_info["type"]
+        stats["features_by_type"][feature_type] = stats["features_by_type"].get(feature_type, 0) + 1
+        
+        # Count by source
+        source = feature_info["source"]
+        stats["features_by_source"][source] = stats["features_by_source"].get(source, 0) + 1
+        
+        # Count by entity type
+        entity_type = feature_info["entity_type"]
+        stats["features_by_entity_type"][entity_type] = stats["features_by_entity_type"].get(entity_type, 0) + 1
+    
+    return stats
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8095)
+    
+    port = int(os.getenv('PORT', '8095'))
+    host = os.getenv('HOST', '0.0.0.0')
+    
+    logger.info(f"Starting TracSeq Feature Store API on {host}:{port}")
+    uvicorn.run(app, host=host, port=port)

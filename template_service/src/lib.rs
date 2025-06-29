@@ -94,6 +94,33 @@ pub fn create_app(state: AppState) -> axum::Router {
             middleware::auth_middleware,
         ));
 
+    // Template Field CRUD routes (require authentication)
+    let field_routes = axum::Router::new()
+        .route(
+            "/templates/:template_id/fields",
+            post(handlers::template_fields::create_field),
+        )
+        .route(
+            "/templates/:template_id/fields",
+            get(handlers::template_fields::list_fields),
+        )
+        .route(
+            "/templates/:template_id/fields/:field_id",
+            get(handlers::template_fields::get_field),
+        )
+        .route(
+            "/templates/:template_id/fields/:field_id",
+            put(handlers::template_fields::update_field),
+        )
+        .route(
+            "/templates/:template_id/fields/:field_id",
+            delete(handlers::template_fields::delete_field),
+        )
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            middleware::auth_middleware,
+        ));
+
     // File upload/download routes
     let file_routes = axum::Router::new()
         .route("/templates/upload", post(handlers::files::upload_template))
@@ -115,6 +142,7 @@ pub fn create_app(state: AppState) -> axum::Router {
     axum::Router::new()
         .merge(health_routes)
         .merge(template_routes)
+        .merge(field_routes)
         .merge(file_routes)
         .layer(
             ServiceBuilder::new()

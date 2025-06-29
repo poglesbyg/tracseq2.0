@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ML Platform Database
   ml-postgres:
@@ -10,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ml_pass
       POSTGRES_DB: ml_platform
     ports:
-      - "5436:5432"
+      - "5438:5432"
     volumes:
       - ml_postgres_data:/var/lib/postgresql/data
     networks:
@@ -20,6 +18,23 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Redis for ML caching
+  redis:
+    image: redis:7-alpine
+    container_name: tracseq-ml-redis
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru
+    volumes:
+      - ml_redis_data:/data
+    networks:
+      - tracseq-ml
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
   # MLflow Server
   mlflow:
@@ -177,75 +192,15 @@ services:
     networks:
       - tracseq-ml
 
-  # Model Training Worker (for distributed training)
-  training-worker:
-    build:
-      context: ./ml-platform
-      dockerfile: Dockerfile.worker
-    container_name: tracseq-training-worker
-    environment:
-      MLFLOW_TRACKING_URI: http://mlflow:5000
-      DATABASE_URL: postgresql://ml_user:ml_pass@ml-postgres:5432/ml_platform
-      WORKER_TYPE: gpu  # or cpu
-    volumes:
-      - training_data:/data
-      - model_checkpoints:/checkpoints
-    depends_on:
-      - mlflow
-      - ml-postgres
-    networks:
-      - tracseq-ml
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-
-  # Model Registry UI (custom)
-  model-registry-ui:
-    build:
-      context: ./ml-platform/model-registry-ui
-      dockerfile: Dockerfile
-    container_name: tracseq-model-registry-ui
-    ports:
-      - "3001:3000"
-    environment:
-      REACT_APP_API_URL: http://localhost:8097
-      REACT_APP_MLFLOW_URL: http://localhost:5000
-    depends_on:
-      - mlops
-      - mlflow
-    networks:
-      - tracseq-ml
-
-  # Drift Detection Service
-  drift-detector:
-    build:
-      context: ./ml-platform/drift-detector
-      dockerfile: Dockerfile
-    container_name: tracseq-drift-detector
-    environment:
-      DATABASE_URL: postgresql://ml_user:ml_pass@ml-postgres:5432/ml_platform
-      FEATURE_STORE_URL: http://feature-store:8095
-      MONITORING_INTERVAL: 300  # 5 minutes
-    depends_on:
-      - ml-postgres
-      - feature-store
-    networks:
-      - tracseq-ml
-
 volumes:
   ml_postgres_data:
+  ml_redis_data:
   mlflow_artifacts:
   model_storage:
   automl_models:
   mlops_models:
   jupyter_notebooks:
   tensorboard_logs:
-  training_data:
-  model_checkpoints:
 
 networks:
   tracseq-ml:

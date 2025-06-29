@@ -1,0 +1,252 @@
+services:
+  # =============================================================================
+  # PHASE 4: ADVANCED INTEGRATIONS & EVENT-DRIVEN ARCHITECTURE
+  # =============================================================================
+
+  # Event Service - Core event streaming and pub/sub messaging
+  event-service:
+    build:
+      context: ./event_service
+      dockerfile: Dockerfile
+    container_name: tracseq-event-service
+    ports:
+      - "8087:8087"
+    environment:
+      - REDIS_URL=redis://tracseq20-redis-1:6379
+      - HOST=0.0.0.0
+      - PORT=8087
+      - RUST_LOG=info
+      - DATABASE_URL=postgresql://postgres:postgres@tracseq20-postgres-1:5432/lab_manager
+      - AUTH_SERVICE_URL=http://tracseq20-auth-service-1:8080
+      - NOTIFICATION_SERVICE_URL=http://tracseq20-notification-service-1:8085
+      - ENABLE_EVENTS=true
+      - EVENT_BUFFER_SIZE=10000
+      - MAX_EVENT_AGE_HOURS=24
+    restart: unless-stopped
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Transaction Service - Distributed transactions with Saga patterns
+  transaction-service:
+    build: ./transaction_service
+    container_name: tracseq-transaction-service
+    ports:
+      - "8088:8088"
+    environment:
+      - PORT=8088
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      # Use existing database with transactions schema
+      - DATABASE_URL=postgresql://postgres:postgres@tracseq20-postgres-1:5432/lab_manager
+      - DB_MAX_CONNECTIONS=20
+      - DB_MIN_CONNECTIONS=5
+      - DB_CONNECTION_TIMEOUT_SECONDS=30
+      # Transaction Configuration
+      - MAX_CONCURRENT_SAGAS=100
+      - DEFAULT_TIMEOUT_MS=300000
+      - CLEANUP_AFTER_HOURS=24
+      # Service URLs - integrated with existing services
+      - EVENT_SERVICE_URL=http://tracseq-event-service:8087
+      - RAG_SERVICE_URL=http://lab_submission_rag-rag-service-1:8000
+      - AUTH_SERVICE_URL=http://tracseq20-auth-service-1:8080
+      - SAMPLE_SERVICE_URL=http://tracseq20-sample-service-1:8081
+      - TEMPLATE_SERVICE_URL=http://tracseq20-template-service-1:8083
+      # Features
+      - ENABLE_EVENTS=true
+      - ENABLE_PERSISTENCE=true
+      - ENABLE_AI_DECISIONS=true
+      - AI_TIMEOUT_SECONDS=30
+      - AI_CONFIDENCE_THRESHOLD=0.8
+      # Use existing Redis for state management
+      - REDIS_URL=redis://tracseq20-redis-1:6379
+    depends_on:
+      - event-service
+    volumes:
+      - ./logs/transaction:/app/logs
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Enhanced Storage Service - IoT integration and advanced analytics
+  enhanced-storage-service:
+    build:
+      context: ./enhanced_storage_service
+      dockerfile: Dockerfile
+    container_name: tracseq-enhanced-storage-service
+    ports:
+      - "8089:8089"
+    environment:
+      - PORT=8089
+      - RUST_LOG=info
+      # Integrated database and caching
+      - DATABASE_URL=postgresql://postgres:postgres@tracseq20-postgres-1:5432/lab_manager
+      - REDIS_URL=redis://tracseq20-redis-1:6379
+      # Service integrations
+      - AUTH_SERVICE_URL=http://tracseq20-auth-service-1:8080
+      - EVENT_SERVICE_URL=http://tracseq-event-service:8087
+      - TRANSACTION_SERVICE_URL=http://tracseq-transaction-service:8088
+      - RAG_SERVICE_URL=http://lab_submission_rag-rag-service-1:8000
+      # IoT and Analytics features
+      - ENABLE_IOT_INTEGRATION=true
+      - ENABLE_BLOCKCHAIN_AUDIT=false
+      - ENABLE_ANALYTICS=true
+      - ENABLE_DIGITAL_TWIN=true
+      - TEMP_CHECK_INTERVAL_MINUTES=5
+      - ALERT_THRESHOLD_CELSIUS=2.0
+      # AI-powered features
+      - ENABLE_PREDICTIVE_ANALYTICS=true
+      - ENABLE_SMART_ALLOCATION=true
+      - STORAGE_OPTIMIZATION_AI=true
+    depends_on:
+      - event-service
+    volumes:
+      - enhanced_storage_data:/app/storage
+      - ./logs/enhanced-storage:/app/logs
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # =============================================================================
+  # SPECIALIZED SERVERS & ADVANCED FEATURES
+  # =============================================================================
+
+  # Quality Control Server - Advanced QC workflows
+  quality-control-server:
+    build:
+      context: ./specialized_servers
+      dockerfile: Dockerfile.qc
+    container_name: tracseq-quality-control-server
+    ports:
+      - "8094:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@tracseq20-postgres-1:5432/lab_manager
+      - EVENT_SERVICE_URL=http://tracseq-event-service:8087
+      - SAMPLE_SERVICE_URL=http://tracseq20-sample-service-1:8081
+      - QC_STANDARDS_AI=true
+      - AUTO_QC_VALIDATION=true
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Redis Commander - Advanced Redis Management UI
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: tracseq-redis-commander
+    environment:
+      - REDIS_HOSTS=main:tracseq20-redis-1:6379,rag:rag-redis:6379,gateway:tracseq-gateway-redis:6379
+      - HTTP_USER=admin
+      - HTTP_PASSWORD=tracseq2024
+      - URL_PREFIX=/redis-ui
+    ports:
+      - "8096:8081"
+    restart: unless-stopped
+    networks:
+      - tracseq-network
+
+  # =============================================================================
+  # ADVANCED ANALYTICS & REAL-TIME PROCESSING
+  # =============================================================================
+
+  # Event Analytics Processor
+  event-analytics:
+    image: python:3.11-slim
+    container_name: tracseq-event-analytics
+    command: >
+      sh -c "
+        pip install redis pandas numpy prometheus_client &&
+        python -c '
+        import redis, time, json
+        from prometheus_client import Counter, Histogram, start_http_server
+        
+        # Prometheus metrics
+        event_counter = Counter(\"events_processed_total\", \"Total events processed\", [\"event_type\"])
+        processing_time = Histogram(\"event_processing_seconds\", \"Time spent processing events\")
+        
+        r = redis.Redis(host=\"tracseq20-redis-1\", port=6379, decode_responses=True)
+        start_http_server(8097)
+        
+        print(\"Event Analytics Processor started on port 8097\")
+        while True:
+            try:
+                # Process events from Redis streams
+                events = r.xread({\"tracseq:events\": \"$\"}, block=1000)
+                for stream, msgs in events:
+                    for msg_id, fields in msgs:
+                        event_type = fields.get(\"type\", \"unknown\")
+                        event_counter.labels(event_type=event_type).inc()
+                        print(f\"Processed event: {event_type}\")
+            except Exception as e:
+                print(f\"Error: {e}\")
+                time.sleep(5)
+        '
+      "
+    ports:
+      - "8097:8097"
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # MONITORING & OBSERVABILITY ENHANCEMENTS
+  # =============================================================================
+
+  # Advanced Jaeger for Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: tracseq-jaeger-advanced
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # HTTP collector
+      - "6831:6831/udp"  # UDP agent
+      - "6832:6832/udp"  # UDP agent
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=memory
+      - MEMORY_MAX_TRACES=100000
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Service Mesh Envoy Proxy
+  envoy-proxy:
+    image: envoyproxy/envoy:v1.28-latest
+    container_name: tracseq-envoy-proxy
+    ports:
+      - "8080:8080"  # Admin interface
+      - "8000:8000"  # Proxy port
+    volumes:
+      - ./service-mesh/envoy-config.yaml:/etc/envoy/envoy.yaml
+    command: /usr/local/bin/envoy -c /etc/envoy/envoy.yaml
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+# =============================================================================
+# VOLUMES & NETWORKS
+# =============================================================================
+
+volumes:
+  enhanced_storage_data:
+    driver: local
+  
+networks:
+  tracseq-network:
+    external: true 

@@ -1,0 +1,42 @@
+services:
+  # Event Service integrated with existing TracSeq infrastructure
+  event-service:
+    build: .
+    container_name: tracseq-event-service
+    ports:
+      - "8087:8087"
+    environment:
+      - REDIS_URL=redis://tracseq20-redis-1:6379
+      - HOST=0.0.0.0
+      - PORT=8087
+      - RUST_LOG=info
+      - DATABASE_URL=postgresql://postgres:postgres@tracseq20-postgres-1:5432/lab_manager
+      - AUTH_SERVICE_URL=http://tracseq20-auth-service-1:8080
+      - NOTIFICATION_SERVICE_URL=http://tracseq20-notification-service-1:8085
+    restart: unless-stopped
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis Commander for Event Service Management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: tracseq-redis-ui
+    environment:
+      - REDIS_HOSTS=main:tracseq20-redis-1:6379,rag:rag-redis:6379,gateway:tracseq-gateway-redis:6379
+      - HTTP_USER=admin
+      - HTTP_PASSWORD=tracseq2024
+    ports:
+      - "8095:8081"
+    restart: unless-stopped
+    networks:
+      - tracseq-network
+
+networks:
+  tracseq-network:
+    external: true 

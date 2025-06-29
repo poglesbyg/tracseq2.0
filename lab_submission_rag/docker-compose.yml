@@ -12,7 +12,7 @@ services:
   rag-service:
     build: .
     ports:
-      - "8000:8000"
+      - "8086:8000"
     volumes:
       - uploads:/app/uploads
       - exports:/app/exports
@@ -44,7 +44,7 @@ services:
     # Connect to the same Docker network as lab_manager if it exists
     networks:
       - default
-      - lab_manager_lab_network
+      - tracseq-network
     external_links:
       - lab_manager_postgres:postgres
 
@@ -57,5 +57,5 @@ volumes:
 
 networks:
   default:
-  lab_manager_lab_network:
+  tracseq-network:
     external: true

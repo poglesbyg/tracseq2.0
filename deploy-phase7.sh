@@ -61,28 +61,28 @@ init_kafka_topics() {
     # Wait for Kafka to be ready
     sleep 30
     
-    # Create topics
-    docker exec tracseq-kafka kafka-topics --bootstrap-server localhost:9093 \
+    # Create topics (using internal Kafka port 9093)
+    docker exec tracseq-kafka kafka-topics --bootstrap-server kafka:9093 \
         --create --if-not-exists --topic laboratory.sample.events \
         --partitions 3 --replication-factor 1 || true
         
-    docker exec tracseq-kafka kafka-topics --bootstrap-server localhost:9093 \
+    docker exec tracseq-kafka kafka-topics --bootstrap-server kafka:9093 \
         --create --if-not-exists --topic laboratory.sequencing.events \
         --partitions 3 --replication-factor 1 || true
         
-    docker exec tracseq-kafka kafka-topics --bootstrap-server localhost:9093 \
+    docker exec tracseq-kafka kafka-topics --bootstrap-server kafka:9093 \
         --create --if-not-exists --topic laboratory.storage.events \
         --partitions 3 --replication-factor 1 || true
         
-    docker exec tracseq-kafka kafka-topics --bootstrap-server localhost:9093 \
+    docker exec tracseq-kafka kafka-topics --bootstrap-server kafka:9093 \
         --create --if-not-exists --topic laboratory.notification.events \
         --partitions 3 --replication-factor 1 || true
         
-    docker exec tracseq-kafka kafka-topics --bootstrap-server localhost:9093 \
+    docker exec tracseq-kafka kafka-topics --bootstrap-server kafka:9093 \
         --create --if-not-exists --topic laboratory.saga.events \
         --partitions 3 --replication-factor 1 || true
         
-    docker exec tracseq-kafka kafka-topics --bootstrap-server localhost:9093 \
+    docker exec tracseq-kafka kafka-topics --bootstrap-server kafka:9093 \
         --create --if-not-exists --topic laboratory.dead-letter \
         --partitions 1 --replication-factor 1 || true
     
@@ -197,12 +197,15 @@ display_access_info() {
     log "🎉 Phase 7 Deployment Complete!"
     echo ""
     info "Access your Phase 7 components:"
-    echo "  📊 Kafka UI: http://localhost:8080"
+    echo "  📊 Kafka UI: http://localhost:8084"
     echo "  🔧 Schema Registry: http://localhost:8081"
-    echo "  🔌 Kafka Connect: http://localhost:8083"
+    echo "  🔌 Kafka Connect: http://localhost:8094"
     echo "  📈 ksqlDB: http://localhost:8088"
-    echo "  🗄️ Event Store DB: postgresql://localhost:5434"
-    echo "  📖 Read Model DB: postgresql://localhost:5435"
+    echo "  🗄️ Event Store DB: postgresql://localhost:5436"
+    echo "  📖 Read Model DB: postgresql://localhost:5437"
+    echo "  📝 Event Sourcing Service: http://localhost:8091"
+    echo "  🔄 CQRS Projection Service: http://localhost:8096"
+    echo "  🎭 Saga Orchestrator: http://localhost:8095"
     echo ""
     info "Kafka Topics created:"
     echo "  - laboratory.sample.events"

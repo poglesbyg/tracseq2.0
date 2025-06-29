@@ -59,11 +59,21 @@ export default function Templates() {
       const apiData = response.data || {};
       const rawTemplates = apiData.data || apiData.templates || [];
       
-      // Ensure we always return an array
+      // Ensure we always return an array and transform to match Template interface
       const templatesArray = Array.isArray(rawTemplates) ? rawTemplates : [];
-      console.log(`✅ Final templates count: ${templatesArray.length}`);
       
-      return templatesArray;
+      // Transform API data to match Template interface
+      const transformedTemplates = templatesArray.map((apiTemplate: any) => ({
+        id: apiTemplate.id,
+        name: apiTemplate.name,
+        description: apiTemplate.description,
+        created_at: apiTemplate.created_at,
+        fields: apiTemplate.fields || [],
+        metadata: apiTemplate.metadata || {}
+      }));
+      
+      console.log(`✅ Final templates count: ${transformedTemplates.length}`);
+      return transformedTemplates;
     },
   });
 

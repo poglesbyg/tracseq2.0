@@ -15,26 +15,16 @@ pub enum TemplateStatus {
 }
 
 /// Field type enumeration for template fields
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, sqlx::Type, PartialEq, Eq)]
 #[sqlx(type_name = "field_type", rename_all = "snake_case")]
 pub enum FieldType {
     Text,
     Number,
     Date,
-    DateTime,
-    Email,
-    Phone,
-    Url,
-    Select,
-    MultiSelect,
-    Radio,
-    Checkbox,
     Boolean,
+    Select,
+    Multiselect,
     File,
-    TextArea,
-    RichText,
-    Password,
-    Hidden,
 }
 
 /// Validation rule type enumeration
@@ -83,21 +73,16 @@ pub struct Template {
 pub struct TemplateField {
     pub id: Uuid,
     pub template_id: Uuid,
-    pub name: String,
-    pub label: String,
-    pub description: Option<String>,
+    pub field_name: String,
     pub field_type: FieldType,
-    pub is_required: bool,
-    pub is_readonly: bool,
-    pub is_hidden: bool,
-    pub default_value: Option<serde_json::Value>,
-    pub placeholder: Option<String>,
-    pub help_text: Option<String>,
-    pub sort_order: i32,
-    pub group_name: Option<String>,
-    pub field_config: serde_json::Value,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub field_label: String,
+    pub field_description: Option<String>,
+    pub is_required: Option<bool>,
+    pub field_order: Option<i32>,
+    pub validation_rules: Option<serde_json::Value>,
+    pub default_value: Option<String>,
+    pub field_options: Option<serde_json::Value>,
+    pub field_metadata: Option<serde_json::Value>,
 }
 
 /// Template creation request
@@ -175,28 +160,70 @@ pub struct TemplateResponse {
 pub struct CreateFieldRequest {
     #[validate(length(
         min = 1,
-        max = 100,
-        message = "Field name must be between 1 and 100 characters"
+        max = 255,
+        message = "Field name must be between 1 and 255 characters"
     ))]
-    pub name: String,
+    pub field_name: String,
 
     #[validate(length(
         min = 1,
         max = 255,
         message = "Field label must be between 1 and 255 characters"
     ))]
-    pub label: String,
+    pub field_label: String,
 
-    pub description: Option<String>,
+    pub field_description: Option<String>,
     pub field_type: FieldType,
     pub is_required: Option<bool>,
-    pub is_readonly: Option<bool>,
-    pub is_hidden: Option<bool>,
-    pub default_value: Option<serde_json::Value>,
-    pub placeholder: Option<String>,
-    pub help_text: Option<String>,
-    pub group_name: Option<String>,
-    pub field_config: Option<serde_json::Value>,
+    pub field_order: Option<i32>,
+    pub validation_rules: Option<serde_json::Value>,
+    pub default_value: Option<String>,
+    pub field_options: Option<serde_json::Value>,
+    pub field_metadata: Option<serde_json::Value>,
+}
+
+/// Field update request
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct UpdateFieldRequest {
+    #[validate(length(
+        min = 1,
+        max = 255,
+        message = "Field name must be between 1 and 255 characters"
+    ))]
+    pub field_name: Option<String>,
+
+    #[validate(length(
+        min = 1,
+        max = 255,
+        message = "Field label must be between 1 and 255 characters"
+    ))]
+    pub field_label: Option<String>,
+
+    pub field_description: Option<String>,
+    pub field_type: Option<FieldType>,
+    pub is_required: Option<bool>,
+    pub field_order: Option<i32>,
+    pub validation_rules: Option<serde_json::Value>,
+    pub default_value: Option<String>,
+    pub field_options: Option<serde_json::Value>,
+    pub field_metadata: Option<serde_json::Value>,
+}
+
+/// Field response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FieldResponse {
+    pub id: Uuid,
+    pub template_id: Uuid,
+    pub field_name: String,
+    pub field_type: FieldType,
+    pub field_label: String,
+    pub field_description: Option<String>,
+    pub is_required: bool,
+    pub field_order: i32,
+    pub validation_rules: serde_json::Value,
+    pub default_value: Option<String>,
+    pub field_options: serde_json::Value,
+    pub field_metadata: serde_json::Value,
 }
 
 /// Template search filters

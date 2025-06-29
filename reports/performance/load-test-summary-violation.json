@@ -1,0 +1,17 @@
+{
+    "timestamp": "2024-12-29T16:30:00Z",
+    "metrics": {
+        "http_req_duration": {
+            "avg": 125.7,
+            "p(95)": 685.4,
+            "p(99)": 1250.8
+        },
+        "http_req_failed": {
+            "rate": 0.087
+        },
+        "http_reqs": {
+            "count": 1000,
+            "rate": 16.67
+        }
+    }
+}

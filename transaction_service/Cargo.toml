@@ -24,7 +24,7 @@ async-trait = "0.1"
 rand = "0.8"
 
 # Database
-sqlx = { workspace = true, optional = true }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros", "migrate"], optional = true }
 uuid = { version = "1.6", features = ["v4", "serde"] }
 
 # Connection pooling
@@ -55,8 +55,8 @@ thiserror = "1.0"
 # HTTP client for service communication
 reqwest = { version = "0.11", features = ["json", "stream"] }
 
-# Event service integration
-event_service = { path = "../event_service" }
+# Event service integration (using local HTTP calls instead of library dependency)
+# event_service = { path = "../event_service" }
 
 # Redis for state management
 redis = { version = "0.24", features = ["streams", "connection-manager", "tokio-comp"] }
@@ -88,7 +88,7 @@ tower = { version = "0.4", features = ["util", "timeout", "load-shed", "limit"] 
 tower-http = { version = "0.5", features = ["fs", "trace", "cors", "timeout"] }
 
 # Database testing
-sqlx = { workspace = true }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros", "migrate"] }
 
 # Distributed system testing
 wiremock = "0.6"

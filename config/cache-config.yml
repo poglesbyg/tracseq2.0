@@ -1,0 +1,13 @@
+# Cache Configuration
+cache:
+  default_ttl: 300s
+  max_entries: 10000
+  eviction_policy: lru
+  
+  endpoints:
+    - pattern: "/api/samples/*"
+      ttl: 600s
+    - pattern: "/api/templates/*"
+      ttl: 1800s
+    - pattern: "/api/storage/locations/*"
+      ttl: 3600s
