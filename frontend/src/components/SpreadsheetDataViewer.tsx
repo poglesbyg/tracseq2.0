@@ -394,7 +394,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
     if (Date.parse(strValue) && /\d/.test(strValue)) return 'date';
     
     // Boolean detection
-    if (['true', 'false', 'yes', 'no', '1', '0'].includes(strValue.toLowerCase())) return 'boolean';
+    if (strValue && ['true', 'false', 'yes', 'no', '1', '0'].includes(strValue.toLowerCase())) return 'boolean';
     
     return 'text';
   }, []);
@@ -813,7 +813,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
           </a>
         );
       case 'boolean': {
-        const lowerVal = stringValue.toLowerCase();
+        const lowerVal = stringValue && typeof stringValue === 'string' ? stringValue.toLowerCase() : '';
         const isTrue = ['true', 'yes', '1'].includes(lowerVal);
         return (
           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${

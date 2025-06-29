@@ -80,8 +80,8 @@ export default function Samples() {
     },
   });
 
-  // Extract samples array from response
-  const samples = samplesResponse?.samples || [];
+  // Extract samples array from response with proper safety checks
+  const samples = (samplesResponse && Array.isArray(samplesResponse.samples)) ? samplesResponse.samples : [];
 
   // Handle error state
   if (isError) {
@@ -100,8 +100,8 @@ export default function Samples() {
     );
   }
 
-  // Filter samples based on current filters
-  const filteredSamples = samples.filter((sample: Sample) => {
+  // Filter samples based on current filters with safety checks
+  const filteredSamples = Array.isArray(samples) ? samples.filter((sample: Sample) => {
     // Search filter
     if (searchQuery && !sample.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
         !sample.barcode.toLowerCase().includes(searchQuery.toLowerCase())) {
@@ -131,7 +131,7 @@ export default function Samples() {
     }
     
     return true;
-  });
+  }) : [];
 
   const getStatusColor = (status: string) => {
     switch (status) {

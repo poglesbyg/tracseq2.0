@@ -70,7 +70,8 @@ export default function Spreadsheets() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
+    const statusLower = status && typeof status === 'string' ? status.toLowerCase() : '';
+    switch (statusLower) {
       case 'completed':
         return 'bg-green-100 text-green-800';
       case 'processing':
@@ -173,7 +174,7 @@ export default function Spreadsheets() {
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Total Records</dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      {datasets.reduce((sum, dataset) => sum + dataset.total_rows, 0).toLocaleString()}
+                      {Array.isArray(datasets) ? datasets.reduce((sum, dataset) => sum + dataset.total_rows, 0).toLocaleString() : '0'}
                     </dd>
                   </dl>
                 </div>
@@ -264,7 +265,7 @@ export default function Spreadsheets() {
                       </td>
                     </tr>
                   ) : (
-                    datasets.map((dataset) => (
+                    Array.isArray(datasets) && datasets.map((dataset) => (
                       <tr 
                         key={dataset.id}
                         className={`${

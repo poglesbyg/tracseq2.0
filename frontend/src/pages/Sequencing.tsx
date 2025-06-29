@@ -38,7 +38,9 @@ export default function Sequencing() {
     queryKey: ['samples'],
     queryFn: async () => {
       const response = await api.get('/api/samples');
-      return response.data;
+      const apiData = response.data || {};
+      const rawSamples = apiData.data || apiData.samples || response.data;
+      return Array.isArray(rawSamples) ? rawSamples : [];
     },
   });
 
@@ -115,7 +117,7 @@ export default function Sequencing() {
                     setSelectedSamples(values);
                   }}
                 >
-                  {samples?.map((sample) => (
+                  {Array.isArray(samples) && samples.map((sample) => (
                     <option key={sample.id} value={sample.id}>
                       {sample.name} ({sample.barcode})
                     </option>
@@ -140,7 +142,7 @@ export default function Sequencing() {
                   </div>
                 ) : (
                   <ul className="divide-y divide-gray-200">
-                    {jobs?.map((job) => (
+                    {Array.isArray(jobs) && jobs.map((job) => (
                       <li key={job.id} className="py-4">
                         <div className="flex items-center justify-between">
                           <div>
