@@ -315,7 +315,7 @@ async def main():
 
 if __name__ == "__main__":
     import sys
-from typing import Any
+    from typing import Any
 
     # Set up proper event loop policy for Windows
     if sys.platform.startswith("win"):

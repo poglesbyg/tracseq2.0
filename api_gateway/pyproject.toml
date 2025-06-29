@@ -262,10 +262,3 @@ exclude_lines = [
 [tool.coverage.paths]
 api_gateway = ["src/api_gateway", "*/tracseq-api-gateway/src/api_gateway"]
 tests = ["tests", "*/tracseq-api-gateway/tests"]
-
-[tool.coverage.report]
-exclude_lines = [
-  "no cov",
-  "if __name__ == .__main__.:",
-  "if TYPE_CHECKING:",
-] 

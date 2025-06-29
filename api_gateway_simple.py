@@ -10,6 +10,9 @@ from datetime import datetime
 import uvicorn
 import json
 import uuid
+import asyncpg
+import os
+from typing import Optional, List, Dict, Any
 
 app = FastAPI(title="TracSeq 2.0 Simple API Gateway", version="1.0.0")
 
@@ -22,8 +25,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory storage for uploaded spreadsheets (persisted during session)
-UPLOADED_SPREADSHEETS = []
+# Database configuration for PostgreSQL connection
+DATABASE_URL = "postgresql://tracseq_admin:tracseq_secure_password@localhost:5433/tracseq_main"
+db_pool: Optional[asyncpg.Pool] = None
+
+async def get_db_pool() -> asyncpg.Pool:
+    """Get database connection pool"""
+    global db_pool
+    if db_pool is None:
+        try:
+            db_pool = await asyncpg.create_pool(
+                DATABASE_URL,
+                min_size=5,
+                max_size=20,
+                command_timeout=60,
+                server_settings={'application_name': 'tracseq_api_gateway'}
+            )
+            print(f"✅ Connected to PostgreSQL database")
+        except Exception as e:
+            print(f"❌ Failed to connect to database: {e}")
+            raise
+    return db_pool
+
+async def init_database():
+    """Initialize database connection on startup"""
+    await get_db_pool()
+
+async def close_database():
+    """Close database connection on shutdown"""
+    global db_pool
+    if db_pool:
+        await db_pool.close()
+        print("✅ Database connection closed")
+
+# In-memory cache for better performance (optional fallback)
+CACHE_ENABLED = True
 
 # Mock data for development
 MOCK_SAMPLES = [
@@ -618,56 +654,142 @@ async def update_sequencing_job(job_id: str, request: dict):
 
 @app.get("/api/spreadsheets/datasets")
 async def get_spreadsheet_datasets():
-    """Get available spreadsheet datasets including uploaded ones"""
-    # Mock datasets (always present)
-    mock_datasets = [
-        {
-            "id": "dataset-001",
-            "name": "Sample Tracking Database",
-            "description": "Comprehensive sample tracking and metadata",
-            "file_type": "XLSX",
-            "size": "2.4 MB",
-            "last_modified": datetime.now().isoformat(),
-            "status": "active",
-            "row_count": 1247,
-            "column_count": 23,
-            "sheets": ["Samples", "Storage", "QC Results"],
-            "created_by": "Dr. Sarah Wilson",
-            "created_at": datetime.now().isoformat()
-        },
-        {
-            "id": "dataset-002", 
-            "name": "Sequencing Results Archive",
-            "description": "Historical sequencing job results and metrics",
-            "file_type": "CSV",
-            "size": "856 KB",
-            "last_modified": datetime.now().isoformat(),
-            "status": "active",
-            "row_count": 892,
-            "column_count": 15,
-            "sheets": ["Results"],
-            "created_by": "Dr. Jane Smith",
-            "created_at": datetime.now().isoformat()
-        },
-        {
-            "id": "dataset-003",
-            "name": "Template Usage Statistics",
-            "description": "Analytics on template usage and effectiveness",
-            "file_type": "XLSX",
-            "size": "1.1 MB", 
-            "last_modified": datetime.now().isoformat(),
-            "status": "active",
-            "row_count": 456,
-            "column_count": 12,
-            "sheets": ["Usage Stats", "Templates", "Metrics"],
-            "created_by": "Lab Administrator",
-            "created_at": datetime.now().isoformat()
-        }
-    ]
-    
-    # Combine mock datasets with uploaded spreadsheets (most recent first)
-    all_datasets = UPLOADED_SPREADSHEETS + mock_datasets
-    return all_datasets
+    """Get available spreadsheet datasets from PostgreSQL database"""
+    try:
+        pool = await get_db_pool()
+        async with pool.acquire() as connection:
+            # Get spreadsheet datasets from the database
+            rows = await connection.fetch("""
+                SELECT 
+                    id,
+                    name,
+                    filename,
+                    file_type,
+                    file_size,
+                    total_rows,
+                    total_columns,
+                    upload_status as status,
+                    description,
+                    uploaded_by,
+                    created_at,
+                    updated_at,
+                    metadata
+                FROM spreadsheet_datasets 
+                WHERE upload_status IN ('completed', 'processing', 'pending')
+                ORDER BY created_at DESC
+            """)
+            
+            # Convert database rows to API format
+            datasets = []
+            for row in rows:
+                # Format file size
+                file_size_bytes = row['file_size'] or 0
+                if file_size_bytes > 1024 * 1024:
+                    size_str = f"{file_size_bytes / (1024 * 1024):.1f} MB"
+                elif file_size_bytes > 1024:
+                    size_str = f"{file_size_bytes / 1024:.1f} KB"
+                else:
+                    size_str = f"{file_size_bytes} B"
+                
+                # Parse metadata if available
+                metadata = {}
+                if row['metadata']:
+                    try:
+                        metadata = json.loads(row['metadata']) if isinstance(row['metadata'], str) else row['metadata']
+                    except (json.JSONDecodeError, TypeError):
+                        metadata = {}
+                
+                dataset = {
+                    "id": str(row['id']),
+                    "name": row['name'],
+                    "description": row['description'] or "User uploaded spreadsheet",
+                    "filename": row['filename'],
+                    "file_type": row['file_type'],
+                    "size": size_str,
+                    "last_modified": row['updated_at'].isoformat() if row['updated_at'] else row['created_at'].isoformat(),
+                    "status": row['status'],
+                    "row_count": row['total_rows'] or 0,
+                    "column_count": row['total_columns'] or 0,
+                    "sheets": metadata.get("sheets", ["Data"]),
+                    "created_by": str(row['uploaded_by']) if row['uploaded_by'] else "Unknown",
+                    "created_at": row['created_at'].isoformat(),
+                    "upload_method": metadata.get("upload_method", "database")
+                }
+                datasets.append(dataset)
+            
+            # Add mock datasets for demonstration (can be removed in production)
+            mock_datasets = [
+                {
+                    "id": "dataset-mock-001",
+                    "name": "Sample Tracking Database",
+                    "description": "Comprehensive sample tracking and metadata",
+                    "file_type": "XLSX",
+                    "size": "2.4 MB",
+                    "last_modified": datetime.now().isoformat(),
+                    "status": "active",
+                    "row_count": 1247,
+                    "column_count": 23,
+                    "sheets": ["Samples", "Storage", "QC Results"],
+                    "created_by": "Dr. Sarah Wilson",
+                    "created_at": datetime.now().isoformat(),
+                    "upload_method": "system"
+                },
+                {
+                    "id": "dataset-mock-002", 
+                    "name": "Sequencing Results Archive",
+                    "description": "Historical sequencing job results and metrics",
+                    "file_type": "CSV",
+                    "size": "856 KB",
+                    "last_modified": datetime.now().isoformat(),
+                    "status": "active",
+                    "row_count": 892,
+                    "column_count": 15,
+                    "sheets": ["Results"],
+                    "created_by": "Dr. Jane Smith",
+                    "created_at": datetime.now().isoformat(),
+                    "upload_method": "system"
+                },
+                {
+                    "id": "dataset-mock-003",
+                    "name": "Template Usage Statistics",
+                    "description": "Analytics on template usage and effectiveness",
+                    "file_type": "XLSX",
+                    "size": "1.1 MB", 
+                    "last_modified": datetime.now().isoformat(),
+                    "status": "active",
+                    "row_count": 456,
+                    "column_count": 12,
+                    "sheets": ["Usage Stats", "Templates", "Metrics"],
+                    "created_by": "Lab Administrator",
+                    "created_at": datetime.now().isoformat(),
+                    "upload_method": "system"
+                }
+            ]
+            
+            # Combine database datasets with mock datasets
+            all_datasets = datasets + mock_datasets
+            return all_datasets
+            
+    except Exception as e:
+        print(f"Database error in get_spreadsheet_datasets: {e}")
+        # Return mock data if database fails
+        return [
+            {
+                "id": "dataset-error-001",
+                "name": "Sample Tracking Database (DB Error)",
+                "description": "Mock data - database connection failed",
+                "file_type": "XLSX",
+                "size": "2.4 MB",
+                "last_modified": datetime.now().isoformat(),
+                "status": "active",
+                "row_count": 1247,
+                "column_count": 23,
+                "sheets": ["Samples", "Storage", "QC Results"],
+                "created_by": "Dr. Sarah Wilson",
+                "created_at": datetime.now().isoformat(),
+                "upload_method": "fallback"
+            }
+        ]
 
 @app.get("/api/spreadsheets/datasets/{dataset_id}")
 async def get_spreadsheet_dataset(dataset_id: str):
@@ -869,51 +991,98 @@ async def preview_spreadsheet_sheets(file: UploadFile = File(...)):
 
 @app.post("/api/spreadsheets/upload-multiple")
 async def upload_multiple_spreadsheets(file: UploadFile = File(...), uploaded_by: str = "Lab Administrator"):
-    """Upload multiple spreadsheet files"""
-    # Get file extension and determine type
-    file_extension = file.filename.split('.')[-1].upper() if file.filename else "UNKNOWN"
-    file_size_mb = round((file.size if hasattr(file, 'size') and file.size else 2000000) / (1024 * 1024), 1)
-    
-    # Create new spreadsheet record
-    new_spreadsheet = {
-        "id": f"dataset-{datetime.now().strftime('%Y%m%d%H%M%S')}-{len(UPLOADED_SPREADSHEETS) + 1:03d}",
-        "name": f"Uploaded: {file.filename or 'Unknown File'}",
-        "description": f"User uploaded spreadsheet via web interface",
-        "filename": file.filename or "uploaded_file.xlsx",
-        "original_name": file.filename or "Uploaded Spreadsheet.xlsx",
-        "file_type": file_extension,
-        "size": f"{file_size_mb} MB",
-        "status": "completed",
-        "last_modified": datetime.now().isoformat(),
-        "created_at": datetime.now().isoformat(),
-        "uploaded_by": uploaded_by,
-        "created_by": uploaded_by,
-        "row_count": 245,  # Mock row count - could be analyzed from actual file
-        "column_count": 8,  # Mock column count
-        "sheets": ["Sample Data", "Storage Info"] if file_extension in ["XLSX", "XLS"] else ["Data"],
-        "upload_method": "web_interface",
-        "preview": {
-            "headers": ["Sample ID", "Type", "Volume", "Concentration"],
-            "sample_rows": [
-                ["S001", "DNA", "150", "25.7"],
-                ["S002", "RNA", "100", "22.3"]
-            ]
-        }
-    }
-    
-    # Add to uploaded spreadsheets list (at the beginning for newest first)
-    UPLOADED_SPREADSHEETS.insert(0, new_spreadsheet)
-    
-    return {
-        "success": True,
-        "message": f"Spreadsheet '{file.filename}' uploaded successfully and saved to in-memory storage",
-        "uploaded_count": 1,
-        "files": [new_spreadsheet],
-        "data": [new_spreadsheet],  # Frontend might expect 'data' key
-        "total_size": f"{file_size_mb} MB",
-        "processing_time": 1.5,
-        "spreadsheet_id": new_spreadsheet["id"]
-    }
+    """Upload spreadsheet files and save to PostgreSQL database"""
+    try:
+        # Get file extension and determine type
+        file_extension = file.filename.split('.')[-1].upper() if file.filename else "UNKNOWN"
+        file_size_bytes = file.size if hasattr(file, 'size') and file.size else 2000000
+        file_size_mb = round(file_size_bytes / (1024 * 1024), 1)
+        
+        pool = await get_db_pool()
+        async with pool.acquire() as connection:
+            # Generate UUID for the spreadsheet
+            spreadsheet_id = uuid.uuid4()
+            
+            # Create metadata
+            metadata = {
+                "upload_method": "web_interface",
+                "original_name": file.filename or "Uploaded Spreadsheet",
+                "sheets": ["Sample Data", "Storage Info"] if file_extension in ["XLSX", "XLS"] else ["Data"],
+                "preview": {
+                    "headers": ["Sample ID", "Type", "Volume", "Concentration"],
+                    "sample_rows": [
+                        ["S001", "DNA", "150", "25.7"],
+                        ["S002", "RNA", "100", "22.3"]
+                    ]
+                }
+            }
+            
+            # Get a valid user UUID (Lab Administrator) for the uploaded_by field
+            user_result = await connection.fetchrow("""
+                SELECT id FROM users WHERE email = 'admin@lab.local' LIMIT 1
+            """)
+            user_id = user_result['id'] if user_result else None
+            
+            # Insert spreadsheet record into database
+            await connection.execute("""
+                INSERT INTO spreadsheet_datasets (
+                    id, name, filename, file_size, file_type, 
+                    upload_status, total_rows, total_columns,
+                    description, metadata, uploaded_by, created_at, updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+            """, 
+                spreadsheet_id,
+                f"Uploaded: {file.filename or 'Unknown File'}",
+                file.filename or "uploaded_file.xlsx", 
+                file_size_bytes,
+                file_extension,
+                "completed",  # Set as completed for now
+                245,  # Mock row count
+                8,    # Mock column count
+                "User uploaded spreadsheet via web interface",
+                json.dumps(metadata),
+                user_id  # Use UUID instead of string
+            )
+            
+            # Create response with the inserted data
+            new_spreadsheet = {
+                "id": str(spreadsheet_id),
+                "name": f"Uploaded: {file.filename or 'Unknown File'}",
+                "description": "User uploaded spreadsheet via web interface",
+                "filename": file.filename or "uploaded_file.xlsx",
+                "original_name": file.filename or "Uploaded Spreadsheet.xlsx",
+                "file_type": file_extension,
+                "size": f"{file_size_mb} MB",
+                "status": "completed",
+                "last_modified": datetime.now().isoformat(),
+                "created_at": datetime.now().isoformat(),
+                "uploaded_by": uploaded_by,
+                "created_by": uploaded_by,
+                "row_count": 245,  # Mock row count
+                "column_count": 8,  # Mock column count
+                "sheets": metadata["sheets"],
+                "upload_method": "web_interface",
+                "preview": metadata["preview"]
+            }
+            
+            return {
+                "success": True,
+                "message": f"Spreadsheet '{file.filename}' uploaded successfully and saved to PostgreSQL database",
+                "uploaded_count": 1,
+                "files": [new_spreadsheet],
+                "data": [new_spreadsheet],  # Frontend might expect 'data' key
+                "total_size": f"{file_size_mb} MB",
+                "processing_time": 1.5,
+                "spreadsheet_id": str(spreadsheet_id)
+            }
+            
+    except Exception as e:
+        print(f"Database error during upload: {e}")
+        # Return error response
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to save spreadsheet to database: {str(e)}"
+        )
 
 @app.get("/api/reports/schema")
 async def get_reports_schema():
@@ -1102,7 +1271,16 @@ async def redirect_rag_samples():
     """Redirect handler for double /api prefix - frontend routing issue"""
     return await get_rag_samples()
 
-# Simple API Gateway - no database connections needed
+# Add startup and shutdown event handlers
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database connection on startup"""
+    await init_database()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Close database connection on shutdown"""
+    await close_database()
 
 if __name__ == "__main__":
     print("🚀 Starting TracSeq 2.0 Simple API Gateway...")
