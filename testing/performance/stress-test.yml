@@ -1,0 +1,301 @@
+config:
+  target: "http://localhost:8089"  # API Gateway
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up"
+    - duration: 120
+      arrivalRate: 25
+      name: "Ramp up load"
+    - duration: 300
+      arrivalRate: 100
+      name: "High load"
+    - duration: 120
+      arrivalRate: 200
+      name: "Stress test"
+    - duration: 60
+      arrivalRate: 50
+      name: "Cool down"
+  
+  processor: "./stress-test-processor.js"
+  
+  plugins:
+    ensure:
+      thresholds:
+        - http.response_time.p95: 1000
+        - http.response_time.p99: 2000
+        - http.codes.200: 100
+        - http.request_rate: 100
+    
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+  
+  engines:
+    http:
+      timeout: 30
+      pool: 50
+  
+  variables:
+    sampleTypes:
+      - "blood"
+      - "tissue"
+      - "dna"
+      - "rna"
+      - "plasma"
+    storageTemperatures:
+      - -80
+      - -20
+      - 4
+      - 25
+      - 37
+    sequencingTypes:
+      - "WGS"
+      - "WES"
+      - "RNA-Seq"
+      - "ChIP-Seq"
+      - "ATAC-Seq"
+
+before:
+  flow:
+    - log: "Starting TracSeq 2.0 stress test"
+    - post:
+        url: "/auth/login"
+        json:
+          username: "stress_test_user"
+          password: "stress_test_password"
+        capture:
+          - json: "$.access_token"
+            as: "authToken"
+
+scenarios:
+  - name: "Laboratory Workflow - Heavy Load"
+    weight: 40
+    flow:
+      # Authenticate
+      - post:
+          url: "/auth/login"
+          json:
+            username: "user_{{ $randomNumber(1, 100) }}"
+            password: "password123"
+          capture:
+            - json: "$.access_token"
+              as: "userToken"
+      
+      # Create multiple samples rapidly
+      - loop:
+        - post:
+            url: "/samples"
+            headers:
+              Authorization: "Bearer {{ userToken }}"
+            json:
+              name: "STRESS-{{ $randomString(10) }}"
+              sample_type: "{{ sampleTypes[Math.floor(Math.random() * sampleTypes.length)] }}"
+              volume_ml: "{{ $randomNumber(1, 20) }}"
+              collection_date: "{{ new Date().toISOString() }}"
+              patient_id: "PAT-{{ $randomString(8) }}"
+              priority: "urgent"
+            capture:
+              - json: "$.id"
+                as: "sampleId"
+            name: "Create Sample"
+        
+        - get:
+            url: "/samples/{{ sampleId }}"
+            headers:
+              Authorization: "Bearer {{ userToken }}"
+            name: "Get Sample"
+        
+        - patch:
+            url: "/samples/{{ sampleId }}/status"
+            headers:
+              Authorization: "Bearer {{ userToken }}"
+            json:
+              status: "processing"
+            name: "Update Sample Status"
+        
+        count: 5
+      
+      # Storage allocation stress
+      - post:
+          url: "/storage/allocate"
+          headers:
+            Authorization: "Bearer {{ userToken }}"
+          json:
+            sample_id: "{{ sampleId }}"
+            temperature: "{{ storageTemperatures[Math.floor(Math.random() * storageTemperatures.length)] }}"
+            duration_days: "{{ $randomNumber(30, 365) }}"
+          name: "Allocate Storage"
+      
+      # Concurrent searches
+      - parallel:
+        - get:
+            url: "/samples/search?sample_type=blood&limit=50"
+            headers:
+              Authorization: "Bearer {{ userToken }}"
+            name: "Search Blood Samples"
+        
+        - get:
+            url: "/samples/search?priority=urgent&limit=100"
+            headers:
+              Authorization: "Bearer {{ userToken }}"
+            name: "Search Urgent Samples"
+        
+        - get:
+            url: "/storage/capacity"
+            headers:
+              Authorization: "Bearer {{ userToken }}"
+            name: "Check Storage Capacity"
+
+  - name: "Sequencing Operations - Stress"
+    weight: 30
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            username: "seq_user_{{ $randomNumber(1, 50) }}"
+            password: "password123"
+          capture:
+            - json: "$.access_token"
+              as: "seqToken"
+      
+      # Create sequencing runs
+      - loop:
+        - post:
+            url: "/sequencing/runs"
+            headers:
+              Authorization: "Bearer {{ seqToken }}"
+            json:
+              name: "STRESS-SEQ-{{ $randomString(8) }}"
+              sequencer_id: "SEQ-{{ $randomNumber(1, 10) }}"
+              run_type: "{{ sequencingTypes[Math.floor(Math.random() * sequencingTypes.length)] }}"
+              samples: 
+                - "SAMPLE-{{ $randomString(10) }}"
+                - "SAMPLE-{{ $randomString(10) }}"
+                - "SAMPLE-{{ $randomString(10) }}"
+              parameters:
+                read_length: "{{ $randomNumber(1, 3) * 100 }}"
+                paired_end: true
+                coverage: "{{ $randomNumber(30, 100) }}"
+            capture:
+              - json: "$.id"
+                as: "runId"
+            name: "Create Sequencing Run"
+        
+        - get:
+            url: "/sequencing/runs/{{ runId }}"
+            headers:
+              Authorization: "Bearer {{ seqToken }}"
+            name: "Get Sequencing Run"
+        
+        - patch:
+            url: "/sequencing/runs/{{ runId }}/status"
+            headers:
+              Authorization: "Bearer {{ seqToken }}"
+            json:
+              status: "running"
+              progress: "{{ $randomNumber(0, 100) }}"
+            name: "Update Run Status"
+        
+        count: 3
+
+  - name: "Data Processing - Intensive"
+    weight: 20
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            username: "data_user_{{ $randomNumber(1, 30) }}"
+            password: "password123"
+          capture:
+            - json: "$.access_token"
+              as: "dataToken"
+      
+      # Heavy template operations
+      - get:
+          url: "/templates?limit=100"
+          headers:
+            Authorization: "Bearer {{ dataToken }}"
+          capture:
+            - json: "$[0].id"
+              as: "templateId"
+          name: "List Templates"
+      
+      - post:
+          url: "/templates/{{ templateId }}/process"
+          headers:
+            Authorization: "Bearer {{ dataToken }}"
+          json:
+            data:
+              samples: 
+                - id: "SAMPLE-{{ $randomString(10) }}"
+                  values: 
+                    field1: "{{ $randomString(20) }}"
+                    field2: "{{ $randomNumber(1, 1000) }}"
+                    field3: "{{ new Date().toISOString() }}"
+              repeat: 50
+          name: "Process Template - Heavy"
+      
+      # Bulk operations
+      - post:
+          url: "/samples/bulk"
+          headers:
+            Authorization: "Bearer {{ dataToken }}"
+          json:
+            operation: "update"
+            filter:
+              sample_type: "blood"
+              created_after: "{{ new Date(Date.now() - 86400000).toISOString() }}"
+            update:
+              status: "archived"
+              archived_by: "stress_test"
+          name: "Bulk Update Samples"
+
+  - name: "Notification Flood"
+    weight: 10
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            username: "notif_user_{{ $randomNumber(1, 20) }}"
+            password: "password123"
+          capture:
+            - json: "$.access_token"
+              as: "notifToken"
+      
+      # Send many notifications
+      - loop:
+        - post:
+            url: "/notifications/send"
+            headers:
+              Authorization: "Bearer {{ notifToken }}"
+            json:
+              type: "sample_alert"
+              priority: "high"
+              recipients: 
+                - "user_{{ $randomNumber(1, 100) }}@tracseq.io"
+              subject: "Stress Test Alert {{ $randomString(8) }}"
+              body: "This is a stress test notification with ID {{ $randomString(10) }}"
+              metadata:
+                sample_id: "SAMPLE-{{ $randomString(10) }}"
+                timestamp: "{{ new Date().toISOString() }}"
+            name: "Send Notification"
+        
+        count: 10
+      
+      # Check notifications
+      - get:
+          url: "/notifications/unread?limit=100"
+          headers:
+            Authorization: "Bearer {{ notifToken }}"
+          name: "Get Unread Notifications"
+
+after:
+  flow:
+    - log: "Stress test completed"
+    - post:
+        url: "/admin/cleanup"
+        headers:
+          Authorization: "Bearer {{ authToken }}"
+        json:
+          pattern: "STRESS-*"
+          older_than: "1h"
