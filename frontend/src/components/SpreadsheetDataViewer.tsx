@@ -393,8 +393,8 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
     // Date detection (various formats)
     if (Date.parse(strValue) && /\d/.test(strValue)) return 'date';
     
-    // Boolean detection
-    if (strValue && ['true', 'false', 'yes', 'no', '1', '0'].includes(strValue.toLowerCase())) return 'boolean';
+    // Boolean detection - safe toLowerCase() call
+    if (strValue && typeof strValue === 'string' && ['true', 'false', 'yes', 'no', '1', '0'].includes(strValue.toLowerCase())) return 'boolean';
     
     return 'text';
   }, []);
