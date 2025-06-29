@@ -53,7 +53,17 @@ export default function Templates() {
     queryKey: ['templates'],
     queryFn: async () => {
       const response = await axios.get('/api/templates');
-      return response.data;
+      console.log('📊 Templates response:', response.data);
+      
+      // Handle API response structure - API returns {data: [...], templates: [...]}
+      const apiData = response.data || {};
+      const rawTemplates = apiData.data || apiData.templates || [];
+      
+      // Ensure we always return an array
+      const templatesArray = Array.isArray(rawTemplates) ? rawTemplates : [];
+      console.log(`✅ Final templates count: ${templatesArray.length}`);
+      
+      return templatesArray;
     },
   });
 
@@ -265,7 +275,7 @@ export default function Templates() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
-                  {templates?.map((template) => (
+                  {Array.isArray(templates) && templates.map((template) => (
                     <tr key={template.id}>
                       <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
                         <div className="flex items-center">

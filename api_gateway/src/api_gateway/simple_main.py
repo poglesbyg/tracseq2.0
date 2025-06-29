@@ -480,6 +480,88 @@ async def get_rag_submissions():
         "failed": 6
     }
 
+@app.get("/api/rag/submissions/{submission_id}")
+async def get_rag_submission_detail(submission_id: str):
+    """Get detailed RAG submission information"""
+    # Mock detailed submission data
+    submission_details = {
+        "RAG-001": {
+            "id": "RAG-001",
+            "submission_id": "RAG-001",
+            "source_document": "lab_report_2024_01.pdf",
+            "submitter_name": "Dr. Smith",
+            "submitter_email": "dr.smith@lab.com",
+            "confidence_score": 0.92,
+            "processing_time": 2.3,
+            "created_at": (datetime.now() - timedelta(days=2)).isoformat(),
+            "status": "Processed",
+            "samples_created": 15,
+            "extracted_data": {
+                "administrative_info": {
+                    "submitter_name": "Dr. Smith",
+                    "submitter_email": "dr.smith@lab.com",
+                    "project_name": "Cancer Research Study 2024",
+                    "institution": "Advanced Medical Research Lab"
+                },
+                "source_material": {
+                    "sample_type": "Blood",
+                    "source_organism": "Human",
+                    "collection_date": "2024-01-15",
+                    "collection_method": "Venipuncture"
+                },
+                "sample_details": {
+                    "sample_count": 15,
+                    "volume_per_sample": "5ml",
+                    "container_type": "EDTA tubes",
+                    "storage_temperature": "-80°C"
+                }
+            }
+        },
+        "RAG-002": {
+            "id": "RAG-002",
+            "submission_id": "RAG-002", 
+            "source_document": "sample_manifest_batch_47.xlsx",
+            "submitter_name": "Lab Tech Johnson",
+            "submitter_email": "johnson@lab.com",
+            "confidence_score": 0.87,
+            "processing_time": 1.8,
+            "created_at": (datetime.now() - timedelta(hours=4)).isoformat(),
+            "status": "Processing",
+            "samples_created": 8,
+            "extracted_data": {
+                "administrative_info": {
+                    "submitter_name": "Lab Tech Johnson",
+                    "submitter_email": "johnson@lab.com",
+                    "project_name": "Batch 47 Processing",
+                    "institution": "Clinical Testing Laboratory"
+                },
+                "source_material": {
+                    "sample_type": "Tissue",
+                    "source_organism": "Human",
+                    "collection_date": "2024-06-28"
+                }
+            }
+        },
+        "RAG-003": {
+            "id": "RAG-003",
+            "submission_id": "RAG-003",
+            "source_document": "quality_control_summary.docx",
+            "submitter_name": "Dr. Williams",
+            "submitter_email": "williams@lab.com",
+            "confidence_score": 0.75,
+            "processing_time": 0.0,
+            "created_at": (datetime.now() - timedelta(minutes=30)).isoformat(),
+            "status": "Pending",
+            "samples_created": 0,
+            "extracted_data": {}
+        }
+    }
+    
+    if submission_id not in submission_details:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    return submission_details[submission_id]
+
 @app.post("/api/rag/process")
 async def process_rag_document(request: Request):
     """Process a document with RAG system"""
