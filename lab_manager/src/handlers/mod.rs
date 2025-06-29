@@ -1,5 +1,6 @@
 pub mod dashboard;
 pub mod health;
+pub mod proxy_handlers;
 pub mod rag_proxy;
 pub mod reports;
 pub mod samples;
