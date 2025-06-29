@@ -23,17 +23,17 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY pyproject.toml .
-COPY requirements.txt ./requirements.txt
+COPY enhanced_rag_service/pyproject.toml .
+COPY enhanced_rag_service/requirements.txt ./requirements.txt
 
 # Install Python dependencies
 RUN pip install --upgrade pip
 RUN pip install -e .
 
 # Copy source code
-COPY src/ ./src/
-COPY alembic/ ./alembic/
-COPY alembic.ini ./
+COPY enhanced_rag_service/src/ ./src/
+COPY enhanced_rag_service/alembic/ ./alembic/
+COPY enhanced_rag_service/alembic.ini ./
 
 # Create necessary directories
 RUN mkdir -p /app/uploads /app/chroma_db /app/logs

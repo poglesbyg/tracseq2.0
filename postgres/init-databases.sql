@@ -2,8 +2,7 @@
 -- This script creates separate databases for each service
 
 -- Main TracSeq databases
-CREATE DATABASE tracseq;
-GRANT ALL PRIVILEGES ON DATABASE tracseq TO postgres;
+-- Skip tracseq database as it already exists by default
 
 CREATE DATABASE tracseq_main;
 GRANT ALL PRIVILEGES ON DATABASE tracseq_main TO postgres;
@@ -55,6 +54,10 @@ GRANT ALL PRIVILEGES ON DATABASE tracseq_library TO postgres;
 -- Spreadsheet Versioning Service Database
 CREATE DATABASE tracseq_spreadsheets;
 GRANT ALL PRIVILEGES ON DATABASE tracseq_spreadsheets TO postgres;
+
+-- Barcode Service Database
+CREATE DATABASE tracseq_barcodes;
+GRANT ALL PRIVILEGES ON DATABASE tracseq_barcodes TO postgres;
 
 -- API Gateway Database
 CREATE DATABASE tracseq_gateway;
@@ -113,7 +116,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 \c tracseq_rag;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-CREATE EXTENSION IF NOT EXISTS "vector";
+-- Note: vector extension requires manual installation
 
 \c tracseq_transactions;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -132,6 +135,10 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 \c tracseq_spreadsheets;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+\c tracseq_barcodes;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
@@ -163,7 +170,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 \c rag_db;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-CREATE EXTENSION IF NOT EXISTS "vector";
+-- Note: vector extension requires manual installation
 
 \c transaction_db;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

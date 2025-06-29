@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Database services
   postgres:
@@ -237,6 +235,33 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Barcode Service (Rust)
+  barcode-service:
+    build:
+      context: .
+      dockerfile: barcode_service/Dockerfile
+    ports:
+      - "3020:8090"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_barcodes
+      HOST: 0.0.0.0
+      PORT: 8090
+      ENVIRONMENT: development
+      BARCODE_PREFIX: LAB
+      BARCODE_SEPARATOR: "-"
+      BARCODE_MIN_LENGTH: 8
+      BARCODE_INCLUDE_DATE: "true"
+      BARCODE_INCLUDE_SEQUENCE: "true"
+      RUST_LOG: barcode_service=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
       interval: 30s
       timeout: 10s
       retries: 3
