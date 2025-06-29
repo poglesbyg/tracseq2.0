@@ -23,11 +23,6 @@ module.exports = {
     testMatch: ['**/__tests__/**/*.test.(ts|tsx)', '**/*.test.(ts|tsx)'],
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
     extensionsToTreatAsEsm: ['.ts', '.tsx'],
-    globals: {
-        'ts-jest': {
-            useESM: true,
-        },
-    },
     testEnvironmentOptions: {
         customExportConditions: ['node', 'node-addons'],
     },
