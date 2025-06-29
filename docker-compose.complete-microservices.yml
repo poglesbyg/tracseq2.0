@@ -667,4 +667,4 @@ volumes:
 
 networks:
   tracseq-network:
-    driver: bridge 
+    driver: bridge
