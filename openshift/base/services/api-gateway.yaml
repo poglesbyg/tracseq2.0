@@ -1,0 +1,152 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: tracseq
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+      app.kubernetes.io/component: api-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api-gateway
+        app.kubernetes.io/component: api-gateway
+        app.kubernetes.io/part-of: tracseq
+    spec:
+      serviceAccountName: tracseq-api-gateway
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: api-gateway
+        image: api-gateway:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8089
+          protocol: TCP
+          name: http
+        env:
+        - name: SERVICE_NAME
+          value: "api-gateway"
+        - name: SERVICE_PORT
+          value: "8089"
+        # Service discovery configuration
+        - name: AUTH_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: tracseq-common-config
+              key: AUTH_SERVICE_URL
+        - name: SAMPLE_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: tracseq-common-config
+              key: SAMPLE_SERVICE_URL
+        - name: TEMPLATE_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: tracseq-common-config
+              key: TEMPLATE_SERVICE_URL
+        - name: NOTIFICATION_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: tracseq-common-config
+              key: NOTIFICATION_SERVICE_URL
+        - name: SEQUENCING_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: tracseq-common-config
+              key: SEQUENCING_SERVICE_URL
+        - name: TRANSACTION_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: tracseq-common-config
+              key: TRANSACTION_SERVICE_URL
+        - name: RAG_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: tracseq-common-config
+              key: RAG_SERVICE_URL
+        # Redis configuration for caching
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: tracseq-database-credentials
+              key: REDIS_URL
+        # JWT configuration for validation
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: tracseq-jwt-secret
+              key: JWT_SECRET_KEY
+        # Common configuration from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: tracseq-common-config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "2"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8089
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8089
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        volumeMounts:
+        - name: temp
+          mountPath: /tmp
+      volumes:
+      - name: temp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: tracseq
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8089
+    targetPort: 8089
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: api-gateway
+  sessionAffinity: None

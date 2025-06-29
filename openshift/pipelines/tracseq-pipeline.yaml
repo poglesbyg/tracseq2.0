@@ -1,0 +1,232 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: tracseq-service-pipeline
+  namespace: tracseq
+spec:
+  params:
+  - name: git-url
+    type: string
+    description: The git repository URL
+  - name: git-revision
+    type: string
+    description: The git revision (branch, tag, or commit)
+    default: main
+  - name: service-name
+    type: string
+    description: Name of the service to build
+  - name: context-dir
+    type: string
+    description: Context directory for the service
+  - name: image-name
+    type: string
+    description: Name of the image to build
+  workspaces:
+  - name: shared-workspace
+  - name: docker-credentials
+  tasks:
+  # Clone the repository
+  - name: fetch-source
+    taskRef:
+      name: git-clone
+      kind: ClusterTask
+    workspaces:
+    - name: output
+      workspace: shared-workspace
+    params:
+    - name: url
+      value: $(params.git-url)
+    - name: revision
+      value: $(params.git-revision)
+    - name: deleteExisting
+      value: "true"
+  
+  # Run tests for Rust services
+  - name: run-tests
+    runAfter:
+    - fetch-source
+    taskRef:
+      name: rust-test
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+    params:
+    - name: context
+      value: $(params.context-dir)
+  
+  # Security scan
+  - name: security-scan
+    runAfter:
+    - fetch-source
+    taskRef:
+      name: trivy-scan
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+    params:
+    - name: context
+      value: $(params.context-dir)
+  
+  # Build the image
+  - name: build-image
+    runAfter:
+    - run-tests
+    - security-scan
+    taskRef:
+      name: buildah
+      kind: ClusterTask
+    workspaces:
+    - name: source
+      workspace: shared-workspace
+    - name: dockerconfig
+      workspace: docker-credentials
+    params:
+    - name: IMAGE
+      value: $(params.image-name)
+    - name: DOCKERFILE
+      value: $(params.context-dir)/Dockerfile
+    - name: CONTEXT
+      value: $(params.context-dir)
+    - name: TLSVERIFY
+      value: "false"
+  
+  # Deploy to OpenShift
+  - name: deploy
+    runAfter:
+    - build-image
+    taskRef:
+      name: openshift-deploy
+    params:
+    - name: service-name
+      value: $(params.service-name)
+    - name: image-name
+      value: $(params.image-name)
+---
+# Custom Task for Rust testing
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: rust-test
+  namespace: tracseq
+spec:
+  params:
+  - name: context
+    type: string
+    description: The context directory
+  workspaces:
+  - name: source
+  steps:
+  - name: rust-test
+    image: registry.access.redhat.com/ubi9/rust-toolset:latest
+    workingDir: $(workspaces.source.path)/$(params.context)
+    script: |
+      #!/bin/bash
+      set -e
+      
+      echo "Running Rust tests for $(params.context)"
+      
+      # Run formatting check
+      cargo fmt -- --check
+      
+      # Run clippy
+      cargo clippy -- -D warnings
+      
+      # Run tests
+      cargo test --release
+      
+      # Run security audit
+      cargo audit || true
+---
+# Custom Task for Trivy security scanning
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: trivy-scan
+  namespace: tracseq
+spec:
+  params:
+  - name: context
+    type: string
+    description: The context directory
+  workspaces:
+  - name: source
+  steps:
+  - name: trivy-scan
+    image: aquasec/trivy:latest
+    workingDir: $(workspaces.source.path)
+    script: |
+      #!/bin/bash
+      set -e
+      
+      echo "Running Trivy security scan for $(params.context)"
+      
+      # Scan filesystem for vulnerabilities
+      trivy fs --exit-code 0 --severity HIGH,CRITICAL $(params.context)
+      
+      # Scan for misconfigurations
+      trivy config $(params.context)
+---
+# Custom Task for OpenShift deployment
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: openshift-deploy
+  namespace: tracseq
+spec:
+  params:
+  - name: service-name
+    type: string
+  - name: image-name
+    type: string
+  steps:
+  - name: deploy
+    image: quay.io/openshift/origin-cli:latest
+    script: |
+      #!/bin/bash
+      set -e
+      
+      echo "Deploying $(params.service-name) with image $(params.image-name)"
+      
+      # Update the deployment with the new image
+      oc set image deployment/$(params.service-name) \
+        $(params.service-name)=$(params.image-name) \
+        -n tracseq
+      
+      # Wait for rollout to complete
+      oc rollout status deployment/$(params.service-name) -n tracseq
+      
+      # Verify deployment
+      oc get pods -l app.kubernetes.io/name=$(params.service-name) -n tracseq
+---
+# PipelineRun template
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: tracseq-service-run-
+  namespace: tracseq
+spec:
+  pipelineRef:
+    name: tracseq-service-pipeline
+  params:
+  - name: git-url
+    value: https://github.com/your-org/tracseq-2.0.git
+  - name: git-revision
+    value: main
+  - name: service-name
+    value: auth-service  # Change this for different services
+  - name: context-dir
+    value: auth_service
+  - name: image-name
+    value: image-registry.openshift-image-registry.svc:5000/tracseq/auth-service:latest
+  workspaces:
+  - name: shared-workspace
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
+  - name: docker-credentials
+    secret:
+      secretName: docker-registry-secret
