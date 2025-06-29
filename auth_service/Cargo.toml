@@ -87,6 +87,7 @@ chrono = { version = "0.4", features = ["serde"] }
 # Security testing
 jsonwebtoken = "9.2"
 argon2 = "0.5"
+regex = "1.10"
 
 # Async testing utilities
 futures = "0.3"

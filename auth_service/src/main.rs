@@ -1,10 +1,9 @@
 use anyhow::Result;
-use axum::{Router, routing::get};
 use std::net::SocketAddr;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use auth_service::{AppState, AuthServiceImpl, Config, DatabasePool};
+use auth_service::{AppState, AuthServiceImpl, Config, DatabasePool, create_router};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -87,7 +86,7 @@ async fn main() -> Result<()> {
 
     // Build the application router
     println!("AUTH SERVICE: Building application router");
-    let app = create_app(app_state);
+    let app = create_router(app_state);
 
     // Start the server
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
@@ -114,78 +113,3 @@ async fn main() -> Result<()> {
     println!("AUTH SERVICE: Server exited normally");
     Ok(())
 }
-
-/// Create the application router with all routes and middleware
-fn create_app(_state: AppState) -> Router {
-    // Simplified router for testing
-    Router::new().route("/health", get(|| async { "OK" }))
-}
-
-/*
-// Full router implementation - commented out for debugging
-fn create_app_full(state: AppState) -> Router {
-    // Health check routes (no auth required)
-    let health_routes = Router::new()
-        .route("/health", get(handlers::health::health_check))
-        .route("/health/ready", get(handlers::health::readiness_check))
-        .route("/health/metrics", get(handlers::health::metrics));
-
-    // Authentication routes (public)
-    let auth_routes = Router::new()
-        .route("/auth/login", post(handlers::auth::login))
-        .route("/auth/register", post(handlers::auth::register))
-        .route("/auth/refresh", post(handlers::auth::refresh_token))
-        .route("/auth/forgot-password", post(handlers::auth::forgot_password))
-        .route("/auth/reset-password", post(handlers::auth::reset_password))
-        .route("/auth/verify-email", post(handlers::auth::verify_email));
-
-    // Protected routes (require authentication)
-    let protected_routes = Router::new()
-        .route("/auth/logout", post(handlers::auth::logout))
-        .route("/auth/me", get(handlers::auth::get_current_user))
-        .route("/auth/sessions", get(handlers::auth::get_sessions))
-        .route("/auth/sessions/:session_id", delete(handlers::auth::revoke_session))
-        .route("/auth/change-password", post(handlers::auth::change_password))
-        .layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::auth_middleware,
-        ));
-
-    // Token validation routes (for other services)
-    let validation_routes = Router::new()
-        .route("/validate/token", post(handlers::validation::validate_token))
-        .route("/validate/permissions", post(handlers::validation::validate_permissions))
-        .layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::service_auth_middleware,
-        ));
-
-    // Admin routes (require admin privileges)
-    let admin_routes = Router::new()
-        .route("/admin/users", get(handlers::admin::list_users))
-        .route("/admin/users/:user_id", get(handlers::admin::get_user))
-        .route("/admin/users/:user_id", delete(handlers::admin::delete_user))
-        .route("/admin/users/:user_id/disable", post(handlers::admin::disable_user))
-        .route("/admin/users/:user_id/enable", post(handlers::admin::enable_user))
-        .route("/admin/sessions", get(handlers::admin::list_sessions))
-        .route("/admin/audit-log", get(handlers::admin::get_audit_log))
-        .layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            crate::middleware::admin_middleware,
-        ));
-
-    // Combine all routes
-    Router::new()
-        .merge(health_routes)
-        .merge(auth_routes)
-        .merge(protected_routes)
-        .merge(validation_routes)
-        .merge(admin_routes)
-        .layer(
-            ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
-                .layer(CorsLayer::permissive()) // Configure CORS as needed
-        )
-        .with_state(state)
-}
-*/
