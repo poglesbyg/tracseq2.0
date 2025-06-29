@@ -10,10 +10,19 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy Cargo files
-COPY Cargo-simple.toml Cargo.toml
-COPY src/simple_main.rs src/simple_main.rs
+COPY template_service/Cargo.toml ./
 
-# Build the application
+# Create dummy source for dependency caching
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+
+# Build dependencies (cached layer)
+RUN cargo build --release
+RUN rm src/main.rs
+
+# Copy actual source
+COPY template_service/src/ ./src/
+
+# Build the application  
 RUN cargo build --release
 
 # Runtime stage
