@@ -1,0 +1,145 @@
+# TracSeq 2.0 Phase 6 - Production Monitoring Configuration
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'tracseq-prod'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules files
+rule_files:
+  - '/etc/prometheus/alerts/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Core Microservices
+  - job_name: 'auth-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['auth-service:8080']
+        labels:
+          service: 'auth'
+          tier: 'security'
+
+  - job_name: 'sample-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['sample-service:8081']
+        labels:
+          service: 'sample'
+          tier: 'core'
+
+  - job_name: 'enhanced-storage-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['enhanced-storage-service:8082']
+        labels:
+          service: 'storage'
+          tier: 'infrastructure'
+          ai_enabled: 'true'
+
+  - job_name: 'template-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['template-service:8083']
+        labels:
+          service: 'template'
+          tier: 'core'
+
+  - job_name: 'sequencing-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['sequencing-service:8084']
+        labels:
+          service: 'sequencing'
+          tier: 'laboratory'
+
+  - job_name: 'notification-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['notification-service:8085']
+        labels:
+          service: 'notification'
+          tier: 'communication'
+
+  - job_name: 'enhanced-rag-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['enhanced-rag-service:8086']
+        labels:
+          service: 'rag'
+          tier: 'ai'
+
+  - job_name: 'event-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['event-service:8087']
+        labels:
+          service: 'event'
+          tier: 'infrastructure'
+
+  - job_name: 'transaction-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['transaction-service:8088']
+        labels:
+          service: 'transaction'
+          tier: 'business'
+
+  - job_name: 'api-gateway'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['api-gateway:8089']
+        labels:
+          service: 'gateway'
+          tier: 'edge'
+
+  # Infrastructure Services
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgres'
+          tier: 'database'
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+          tier: 'cache'
+
+  # Node Exporter for host metrics
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          tier: 'infrastructure'
+
+  # Jaeger Tracing
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger:14269']
+        labels:
+          service: 'jaeger'
+          tier: 'observability'
+
+  # Grafana
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+        labels:
+          service: 'grafana'
+          tier: 'observability'
