@@ -1,0 +1,254 @@
+version: '3.8'
+
+services:
+  # ML Platform Database
+  ml-postgres:
+    image: postgres:15-alpine
+    container_name: tracseq-ml-db
+    environment:
+      POSTGRES_USER: ml_user
+      POSTGRES_PASSWORD: ml_pass
+      POSTGRES_DB: ml_platform
+    ports:
+      - "5436:5432"
+    volumes:
+      - ml_postgres_data:/var/lib/postgresql/data
+    networks:
+      - tracseq-ml
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ml_user -d ml_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MLflow Server
+  mlflow:
+    image: python:3.9-slim
+    container_name: tracseq-mlflow
+    working_dir: /mlflow
+    command: >
+      sh -c "pip install mlflow psycopg2-binary && 
+             mlflow server --backend-store-uri postgresql://ml_user:ml_pass@ml-postgres:5432/mlflow 
+             --default-artifact-root /mlflow/artifacts --host 0.0.0.0 --port 5000"
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    depends_on:
+      ml-postgres:
+        condition: service_healthy
+    networks:
+      - tracseq-ml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Model Serving Service
+  model-server:
+    build:
+      context: ./ml-platform/model-serving
+      dockerfile: Dockerfile
+    container_name: tracseq-model-server
+    ports:
+      - "8094:8094"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DATABASE_URL: postgresql://ml_user:ml_pass@ml-postgres:5432/ml_platform
+      MODEL_STORAGE_PATH: /models
+    volumes:
+      - model_storage:/models
+    depends_on:
+      - ml-postgres
+      - redis
+    networks:
+      - tracseq-ml
+      - tracseq-backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8094/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Feature Store Service
+  feature-store:
+    build:
+      context: ./ml-platform/feature-store
+      dockerfile: Dockerfile
+    container_name: tracseq-feature-store
+    ports:
+      - "8095:8095"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DATABASE_URL: postgresql://ml_user:ml_pass@ml-postgres:5432/ml_platform
+      CACHE_TTL: 3600
+    depends_on:
+      - ml-postgres
+      - redis
+    networks:
+      - tracseq-ml
+      - tracseq-backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8095/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AutoML Service
+  automl:
+    build:
+      context: ./ml-platform/automl
+      dockerfile: Dockerfile
+    container_name: tracseq-automl
+    ports:
+      - "8096:8096"
+    environment:
+      DATABASE_URL: postgresql://ml_user:ml_pass@ml-postgres:5432/ml_platform
+      MODEL_STORAGE_PATH: /models/automl
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - automl_models:/models/automl
+    depends_on:
+      - ml-postgres
+      - mlflow
+    networks:
+      - tracseq-ml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MLOps Pipeline Service
+  mlops:
+    build:
+      context: ./ml-platform/mlops
+      dockerfile: Dockerfile
+    container_name: tracseq-mlops
+    ports:
+      - "8097:8097"
+    environment:
+      DATABASE_URL: postgresql://ml_user:ml_pass@ml-postgres:5432/ml_platform
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      DOCKER_HOST: unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - mlops_models:/models
+    depends_on:
+      - ml-postgres
+      - mlflow
+    networks:
+      - tracseq-ml
+      - tracseq-backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8097/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Jupyter Lab for ML Development
+  jupyter:
+    image: jupyter/datascience-notebook:latest
+    container_name: tracseq-jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - jupyter_notebooks:/home/jovyan/work
+      - ./ml-models:/home/jovyan/models
+    networks:
+      - tracseq-ml
+    command: start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''
+
+  # TensorBoard for Model Visualization
+  tensorboard:
+    image: tensorflow/tensorflow:latest
+    container_name: tracseq-tensorboard
+    ports:
+      - "6006:6006"
+    volumes:
+      - tensorboard_logs:/logs
+    command: tensorboard --logdir /logs --host 0.0.0.0
+    networks:
+      - tracseq-ml
+
+  # Model Training Worker (for distributed training)
+  training-worker:
+    build:
+      context: ./ml-platform
+      dockerfile: Dockerfile.worker
+    container_name: tracseq-training-worker
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      DATABASE_URL: postgresql://ml_user:ml_pass@ml-postgres:5432/ml_platform
+      WORKER_TYPE: gpu  # or cpu
+    volumes:
+      - training_data:/data
+      - model_checkpoints:/checkpoints
+    depends_on:
+      - mlflow
+      - ml-postgres
+    networks:
+      - tracseq-ml
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Model Registry UI (custom)
+  model-registry-ui:
+    build:
+      context: ./ml-platform/model-registry-ui
+      dockerfile: Dockerfile
+    container_name: tracseq-model-registry-ui
+    ports:
+      - "3001:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8097
+      REACT_APP_MLFLOW_URL: http://localhost:5000
+    depends_on:
+      - mlops
+      - mlflow
+    networks:
+      - tracseq-ml
+
+  # Drift Detection Service
+  drift-detector:
+    build:
+      context: ./ml-platform/drift-detector
+      dockerfile: Dockerfile
+    container_name: tracseq-drift-detector
+    environment:
+      DATABASE_URL: postgresql://ml_user:ml_pass@ml-postgres:5432/ml_platform
+      FEATURE_STORE_URL: http://feature-store:8095
+      MONITORING_INTERVAL: 300  # 5 minutes
+    depends_on:
+      - ml-postgres
+      - feature-store
+    networks:
+      - tracseq-ml
+
+volumes:
+  ml_postgres_data:
+  mlflow_artifacts:
+  model_storage:
+  automl_models:
+  mlops_models:
+  jupyter_notebooks:
+  tensorboard_logs:
+  training_data:
+  model_checkpoints:
+
+networks:
+  tracseq-ml:
+    driver: bridge
+  tracseq-backend:
+    external: true
