@@ -1,7 +1,7 @@
 use crate::models::{LabContext, DataPoint, SourceType};
 use anyhow::Result;
 use chrono::Utc;
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use std::collections::HashMap;
 use tracing::{info, warn};
 

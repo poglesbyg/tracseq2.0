@@ -480,7 +480,7 @@ services:
       dockerfile: Dockerfile
     container_name: tracseq-cognitive-assistant
     ports:
-      - "8091:8090"
+      - "8090:8090"
     environment:
       - PORT=8090
       - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
