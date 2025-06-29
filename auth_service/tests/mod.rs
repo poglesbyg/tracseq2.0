@@ -4,6 +4,7 @@ pub mod test_utils;
 #[cfg(test)]
 pub mod unit {
     pub mod test_auth_handlers;
+    pub mod test_basic_auth;
 }
 
 #[cfg(test)]

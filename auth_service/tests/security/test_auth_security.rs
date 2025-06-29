@@ -37,9 +37,9 @@ async fn create_secure_test_server() -> anyhow::Result<TestServer> {
     config.security.max_login_attempts = 3;
     config.security.lockout_duration_minutes = 30;
     config.security.password_min_length = 8;
-    config.security.require_special_char = true;
-    config.security.require_uppercase = true;
-    config.security.require_number = true;
+    config.security.password_require_symbols = true;
+    config.security.password_require_uppercase = true;
+    config.security.password_require_numbers = true;
     
     let auth_service = AuthServiceImpl::new(db_pool.clone(), config.clone())?;
     
@@ -343,11 +343,12 @@ async fn test_jwt_tampering_detection() {
     let valid_token = body["data"]["access_token"].as_str().unwrap();
     
     // Test various tampered tokens
+    let modified_token = format!("{}XXX", valid_token);
     let tampered_tokens = vec![
         // Modified payload
         &valid_token[..valid_token.len()-10],
         // Invalid signature
-        &format!("{}XXX", valid_token),
+        modified_token.as_str(),
         // Completely invalid
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalid.signature",
         // Empty
