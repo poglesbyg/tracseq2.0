@@ -10,7 +10,7 @@ export default defineConfig({
     proxy: {
       // Proxy API requests to the real API gateway
       '/api': {
-        target: 'http://localhost:8089',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
       },
