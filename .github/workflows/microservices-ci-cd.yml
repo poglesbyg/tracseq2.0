@@ -1,0 +1,584 @@
+name: TracSeq 2.0 Microservices CI/CD
+
+on:
+  push:
+    branches: [ main, develop, 'release/*' ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: 'Environment to deploy to'
+        required: false
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  RUST_VERSION: '1.82'
+  DOCKER_REGISTRY: 'ghcr.io'
+  NAMESPACE: 'tracseq'
+
+jobs:
+  # ========================================
+  # Stage 1: Code Quality & Security Checks
+  # ========================================
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - auth_service
+          - sample_service
+          - template_service
+          - sequencing_service
+          - notification_service
+          - transaction_service
+          - event_service
+          - enhanced_storage_service
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+          
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ matrix.service }}/target
+          key: ${{ runner.os }}-cargo-${{ matrix.service }}-${{ hashFiles(format('{0}/Cargo.lock', matrix.service)) }}
+          
+      - name: Format check
+        working-directory: ${{ matrix.service }}
+        run: cargo fmt -- --check
+        
+      - name: Clippy analysis
+        working-directory: ${{ matrix.service }}
+        run: cargo clippy -- -D warnings
+        
+      - name: Security audit
+        working-directory: ${{ matrix.service }}
+        run: |
+          cargo install cargo-audit
+          cargo audit
+
+  python-quality:
+    name: Python Code Quality
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - api_gateway
+          - enhanced_rag_service
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        working-directory: ${{ matrix.service }}
+        run: |
+          pip install -r requirements.txt
+          pip install black flake8 mypy safety bandit
+          
+      - name: Black formatting
+        working-directory: ${{ matrix.service }}
+        run: black --check .
+        
+      - name: Flake8 linting
+        working-directory: ${{ matrix.service }}
+        run: flake8 .
+        
+      - name: Type checking
+        working-directory: ${{ matrix.service }}
+        run: mypy .
+        
+      - name: Security scan
+        working-directory: ${{ matrix.service }}
+        run: |
+          safety check
+          bandit -r .
+
+  # ========================================
+  # Stage 2: Unit Tests
+  # ========================================
+  unit-tests:
+    name: Unit Tests
+    needs: [code-quality]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - auth_service
+          - sample_service
+          - template_service
+          - sequencing_service
+          - notification_service
+          - transaction_service
+          - event_service
+          - enhanced_storage_service
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ matrix.service }}/target
+          key: ${{ runner.os }}-cargo-${{ matrix.service }}-${{ hashFiles(format('{0}/Cargo.lock', matrix.service)) }}
+          
+      - name: Run unit tests
+        working-directory: ${{ matrix.service }}
+        run: |
+          cargo test --lib --bins
+          cargo test --doc
+        env:
+          RUST_BACKTRACE: 1
+          
+      - name: Generate test coverage
+        working-directory: ${{ matrix.service }}
+        run: |
+          cargo install cargo-tarpaulin
+          cargo tarpaulin --out Xml --output-dir coverage
+          
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ${{ matrix.service }}/coverage/cobertura.xml
+          flags: ${{ matrix.service }}
+          name: ${{ matrix.service }}-coverage
+
+  python-unit-tests:
+    name: Python Unit Tests
+    needs: [python-quality]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - api_gateway
+          - enhanced_rag_service
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        working-directory: ${{ matrix.service }}
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio
+          
+      - name: Run unit tests
+        working-directory: ${{ matrix.service }}
+        run: |
+          pytest tests/unit -v --cov=. --cov-report=xml
+          
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ${{ matrix.service }}/coverage.xml
+          flags: ${{ matrix.service }}
+
+  # ========================================
+  # Stage 3: Integration Tests
+  # ========================================
+  integration-tests:
+    name: Integration Tests
+    needs: [unit-tests, python-unit-tests]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: tracseq_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Setup test environment
+        run: |
+          cp .env.example .env.test
+          echo "DATABASE_URL=postgresql://postgres:testpass@localhost:5432/tracseq_test" >> .env.test
+          echo "REDIS_URL=redis://localhost:6379" >> .env.test
+          
+      - name: Start services
+        run: |
+          docker-compose -f docker-compose.test.yml up -d
+          sleep 30  # Wait for services to be ready
+          
+      - name: Run integration tests
+        run: |
+          cd testing/integration
+          cargo test --test '*' -- --test-threads=1
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:testpass@localhost:5432/tracseq_test
+          
+      - name: Collect service logs
+        if: failure()
+        run: docker-compose -f docker-compose.test.yml logs
+
+  # ========================================
+  # Stage 4: Contract Tests
+  # ========================================
+  contract-tests:
+    name: Contract Tests
+    needs: [integration-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Setup Pact
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/pact-foundation/pact-ruby-standalone/master/install.sh | bash
+          export PATH="${PATH}:${PWD}/pact/bin"
+          
+      - name: Run consumer tests
+        run: |
+          cd testing/contract
+          cargo test --features pact_consumer
+          
+      - name: Verify provider contracts
+        run: |
+          cd testing/contract
+          cargo test --features pact_provider
+          
+      - name: Publish Pacts
+        if: github.ref == 'refs/heads/main'
+        run: |
+          pact-broker publish ./pacts \
+            --consumer-app-version=${{ github.sha }} \
+            --broker-base-url=${{ secrets.PACT_BROKER_URL }} \
+            --broker-token=${{ secrets.PACT_BROKER_TOKEN }}
+
+  # ========================================
+  # Stage 5: Performance Tests
+  # ========================================
+  performance-tests:
+    name: Performance Tests
+    needs: [integration-tests]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Setup k6
+        run: |
+          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+          
+      - name: Setup Artillery
+        run: |
+          npm install -g artillery
+          
+      - name: Start services for testing
+        run: |
+          docker-compose -f docker-compose.test.yml up -d
+          sleep 30
+          
+      - name: Run k6 load tests
+        run: |
+          k6 run testing/performance/load-test.js \
+            --out json=load-test-results.json \
+            --summary-export=load-test-summary.json
+            
+      - name: Run Artillery stress tests
+        run: |
+          artillery run testing/performance/stress-test.yml \
+            --output stress-test-results.json
+            
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-test-results
+          path: |
+            load-test-results.json
+            load-test-summary.json
+            stress-test-results.json
+            
+      - name: Performance regression check
+        run: |
+          python scripts/ci-cd/check-performance-regression.py \
+            --current load-test-summary.json \
+            --baseline ${{ secrets.PERFORMANCE_BASELINE_URL }}
+
+  # ========================================
+  # Stage 6: Build Docker Images
+  # ========================================
+  build-images:
+    name: Build Docker Images
+    needs: [contract-tests]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    strategy:
+      matrix:
+        service:
+          - auth_service
+          - sample_service
+          - template_service
+          - sequencing_service
+          - notification_service
+          - transaction_service
+          - event_service
+          - enhanced_storage_service
+          - api_gateway
+          - enhanced_rag_service
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ github.repository_owner }}/${{ env.NAMESPACE }}-${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+            
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ steps.meta.outputs.version }}
+
+  # ========================================
+  # Stage 7: Security Scanning
+  # ========================================
+  security-scan:
+    name: Security Scanning
+    needs: [build-images]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - auth_service
+          - sample_service
+          - template_service
+          - sequencing_service
+          - notification_service
+          - transaction_service
+          - event_service
+          - enhanced_storage_service
+          - api_gateway
+          - enhanced_rag_service
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_REGISTRY }}/${{ github.repository_owner }}/${{ env.NAMESPACE }}-${{ matrix.service }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+          
+      - name: OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: '${{ matrix.service }}'
+          path: './${{ matrix.service }}'
+          format: 'HTML'
+          args: >
+            --enableRetired
+            --enableExperimental
+
+  # ========================================
+  # Stage 8: Deploy to Staging
+  # ========================================
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [performance-tests, security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://staging.tracseq.io
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+          
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.STAGING_KUBECONFIG }}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+          
+      - name: Deploy with ArgoCD
+        run: |
+          kubectl apply -f infrastructure/argocd/staging/
+          
+      - name: Wait for deployment
+        run: |
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/part-of=tracseq \
+            -n tracseq-staging \
+            --timeout=600s
+            
+      - name: Run smoke tests
+        run: |
+          cd testing/smoke
+          npm install
+          npm run test:staging
+
+  # ========================================
+  # Stage 9: Deploy to Production
+  # ========================================
+  deploy-production:
+    name: Deploy to Production
+    needs: [deploy-staging]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
+    environment:
+      name: production
+      url: https://tracseq.io
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+          
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.PRODUCTION_KUBECONFIG }}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+          
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Release v${{ github.run_number }}
+          body: |
+            ## Changes in this Release
+            - Automated deployment from ${{ github.sha }}
+            - See commit history for details
+          draft: false
+          prerelease: false
+          
+      - name: Deploy with ArgoCD
+        run: |
+          kubectl apply -f infrastructure/argocd/production/
+          
+      - name: Monitor deployment
+        run: |
+          kubectl rollout status deployment --timeout=10m \
+            -l app.kubernetes.io/part-of=tracseq \
+            -n tracseq-production
+            
+      - name: Run production smoke tests
+        run: |
+          cd testing/smoke
+          npm install
+          npm run test:production
+          
+      - name: Notify deployment status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'Production deployment ${{ job.status }}'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+  # ========================================
+  # Stage 10: Post-Deployment Validation
+  # ========================================
+  post-deployment:
+    name: Post-Deployment Validation
+    needs: [deploy-production]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Run synthetic monitoring
+        run: |
+          cd testing/synthetic
+          npm install
+          npm run monitor:production
+          
+      - name: Check SLOs
+        run: |
+          python scripts/ci-cd/check-slos.py \
+            --environment production \
+            --time-range 1h
+            
+      - name: Update deployment metrics
+        run: |
+          curl -X POST ${{ secrets.METRICS_ENDPOINT }} \
+            -H "Authorization: Bearer ${{ secrets.METRICS_TOKEN }}" \
+            -d '{
+              "deployment": "success",
+              "version": "${{ github.sha }}",
+              "environment": "production",
+              "timestamp": "${{ github.event.head_commit.timestamp }}"
+            }'

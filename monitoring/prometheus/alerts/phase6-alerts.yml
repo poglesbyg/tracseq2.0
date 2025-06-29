@@ -1,0 +1,213 @@
+groups:
+  - name: service_health
+    interval: 30s
+    rules:
+      # Service Availability Alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.job }} has been down for more than 5 minutes."
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+          description: "Error rate is above 10% for {{ $labels.job }}"
+
+      # Response Time Alerts
+      - alert: SlowResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow response time on {{ $labels.job }}"
+          description: "95th percentile response time is above 1 second"
+
+      - alert: CriticalSlowResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical slow response time on {{ $labels.job }}"
+          description: "95th percentile response time is above 5 seconds"
+
+  - name: resource_usage
+    interval: 30s
+    rules:
+      # Memory Alerts
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage for {{ $labels.container_name }}"
+          description: "Memory usage is above 80% for container {{ $labels.container_name }}"
+
+      - alert: CriticalMemoryUsage
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical memory usage for {{ $labels.container_name }}"
+          description: "Memory usage is above 95% for container {{ $labels.container_name }}"
+
+      # CPU Alerts
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage for {{ $labels.container_name }}"
+          description: "CPU usage is above 80% for container {{ $labels.container_name }}"
+
+  - name: database_health
+    interval: 30s
+    rules:
+      # PostgreSQL Alerts
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been down for more than 5 minutes"
+
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_activity_count / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL high connection usage"
+          description: "PostgreSQL connection usage is above 80%"
+
+      - alert: PostgreSQLSlowQueries
+        expr: rate(pg_stat_statements_mean_time_seconds[5m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "Average query time is above 1 second"
+
+      # Redis Alerts
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 5 minutes"
+
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is above 90%"
+
+  - name: laboratory_business_metrics
+    interval: 1m
+    rules:
+      # Sample Processing Alerts
+      - alert: SampleProcessingBacklog
+        expr: sample_queue_size > 1000
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Large sample processing backlog"
+          description: "Sample queue has more than 1000 pending samples"
+
+      - alert: SampleValidationFailureRate
+        expr: rate(sample_validation_failures_total[5m]) / rate(sample_validation_total[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High sample validation failure rate"
+          description: "Sample validation failure rate is above 10%"
+
+      # Storage Alerts
+      - alert: StorageCapacityLow
+        expr: (storage_capacity_used / storage_capacity_total) > 0.85
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Storage capacity low in {{ $labels.location }}"
+          description: "Storage capacity is above 85% in location {{ $labels.location }}"
+
+      - alert: TemperatureDeviation
+        expr: abs(storage_temperature_celsius - storage_temperature_target_celsius) > 2
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Temperature deviation in {{ $labels.location }}"
+          description: "Temperature is deviating more than 2°C from target in {{ $labels.location }}"
+
+      # AI/RAG Service Alerts
+      - alert: RAGProcessingTimeout
+        expr: rate(rag_processing_timeouts_total[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High RAG processing timeout rate"
+          description: "RAG service is experiencing high timeout rates"
+
+      - alert: AIModelAccuracyDrop
+        expr: ai_model_accuracy < 0.85
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI model accuracy below threshold"
+          description: "AI model {{ $labels.model }} accuracy is below 85%"
+
+  - name: security_alerts
+    interval: 30s
+    rules:
+      - alert: HighAuthenticationFailures
+        expr: rate(authentication_failures_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is above 10 per minute"
+
+      - alert: SuspiciousAPIActivity
+        expr: rate(api_requests_total{status="403"}[5m]) > 50
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Suspicious API activity detected"
+          description: "High rate of forbidden (403) requests detected"
+
+      - alert: JWTExpirationIssues
+        expr: rate(jwt_validation_failures_total[5m]) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JWT validation failures"
+          description: "High rate of JWT validation failures"
