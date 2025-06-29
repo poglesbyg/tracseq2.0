@@ -1,0 +1,482 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # FRONTEND APPLICATION
+  # =============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tracseq-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=http://localhost:8000
+      - VITE_RAG_URL=http://localhost:8086
+      - VITE_GATEWAY_URL=http://localhost:8000
+    depends_on:
+      - api-gateway
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # API GATEWAY - Central Router
+  # =============================================================================
+  api-gateway:
+    build:
+      context: ./api_gateway
+      dockerfile: Dockerfile
+    container_name: tracseq-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - SERVICE_NAME=TracSeq API Gateway
+      - VERSION=0.1.0
+      - ENVIRONMENT=development
+      - HOST=0.0.0.0
+      - PORT=8000
+      - SERVICES__AUTH__HOST=auth-service
+      - SERVICES__AUTH__PORT=8080
+      - SERVICES__SAMPLES__HOST=sample-service
+      - SERVICES__SAMPLES__PORT=8081
+      - SERVICES__STORAGE__HOST=enhanced-storage-service
+      - SERVICES__STORAGE__PORT=8082
+      - SERVICES__TEMPLATES__HOST=template-service
+      - SERVICES__TEMPLATES__PORT=8083
+      - SERVICES__SEQUENCING__HOST=sequencing-service
+      - SERVICES__SEQUENCING__PORT=8084
+      - SERVICES__NOTIFICATIONS__HOST=notification-service
+      - SERVICES__NOTIFICATIONS__PORT=8085
+      - SERVICES__RAG__HOST=enhanced-rag-service
+      - SERVICES__RAG__PORT=8086
+      - SERVICES__EVENT__HOST=event-service
+      - SERVICES__EVENT__PORT=8087
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - RATE_LIMITING__REDIS_URL=redis://redis:6379/1
+      - AUTHENTICATION__ENABLED=false
+      - AUTHENTICATION__JWT_SECRET_KEY=your-secret-key-change-in-production
+      - CORS__ENABLED=true
+      - CORS__ALLOW_ORIGINS=["http://localhost:3000","http://localhost:8080"]
+    depends_on:
+      - postgres
+      - redis
+      - auth-service
+      - template-service
+      - sample-service
+      - enhanced-storage-service
+      - sequencing-service
+      - notification-service
+      - enhanced-rag-service
+      - event-service
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # CORE MICROSERVICES
+  # =============================================================================
+  
+  # Authentication Service
+  auth-service:
+    build:
+      context: ./auth_service
+      dockerfile: Dockerfile
+    container_name: tracseq-auth-service
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=your-secret-key-change-in-production
+      - RUST_LOG=debug
+      - BCRYPT_COST=10
+      - SESSION_TIMEOUT_HOURS=24
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Sample Management Service
+  sample-service:
+    build:
+      context: ./sample_service
+      dockerfile: Dockerfile
+    container_name: tracseq-sample-service
+    ports:
+      - "8081:8081"
+    environment:
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - RUST_LOG=debug
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - STORAGE_SERVICE_URL=http://enhanced-storage-service:8082
+      - EVENT_SERVICE_URL=http://event-service:8087
+    depends_on:
+      - postgres
+      - redis
+      - auth-service
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Enhanced Storage Service with AI
+  enhanced-storage-service:
+    build:
+      context: ./enhanced_storage_service
+      dockerfile: Dockerfile
+    container_name: tracseq-enhanced-storage-service
+    ports:
+      - "8082:8082"
+    environment:
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - RUST_LOG=debug
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - RAG_SERVICE_URL=http://enhanced-rag-service:8086
+      - MQTT_BROKER_URL=tcp://mosquitto:1883
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - postgres
+      - redis
+      - auth-service
+      - mosquitto
+      - ollama
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Template Service
+  template-service:
+    build:
+      context: ./template_service
+      dockerfile: Dockerfile
+    container_name: tracseq-template-service
+    ports:
+      - "8083:8083"
+    environment:
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - RUST_LOG=debug
+      - AUTH_SERVICE_URL=http://auth-service:8080
+    depends_on:
+      - postgres
+      - redis
+      - auth-service
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Sequencing Service
+  sequencing-service:
+    build:
+      context: ./sequencing_service
+      dockerfile: Dockerfile
+    container_name: tracseq-sequencing-service
+    ports:
+      - "8084:8084"
+    environment:
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - RUST_LOG=debug
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - SAMPLE_SERVICE_URL=http://sample-service:8081
+    depends_on:
+      - postgres
+      - redis
+      - auth-service
+      - sample-service
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ./notification_service
+      dockerfile: Dockerfile
+    container_name: tracseq-notification-service
+    ports:
+      - "8085:8085"
+    environment:
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - RUST_LOG=debug
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - KAFKA_BROKERS=kafka:9092
+    depends_on:
+      - postgres
+      - redis
+      - auth-service
+      - kafka
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Enhanced RAG Service
+  enhanced-rag-service:
+    build:
+      context: ./enhanced_rag_service
+      dockerfile: Dockerfile
+    container_name: tracseq-enhanced-rag-service
+    ports:
+      - "8086:8086"
+    environment:
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHON_ENV=development
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - CHROMA_PERSIST_DIRECTORY=/app/data/chroma
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+    depends_on:
+      - postgres
+      - redis
+      - ollama
+      - chroma
+    volumes:
+      - ./lab_submission_rag/data:/app/data
+      - ./lab_submission_rag/uploads:/app/uploads
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Event Service
+  event-service:
+    build:
+      context: ./event_service
+      dockerfile: Dockerfile
+    container_name: tracseq-event-service
+    ports:
+      - "8087:8087"
+    environment:
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - RUST_LOG=debug
+      - KAFKA_BROKERS=kafka:9092
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # AI AND PROCESSING SERVICES
+  # =============================================================================
+  
+  # Ollama for AI/LLM
+  ollama:
+    image: ollama/ollama:latest
+    container_name: tracseq-ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_ORIGINS=*
+      - OLLAMA_HOST=0.0.0.0
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ChromaDB for Vector Storage
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: tracseq-chroma
+    ports:
+      - "8001:8000"
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+    volumes:
+      - chroma-data:/chroma/chroma
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # INFRASTRUCTURE SERVICES
+  # =============================================================================
+  
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16
+    container_name: tracseq-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=tracseq
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=tracseq_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: tracseq-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Apache Kafka for Event Streaming
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: tracseq-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - tracseq-network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: tracseq-kafka
+    ports:
+      - "9092:9092"
+      - "9094:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+    depends_on:
+      - zookeeper
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Kafka Schema Registry
+  schema-registry:
+    image: confluentinc/cp-schema-registry:latest
+    container_name: tracseq-schema-registry
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - tracseq-network
+
+  # Kafka UI for Management
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: tracseq-kafka-ui
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+    depends_on:
+      - kafka
+      - schema-registry
+    networks:
+      - tracseq-network
+
+  # MQTT Broker for IoT
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: tracseq-mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-logs:/mosquitto/log
+    networks:
+      - tracseq-network
+
+volumes:
+  postgres-data:
+  redis-data:
+  chroma-data:
+  ollama-data:
+  mosquitto-data:
+  mosquitto-logs:
+
+networks:
+  tracseq-network:
+    driver: bridge 

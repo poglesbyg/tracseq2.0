@@ -1,0 +1,213 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # API GATEWAY - Central Router
+  # =============================================================================
+  api-gateway:
+    build:
+      context: ./api_gateway
+      dockerfile: Dockerfile
+    container_name: tracseq-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - SERVICE_NAME=TracSeq API Gateway
+      - VERSION=0.1.0
+      - ENVIRONMENT=development
+      - HOST=0.0.0.0
+      - PORT=8000
+      - SERVICES__AUTH__HOST=auth-service
+      - SERVICES__AUTH__PORT=8080
+      - SERVICES__TEMPLATES__HOST=template-service
+      - SERVICES__TEMPLATES__PORT=8083
+      - SERVICES__STORAGE__HOST=enhanced-storage-service
+      - SERVICES__STORAGE__PORT=8082
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - RATE_LIMITING__REDIS_URL=redis://redis:6379/1
+      - AUTHENTICATION__ENABLED=true
+      - AUTHENTICATION__JWT_SECRET_KEY=your-secret-key-change-in-production
+      - CORS__ENABLED=true
+      - CORS__ALLOW_ORIGINS=["http://localhost:3000","http://localhost:8080"]
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # WORKING MICROSERVICES
+  # =============================================================================
+  
+  # Template Service (known to work)
+  template-service:
+    build:
+      context: ./template_service
+      dockerfile: Dockerfile
+    container_name: tracseq-template-service
+    ports:
+      - "8083:8083"
+    environment:
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - RUST_LOG=debug
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Transaction Service (known to work)
+  transaction-service:
+    build:
+      context: ./transaction_service
+      dockerfile: Dockerfile
+    container_name: tracseq-transaction-service
+    ports:
+      - "8094:8094"
+    environment:
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - RUST_LOG=debug
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8094/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Event Service (known to work)
+  event-service:
+    build:
+      context: ./event_service
+      dockerfile: Dockerfile
+    container_name: tracseq-event-service
+    ports:
+      - "8095:8095"
+    environment:
+      - DATABASE_URL=postgresql://postgres:tracseq_password@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379/0
+      - RUST_LOG=debug
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8095/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # INFRASTRUCTURE SERVICES
+  # =============================================================================
+  
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16
+    container_name: tracseq-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=tracseq
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=tracseq_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: tracseq-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Kafka for Event Streaming
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: tracseq-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - tracseq-network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: tracseq-kafka
+    ports:
+      - "9092:9092"
+      - "9094:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+    depends_on:
+      - zookeeper
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Kafka UI for Management
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: tracseq-kafka-ui
+    ports:
+      - "8084:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - tracseq-network
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  tracseq-network:
+    driver: bridge 
