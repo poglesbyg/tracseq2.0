@@ -83,21 +83,43 @@ export default function RagSamples() {
     queryKey: ['rag-samples', searchTerm, statusFilter, confidenceFilter],
     queryFn: async () => {
       try {
-        // Use the dedicated RAG samples endpoint first
+        // Use the correct RAG submissions endpoint
         console.log('🔍 Fetching RAG samples...');
-        const response = await axios.get('/api/rag/samples');
+        const response = await axios.get('/api/rag/submissions');
         console.log('📊 RAG samples response:', response.data);
         
-        let samples = response.data || [];
+        // Extract samples from the API response structure
+        // API returns: {data: [...], submissions: [...], totalCount: X, ...}
+        // We'll use the 'data' array and transform it to RagSample format
+        const apiData = response.data || {};
+        const rawSamples = apiData.data || apiData.submissions || [];
         
-        // If no data from RAG endpoint, try the filtered samples endpoint
-        if (!samples || samples.length === 0) {
-          console.log('🔄 Trying filtered samples endpoint...');
-          const params = new URLSearchParams();
-          params.append('extraction_method', 'ai_rag');
-          const fallbackResponse = await axios.get(`/api/samples?${params}`);
-          console.log('📊 Filtered samples response:', fallbackResponse.data);
-          samples = Array.isArray(fallbackResponse.data) ? fallbackResponse.data : [];
+        // Transform API data to RagSample format
+        let samples: RagSample[] = rawSamples.map((item: any, index: number) => ({
+          id: item.id || `rag-${index}`,
+          name: item.filename || item.name || `Document ${index + 1}`,
+          barcode: `RAG-${item.id || index}`,
+          location: 'AI-Processed',
+          status: item.status === 'Processed' ? 'Completed' : item.status === 'Processing' ? 'Pending' : item.status || 'Pending',
+          created_at: item.submittedDate || item.created_at || new Date().toISOString(),
+          metadata: {
+            confidence_score: item.confidenceScore || 0.85,
+            processing_time: 2.5,
+            source_document: item.filename || item.name,
+            submitter_name: item.submittedBy || 'Unknown',
+            submitter_email: item.submitterEmail || '',
+            rag_submission_id: item.id,
+            extraction_method: 'ai_rag',
+            sample_type: 'Document',
+            extraction_warnings: [],
+            validation_warnings: []
+          }
+        }));
+        
+        // Ensure samples is always an array
+        if (!Array.isArray(samples)) {
+          console.warn('⚠️ Samples is not an array, defaulting to empty array');
+          samples = [];
         }
         
         // Apply client-side filtering
@@ -137,8 +159,8 @@ export default function RagSamples() {
           });
         }
         
-        console.log(`✅ Final RAG samples count: ${samples.length}`);
-        return samples;
+        console.log(`✅ Final RAG samples count: ${samples?.length || 0}`);
+        return samples || [];
       } catch (error) {
         console.error('❌ Failed to fetch RAG samples:', error);
         return [];
@@ -319,7 +341,7 @@ export default function RagSamples() {
                     Total AI Samples
                   </dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {ragSamples?.length || 0}
+                    {Array.isArray(ragSamples) ? ragSamples.length : 0}
                   </dd>
                 </dl>
               </div>
@@ -339,7 +361,7 @@ export default function RagSamples() {
                     High Confidence
                   </dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {ragSamples?.filter(s => (s.metadata?.confidence_score || 0) >= 0.8).length || 0}
+                    {Array.isArray(ragSamples) ? ragSamples.filter(s => (s.metadata?.confidence_score || 0) >= 0.8).length : 0}
                   </dd>
                 </dl>
               </div>
@@ -359,7 +381,7 @@ export default function RagSamples() {
                     Documents Processed
                   </dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {new Set(ragSamples?.map(s => s.metadata?.rag_submission_id).filter(Boolean)).size || 0}
+                    {Array.isArray(ragSamples) ? new Set(ragSamples.map(s => s.metadata?.rag_submission_id).filter(Boolean)).size : 0}
                   </dd>
                 </dl>
               </div>
@@ -379,7 +401,7 @@ export default function RagSamples() {
                     Avg. Confidence
                   </dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {ragSamples?.length ? 
+                    {Array.isArray(ragSamples) && ragSamples.length > 0 ? 
                       Math.round((ragSamples.reduce((sum, s) => sum + (s.metadata?.confidence_score || 0), 0) / ragSamples.length) * 100) : 0}%
                   </dd>
                 </dl>
@@ -480,7 +502,7 @@ export default function RagSamples() {
               Try Again
             </button>
           </div>
-        ) : ragSamples?.length === 0 ? (
+        ) : Array.isArray(ragSamples) && ragSamples.length === 0 ? (
           <div className="text-center py-12">
             <BeakerIcon className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No AI-Generated Samples Found</h3>
@@ -499,7 +521,7 @@ export default function RagSamples() {
           </div>
         ) : (
           <ul className="divide-y divide-gray-200">
-            {ragSamples?.map((sample) => (
+            {Array.isArray(ragSamples) && ragSamples.map((sample) => (
               <li key={sample.id}>
                 <div className="px-4 py-4 sm:px-6">
                   <div className="flex items-center justify-between">

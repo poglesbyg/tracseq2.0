@@ -302,7 +302,7 @@ services:
   api-gateway:
     build:
       context: .
-      dockerfile: api_gateway/Dockerfile
+      dockerfile: api_gateway/Dockerfile.enhanced
     ports:
       - "8000:8000"
     environment:
@@ -316,27 +316,46 @@ services:
       EVENT_SERVICE_URL: http://event-service:8080
       RAG_SERVICE_URL: http://enhanced-rag-service:8000
       REDIS_URL: redis://redis:6379
+      HOST: 0.0.0.0
+      PORT: 8000
     depends_on:
-      - auth-service
-      - sample-service
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      template-service:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   # Frontend
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.enhanced
     ports:
       - "5173:80"
     environment:
       VITE_API_URL: http://localhost:8000
+      NGINX_HOST: 0.0.0.0
+      NGINX_PORT: 80
+      API_GATEWAY_HOST: api-gateway
+      API_GATEWAY_PORT: 8000
     depends_on:
-      - api-gateway
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
 
 volumes:
   postgres_data:

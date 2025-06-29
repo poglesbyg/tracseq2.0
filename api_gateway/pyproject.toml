@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "tracseq-api-gateway"
 version = "2.1.0"
 description = "Enhanced API Gateway for TracSeq 2.0 with production-grade features"
-readme = "README.md"
+readme = "README-gateway.md"
 authors = [
     { name = "TracSeq Team", email = "team@tracseq.com" }
 ]
