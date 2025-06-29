@@ -125,10 +125,4 @@ database-persistence = ["dep:sqlx"]
 
 [[bin]]
 name = "transaction_service"
-path = "src/main.rs"
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort" 
+path = "src/main.rs" 

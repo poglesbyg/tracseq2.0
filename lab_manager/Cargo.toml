@@ -13,20 +13,6 @@ default-run = "lab_manager"
 name = "lab_manager"
 path = "src/lib.rs"
 
-# Size and memory optimizations for release builds
-[profile.release]
-opt-level = "s"          # Optimize for size
-lto = true               # Enable link-time optimization
-codegen-units = 1        # Reduce parallel code generation for smaller binaries
-panic = "abort"          # Reduce binary size by removing unwinding code
-strip = true             # Strip debug symbols
-
-# Additional optimization profile for ultra-small builds
-[profile.release-small]
-inherits = "release"
-opt-level = "z"          # Optimize aggressively for size
-lto = "fat"              # Full LTO for maximum size reduction
-
 [dependencies]
 # Core async runtime and utilities
 tokio = { version = "1.36", features = ["full"] }
