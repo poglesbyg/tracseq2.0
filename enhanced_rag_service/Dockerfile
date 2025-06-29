@@ -23,17 +23,17 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY enhanced_rag_service/pyproject.toml .
-COPY enhanced_rag_service/requirements.txt ./requirements.txt
+COPY pyproject.toml .
+COPY requirements.txt ./requirements.txt
 
 # Install Python dependencies
 RUN pip install --upgrade pip
 RUN pip install -e .
 
 # Copy source code
-COPY enhanced_rag_service/src/ ./src/
-COPY enhanced_rag_service/alembic/ ./alembic/
-COPY enhanced_rag_service/alembic.ini ./
+COPY src/ ./src/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
 
 # Create necessary directories
 RUN mkdir -p /app/uploads /app/chroma_db /app/logs
@@ -51,4 +51,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
 # Command to run the application
-CMD ["python", "src/enhanced_rag_service/main.py"] 
+CMD ["python", "src/main.py"] 

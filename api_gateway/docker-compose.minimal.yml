@@ -22,10 +22,10 @@ services:
       - USE_AUTH_SERVICE=false
       - USE_SAMPLE_SERVICE=false
       - USE_TEMPLATE_SERVICE=true
-      - USE_STORAGE_SERVICE=false
+      - USE_STORAGE_SERVICE=true
       - USE_SEQUENCING_SERVICE=false
-      - USE_NOTIFICATION_SERVICE=false
-      - USE_RAG_SERVICE=false
+      - USE_NOTIFICATION_SERVICE=true
+      - USE_RAG_SERVICE=true
       
       # Gateway configuration
       - REQUEST_TIMEOUT=30
