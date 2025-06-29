@@ -1,0 +1,67 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tracseq-prod
+
+bases:
+- ../../base
+
+namePrefix: prod-
+
+commonLabels:
+  environment: production
+  app.kubernetes.io/instance: production
+
+replicas:
+- name: auth-service
+  count: 3
+- name: api-gateway
+  count: 3
+- name: sample-service
+  count: 2
+- name: template-service
+  count: 2
+- name: notification-service
+  count: 2
+- name: sequencing-service
+  count: 2
+- name: transaction-service
+  count: 2
+- name: rag-service
+  count: 2
+
+patchesStrategicMerge:
+- postgres-prod-patch.yaml
+- redis-prod-patch.yaml
+- services-prod-patch.yaml
+
+configMapGenerator:
+- name: tracseq-common-config
+  behavior: merge
+  literals:
+  - ENVIRONMENT=production
+  - LOG_LEVEL=warn
+  - ENABLE_DEBUG=false
+
+secretGenerator:
+- name: tracseq-database-credentials
+  behavior: merge
+  env: secrets.env
+
+images:
+- name: auth-service
+  newTag: stable
+- name: sample-service
+  newTag: stable
+- name: template-service
+  newTag: stable
+- name: notification-service
+  newTag: stable
+- name: sequencing-service
+  newTag: stable
+- name: transaction-service
+  newTag: stable
+- name: api-gateway
+  newTag: stable
+- name: rag-service
+  newTag: stable

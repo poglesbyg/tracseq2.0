@@ -1,0 +1,46 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: api-gateway
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: tracseq
+  annotations:
+    haproxy.router.openshift.io/timeout: "60s"
+    haproxy.router.openshift.io/rate-limit-connections: "true"
+    haproxy.router.openshift.io/rate-limit-connections.concurrent-tcp: "100"
+    haproxy.router.openshift.io/rate-limit-connections.rate-tcp: "100"
+spec:
+  host: tracseq-api.apps.your-cluster.example.com  # Will be replaced by deployment script
+  to:
+    kind: Service
+    name: api-gateway
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+---
+# Alternative Route for internal API access without TLS
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: api-gateway-internal
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: tracseq
+spec:
+  host: tracseq-api-internal.apps.your-cluster.example.com  # Will be replaced by deployment script
+  to:
+    kind: Service
+    name: api-gateway
+    weight: 100
+  port:
+    targetPort: http
+  wildcardPolicy: None

@@ -1,0 +1,82 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: rust-service-buildconfig
+  annotations:
+    description: "BuildConfig template for Rust-based TracSeq services"
+    tags: "tracseq,rust,microservice"
+parameters:
+- name: SERVICE_NAME
+  description: "Name of the service (e.g., auth-service, sample-service)"
+  required: true
+- name: GIT_REPOSITORY_URL
+  description: "Git repository URL"
+  value: "https://github.com/your-org/tracseq-2.0.git"
+  required: true
+- name: GIT_BRANCH
+  description: "Git branch to build from"
+  value: "main"
+  required: true
+- name: CONTEXT_DIR
+  description: "Context directory within the repository"
+  required: true
+objects:
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: ${SERVICE_NAME}
+    namespace: tracseq
+    labels:
+      app.kubernetes.io/name: ${SERVICE_NAME}
+      app.kubernetes.io/part-of: tracseq
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: rust-builder
+    namespace: tracseq
+  spec:
+    lookupPolicy:
+      local: false
+    tags:
+    - name: latest
+      from:
+        kind: DockerImage
+        name: registry.access.redhat.com/ubi9/rust-toolset:latest
+      importPolicy:
+        scheduled: true
+- apiVersion: build.openshift.io/v1
+  kind: BuildConfig
+  metadata:
+    name: ${SERVICE_NAME}
+    namespace: tracseq
+    labels:
+      app.kubernetes.io/name: ${SERVICE_NAME}
+      app.kubernetes.io/part-of: tracseq
+  spec:
+    source:
+      type: Git
+      git:
+        uri: ${GIT_REPOSITORY_URL}
+        ref: ${GIT_BRANCH}
+      contextDir: ${CONTEXT_DIR}
+    strategy:
+      type: Docker
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: rust-builder:latest
+        dockerfilePath: Dockerfile
+        env:
+        - name: RUST_BACKTRACE
+          value: "1"
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ${SERVICE_NAME}:latest
+    triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChange: {}
+    runPolicy: Serial
+    successfulBuildsHistoryLimit: 5
+    failedBuildsHistoryLimit: 5

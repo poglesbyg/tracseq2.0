@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: postgres
+    app.kubernetes.io/part-of: tracseq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/component: postgres
+        app.kubernetes.io/part-of: tracseq
+    spec:
+      serviceAccountName: default
+      securityContext:
+        fsGroup: 26
+      containers:
+      - name: postgres
+        image: registry.redhat.io/rhel9/postgresql-15:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5432
+          protocol: TCP
+        env:
+        - name: POSTGRESQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: tracseq-database-credentials
+              key: POSTGRES_USER
+        - name: POSTGRESQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: tracseq-database-credentials
+              key: POSTGRES_PASSWORD
+        - name: POSTGRESQL_DATABASE
+          value: tracseq
+        - name: POSTGRESQL_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: tracseq-database-credentials
+              key: POSTGRES_PASSWORD
+        # Performance tuning
+        - name: POSTGRESQL_SHARED_BUFFERS
+          value: "256MB"
+        - name: POSTGRESQL_EFFECTIVE_CACHE_SIZE
+          value: "1GB"
+        - name: POSTGRESQL_MAX_CONNECTIONS
+          value: "200"
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/pgsql/data
+        - name: postgres-init
+          mountPath: /opt/app-root/src/postgresql-init
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2"
+        livenessProbe:
+          exec:
+            command:
+            - /usr/libexec/check-container
+            - --live
+          initialDelaySeconds: 120
+          timeoutSeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /usr/libexec/check-container
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+      volumes:
+      - name: postgres-data
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+      - name: postgres-init
+        configMap:
+          name: postgres-init-script
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+  namespace: tracseq
+data:
+  init-databases.sql: |
+    -- Create databases for each service
+    CREATE DATABASE tracseq_auth;
+    CREATE DATABASE tracseq_samples;
+    CREATE DATABASE tracseq_templates;
+    CREATE DATABASE tracseq_notifications;
+    CREATE DATABASE tracseq_sequencing;
+    CREATE DATABASE tracseq_transactions;
+    
+    -- Grant privileges
+    GRANT ALL PRIVILEGES ON DATABASE tracseq_auth TO tracseq_admin;
+    GRANT ALL PRIVILEGES ON DATABASE tracseq_samples TO tracseq_admin;
+    GRANT ALL PRIVILEGES ON DATABASE tracseq_templates TO tracseq_admin;
+    GRANT ALL PRIVILEGES ON DATABASE tracseq_notifications TO tracseq_admin;
+    GRANT ALL PRIVILEGES ON DATABASE tracseq_sequencing TO tracseq_admin;
+    GRANT ALL PRIVILEGES ON DATABASE tracseq_transactions TO tracseq_admin;
+    
+    -- Create extensions
+    \c tracseq_auth
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+    
+    \c tracseq_samples
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    
+    \c tracseq_templates
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    
+    \c tracseq_notifications
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    
+    \c tracseq_sequencing
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    
+    \c tracseq_transactions
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

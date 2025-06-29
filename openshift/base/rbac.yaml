@@ -1,0 +1,162 @@
+# Service Accounts
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tracseq-auth-service
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/component: auth-service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tracseq-sample-service
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/component: sample-service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tracseq-template-service
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/component: template-service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tracseq-notification-service
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/component: notification-service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tracseq-sequencing-service
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/component: sequencing-service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tracseq-transaction-service
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/component: transaction-service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tracseq-api-gateway
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/component: api-gateway
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tracseq-rag-service
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/component: rag-service
+---
+# Role for services to read ConfigMaps and Secrets
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tracseq-service-reader
+  namespace: tracseq
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["services", "endpoints"]
+  verbs: ["get", "list"]
+---
+# RoleBinding for all service accounts
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tracseq-service-reader-binding
+  namespace: tracseq
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tracseq-service-reader
+subjects:
+- kind: ServiceAccount
+  name: tracseq-auth-service
+  namespace: tracseq
+- kind: ServiceAccount
+  name: tracseq-sample-service
+  namespace: tracseq
+- kind: ServiceAccount
+  name: tracseq-template-service
+  namespace: tracseq
+- kind: ServiceAccount
+  name: tracseq-notification-service
+  namespace: tracseq
+- kind: ServiceAccount
+  name: tracseq-sequencing-service
+  namespace: tracseq
+- kind: ServiceAccount
+  name: tracseq-transaction-service
+  namespace: tracseq
+- kind: ServiceAccount
+  name: tracseq-api-gateway
+  namespace: tracseq
+- kind: ServiceAccount
+  name: tracseq-rag-service
+  namespace: tracseq
+---
+# SecurityContextConstraints for services that need special permissions
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: tracseq-scc
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: false
+allowPrivilegedContainer: false
+allowedCapabilities: null
+defaultAddCapabilities: null
+fsGroup:
+  type: RunAsAny
+groups:
+- system:authenticated
+priority: 10
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+- MKNOD
+runAsUser:
+  type: MustRunAsRange
+  uidRangeMin: 1000
+  uidRangeMax: 65534
+seLinuxContext:
+  type: MustRunAs
+supplementalGroups:
+  type: RunAsAny
+users:
+- system:serviceaccount:tracseq:tracseq-auth-service
+- system:serviceaccount:tracseq:tracseq-sample-service
+- system:serviceaccount:tracseq:tracseq-template-service
+- system:serviceaccount:tracseq:tracseq-notification-service
+- system:serviceaccount:tracseq:tracseq-sequencing-service
+- system:serviceaccount:tracseq:tracseq-transaction-service
+- system:serviceaccount:tracseq:tracseq-api-gateway
+- system:serviceaccount:tracseq:tracseq-rag-service
+volumes:
+- configMap
+- downwardAPI
+- emptyDir
+- persistentVolumeClaim
+- projected
+- secret

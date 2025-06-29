@@ -1,0 +1,73 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tracseq
+
+resources:
+  # Namespace and RBAC
+  - namespace.yaml
+  - rbac.yaml
+  - network-policies.yaml
+  
+  # ConfigMaps and Secrets
+  - configmaps/common-config.yaml
+  - secrets/database-credentials.yaml
+  - secrets/jwt-secret.yaml
+  
+  # Database Layer
+  - postgres/postgres-deployment.yaml
+  - postgres/postgres-service.yaml
+  - postgres/postgres-pvc.yaml
+  - redis/redis-deployment.yaml
+  - redis/redis-service.yaml
+  - redis/redis-pvc.yaml
+  - chromadb/chromadb-deployment.yaml
+  - chromadb/chromadb-service.yaml
+  - chromadb/chromadb-pvc.yaml
+  
+  # Core Services
+  - services/auth-service.yaml
+  - services/sample-service.yaml
+  - services/template-service.yaml
+  - services/notification-service.yaml
+  - services/sequencing-service.yaml
+  - services/transaction-service.yaml
+  
+  # API Gateway
+  - services/api-gateway.yaml
+  
+  # AI Services
+  - services/rag-service.yaml
+  
+  # Routes
+  - routes/api-gateway-route.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: tracseq
+  app.kubernetes.io/managed-by: kustomize
+
+images:
+  - name: auth-service
+    newName: image-registry.openshift-image-registry.svc:5000/tracseq/auth-service
+    newTag: latest
+  - name: sample-service
+    newName: image-registry.openshift-image-registry.svc:5000/tracseq/sample-service
+    newTag: latest
+  - name: template-service
+    newName: image-registry.openshift-image-registry.svc:5000/tracseq/template-service
+    newTag: latest
+  - name: notification-service
+    newName: image-registry.openshift-image-registry.svc:5000/tracseq/notification-service
+    newTag: latest
+  - name: sequencing-service
+    newName: image-registry.openshift-image-registry.svc:5000/tracseq/sequencing-service
+    newTag: latest
+  - name: transaction-service
+    newName: image-registry.openshift-image-registry.svc:5000/tracseq/transaction-service
+    newTag: latest
+  - name: api-gateway
+    newName: image-registry.openshift-image-registry.svc:5000/tracseq/api-gateway
+    newTag: latest
+  - name: rag-service
+    newName: image-registry.openshift-image-registry.svc:5000/tracseq/rag-service
+    newTag: latest

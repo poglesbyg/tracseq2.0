@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: chromadb-service
+  namespace: tracseq
+  labels:
+    app.kubernetes.io/name: chromadb
+    app.kubernetes.io/component: chromadb
+    app.kubernetes.io/part-of: tracseq
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: chromadb
+    app.kubernetes.io/component: chromadb
+  sessionAffinity: None
