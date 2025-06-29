@@ -1,426 +1,353 @@
 #!/bin/bash
 
 # TracSeq 2.0 Microservices Migration Script
-# This script helps migrate from monolithic to microservices architecture
+# This script helps with the migration from monolith to microservices
 
 set -e
-
-# Configuration
-MIGRATION_DIR="deploy/migration"
-DOCKER_COMPOSE_FILE="$MIGRATION_DIR/docker-compose.migration.yml"
-ENV_FILE="$MIGRATION_DIR/migration.env"
-BACKUP_DIR="backups/migration"
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Default values
+MODE="monolith"
 ACTION=""
-FORCE=false
-BACKUP=true
+SERVICES=""
 
-# Logging function
-log_message() {
-    local message="$1"
-    local level="${2:-INFO}"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    
-    case $level in
-        "ERROR")   echo -e "[$timestamp] [${RED}$level${NC}] $message" ;;
-        "WARN")    echo -e "[$timestamp] [${YELLOW}$level${NC}] $message" ;;
-        "SUCCESS") echo -e "[$timestamp] [${GREEN}$level${NC}] $message" ;;
-        *)         echo -e "[$timestamp] [$level] $message" ;;
-    esac
+# Function to print colored output
+print_color() {
+    color=$1
+    message=$2
+    echo -e "${color}${message}${NC}"
 }
 
-# Show usage
+# Function to show usage
 show_usage() {
     echo "TracSeq 2.0 Microservices Migration Tool"
     echo ""
-    echo "Usage: $0 <action> [options]"
+    echo "Usage: $0 [OPTIONS] ACTION"
     echo ""
     echo "Actions:"
-    echo "  prepare    Prepare the migration environment"
-    echo "  phase1     Start Phase 1 (Hybrid architecture)"
-    echo "  phase2     Start Phase 2 (Partial migration)"
-    echo "  phase3     Start Phase 3 (Full microservices)"
-    echo "  rollback   Rollback to monolithic architecture"
-    echo "  status     Check migration status"
+    echo "  status              Show current deployment status"
+    echo "  start-monolith      Start lab_manager in monolith mode"
+    echo "  start-proxy         Start lab_manager in proxy mode"
+    echo "  start-microservices Start all microservices"
+    echo "  stop                Stop all services"
+    echo "  test                Run migration tests"
+    echo "  compare             Compare monolith vs microservices responses"
+    echo "  migrate             Perform full migration"
     echo ""
     echo "Options:"
-    echo "  --force       Force action without confirmation"
-    echo "  --no-backup   Skip backup creation"
-    echo "  --help        Show this help message"
+    echo "  -h, --help          Show this help message"
+    echo "  -s, --services      Specify services (comma-separated)"
+    echo "  -f, --force         Force action without confirmation"
     echo ""
+    echo "Examples:"
+    echo "  $0 status"
+    echo "  $0 start-microservices"
+    echo "  $0 start-proxy"
+    echo "  $0 test -s auth,sample"
+}
+
+# Function to check service health
+check_service_health() {
+    service_name=$1
+    port=$2
+    
+    if curl -f -s "http://localhost:${port}/health" > /dev/null 2>&1; then
+        print_color "$GREEN" "✓ ${service_name} is healthy"
+        return 0
+    else
+        print_color "$RED" "✗ ${service_name} is not responding"
+        return 1
+    fi
+}
+
+# Function to show deployment status
+show_status() {
+    print_color "$BLUE" "=== TracSeq 2.0 Deployment Status ==="
+    echo ""
+    
+    # Check if running in proxy mode
+    if [ ! -z "$ENABLE_PROXY_MODE" ] && [ "$ENABLE_PROXY_MODE" = "true" ]; then
+        print_color "$YELLOW" "Mode: PROXY (routing to microservices)"
+    else
+        print_color "$YELLOW" "Mode: MONOLITH (local services)"
+    fi
+    echo ""
+    
+    # Check services
+    print_color "$BLUE" "Service Status:"
+    check_service_health "Lab Manager" 8080
+    check_service_health "API Gateway" 8000
+    check_service_health "Auth Service" 3010
+    check_service_health "Sample Service" 3011
+    check_service_health "Sequencing Service" 3012
+    check_service_health "Template Service" 3013
+    check_service_health "Storage Service" 3014
+    check_service_health "Spreadsheet Service" 3015
+    check_service_health "PostgreSQL" 5432
+    check_service_health "Redis" 6379
+}
+
+# Function to start monolith mode
+start_monolith() {
+    print_color "$BLUE" "Starting Lab Manager in MONOLITH mode..."
+    
+    # Ensure proxy mode is disabled
+    export ENABLE_PROXY_MODE=false
+    
+    # Start only required services
+    docker-compose -f docker-compose.yml up -d postgres redis
+    
+    # Wait for database
+    print_color "$YELLOW" "Waiting for database..."
+    sleep 5
+    
+    # Start lab manager
+    cd lab_manager
+    cargo run &
+    
+    print_color "$GREEN" "Lab Manager started in monolith mode"
+}
+
+# Function to start proxy mode
+start_proxy() {
+    print_color "$BLUE" "Starting Lab Manager in PROXY mode..."
+    
+    # Start all microservices first
+    start_microservices
+    
+    # Wait for services to be ready
+    print_color "$YELLOW" "Waiting for microservices to be ready..."
+    sleep 10
+    
+    # Enable proxy mode
+    export ENABLE_PROXY_MODE=true
+    
+    # Start lab manager in proxy mode
+    docker-compose -f docker-compose.microservices.yml up -d lab-manager-proxy
+    
+    print_color "$GREEN" "Lab Manager started in proxy mode"
+}
+
+# Function to start microservices
+start_microservices() {
+    print_color "$BLUE" "Starting all microservices..."
+    
+    # Start infrastructure services first
+    docker-compose -f docker-compose.microservices.yml up -d postgres redis
+    
+    # Wait for infrastructure
+    print_color "$YELLOW" "Waiting for infrastructure services..."
+    sleep 10
+    
+    # Start all microservices
+    if [ -z "$SERVICES" ]; then
+        docker-compose -f docker-compose.microservices.yml up -d
+    else
+        # Start specific services
+        docker-compose -f docker-compose.microservices.yml up -d $SERVICES
+    fi
+    
+    print_color "$GREEN" "Microservices started"
+}
+
+# Function to stop all services
+stop_services() {
+    print_color "$BLUE" "Stopping all services..."
+    
+    # Stop docker services
+    docker-compose -f docker-compose.microservices.yml down
+    docker-compose -f docker-compose.yml down
+    
+    # Kill any running cargo processes
+    pkill -f "cargo run" || true
+    
+    print_color "$GREEN" "All services stopped"
+}
+
+# Function to run migration tests
+run_tests() {
+    print_color "$BLUE" "Running migration tests..."
+    
+    # Test health endpoints
+    print_color "$YELLOW" "Testing health endpoints..."
+    for port in 8080 8000 3010 3011 3012 3013 3014 3015; do
+        if curl -f -s "http://localhost:${port}/health" > /dev/null 2>&1; then
+            print_color "$GREEN" "✓ Port ${port} health check passed"
+        else
+            print_color "$RED" "✗ Port ${port} health check failed"
+        fi
+    done
+    
+    # Test service discovery
+    if [ "$ENABLE_PROXY_MODE" = "true" ]; then
+        print_color "$YELLOW" "Testing service discovery..."
+        curl -s http://localhost:8080/api/services/discovery | jq .
+    fi
+    
+    print_color "$GREEN" "Tests completed"
+}
+
+# Function to compare monolith vs microservices
+compare_services() {
+    print_color "$BLUE" "Comparing monolith vs microservices responses..."
+    
+    # Create test data
+    test_endpoints=(
+        "/health"
+        "/api/samples"
+        "/api/templates"
+        "/api/sequencing/jobs"
+    )
+    
+    for endpoint in "${test_endpoints[@]}"; do
+        print_color "$YELLOW" "Testing endpoint: $endpoint"
+        
+        # Get monolith response
+        monolith_response=$(curl -s "http://localhost:8080${endpoint}" || echo "FAILED")
+        
+        # Get microservices response (through API gateway)
+        micro_response=$(curl -s "http://localhost:8000${endpoint}" || echo "FAILED")
+        
+        # Compare
+        if [ "$monolith_response" = "$micro_response" ]; then
+            print_color "$GREEN" "✓ Responses match"
+        else
+            print_color "$RED" "✗ Responses differ"
+            echo "Monolith: $monolith_response"
+            echo "Microservices: $micro_response"
+        fi
+    done
+}
+
+# Function to perform full migration
+perform_migration() {
+    print_color "$BLUE" "=== Starting Full Migration Process ==="
+    
+    # Step 1: Ensure monolith is running
+    print_color "$YELLOW" "Step 1: Starting monolith mode..."
+    start_monolith
+    sleep 5
+    
+    # Step 2: Start microservices
+    print_color "$YELLOW" "Step 2: Starting microservices..."
+    start_microservices
+    sleep 10
+    
+    # Step 3: Run comparison tests
+    print_color "$YELLOW" "Step 3: Comparing responses..."
+    compare_services
+    
+    # Step 4: Switch to proxy mode
+    print_color "$YELLOW" "Step 4: Switching to proxy mode..."
+    export ENABLE_PROXY_MODE=true
+    docker-compose -f docker-compose.microservices.yml restart lab-manager-proxy
+    
+    # Step 5: Verify proxy mode
+    print_color "$YELLOW" "Step 5: Verifying proxy mode..."
+    sleep 5
+    run_tests
+    
+    print_color "$GREEN" "=== Migration completed successfully! ==="
 }
 
 # Parse command line arguments
-parse_args() {
-    if [ $# -eq 0 ]; then
-        show_usage
-        exit 1
-    fi
-    
-    ACTION="$1"
-    shift
-    
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --force)
-                FORCE=true
-                shift
-                ;;
-            --no-backup)
-                BACKUP=false
-                shift
-                ;;
-            --help)
-                show_usage
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            show_usage
+            exit 0
+            ;;
+        -s|--services)
+            SERVICES="$2"
+            shift 2
+            ;;
+        -f|--force)
+            FORCE=true
+            shift
+            ;;
+        status)
+            ACTION="status"
+            shift
+            ;;
+        start-monolith)
+            ACTION="start-monolith"
+            shift
+            ;;
+        start-proxy)
+            ACTION="start-proxy"
+            shift
+            ;;
+        start-microservices)
+            ACTION="start-microservices"
+            shift
+            ;;
+        stop)
+            ACTION="stop"
+            shift
+            ;;
+        test)
+            ACTION="test"
+            shift
+            ;;
+        compare)
+            ACTION="compare"
+            shift
+            ;;
+        migrate)
+            ACTION="migrate"
+            shift
+            ;;
+        *)
+            print_color "$RED" "Unknown option: $1"
+            show_usage
+            exit 1
+            ;;
+    esac
+done
+
+# Execute action
+case $ACTION in
+    status)
+        show_status
+        ;;
+    start-monolith)
+        start_monolith
+        ;;
+    start-proxy)
+        start_proxy
+        ;;
+    start-microservices)
+        start_microservices
+        ;;
+    stop)
+        stop_services
+        ;;
+    test)
+        run_tests
+        ;;
+    compare)
+        compare_services
+        ;;
+    migrate)
+        if [ "$FORCE" != true ]; then
+            print_color "$YELLOW" "This will perform a full migration. Continue? (y/N)"
+            read -r response
+            if [ "$response" != "y" ]; then
+                print_color "$RED" "Migration cancelled"
                 exit 0
-                ;;
-            *)
-                echo "Unknown option: $1"
-                show_usage
-                exit 1
-                ;;
-        esac
-    done
-    
-    # Validate action
-    if [[ ! "$ACTION" =~ ^(prepare|phase1|phase2|phase3|rollback|status)$ ]]; then
-        echo "Invalid action: $ACTION"
+            fi
+        fi
+        perform_migration
+        ;;
+    *)
+        print_color "$RED" "No action specified"
         show_usage
         exit 1
-    fi
-}
-
-# Check prerequisites
-check_prerequisites() {
-    log_message "Checking prerequisites..."
-    
-    # Check Docker
-    if ! command -v docker &> /dev/null; then
-        log_message "Docker is not installed or not in PATH" "ERROR"
-        exit 1
-    fi
-    
-    # Check Docker Compose
-    if ! command -v docker-compose &> /dev/null; then
-        log_message "Docker Compose is not installed or not in PATH" "ERROR"
-        exit 1
-    fi
-    
-    # Check if migration files exist
-    if [ ! -f "$DOCKER_COMPOSE_FILE" ]; then
-        log_message "Migration Docker Compose file not found: $DOCKER_COMPOSE_FILE" "ERROR"
-        exit 1
-    fi
-    
-    if [ ! -f "$ENV_FILE" ]; then
-        log_message "Migration environment file not found: $ENV_FILE" "ERROR"
-        exit 1
-    fi
-    
-    log_message "Prerequisites check passed" "SUCCESS"
-}
-
-# Backup current state
-backup_current_state() {
-    if [ "$BACKUP" = false ]; then
-        log_message "Backup skipped (--no-backup flag)" "WARN"
-        return
-    fi
-    
-    log_message "Creating backup of current state..."
-    
-    local backup_timestamp=$(date '+%Y%m%d_%H%M%S')
-    local backup_path="$BACKUP_DIR/$backup_timestamp"
-    
-    mkdir -p "$backup_path"
-    
-    # Backup databases
-    log_message "Backing up databases..."
-    
-    # Export current monolith database
-    local monolith_backup="$backup_path/monolith_db.sql"
-    if docker ps | grep -q "lab_manager_db"; then
-        docker exec lab_manager_db_1 pg_dump -U postgres -d lab_manager > "$monolith_backup"
-    fi
-    
-    # Export volumes
-    log_message "Backing up volumes..."
-    if docker volume ls | grep -q "lab_manager_postgres_data"; then
-        docker run --rm -v lab_manager_postgres_data:/data -v "${PWD}/${backup_path}:/backup" busybox tar czf /backup/postgres_data.tar.gz -C /data .
-    fi
-    
-    if docker volume ls | grep -q "lab_manager_app_storage"; then
-        docker run --rm -v lab_manager_app_storage:/data -v "${PWD}/${backup_path}:/backup" busybox tar czf /backup/app_storage.tar.gz -C /data .
-    fi
-    
-    log_message "Backup completed: $backup_path" "SUCCESS"
-}
-
-# Start Migration Phase 1
-start_migration_phase1() {
-    log_message "Starting Migration Phase 1: Hybrid Architecture"
-    
-    # Update environment for Phase 1
-    sed -i 's/MIGRATION_PHASE=.*/MIGRATION_PHASE=1/' "$ENV_FILE"
-    
-    # Start services with Phase 1 configuration
-    log_message "Starting hybrid services..."
-    
-    cd "$MIGRATION_DIR"
-    
-    # Start core infrastructure
-    docker-compose --env-file migration.env up -d \
-        legacy-postgres \
-        auth-postgres \
-        storage-postgres \
-        notification-postgres \
-        rag-postgres \
-        event-postgres \
-        gateway-redis \
-        event-redis \
-        ollama
-    
-    sleep 10
-    
-    # Start microservices
-    docker-compose --env-file migration.env up -d \
-        auth-service \
-        enhanced-storage-service \
-        notification-service \
-        enhanced-rag-service \
-        event-service
-    
-    sleep 5
-    
-    # Start legacy monolith
-    docker-compose --env-file migration.env up -d lab-manager
-    
-    sleep 5
-    
-    # Start API Gateway
-    docker-compose --env-file migration.env up -d api-gateway
-    
-    sleep 5
-    
-    # Start Frontend
-    docker-compose --env-file migration.env up -d frontend
-    
-    cd - > /dev/null
-    
-    log_message "Phase 1 deployment completed" "SUCCESS"
-}
-
-# Start Migration Phase 2
-start_migration_phase2() {
-    log_message "Starting Migration Phase 2: Partial Migration"
-    
-    # Update environment for Phase 2
-    sed -i 's/MIGRATION_PHASE=.*/MIGRATION_PHASE=2/' "$ENV_FILE"
-    
-    cd "$MIGRATION_DIR"
-    
-    # Add more microservices
-    docker-compose --env-file migration.env up -d \
-        template-postgres \
-        sequencing-postgres \
-        template-service \
-        sequencing-service
-    
-    # Update API Gateway routing
-    docker-compose --env-file migration.env restart api-gateway
-    
-    cd - > /dev/null
-    
-    log_message "Phase 2 deployment completed" "SUCCESS"
-}
-
-# Start Migration Phase 3
-start_migration_phase3() {
-    log_message "Starting Migration Phase 3: Full Microservices"
-    
-    # Update environment for Phase 3
-    sed -i 's/MIGRATION_PHASE=.*/MIGRATION_PHASE=3/' "$ENV_FILE"
-    
-    cd "$MIGRATION_DIR"
-    
-    # Add remaining microservices
-    docker-compose --env-file migration.env up -d \
-        sample-postgres \
-        transaction-postgres \
-        sample-service \
-        transaction-service
-    
-    # Update API Gateway to route everything to microservices
-    docker-compose --env-file migration.env restart api-gateway
-    
-    # Gracefully shut down legacy monolith
-    log_message "Shutting down legacy monolith..."
-    docker-compose --env-file migration.env stop lab-manager
-    
-    cd - > /dev/null
-    
-    log_message "Phase 3 deployment completed - Full microservices!" "SUCCESS"
-}
-
-# Get migration status
-get_migration_status() {
-    log_message "Checking migration status..."
-    
-    cd "$MIGRATION_DIR"
-    
-    local services=$(docker-compose --env-file migration.env ps --services)
-    local running_services=$(docker-compose --env-file migration.env ps --filter "status=running" --services)
-    
-    echo -e "\n${CYAN}=== Migration Status ===${NC}"
-    echo "Total Services: $(echo "$services" | wc -l)"
-    echo "Running Services: $(echo "$running_services" | wc -l)"
-    
-    echo -e "\n${CYAN}=== Service Health ===${NC}"
-    for service in $services; do
-        local status=$(docker-compose --env-file migration.env ps "$service" --format "table {{.State}}" | tail -n 1)
-        if [ "$status" = "running" ]; then
-            echo -e "${GREEN}$service : $status${NC}"
-        else
-            echo -e "${RED}$service : $status${NC}"
-        fi
-    done
-    
-    # Check API Gateway health
-    echo -e "\n${CYAN}=== API Gateway Health ===${NC}"
-    if curl -f -s "http://localhost:8000/health" > /dev/null 2>&1; then
-        echo -e "${GREEN}API Gateway: Healthy${NC}"
-    else
-        echo -e "${RED}API Gateway: Unhealthy${NC}"
-    fi
-    
-    # Check Frontend
-    echo -e "\n${CYAN}=== Frontend Health ===${NC}"
-    if curl -f -s "http://localhost:8080" > /dev/null 2>&1; then
-        echo -e "${GREEN}Frontend: Accessible${NC}"
-    else
-        echo -e "${RED}Frontend: Inaccessible${NC}"
-    fi
-    
-    cd - > /dev/null
-}
-
-# Rollback migration
-rollback_migration() {
-    log_message "Rolling back migration..." "WARN"
-    
-    if [ "$FORCE" = false ]; then
-        echo -n "This will stop all microservices and restore monolith. Continue? (y/N): "
-        read -r confirmation
-        if [[ ! "$confirmation" =~ ^[Yy]$ ]]; then
-            log_message "Rollback cancelled" "INFO"
-            return
-        fi
-    fi
-    
-    cd "$MIGRATION_DIR"
-    
-    # Stop all migration services
-    docker-compose --env-file migration.env down
-    
-    # Restart original monolith
-    cd ../..
-    docker-compose up -d
-    cd - > /dev/null
-    
-    log_message "Rollback completed" "SUCCESS"
-}
-
-# Prepare migration
-prepare_migration() {
-    log_message "Preparing migration environment..."
-    
-    # Create migration directories
-    mkdir -p "$MIGRATION_DIR"
-    mkdir -p "$BACKUP_DIR"
-    
-    # Stop current monolith
-    log_message "Stopping current monolith services..."
-    docker-compose down
-    
-    log_message "Migration preparation completed" "SUCCESS"
-}
-
-# Show next steps
-show_next_steps() {
-    case $ACTION in
-        "phase1")
-            echo -e "\n${CYAN}=== Next Steps ===${NC}"
-            echo "1. Test the hybrid setup at http://localhost:8080"
-            echo "2. Verify API Gateway at http://localhost:8000/health"
-            echo "3. Run './migrate-to-microservices.sh phase2' when ready"
-            ;;
-        "phase2")
-            echo -e "\n${CYAN}=== Next Steps ===${NC}"
-            echo "1. Test additional services (Templates, Sequencing)"
-            echo "2. Run './migrate-to-microservices.sh phase3' for full migration"
-            ;;
-        "phase3")
-            echo -e "\n${GREEN}=== Congratulations! ===${NC}"
-            echo "Full microservices migration completed!"
-            echo "Your application is now running on distributed architecture."
-            echo "Frontend: http://localhost:8080"
-            echo "API Gateway: http://localhost:8000"
-            ;;
-    esac
-}
-
-# Main execution
-main() {
-    parse_args "$@"
-    
-    log_message "TracSeq 2.0 Microservices Migration Tool" "SUCCESS"
-    log_message "Action: $ACTION"
-    
-    check_prerequisites
-    
-    case $ACTION in
-        "prepare")
-            prepare_migration
-            ;;
-        "phase1")
-            if [ "$BACKUP" = true ]; then
-                backup_current_state
-            fi
-            start_migration_phase1
-            ;;
-        "phase2")
-            start_migration_phase2
-            ;;
-        "phase3")
-            start_migration_phase3
-            ;;
-        "rollback")
-            rollback_migration
-            ;;
-        "status")
-            get_migration_status
-            ;;
-    esac
-    
-    if [[ "$ACTION" != "status" && "$ACTION" != "rollback" ]]; then
-        log_message "Waiting for services to stabilize..."
-        sleep 10
-        get_migration_status
-    fi
-    
-    log_message "Migration action '$ACTION' completed successfully!" "SUCCESS"
-    
-    show_next_steps
-}
-
-# Run main function with all arguments
-main "$@" 
+        ;;
+esac 
