@@ -94,6 +94,7 @@ backoff = "0.4"                             # Exponential backoff implementation
 # Middleware Enhancements
 tower-request-id = "0.3"                    # Request ID generation
 tower-default-headers = "0.2"               # Default security headers
+serde_urlencoded = "0.7.1"
 
 [dev-dependencies]
 axum-test = "15.0"

@@ -37,6 +37,9 @@ async fn main() {
         process::exit(1);
     }
 
+    // Initialize proxy system if enabled
+    router::proxy_routes::init_proxy_system().await;
+
     // Assemble all components using the new modular system
     let components = match assemble_production_components().await {
         Ok(components) => components,

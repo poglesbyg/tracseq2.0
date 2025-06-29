@@ -1,0 +1,316 @@
+version: '3.8'
+
+services:
+  # Database services
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tracseq
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init-databases.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Microservices
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth_service/Dockerfile
+    ports:
+      - "3010:8080"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_auth
+      JWT_SECRET: your-very-secure-secret-key-change-in-production
+      RUST_LOG: auth_service=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  sample-service:
+    build:
+      context: .
+      dockerfile: sample_service/Dockerfile
+    ports:
+      - "3011:8080"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_samples
+      AUTH_SERVICE_URL: http://auth-service:8080
+      STORAGE_SERVICE_URL: http://enhanced-storage-service:8080
+      RUST_LOG: sample_service=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  sequencing-service:
+    build:
+      context: .
+      dockerfile: sequencing_service/Dockerfile
+    ports:
+      - "3012:8080"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_sequencing
+      AUTH_SERVICE_URL: http://auth-service:8080
+      RUST_LOG: sequencing_service=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  template-service:
+    build:
+      context: .
+      dockerfile: template_service/Dockerfile
+    ports:
+      - "3013:8080"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_templates
+      AUTH_SERVICE_URL: http://auth-service:8080
+      RUST_LOG: template_service=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  enhanced-storage-service:
+    build:
+      context: .
+      dockerfile: enhanced_storage_service/Dockerfile
+    ports:
+      - "3014:8080"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_storage
+      REDIS_URL: redis://redis:6379
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+      RUST_LOG: enhanced_storage_service=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  spreadsheet-versioning-service:
+    build:
+      context: .
+      dockerfile: spreadsheet_versioning_service/Dockerfile
+    ports:
+      - "3015:8080"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_spreadsheets
+      AUTH_SERVICE_URL: http://auth-service:8080
+      RUST_LOG: spreadsheet_versioning_service=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification_service/Dockerfile
+    ports:
+      - "3016:8080"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_notifications
+      REDIS_URL: redis://redis:6379
+      RUST_LOG: notification_service=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  event-service:
+    build:
+      context: .
+      dockerfile: event_service/Dockerfile
+    ports:
+      - "3017:8080"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_events
+      REDIS_URL: redis://redis:6379
+      RUST_LOG: event_service=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  qaqc-service:
+    build:
+      context: .
+      dockerfile: qaqc_service/Dockerfile
+    ports:
+      - "3018:8080"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_qaqc
+      AUTH_SERVICE_URL: http://auth-service:8080
+      RUST_LOG: qaqc_service=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Enhanced RAG Service (Python)
+  enhanced-rag-service:
+    build:
+      context: .
+      dockerfile: enhanced_rag_service/Dockerfile
+    ports:
+      - "3019:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_rag
+      REDIS_URL: redis://redis:6379
+      PYTHONPATH: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Lab Manager in Proxy Mode
+  lab-manager-proxy:
+    build:
+      context: .
+      dockerfile: lab_manager/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/tracseq_main
+      ENABLE_PROXY_MODE: "true"
+      AUTH_SERVICE_URL: http://auth-service:8080
+      SAMPLE_SERVICE_URL: http://sample-service:8080
+      SEQUENCING_SERVICE_URL: http://sequencing-service:8080
+      TEMPLATE_SERVICE_URL: http://template-service:8080
+      STORAGE_SERVICE_URL: http://enhanced-storage-service:8080
+      SPREADSHEET_SERVICE_URL: http://spreadsheet-versioning-service:8080
+      RUST_LOG: lab_manager=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      sample-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Gateway (Python)
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api_gateway/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:8080
+      SAMPLE_SERVICE_URL: http://sample-service:8080
+      SEQUENCING_SERVICE_URL: http://sequencing-service:8080
+      TEMPLATE_SERVICE_URL: http://template-service:8080
+      STORAGE_SERVICE_URL: http://enhanced-storage-service:8080
+      SPREADSHEET_SERVICE_URL: http://spreadsheet-versioning-service:8080
+      NOTIFICATION_SERVICE_URL: http://notification-service:8080
+      EVENT_SERVICE_URL: http://event-service:8080
+      RAG_SERVICE_URL: http://enhanced-rag-service:8000
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - auth-service
+      - sample-service
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    depends_on:
+      - api-gateway
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,3 +1,5 @@
+pub mod proxy_routes;
+
 use axum::{
     routing::{delete, get, post, put},
     Router,
@@ -7,10 +9,12 @@ use tower_http::cors::CorsLayer;
 use crate::{
     assembly::AppComponents,
     handlers::{
-        dashboard, health, rag_proxy, reports, samples, sequencing, spreadsheets,
+        dashboard, health, proxy_handlers, rag_proxy, reports, samples, sequencing, spreadsheets,
         templates, users,
     },
 };
+
+use self::proxy_routes::create_proxy_routes;
 
 /// Health and system routes
 pub fn health_routes() -> Router<AppComponents> {
@@ -213,6 +217,37 @@ pub fn create_authenticated_routes() -> Router<AppComponents> {
 
 /// Assemble all routes into a complete application router
 pub fn create_app_router() -> Router<AppComponents> {
+    // Check if proxy mode is enabled
+    if proxy_handlers::is_proxy_mode_enabled() {
+        tracing::info!("🔄 Creating router in PROXY MODE - routing to microservices");
+        return create_proxy_app_router();
+    }
+    
+    tracing::info!("📦 Creating router in MONOLITH MODE - using local services");
+    create_monolith_app_router()
+}
+
+/// Create router for proxy mode (routes to microservices)
+fn create_proxy_app_router() -> Router<AppComponents> {
+    Router::new()
+        // Health check routes (always local)
+        .route("/health", get(health::health_check))
+        .route("/health/system", get(health::system_health_check))
+        .route("/health/database", get(health::database_health_check))
+        .route("/health/metrics", get(health::application_metrics))
+        .route("/health/ready", get(health::readiness_check))
+        .route("/health/live", get(health::liveness_check))
+        // Proxy routes to microservices
+        .merge(create_proxy_routes())
+        // Dashboard routes (still local)
+        .route("/dashboard/stats", get(dashboard::get_dashboard_stats))
+        .route("/api/dashboard/stats", get(dashboard::get_dashboard_stats))
+        // CORS layer
+        .layer(create_cors_layer())
+}
+
+/// Create router for monolith mode (uses local services)
+fn create_monolith_app_router() -> Router<AppComponents> {
     Router::new()
         // Health check routes (no authentication required for monitoring)
         .route("/health", get(health::health_check))
@@ -335,44 +370,47 @@ pub fn create_app_router() -> Router<AppComponents> {
         .route("/users/:id", put(users::update_user))
         .route("/users/:id", delete(users::delete_user))
         // CORS layer
-        .layer(
-            CorsLayer::new()
-                .allow_origin(
-                    "http://localhost:5173"
-                        .parse::<axum::http::HeaderValue>()
-                        .map_err(|e| {
-                            tracing::error!("Failed to parse CORS origin: {}", e);
-                            e
-                        })
-                        .unwrap_or_else(|_| {
-                            axum::http::HeaderValue::from_static("http://localhost:5173")
-                        }),
-                )
-                .allow_origin(
-                    "http://localhost:8080"
-                        .parse::<axum::http::HeaderValue>()
-                        .map_err(|e| {
-                            tracing::error!("Failed to parse CORS origin: {}", e);
-                            e
-                        })
-                        .unwrap_or_else(|_| {
-                            axum::http::HeaderValue::from_static("http://localhost:8080")
-                        }),
-                )
-                .allow_methods([
-                    axum::http::Method::GET,
-                    axum::http::Method::POST,
-                    axum::http::Method::PUT,
-                    axum::http::Method::DELETE,
-                    axum::http::Method::OPTIONS,
-                ])
-                .allow_headers([
-                    axum::http::header::CONTENT_TYPE,
-                    axum::http::header::AUTHORIZATION,
-                    axum::http::header::USER_AGENT,
-                ])
-                .allow_credentials(true),
+        .layer(create_cors_layer())
+}
+
+/// Create CORS layer for the application
+fn create_cors_layer() -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin(
+            "http://localhost:5173"
+                .parse::<axum::http::HeaderValue>()
+                .map_err(|e| {
+                    tracing::error!("Failed to parse CORS origin: {}", e);
+                    e
+                })
+                .unwrap_or_else(|_| {
+                    axum::http::HeaderValue::from_static("http://localhost:5173")
+                }),
         )
+        .allow_origin(
+            "http://localhost:8080"
+                .parse::<axum::http::HeaderValue>()
+                .map_err(|e| {
+                    tracing::error!("Failed to parse CORS origin: {}", e);
+                    e
+                })
+                .unwrap_or_else(|_| {
+                    axum::http::HeaderValue::from_static("http://localhost:8080")
+                }),
+        )
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::PUT,
+            axum::http::Method::DELETE,
+            axum::http::Method::OPTIONS,
+        ])
+        .allow_headers([
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::USER_AGENT,
+        ])
+        .allow_credentials(true)
 }
 
 /// Create a minimal router for testing
