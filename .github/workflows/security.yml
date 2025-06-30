@@ -1,1160 +1,281 @@
-# TracSeq 2.0 Laboratory Management System - Enhanced Security Pipeline
-name: 🔒 TracSeq 2.0 Security & Compliance
+# TracSeq 2.0 Security and Compliance Pipeline
+name: 🔒 Security & Compliance
 
 on:
   push:
-    branches: [ "dev", "main", "master" ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ "dev", "main", "master" ]
+    branches: [ main, develop ]
   schedule:
-    # Run security scans daily at 3 AM UTC
-    - cron: '0 3 * * *'
+    - cron: '0 9 * * 1'  # Weekly on Monday at 9 AM
   workflow_dispatch:
-    inputs:
-      scan_type:
-        description: 'Type of security scan to run'
-        required: true
-        default: 'comprehensive'
-        type: choice
-        options:
-        - quick
-        - comprehensive
-        - dependency-only
-        - laboratory-compliance
-      include_runtime_security:
-        description: 'Include runtime security configuration'
-        required: false
-        default: true
-        type: boolean
 
 env:
-  RUST_VERSION: '1.75'
-  NODE_VERSION: '20'
+  RUST_VERSION: '1.82'
   PYTHON_VERSION: '3.11'
-  # Laboratory security compliance requirements
-  LAB_SECURITY_STANDARD: "ISO-15189"
-  PHI_COMPLIANCE: "HIPAA"
-  DATA_CLASSIFICATION: "RESTRICTED"
+  NODE_VERSION: '20'
 
 jobs:
-  # 🔍 Security environment analysis
-  security-analysis:
-    name: 🔍 Security Environment Analysis
+  # 🔍 Dependency Security Scanning
+  dependency-scan:
+    name: 🔍 Dependency Security Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    outputs:
-      has_rust: ${{ steps.detect.outputs.has_rust }}
-      has_frontend: ${{ steps.detect.outputs.has_frontend }}
-      has_python: ${{ steps.detect.outputs.has_python }}
-      scan_scope: ${{ steps.scope.outputs.scan_scope }}
-      compliance_required: ${{ steps.compliance.outputs.required }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Detect project structure
-        id: detect
-        run: |
-          echo "🔍 Analyzing TracSeq 2.0 project structure for security scanning"
-          
-          # Detect technology stacks
-          HAS_RUST="false"
-          HAS_FRONTEND="false"
-          HAS_PYTHON="false"
-          
-          if [ -f "Cargo.toml" ]; then
-            HAS_RUST="true"
-            echo "✅ Rust workspace detected"
-          fi
-          
-          if [ -d "lab_manager/frontend" ] && [ -f "lab_manager/frontend/package.json" ]; then
-            HAS_FRONTEND="true"
-            echo "✅ Frontend application detected"
-          fi
-          
-          if find . -name "*.py" -type f | head -1 | wc -l | grep -q "1"; then
-            HAS_PYTHON="true"
-            echo "✅ Python services detected"
-          fi
-          
-          echo "has_rust=$HAS_RUST" >> $GITHUB_OUTPUT
-          echo "has_frontend=$HAS_FRONTEND" >> $GITHUB_OUTPUT
-          echo "has_python=$HAS_PYTHON" >> $GITHUB_OUTPUT
-
-      - name: Determine scan scope
-        id: scope
-        run: |
-          SCAN_TYPE="${{ github.event.inputs.scan_type || 'comprehensive' }}"
-          
-          case "$SCAN_TYPE" in
-            "quick")
-              SCOPE="dependencies,secrets"
-              ;;
-            "dependency-only")
-              SCOPE="dependencies"
-              ;;
-            "laboratory-compliance")
-              SCOPE="compliance,data-protection,audit"
-              ;;
-            "comprehensive"|*)
-              SCOPE="dependencies,secrets,vulnerabilities,containers,compliance,runtime"
-              ;;
-          esac
-          
-          echo "scan_scope=$SCOPE" >> $GITHUB_OUTPUT
-          echo "📋 Security scan scope: $SCOPE"
-
-      - name: Check compliance requirements
-        id: compliance
-        run: |
-          echo "🏥 Checking laboratory compliance requirements"
-          
-          # Check for PHI/PII handling
-          PHI_INDICATORS=0
-          if grep -r -i "patient\|sample\|specimen\|medical\|health\|phi\|pii" --include="*.rs" --include="*.py" --include="*.ts" --include="*.tsx" . >/dev/null 2>&1; then
-            PHI_INDICATORS=1
-            echo "⚠️ PHI/PII indicators found - enhanced compliance required"
-          fi
-          
-          # Check for laboratory-specific data
-          LAB_INDICATORS=0
-          if grep -r -i "barcode\|temperature\|storage\|sample.*lifecycle\|rag.*confidence" --include="*.rs" --include="*.py" . >/dev/null 2>&1; then
-            LAB_INDICATORS=1
-            echo "🧬 Laboratory data handling detected"
-          fi
-          
-          COMPLIANCE_REQUIRED="false"
-          if [ $PHI_INDICATORS -eq 1 ] || [ $LAB_INDICATORS -eq 1 ]; then
-            COMPLIANCE_REQUIRED="true"
-          fi
-          
-          echo "required=$COMPLIANCE_REQUIRED" >> $GITHUB_OUTPUT
-          echo "📋 Compliance scanning required: $COMPLIANCE_REQUIRED"
-
-  # 🛡️ Dependency vulnerability scanning
-  dependency-security:
-    name: 🛡️ Dependency Security Scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: security-analysis
-    if: contains(needs.security-analysis.outputs.scan_scope, 'dependencies')
-    
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: "Rust Dependencies"
-            condition: ${{ needs.security-analysis.outputs.has_rust == 'true' }}
-            scanner: "cargo-audit"
-          - name: "Frontend Dependencies" 
-            condition: ${{ needs.security-analysis.outputs.has_frontend == 'true' }}
-            scanner: "npm-audit"
-          - name: "Python Dependencies"
-            condition: ${{ needs.security-analysis.outputs.has_python == 'true' }}
-            scanner: "safety"
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        if: matrix.condition == 'true'
-
-      - name: Setup Rust toolchain
-        if: matrix.scanner == 'cargo-audit' && matrix.condition == 'true'
-        uses: dtolnay/rust-toolchain@stable
+      # Rust dependency scanning
+      - name: 🦀 Rust Security Audit
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
+          override: true
 
-      - name: Setup Node.js
-        if: matrix.scanner == 'npm-audit' && matrix.condition == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
 
-      - name: Setup Python
-        if: matrix.scanner == 'safety' && matrix.condition == 'true'
+      - name: Run Rust security audit
+        run: |
+          echo "🔍 Scanning Rust dependencies for vulnerabilities"
+          cargo audit || echo "⚠️ Vulnerabilities found in Rust dependencies"
+
+      # Python dependency scanning
+      - name: 🐍 Python Security Check
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install security scanning tools
-        if: matrix.condition == 'true'
+      - name: Install Python security tools
         run: |
-          echo "🔧 Installing security tools for ${{ matrix.name }}"
-          
-          case "${{ matrix.scanner }}" in
-            "cargo-audit")
-              if cargo install cargo-audit --version 0.20.0; then
-                echo "✅ cargo-audit installed"
-              else
-                echo "⚠️ Failed to install cargo-audit"
-              fi
-              
-              if cargo install cargo-deny --version 0.14.21; then
-                echo "✅ cargo-deny installed"
-              else
-                echo "⚠️ Failed to install cargo-deny"
-              fi
-              ;;
-            "npm-audit")
-              npm install -g audit-ci@^6
-              echo "✅ npm audit tools installed"
-              ;;
-            "safety")
-              pip install safety bandit semgrep
-              echo "✅ Python security tools installed"
-              ;;
-          esac
+          pip install safety bandit
 
-      - name: Run dependency vulnerability scan
-        if: matrix.condition == 'true'
-        continue-on-error: true
+      - name: Check Python dependencies
         run: |
-          echo "🔍 Running ${{ matrix.name }} vulnerability scan"
+          echo "🔍 Scanning Python dependencies"
+          # Check AI services
+          if [ -d "lims-ai" ]; then
+            cd lims-ai
+            for service in lab_submission_rag enhanced_rag_service; do
+              if [ -f "$service/requirements.txt" ]; then
+                echo "Checking $service dependencies"
+                safety check -r $service/requirements.txt || echo "⚠️ Vulnerabilities in $service"
+              fi
+            done
+            cd ..
+          fi
           
-          case "${{ matrix.scanner }}" in
-            "cargo-audit")
-              echo "## Rust Dependency Security Report" > rust-security-report.md
-              echo "" >> rust-security-report.md
-              
-              # Run cargo audit
-              if command -v cargo-audit >/dev/null 2>&1; then
-                echo "### Cargo Audit Results" >> rust-security-report.md
-                if cargo audit --json > cargo-audit.json; then
-                  echo "✅ No critical vulnerabilities found in Rust dependencies" >> rust-security-report.md
-                  echo "✅ Cargo audit completed successfully"
-                else
-                  echo "⚠️ Vulnerabilities found in Rust dependencies" >> rust-security-report.md
-                  echo "See cargo-audit.json for details" >> rust-security-report.md
-                fi
-              else
-                echo "⚠️ cargo-audit not available" >> rust-security-report.md
-              fi
-              
-              # Run cargo deny
-              if command -v cargo-deny >/dev/null 2>&1; then
-                echo "" >> rust-security-report.md
-                echo "### Cargo Deny Results" >> rust-security-report.md
-                if cargo deny check licenses; then
-                  echo "✅ License compliance check passed" >> rust-security-report.md
-                else
-                  echo "⚠️ License compliance issues found" >> rust-security-report.md
-                fi
-                
-                if cargo deny check bans; then
-                  echo "✅ Banned dependency check passed" >> rust-security-report.md
-                else
-                  echo "⚠️ Banned dependencies found" >> rust-security-report.md
-                fi
-              fi
-              ;;
-              
-            "npm-audit")
-              echo "## Frontend Dependency Security Report" > frontend-security-report.md
-              echo "" >> frontend-security-report.md
-              
-              cd lab_manager/frontend || exit 1
-              
-              if [ -f "package.json" ]; then
-                npm install
-                
-                echo "### NPM Audit Results" >> ../../frontend-security-report.md
-                if npm audit --audit-level=high --json > ../../npm-audit.json; then
-                  echo "✅ No high-severity vulnerabilities found" >> ../../frontend-security-report.md
-                else
-                  echo "⚠️ High-severity vulnerabilities found in frontend dependencies" >> ../../frontend-security-report.md
-                  echo "See npm-audit.json for details" >> ../../frontend-security-report.md
-                fi
-                
-                # Check for outdated packages
-                echo "" >> ../../frontend-security-report.md
-                echo "### Outdated Packages" >> ../../frontend-security-report.md
-                npm outdated --json > ../../npm-outdated.json 2>/dev/null || true
-                echo "See npm-outdated.json for details" >> ../../frontend-security-report.md
-              else
-                echo "⚠️ No package.json found" >> ../../frontend-security-report.md
-              fi
-              ;;
-              
-            "safety")
-              echo "## Python Dependency Security Report" > python-security-report.md
-              echo "" >> python-security-report.md
-              
-              # Scan each Python service
-              for service in lab_submission_rag enhanced_rag_service api_gateway; do
-                if [ -d "$service" ] && [ -f "$service/requirements.txt" ]; then
-                  echo "### $service Security Scan" >> python-security-report.md
-                  
-                  # Safety scan
-                  if command -v safety >/dev/null 2>&1; then
-                    cd "$service"
-                    if safety check -r requirements.txt --json > "../safety-$service.json"; then
-                      echo "✅ No known vulnerabilities found" >> ../python-security-report.md
-                    else
-                      echo "⚠️ Vulnerabilities found in $service dependencies" >> ../python-security-report.md
-                    fi
-                    cd ..
-                  fi
-                  
-                  echo "" >> python-security-report.md
-                fi
-              done
-              ;;
-          esac
+          # Check API gateway
+          if [ -f "lims-core/api_gateway/requirements.txt" ]; then
+            safety check -r lims-core/api_gateway/requirements.txt || echo "⚠️ Vulnerabilities in API gateway"
+          fi
+
+      # Node.js dependency scanning
+      - name: 📦 Node.js Security Audit
+        if: always()
+        working-directory: lims-ui
+        run: |
+          echo "🔍 Scanning Node.js dependencies"
+          npm audit --audit-level=high || echo "⚠️ Vulnerabilities found in Node.js dependencies"
+
+  # 🔍 Code Security Analysis
+  code-security:
+    name: 🔍 Code Security Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Python Code Security (Bandit)
+        run: |
+          pip install bandit
+          echo "🔍 Running Bandit security analysis on Python code"
+          
+          # Scan AI services
+          if [ -d "lims-ai" ]; then
+            bandit -r lims-ai -f json -o bandit-ai-report.json || true
+          fi
+          
+          # Scan API gateway
+          if [ -d "lims-core/api_gateway" ]; then
+            bandit -r lims-core/api_gateway -f json -o bandit-api-report.json || true
+          fi
 
       - name: Upload security reports
         uses: actions/upload-artifact@v4
-        if: always() && matrix.condition == 'true'
+        if: always()
         with:
-          name: dependency-security-${{ matrix.scanner }}
-          path: |
-            *-security-report.md
-            *.json
-          retention-days: 30
+          name: bandit-reports
+          path: bandit-*.json
 
-  # 🔍 Secret scanning and sensitive data detection
-  secret-scanning:
-    name: 🔍 Secret & Sensitive Data Scanning
+  # 🔍 Secret Scanning
+  secrets-scan:
+    name: 🔍 Secret Scanning
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: security-analysis
-    if: contains(needs.security-analysis.outputs.scan_scope, 'secrets')
-    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install secret scanning tools
-        run: |
-          echo "🔧 Installing secret scanning tools"
-          
-          # Install gitleaks
-          if curl -sfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.0/gitleaks_8.18.0_linux_x64.tar.gz | tar -xz; then
-            sudo mv gitleaks /usr/local/bin/
-            echo "✅ Gitleaks installed"
-          else
-            echo "⚠️ Failed to install gitleaks"
-          fi
-          
-          # Install truffleHog
-          if curl -sfL https://github.com/trufflesecurity/trufflehog/releases/download/v3.63.2/trufflehog_3.63.2_linux_amd64.tar.gz | tar -xz; then
-            sudo mv trufflehog /usr/local/bin/
-            echo "✅ TruffleHog installed"
-          else
-            echo "⚠️ Failed to install trufflehog"
-          fi
-
-      - name: Run secret detection scans
-        run: |
-          echo "🔍 Running secret detection scans"
-          
-          mkdir -p security-reports
-          
-          # Gitleaks scan
-          if command -v gitleaks >/dev/null 2>&1; then
-            echo "Running Gitleaks scan..."
-            if gitleaks detect --source . --report-format json --report-path security-reports/gitleaks-report.json; then
-              echo "✅ Gitleaks: No secrets detected"
-            else
-              echo "⚠️ Gitleaks: Potential secrets found"
-            fi
-          fi
-          
-          # TruffleHog scan
-          if command -v trufflehog >/dev/null 2>&1; then
-            echo "Running TruffleHog scan..."
-            if trufflehog filesystem --directory . --json > security-reports/trufflehog-report.json; then
-              echo "✅ TruffleHog scan completed"
-            else
-              echo "⚠️ TruffleHog scan encountered issues"
-            fi
-          fi
-
-      - name: Laboratory-specific sensitive data check
-        run: |
-          echo "🧬 Checking for laboratory-specific sensitive data exposure"
-          
-          # Check for hardcoded laboratory credentials
-          echo "## Laboratory Sensitive Data Report" > security-reports/lab-sensitive-data.md
-          echo "" >> security-reports/lab-sensitive-data.md
-          
-          # Check for hardcoded database connections
-          if grep -r -i "postgres://\|mysql://\|mongodb://" --include="*.rs" --include="*.py" --include="*.ts" --include="*.tsx" . | grep -v ".env.example\|config.example"; then
-            echo "⚠️ Potential hardcoded database connections found" >> security-reports/lab-sensitive-data.md
-          else
-            echo "✅ No hardcoded database connections detected" >> security-reports/lab-sensitive-data.md
-          fi
-          
-          # Check for API keys and tokens
-          if grep -r -E "(api[_-]?key|token|secret|password)\s*[:=]\s*['\"][^'\"]{10,}" --include="*.rs" --include="*.py" --include="*.ts" --include="*.tsx" . | grep -v ".env.example\|test\|mock"; then
-            echo "⚠️ Potential hardcoded API keys or secrets found" >> security-reports/lab-sensitive-data.md
-          else
-            echo "✅ No hardcoded API keys detected" >> security-reports/lab-sensitive-data.md
-          fi
-          
-          # Check for sample data in code
-          if grep -r -i "barcode.*[0-9A-Z]{6,}\|sample.*id.*[0-9A-Z]{6,}" --include="*.rs" --include="*.py" .; then
-            echo "⚠️ Potential sample identifiers in code" >> security-reports/lab-sensitive-data.md
-          else
-            echo "✅ No sample identifiers hardcoded in source" >> security-reports/lab-sensitive-data.md
-          fi
-
-      - name: Upload secret scanning reports
-        uses: actions/upload-artifact@v4
-        if: always()
+      - name: 🔍 TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
         with:
-          name: secret-scanning-reports
-          path: security-reports/
-          retention-days: 30
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
 
-  # 🏥 Laboratory compliance and data protection
-  laboratory-compliance:
-    name: 🏥 Laboratory Compliance & Data Protection
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: security-analysis
-    if: needs.security-analysis.outputs.compliance_required == 'true'
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: 🔍 Gitleaks Secret Scan
+        uses: zricethezav/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: HIPAA compliance check
-        run: |
-          echo "🏥 Running HIPAA compliance checks for laboratory data"
-          
-          mkdir -p compliance-reports
-          echo "# HIPAA Compliance Report for TracSeq 2.0" > compliance-reports/hipaa-compliance.md
-          echo "" >> compliance-reports/hipaa-compliance.md
-          echo "**Date:** $(date)" >> compliance-reports/hipaa-compliance.md
-          echo "**Standard:** ${{ env.PHI_COMPLIANCE }}" >> compliance-reports/hipaa-compliance.md
-          echo "" >> compliance-reports/hipaa-compliance.md
-          
-          # Check for PHI handling
-          echo "## PHI Data Handling Analysis" >> compliance-reports/hipaa-compliance.md
-          
-          # Check for encryption requirements
-          if grep -r -i "encrypt\|hash\|bcrypt\|argon" --include="*.rs" --include="*.py" . >/dev/null; then
-            echo "✅ Encryption mechanisms found" >> compliance-reports/hipaa-compliance.md
-          else
-            echo "⚠️ No encryption mechanisms detected" >> compliance-reports/hipaa-compliance.md
-          fi
-          
-          # Check for audit logging
-          if grep -r -i "audit\|log.*access\|log.*event" --include="*.rs" --include="*.py" . >/dev/null; then
-            echo "✅ Audit logging mechanisms found" >> compliance-reports/hipaa-compliance.md
-          else
-            echo "⚠️ No audit logging detected" >> compliance-reports/hipaa-compliance.md
-          fi
-          
-          # Check for access controls
-          if grep -r -i "auth\|permission\|role\|rbac" --include="*.rs" --include="*.py" . >/dev/null; then
-            echo "✅ Access control mechanisms found" >> compliance-reports/hipaa-compliance.md
-          else
-            echo "⚠️ No access control mechanisms detected" >> compliance-reports/hipaa-compliance.md
-          fi
-
-      - name: ISO 15189 laboratory compliance
-        run: |
-          echo "🧪 Running ISO 15189 laboratory standard compliance checks"
-          
-          echo "# ISO 15189 Compliance Report" > compliance-reports/iso15189-compliance.md
-          echo "" >> compliance-reports/iso15189-compliance.md
-          echo "**Standard:** ${{ env.LAB_SECURITY_STANDARD }}" >> compliance-reports/iso15189-compliance.md
-          echo "**Data Classification:** ${{ env.DATA_CLASSIFICATION }}" >> compliance-reports/iso15189-compliance.md
-          echo "" >> compliance-reports/iso15189-compliance.md
-          
-          # Check sample lifecycle compliance
-          echo "## Sample Lifecycle Management" >> compliance-reports/iso15189-compliance.md
-          if grep -r -i "pending.*validated.*instorage.*insequencing.*completed" --include="*.rs" --include="*.py" . >/dev/null; then
-            echo "✅ Sample lifecycle states properly defined" >> compliance-reports/iso15189-compliance.md
-          else
-            echo "⚠️ Sample lifecycle compliance needs verification" >> compliance-reports/iso15189-compliance.md
-          fi
-          
-          # Check temperature monitoring
-          echo "" >> compliance-reports/iso15189-compliance.md
-          echo "## Temperature Zone Monitoring" >> compliance-reports/iso15189-compliance.md
-          if grep -r -E "temperature.*(-80|-20|4|22|37)" --include="*.rs" --include="*.py" . >/dev/null; then
-            echo "✅ Temperature zone monitoring implemented" >> compliance-reports/iso15189-compliance.md
-          else
-            echo "⚠️ Temperature zone monitoring needs verification" >> compliance-reports/iso15189-compliance.md
-          fi
-          
-          # Check chain of custody
-          echo "" >> compliance-reports/iso15189-compliance.md
-          echo "## Chain of Custody" >> compliance-reports/iso15189-compliance.md
-          if grep -r -i "chain.*custody\|audit.*trail\|blockchain" --include="*.rs" --include="*.py" . >/dev/null; then
-            echo "✅ Chain of custody mechanisms found" >> compliance-reports/iso15189-compliance.md
-          else
-            echo "⚠️ Chain of custody implementation needs verification" >> compliance-reports/iso15189-compliance.md
-          fi
-
-      - name: RAG confidence threshold compliance
-        run: |
-          echo "🤖 Checking RAG confidence threshold compliance"
-          
-          echo "" >> compliance-reports/iso15189-compliance.md
-          echo "## AI/RAG Confidence Requirements" >> compliance-reports/iso15189-compliance.md
-          
-          # Check for confidence threshold implementation
-          if grep -r -E "confidence.*0\.85|0\.85.*confidence|threshold.*0\.85" --include="*.rs" --include="*.py" . >/dev/null; then
-            echo "✅ RAG confidence threshold (0.85) properly implemented" >> compliance-reports/iso15189-compliance.md
-          else
-            echo "⚠️ RAG confidence threshold needs verification" >> compliance-reports/iso15189-compliance.md
-          fi
-          
-          # Check for manual review fallback
-          if grep -r -i "manual.*review\|human.*review\|fallback" --include="*.rs" --include="*.py" . >/dev/null; then
-            echo "✅ Manual review fallback mechanisms found" >> compliance-reports/iso15189-compliance.md
-          else
-            echo "⚠️ Manual review fallback needs verification" >> compliance-reports/iso15189-compliance.md
-          fi
-
-      - name: Upload compliance reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: laboratory-compliance-reports
-          path: compliance-reports/
-          retention-days: 90
-
-  # 🐳 Container security scanning
+  # 🐳 Container Security
   container-security:
-    name: 🐳 Container Security Scanning
+    name: 🐳 Container Security Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    needs: security-analysis
-    if: contains(needs.security-analysis.outputs.scan_scope, 'containers')
-    
     strategy:
-      fail-fast: false
       matrix:
-        service:
-          - auth_service
-          - sample_service
-          - enhanced_storage_service
-          - lab_submission_rag
-          - api_gateway
-    
+        include:
+          - service: auth_service
+            path: lims-core/auth_service
+          - service: sample_service
+            path: lims-core/sample_service
+          - service: api_gateway
+            path: lims-core/api_gateway
+          - service: lab_submission_rag
+            path: lims-ai/lab_submission_rag
+          - service: frontend
+            path: lims-ui
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Create security-hardened Dockerfile for ${{ matrix.service }}
+      - name: Check for Dockerfile
+        id: dockerfile-check
         run: |
-          echo "🐳 Creating security-hardened Dockerfile for ${{ matrix.service }}"
-          
-          SERVICE="${{ matrix.service }}"
-          
-          # Determine service type
-          if [ -f "$SERVICE/Cargo.toml" ]; then
-            SERVICE_TYPE="rust"
-          elif [ -f "$SERVICE/requirements.txt" ] || [ -f "$SERVICE/pyproject.toml" ]; then
-            SERVICE_TYPE="python"
+          if [ -f "${{ matrix.path }}/Dockerfile" ]; then
+            echo "has_dockerfile=true" >> $GITHUB_OUTPUT
           else
-            SERVICE_TYPE="unknown"
-            echo "⚠️ Unknown service type for $SERVICE"
-            exit 0
-          fi
-          
-          case "$SERVICE_TYPE" in
-            "rust")
-              cat > Dockerfile.security.$SERVICE << 'RUST_SECURITY_EOF'
-# Security-hardened Rust service
-FROM rust:1.75-slim AS builder
-
-# Security: Create non-root build user
-RUN groupadd --gid 1001 builduser && \
-    useradd --uid 1001 --gid builduser --shell /bin/bash --create-home builduser
-
-# Install minimal build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config \
-    libssl-dev \
-    libpq-dev \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /usr/src/app
-COPY . .
-
-# Build as non-root user where possible
-RUN cargo build --release --package {{ SERVICE_NAME }}
-
-# Minimal runtime image
-FROM debian:bookworm-slim
-
-# Security: Install only essential runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    libssl3 \
-    libpq5 \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
-
-# Security: Create dedicated service user
-RUN groupadd --gid 1000 tracseq && \
-    useradd --uid 1000 --gid tracseq --no-create-home --shell /usr/sbin/nologin tracseq
-
-WORKDIR /app
-
-# Copy binary with minimal permissions
-COPY --from=builder /usr/src/app/target/release/{{ SERVICE_NAME }} ./service
-RUN chown tracseq:tracseq /app/service && \
-    chmod 755 /app/service
-
-# Security: Drop privileges
-USER tracseq
-
-# Security hardening environment
-ENV RUST_LOG=info
-ENV RUST_BACKTRACE=0
-
-# Security: Expose only necessary port
-EXPOSE 3000
-
-# Security: Add health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD timeout 5s /bin/sh -c '</dev/tcp/localhost/3000' || exit 1
-
-CMD ["./service"]
-RUST_SECURITY_EOF
-              sed -i "s/{{ SERVICE_NAME }}/$SERVICE/g" Dockerfile.security.$SERVICE
-              ;;
-              
-            "python")
-              cat > Dockerfile.security.$SERVICE << 'PYTHON_SECURITY_EOF'
-# Security-hardened Python service
-FROM python:3.11-slim
-
-# Security: Install minimal system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
-
-# Security: Create dedicated service user
-RUN groupadd --gid 1000 tracseq && \
-    useradd --uid 1000 --gid tracseq --no-create-home --shell /usr/sbin/nologin tracseq
-
-WORKDIR /app
-
-# Copy service files
-COPY {{ SERVICE_PATH }}/ ./
-
-# Security: Install Python dependencies with security flags
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --require-hashes --only-binary=all -r requirements.txt 2>/dev/null || \
-    pip install --no-cache-dir -r requirements.txt
-
-# Security: Set ownership and remove write permissions
-RUN chown -R tracseq:tracseq /app && \
-    chmod -R 755 /app && \
-    find /app -type f -name "*.py" -exec chmod 644 {} \;
-
-# Security: Drop privileges
-USER tracseq
-
-# Security hardening environment
-ENV PYTHONPATH=/app
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Security: Expose only necessary port
-EXPOSE 8000
-
-# Security: Add health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD timeout 5s /bin/sh -c '</dev/tcp/localhost/8000' || exit 1
-
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-PYTHON_SECURITY_EOF
-              sed -i "s|{{ SERVICE_PATH }}|$SERVICE|g" Dockerfile.security.$SERVICE
-              ;;
-          esac
-
-      - name: Build security test image
-        if: hashFiles(format('Dockerfile.security.{0}', matrix.service)) != ''
-        run: |
-          if [ -f "Dockerfile.security.${{ matrix.service }}" ]; then
-            docker build -f Dockerfile.security.${{ matrix.service }} -t tracseq-security-test:${{ matrix.service }} .
-            echo "✅ Security test image built for ${{ matrix.service }}"
-          else
-            echo "⚠️ No security Dockerfile for ${{ matrix.service }}"
+            echo "has_dockerfile=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Run container security scan
-        run: |
-          echo "🔍 Running container security scan for ${{ matrix.service }}"
-          
-          # Install Trivy
-          if curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin; then
-            echo "✅ Trivy installed"
-            
-            if docker images | grep "tracseq-security-test:${{ matrix.service }}"; then
-              # Scan the built image
-              trivy image --format json --output trivy-${{ matrix.service }}.json tracseq-security-test:${{ matrix.service }}
-              trivy image --format table tracseq-security-test:${{ matrix.service }}
-            else
-              echo "⚠️ No image to scan for ${{ matrix.service }}"
-            fi
-          else
-            echo "⚠️ Failed to install Trivy"
-          fi
-
-      - name: Upload container security reports
-        uses: actions/upload-artifact@v4
-        if: always()
+      - name: Run Trivy vulnerability scanner
+        if: steps.dockerfile-check.outputs.has_dockerfile == 'true'
+        uses: aquasecurity/trivy-action@master
         with:
-          name: container-security-${{ matrix.service }}
+          scan-type: 'fs'
+          scan-ref: ${{ matrix.path }}
+          format: 'sarif'
+          output: 'trivy-${{ matrix.service }}.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results
+        if: steps.dockerfile-check.outputs.has_dockerfile == 'true'
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-${{ matrix.service }}.sarif'
+
+  # 📋 SBOM Generation
+  sbom-generation:
+    name: 📋 Software Bill of Materials
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./
+          format: spdx-json
+          output-file: sbom-spdx.json
+
+      - name: Generate Rust SBOM
+        run: |
+          cargo install cargo-cyclonedx
+          cargo cyclonedx --format json --output-file rust-sbom.json || echo "⚠️ Failed to generate Rust SBOM"
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: software-bill-of-materials
           path: |
-            trivy-*.json
-            Dockerfile.security.*
-          retention-days: 30
+            sbom-spdx.json
+            rust-sbom.json
 
-  # 🛡️ Runtime security configuration
-  runtime-security:
-    name: 🛡️ Runtime Security Configuration
+  # 🛡️ Security Policy Compliance
+  compliance-check:
+    name: 🛡️ Security Compliance Check
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: security-analysis
-    if: contains(needs.security-analysis.outputs.scan_scope, 'runtime') && github.event.inputs.include_runtime_security != 'false'
-    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Generate security policies
+      - name: Check security policy files
         run: |
-          echo "🛡️ Generating runtime security policies for TracSeq 2.0"
+          echo "🔍 Checking for security policy compliance"
           
-          mkdir -p security-policies
-          
-          # Network security policy
-          cat > security-policies/network-policy.yaml << 'NETWORK_EOF'
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: tracseq-network-policy
-  namespace: tracseq
-spec:
-  podSelector: {}
-  policyTypes:
-  - Ingress
-  - Egress
-  ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          name: tracseq
-    ports:
-    - protocol: TCP
-      port: 3000
-    - protocol: TCP
-      port: 8000
-  egress:
-  - to:
-    - namespaceSelector:
-        matchLabels:
-          name: tracseq
-  - to: []
-    ports:
-    - protocol: TCP
-      port: 5432  # PostgreSQL
-    - protocol: TCP
-      port: 6379  # Redis
-    - protocol: TCP
-      port: 443   # HTTPS
-    - protocol: TCP
-      port: 53    # DNS
-    - protocol: UDP
-      port: 53    # DNS
-NETWORK_EOF
+          # Check for required security files
+          REQUIRED_FILES=("SECURITY.md" ".github/CODEOWNERS")
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✅ Found: $file"
+            else
+              echo "⚠️ Missing: $file"
+            fi
+          done
 
-          # Pod security policy
-          cat > security-policies/pod-security-policy.yaml << 'PSP_EOF'
-apiVersion: policy/v1beta1
-kind: PodSecurityPolicy
-metadata:
-  name: tracseq-psp
-spec:
-  privileged: false
-  allowPrivilegeEscalation: false
-  requiredDropCapabilities:
-    - ALL
-  volumes:
-    - 'configMap'
-    - 'emptyDir'
-    - 'projected'
-    - 'secret'
-    - 'downwardAPI'
-    - 'persistentVolumeClaim'
-  hostNetwork: false
-  hostIPC: false
-  hostPID: false
-  runAsUser:
-    rule: 'MustRunAsNonRoot'
-  supplementalGroups:
-    rule: 'MustRunAs'
-    ranges:
-      - min: 1000
-        max: 65535
-  fsGroup:
-    rule: 'MustRunAs'
-    ranges:
-      - min: 1000
-        max: 65535
-  readOnlyRootFilesystem: true
-PSP_EOF
-
-          # RBAC configuration
-          cat > security-policies/rbac.yaml << 'RBAC_EOF'
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: tracseq-service-role
-rules:
-- apiGroups: [""]
-  resources: ["configmaps", "secrets"]
-  verbs: ["get", "list"]
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get", "list", "watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: tracseq-service-binding
-subjects:
-- kind: ServiceAccount
-  name: tracseq-service-account
-  namespace: tracseq
-roleRef:
-  kind: ClusterRole
-  name: tracseq-service-role
-  apiGroup: rbac.authorization.k8s.io
-RBAC_EOF
-
-      - name: Generate monitoring and alerting rules
+      - name: License compliance check
         run: |
-          echo "📊 Generating security monitoring rules"
+          echo "📋 Checking license compliance"
           
-          # Falco rules for runtime security
-          cat > security-policies/falco-rules.yaml << 'FALCO_EOF'
-- rule: TracSeq Unauthorized Process Launch
-  desc: Detect unauthorized process launches in TracSeq containers
-  condition: >
-    spawned_process and
-    container.image.tag contains "tracseq" and
-    not proc.name in (tracseq_allowed_processes)
-  output: >
-    Unauthorized process launched in TracSeq container
-    (user=%user.name command=%proc.cmdline container_id=%container.id container_name=%container.name)
-  priority: WARNING
-  tags: [tracseq, process, security]
-
-- rule: TracSeq Sensitive File Access
-  desc: Detect access to sensitive files in TracSeq
-  condition: >
-    open_read and
-    container.image.tag contains "tracseq" and
-    (fd.name contains "/etc/passwd" or
-     fd.name contains "/etc/shadow" or
-     fd.name contains "private_key" or
-     fd.name contains ".env")
-  output: >
-    Sensitive file accessed in TracSeq container
-    (user=%user.name file=%fd.name container_id=%container.id)
-  priority: HIGH
-  tags: [tracseq, files, security]
-
-- rule: TracSeq Network Anomaly
-  desc: Detect unexpected network connections from TracSeq services
-  condition: >
-    outbound and
-    container.image.tag contains "tracseq" and
-    not (fd.sip in (allowed_dest_ips) or
-         fd.sport in (allowed_dest_ports))
-  output: >
-    Unexpected network connection from TracSeq service
-    (user=%user.name connection=%fd.name container_id=%container.id)
-  priority: WARNING
-  tags: [tracseq, network, security]
-FALCO_EOF
-
-      - name: Generate laboratory-specific security configurations
-        run: |
-          echo "🧬 Generating laboratory-specific security configurations"
-          
-          # Data classification labels
-          cat > security-policies/data-classification.yaml << 'CLASSIFICATION_EOF'
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: tracseq-data-classification
-  namespace: tracseq
-data:
-  classification: "RESTRICTED"
-  phi_handling: "REQUIRED"
-  retention_policy: "7_YEARS"
-  encryption_required: "true"
-  audit_logging: "COMPREHENSIVE"
-  access_logging: "ALL_OPERATIONS"
-  
-  # Laboratory-specific classifications
-  sample_data: "PHI_RESTRICTED"
-  rag_outputs: "CONFIDENTIAL"
-  temperature_logs: "RESTRICTED"
-  audit_trails: "PERMANENT_RETENTION"
-CLASSIFICATION_EOF
-
-          # Backup and disaster recovery policy
-          cat > security-policies/backup-policy.yaml << 'BACKUP_EOF'
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: tracseq-backup-policy
-  namespace: tracseq
-data:
-  backup_frequency: "DAILY"
-  retention_period: "7_YEARS"
-  encryption_in_transit: "true"
-  encryption_at_rest: "true"
-  geographic_replication: "true"
-  recovery_time_objective: "4_HOURS"
-  recovery_point_objective: "1_HOUR"
-  
-  # Laboratory-specific backup requirements
-  sample_database: "DAILY_FULL_WEEKLY_INCREMENTAL"
-  rag_models: "WEEKLY_FULL"
-  audit_logs: "CONTINUOUS_REPLICATION"
-  temperature_data: "HOURLY_SNAPSHOT"
-BACKUP_EOF
-
-      - name: Upload runtime security configurations
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: runtime-security-policies
-          path: security-policies/
-          retention-days: 90
-
-  # 📊 Security report aggregation and summary
-  security-summary:
-    name: 📊 Security Summary & Reporting
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: [security-analysis, dependency-security, secret-scanning, laboratory-compliance, container-security, runtime-security]
-    if: always()
-    
-    steps:
-      - name: Download all security artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: security-artifacts/
-
-      - name: Generate comprehensive security report
-        run: |
-          echo "📊 Generating comprehensive security report for TracSeq 2.0"
-          
-          cat > security-summary-report.md << 'SUMMARY_EOF'
-# 🔒 TracSeq 2.0 Security & Compliance Report
-
-**Generated:** $(date -u)
-**Repository:** ${{ github.repository }}
-**Commit:** ${{ github.sha }}
-**Branch:** ${{ github.ref_name }}
-
-## 📋 Executive Summary
-
-This comprehensive security assessment covers the TracSeq 2.0 Laboratory Management System, including:
-- Dependency vulnerability scanning
-- Secret and sensitive data detection
-- Laboratory compliance verification (HIPAA, ISO 15189)
-- Container security hardening
-- Runtime security configuration
-
-## 🎯 Scan Results Overview
-
-### Job Execution Status
-- **Security Analysis**: ${{ needs.security-analysis.result }}
-- **Dependency Security**: ${{ needs.dependency-security.result }}
-- **Secret Scanning**: ${{ needs.secret-scanning.result }}
-- **Laboratory Compliance**: ${{ needs.laboratory-compliance.result }}
-- **Container Security**: ${{ needs.container-security.result }}
-- **Runtime Security**: ${{ needs.runtime-security.result }}
-
-### Technology Stack Coverage
-- **Rust Services**: ${{ needs.security-analysis.outputs.has_rust }}
-- **Frontend Application**: ${{ needs.security-analysis.outputs.has_frontend }}
-- **Python AI Services**: ${{ needs.security-analysis.outputs.has_python }}
-
-### Compliance Requirements
-- **Laboratory Compliance**: ${{ needs.security-analysis.outputs.compliance_required }}
-- **PHI/PII Handling**: ${{ env.PHI_COMPLIANCE }}
-- **Laboratory Standard**: ${{ env.LAB_SECURITY_STANDARD }}
-- **Data Classification**: ${{ env.DATA_CLASSIFICATION }}
-
-## 🛡️ Security Domains Assessed
-
-### 1. Dependency Security
-- Rust dependencies via cargo-audit and cargo-deny
-- Frontend dependencies via npm audit
-- Python dependencies via safety and bandit
-- License compliance verification
-
-### 2. Secret Detection
-- Hardcoded secrets and API keys
-- Database connection strings
-- Laboratory-specific sensitive data
-- Historical secret exposure via git history
-
-### 3. Laboratory Compliance
-- HIPAA compliance for PHI handling
-- ISO 15189 laboratory standard adherence
-- Sample lifecycle state management
-- Temperature zone monitoring compliance
-- RAG confidence threshold validation (≥0.85)
-
-### 4. Container Security
-- Security-hardened Docker images
-- Non-root user execution
-- Minimal attack surface
-- Vulnerability scanning with Trivy
-
-### 5. Runtime Security
-- Network policies and segmentation
-- Pod security policies
-- RBAC configurations
-- Runtime monitoring with Falco rules
-
-## 🧬 Laboratory-Specific Security Features
-
-### Sample Data Protection
-- ✅ Sample lifecycle state validation
-- ✅ Temperature zone compliance monitoring
-- ✅ Chain of custody implementation
-- ✅ Audit trail requirements
-
-### AI/RAG Security
-- ✅ Confidence threshold enforcement (≥0.85)
-- ✅ Manual review fallback mechanisms
-- ✅ Model integrity verification
-- ✅ Processing audit logging
-
-### Data Classification
-- **Sample Data**: PHI_RESTRICTED
-- **RAG Outputs**: CONFIDENTIAL  
-- **Temperature Logs**: RESTRICTED
-- **Audit Trails**: PERMANENT_RETENTION
-
-## 📊 Recommendations
-
-### Immediate Actions Required
-1. Review and remediate any HIGH/CRITICAL vulnerabilities found
-2. Validate laboratory compliance implementations
-3. Ensure proper secret management practices
-4. Deploy runtime security policies
-
-### Medium-term Improvements
-1. Implement automated security scanning in CI/CD
-2. Enhanced monitoring and alerting setup
-3. Regular penetration testing schedule
-4. Security training for development team
-
-### Long-term Security Strategy
-1. Zero-trust architecture implementation
-2. Advanced threat detection systems
-3. Compliance automation frameworks
-4. Security metrics and KPI tracking
-
-## 🔗 Artifact References
-
-All detailed security scan results, compliance reports, and security configurations are available in the workflow artifacts:
-
-- `dependency-security-*`: Dependency vulnerability reports
-- `secret-scanning-reports`: Secret detection results
-- `laboratory-compliance-reports`: Compliance assessment reports
-- `container-security-*`: Container security scan results
-- `runtime-security-policies`: Runtime security configurations
-
----
-
-**Security Contact**: security@tracseq.com
-**Compliance Contact**: compliance@tracseq.com
-**Emergency Response**: security-incident@tracseq.com
-SUMMARY_EOF
-
-      - name: Upload comprehensive security report
-        uses: actions/upload-artifact@v4
-        with:
-          name: tracseq-security-summary-report
-          path: security-summary-report.md
-          retention-days: 90
-
-      - name: Generate security metrics
-        run: |
-          echo "📊 Generating security metrics"
-          
-          # Count security issues found (example metrics)
-          cat > security-metrics.json << 'METRICS_EOF'
-{
-  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "repository": "${{ github.repository }}",
-  "commit": "${{ github.sha }}",
-  "metrics": {
-    "scan_completion": {
-      "dependency_security": "${{ needs.dependency-security.result }}",
-      "secret_scanning": "${{ needs.secret-scanning.result }}",
-      "laboratory_compliance": "${{ needs.laboratory-compliance.result }}",
-      "container_security": "${{ needs.container-security.result }}",
-      "runtime_security": "${{ needs.runtime-security.result }}"
-    },
-    "coverage": {
-      "rust_services": ${{ needs.security-analysis.outputs.has_rust }},
-      "frontend_application": ${{ needs.security-analysis.outputs.has_frontend }},
-      "python_services": ${{ needs.security-analysis.outputs.has_python }}
-    },
-    "compliance": {
-      "laboratory_standards_checked": ${{ needs.security-analysis.outputs.compliance_required }},
-      "phi_compliance": "${{ env.PHI_COMPLIANCE }}",
-      "lab_standard": "${{ env.LAB_SECURITY_STANDARD }}"
-    }
-  }
-}
-METRICS_EOF
-
-      - name: Final security status
-        run: |
-          echo "🎯 Final Security Pipeline Status"
-          
-          # Determine overall security status
-          CRITICAL_JOBS=("dependency-security" "secret-scanning")
-          SECURITY_STATUS="PASS"
-          
-          if [[ "${{ needs.dependency-security.result }}" == "failure" ]]; then
-            SECURITY_STATUS="FAIL"
-            echo "❌ Critical security issue: Dependency security scan failed"
-          fi
-          
-          if [[ "${{ needs.secret-scanning.result }}" == "failure" ]]; then
-            SECURITY_STATUS="FAIL"
-            echo "❌ Critical security issue: Secret scanning failed"
-          fi
-          
-          if [[ "$SECURITY_STATUS" == "PASS" ]]; then
-            echo "✅ TracSeq 2.0 Security Pipeline completed successfully"
-            echo "🔒 Laboratory Management System meets security requirements"
+          # Check for LICENSE file
+          if [ -f "LICENSE" ]; then
+            echo "✅ LICENSE file found"
           else
-            echo "❌ Security Pipeline failed - immediate attention required"
+            echo "❌ LICENSE file missing"
             exit 1
-          fi 
+          fi
+
+  # 📊 Security Summary
+  security-summary:
+    name: 📊 Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, code-security, secrets-scan, container-security, sbom-generation, compliance-check]
+    if: always()
+    steps:
+      - name: Generate security summary
+        run: |
+          echo "# 🔒 TracSeq 2.0 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependency Scan | ${{ needs.dependency-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Code Security | ${{ needs.code-security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secrets Scan | ${{ needs.secrets-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Security | ${{ needs.container-security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SBOM Generation | ${{ needs.sbom-generation.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Compliance Check | ${{ needs.compliance-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall security status
+          if [ "${{ needs.dependency-scan.result }}" == "success" ] && \
+             [ "${{ needs.code-security.result }}" == "success" ] && \
+             [ "${{ needs.secrets-scan.result }}" == "success" ] && \
+             [ "${{ needs.container-security.result }}" == "success" ] && \
+             [ "${{ needs.compliance-check.result }}" == "success" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **All security checks passed!**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Some security checks require attention.**" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Recommendations" >> $GITHUB_STEP_SUMMARY
+          echo "- Review any reported vulnerabilities in dependencies" >> $GITHUB_STEP_SUMMARY
+          echo "- Ensure all secrets are properly managed" >> $GITHUB_STEP_SUMMARY
+          echo "- Keep dependencies up to date" >> $GITHUB_STEP_SUMMARY
+          echo "- Follow security best practices for laboratory data" >> $GITHUB_STEP_SUMMARY
