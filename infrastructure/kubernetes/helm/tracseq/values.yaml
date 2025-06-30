@@ -1,0 +1,291 @@
+# Default values for TracSeq 2.0
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global configuration
+global:
+  environment: production
+  domain: tracseq.com
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: "gp3"
+  
+# Frontend configuration
+frontend:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: tracseq/frontend
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 3000
+    
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: www.tracseq.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: tracseq-frontend-tls
+        hosts:
+          - www.tracseq.com
+          
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+      
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+
+# API Gateway configuration
+apiGateway:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: tracseq/api-gateway
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+    
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+    
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/rate-limit: "100"
+    hosts:
+      - host: api.tracseq.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: tracseq-api-tls
+        hosts:
+          - api.tracseq.com
+          
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+      
+  env:
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: tracseq-secrets
+          key: database-url
+    - name: REDIS_URL
+      value: "redis://redis-master:6379"
+    - name: LOG_LEVEL
+      value: "info"
+
+# Microservices configuration
+services:
+  # Auth Service
+  authService:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: tracseq/auth-service
+      tag: "2.0.0"
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+        
+  # Sample Service
+  sampleService:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: tracseq/sample-service
+      tag: "2.0.0"
+    resources:
+      limits:
+        cpu: 750m
+        memory: 768Mi
+      requests:
+        cpu: 150m
+        memory: 256Mi
+        
+  # Storage Service
+  storageService:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: tracseq/storage-service
+      tag: "2.0.0"
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 200m
+        memory: 512Mi
+        
+  # RAG Service (AI)
+  ragService:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: tracseq/rag-service
+      tag: "2.0.0"
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+    env:
+      - name: OLLAMA_HOST
+        value: "http://ollama:11434"
+      - name: MODEL_NAME
+        value: "llama3.2:3b"
+        
+  # Reports Service
+  reportsService:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: tracseq/reports-service
+      tag: "2.0.0"
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+# Database configuration
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "changeme"
+    database: "tracseq"
+  primary:
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClass: gp3
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Redis configuration  
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "changeme"
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: gp3
+  replica:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 10Gi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Ollama configuration (for AI/LLM)
+ollama:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ollama/ollama
+    tag: "latest"
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: gp3
+  resources:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+  grafana:
+    enabled: true
+    adminPassword: "changeme"
+    persistence:
+      enabled: true
+      size: 10Gi
+
+# Security configuration
+security:
+  podSecurityPolicy:
+    enabled: true
+  networkPolicy:
+    enabled: true
+  serviceAccount:
+    create: true
+    automountServiceAccountToken: false
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: 30  # days
+  s3:
+    bucket: "tracseq-backups"
+    region: "us-east-1"
+
+# Resource quotas
+resourceQuota:
+  enabled: true
+  hard:
+    requests.cpu: "100"
+    requests.memory: "200Gi"
+    persistentvolumeclaims: "50" 

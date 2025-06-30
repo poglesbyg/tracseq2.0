@@ -1,0 +1,111 @@
+# Local development values for TracSeq
+global:
+  environment: development
+  domain: localhost
+  storageClass: local-path
+  
+frontend:
+  replicaCount: 1
+  image:
+    repository: nginx
+    tag: alpine
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  ingress:
+    hosts:
+      - host: localhost
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+
+apiGateway:
+  replicaCount: 1
+  image:
+    repository: nginx
+    tag: alpine
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 80
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  ingress:
+    hosts:
+      - host: localhost
+        paths:
+          - path: /api
+            pathType: Prefix
+    tls: []
+
+services:
+  authService:
+    replicaCount: 1
+  sampleService:
+    replicaCount: 1
+  storageService:
+    replicaCount: 1
+  ragService:
+    replicaCount: 1
+  reportsService:
+    replicaCount: 1
+
+postgresql:
+  persistence:
+    size: 10Gi
+    storageClass: local-path
+  metrics:
+    enabled: false
+    serviceMonitor:
+      enabled: false
+  
+redis:
+  master:
+    persistence:
+      size: 1Gi
+      storageClass: local-path
+  replica:
+    replicaCount: 0
+  metrics:
+    enabled: false
+    serviceMonitor:
+      enabled: false
+
+ollama:
+  persistence:
+    size: 20Gi
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+monitoring:
+  enabled: false
+  
+backup:
+  enabled: false
+
+ingress:
+  enabled: false  # We already have nginx-ingress installed
+
+nginx-ingress-controller:
+  enabled: false

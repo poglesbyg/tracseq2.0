@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tracseq
+  labels:
+    app.kubernetes.io/name: tracseq
+    app.kubernetes.io/part-of: tracseq-platform
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tracseq-staging
+  labels:
+    app.kubernetes.io/name: tracseq
+    app.kubernetes.io/part-of: tracseq-platform
+    environment: staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tracseq-dev
+  labels:
+    app.kubernetes.io/name: tracseq
+    app.kubernetes.io/part-of: tracseq-platform
+    environment: development 

@@ -1,0 +1,37 @@
+apiVersion: v2
+name: tracseq
+description: TracSeq 2.0 Laboratory Management System
+type: application
+version: 2.0.0
+appVersion: "2.0.0"
+
+keywords:
+  - laboratory
+  - lims
+  - microservices
+  - kubernetes
+
+home: https://github.com/tracseq/tracseq2.0
+sources:
+  - https://github.com/tracseq/tracseq2.0
+
+maintainers:
+  - name: TracSeq Team
+    email: admin@tracseq.com
+
+dependencies:
+  - name: postgresql
+    version: "12.5.8"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
+    
+  - name: redis
+    version: "17.11.3"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled
+    
+  - name: nginx-ingress-controller
+    version: "9.7.1"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: ingress.enabled
+    alias: nginx 
