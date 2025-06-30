@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 
 # Copy workspace files for dependency resolution
 COPY Cargo.toml Cargo.lock ./
-COPY lab_manager/Cargo.toml ./lab_manager/
+COPY Cargo.toml ./lab_manager/
 
 # Create dummy source files to build dependencies  
 RUN mkdir -p lab_manager/src/bin && \

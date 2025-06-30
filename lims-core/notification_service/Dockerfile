@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy service-specific Cargo.toml
-COPY notification_service/Cargo.toml ./
+COPY Cargo.toml ./
 
 # Create dummy source for dependency caching
 RUN mkdir src && echo "fn main() {}" > src/main.rs
@@ -23,7 +23,7 @@ RUN cargo build --release
 RUN rm src/main.rs
 
 # Copy actual source code
-COPY notification_service/src ./src
+COPY src ./src
 
 # Build the application
 RUN cargo build --release

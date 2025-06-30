@@ -5,7 +5,7 @@ FROM rust:1.75-bullseye as builder
 WORKDIR /app
 
 # Copy manifests
-COPY barcode_service/Cargo.toml ./
+COPY Cargo.toml ./
 
 # Create src directory and dummy main to cache dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
@@ -15,7 +15,7 @@ RUN cargo build --release
 RUN rm src/main.rs
 
 # Copy source code
-COPY barcode_service/src ./src
+COPY src ./src
 
 # Build application
 RUN cargo build --release
