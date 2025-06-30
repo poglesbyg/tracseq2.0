@@ -94,6 +94,17 @@ export const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
 
       const data = await response.json();
       
+      // Debug logging - Updated at 14:07
+      console.log('ChatBot API Response:', data);
+      console.log('Response structure:', {
+        hasResult: !!data.result,
+        hasResultResponse: !!(data.result && data.result.response),
+        hasData: !!data.data,
+        hasDataArray: Array.isArray(data.data),
+        dataLength: Array.isArray(data.data) ? data.data.length : 0,
+        hasDataResponse: !!(data.data && Array.isArray(data.data) && data.data[0] && data.data[0].response)
+      });
+      
       // Remove typing indicator and add actual response
       setMessages(prev => prev.filter(msg => msg.id !== 'typing'));
       
@@ -101,14 +112,19 @@ export const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
       let responseContent = "";
       if (data.result && data.result.response) {
         responseContent = data.result.response;
+        console.log('Using data.result.response');
       } else if (data.data && Array.isArray(data.data) && data.data[0] && data.data[0].response) {
         responseContent = data.data[0].response;
+        console.log('Using data.data[0].response');
       } else if (data.response) {
         responseContent = data.response;
+        console.log('Using data.response');
       } else if (data.answer) {
         responseContent = data.answer;
+        console.log('Using data.answer');
       } else {
         responseContent = "I apologize, but I couldn't process your request at the moment. Please try again.";
+        console.log('Using fallback response');
       }
       
       const assistantMessage: Message = {
