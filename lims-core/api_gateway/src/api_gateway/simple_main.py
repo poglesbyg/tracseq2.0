@@ -6,6 +6,7 @@ Minimal working implementation for demonstration
 
 import json
 import os
+import sys
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
@@ -703,27 +704,69 @@ async def get_rag_submission_detail(submission_id: str):
 async def process_rag_document(request: Request):
     """Process a document with RAG system"""
     try:
-        # Get the request body
-        body = await request.json()
-
-        # Mock document processing response
-        document_id = body.get("documentId", f"DOC-{datetime.now().strftime('%Y%m%d%H%M%S')}")
-
-        return {
+        # Handle multipart form data (file upload)
+        form = await request.form()
+        
+        # Check if file is present
+        file = form.get("file")
+        if not file:
+            raise HTTPException(status_code=400, detail="No file uploaded")
+        
+        # Get processing parameters
+        auto_create_str = form.get("auto_create", "false")
+        auto_create = str(auto_create_str).lower() == "true" if auto_create_str else False
+        
+        confidence_threshold_str = form.get("confidence_threshold", "0.8")
+        confidence_threshold = float(str(confidence_threshold_str)) if confidence_threshold_str else 0.8
+        
+        # Generate document ID
+        document_id = f"DOC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        
+        # Mock extraction result (in production, this would process the actual file)
+        extraction_result = {
+            "success": True,
             "id": document_id,
-            "status": "processing",
-            "message": "Document submitted for RAG processing",
-            "estimatedCompletion": (datetime.now() + timedelta(minutes=5)).isoformat(),
-            "processingSteps": [
-                {"step": "upload", "status": "completed", "timestamp": datetime.now().isoformat()},
-                {"step": "text_extraction", "status": "in_progress", "timestamp": None},
-                {"step": "embedding_generation", "status": "pending", "timestamp": None},
-                {"step": "indexing", "status": "pending", "timestamp": None}
-            ]
+            "status": "completed",
+            "message": "Document processed successfully",
+            "confidence_score": 0.92,
+            "processing_time": 2.5,
+            "samples": [
+                {
+                    "name": "Sample 001 from document",
+                    "barcode": f"BC-{datetime.now().strftime('%Y%m%d')}-001",
+                    "location": "Freezer A1",
+                    "metadata": {
+                        "type": "DNA",
+                        "volume": "100 μL",
+                        "concentration": "50 ng/μL"
+                    }
+                },
+                {
+                    "name": "Sample 002 from document", 
+                    "barcode": f"BC-{datetime.now().strftime('%Y%m%d')}-002",
+                    "location": "Freezer A2",
+                    "metadata": {
+                        "type": "RNA",
+                        "volume": "50 μL",
+                        "concentration": "75 ng/μL"
+                    }
+                }
+            ],
+            "validation_warnings": [] if confidence_threshold <= 0.9 else ["Some fields extracted with lower confidence"],
+            "extraction_result": {
+                "success": True,
+                "confidence_score": 0.92,
+                "warnings": [],
+                "source_document": getattr(file, 'filename', 'uploaded_document')
+            }
         }
+        
+        return extraction_result
 
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid request: {e!s}")
+        raise HTTPException(status_code=400, detail=f"Error processing document: {e!s}")
 
 @app.post("/api/samples/rag/query")
 async def query_rag_samples(request: Request):
@@ -732,9 +775,48 @@ async def query_rag_samples(request: Request):
         # Get the request body
         body = await request.json()
         query = body.get("query", "")
-
+        
+        # Add logging
+        print(f"[RAG QUERY] Received query: '{query}'", file=sys.stderr)
+        
         # Mock RAG response based on query
-        if "samples" in query.lower():
+        query_lower = query.lower()
+        
+        # Initialize related_samples
+        related_samples = []
+        
+        # Check for AI document processing related queries
+        ai_keywords = ["ai document", "document processing", "ai processing", "rag submission", "upload document"]
+        is_ai_query = any(keyword in query_lower for keyword in ai_keywords)
+        is_submit_query = "submit" in query_lower and ("sample" in query_lower or "document" in query_lower)
+        
+        print(f"[RAG QUERY] is_ai_query={is_ai_query}, is_submit_query={is_submit_query}", file=sys.stderr)
+        
+        if is_ai_query or is_submit_query:
+            response_text = """To submit a new sample using AI document processing:
+
+1. **Navigate to RAG Submissions**: Click on 'AI Document Submissions' from the main dashboard or go to the RAG Submissions page.
+
+2. **Upload Your Document**: 
+   - Drag and drop your document (PDF, DOCX, or TXT) into the upload area
+   - Or click "Upload a file" to browse and select your document
+   - Files up to 50MB are supported
+
+3. **Configure Processing Options**:
+   - Set the confidence threshold (default: 0.8) - lower values accept more extracted data
+   - Check "Automatically create samples" if you want samples created immediately after extraction
+
+4. **Process the Document**:
+   - Click "Preview" to see what will be extracted without creating samples
+   - Click "Process & Extract" to extract and create samples
+
+5. **Review Results**:
+   - The AI will extract sample information including names, barcodes, locations, and metadata
+   - Check the confidence scores and any validation warnings
+   - If in preview mode, you can "Confirm & Create Samples" after review
+
+The AI system uses advanced language models to understand laboratory documents and extract structured data automatically. This saves time compared to manual data entry and reduces errors."""
+        elif "samples" in query.lower():
             response_text = f"Based on your query '{query}', I found information about laboratory samples. Currently, there are 1,247 samples in the system with 89 active samples and 1,158 completed samples. The most recent samples were submitted by Dr. Smith and include DNA, RNA, and protein samples."
             related_samples = [
                 {
@@ -813,6 +895,30 @@ async def create_rag_submission(request: Request):
         "status": "submitted",
         "message": "Document submitted for processing"
     }
+
+# Debug endpoint to test query logic
+@app.post("/api/debug/test-query")
+async def test_query(request: Request):
+    """Test query logic"""
+    try:
+        body = await request.json()
+        query = body.get("query", "")
+        query_lower = query.lower()
+        
+        ai_keywords = ["ai document", "document processing", "ai processing", "rag submission", "upload document"]
+        is_ai_query = any(keyword in query_lower for keyword in ai_keywords)
+        is_submit_query = "submit" in query_lower and ("sample" in query_lower or "document" in query_lower)
+        
+        return {
+            "query": query,
+            "query_lower": query_lower,
+            "is_ai_query": is_ai_query,
+            "is_submit_query": is_submit_query,
+            "should_match": is_ai_query or is_submit_query,
+            "ai_keyword_matches": [kw for kw in ai_keywords if kw in query_lower]
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 # Debug endpoint to see all registered routes
 @app.get("/api/debug/routes")

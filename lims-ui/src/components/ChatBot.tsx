@@ -97,9 +97,23 @@ export const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
       // Remove typing indicator and add actual response
       setMessages(prev => prev.filter(msg => msg.id !== 'typing'));
       
+      // Extract the response from the nested structure
+      let responseContent = "";
+      if (data.result && data.result.response) {
+        responseContent = data.result.response;
+      } else if (data.data && Array.isArray(data.data) && data.data[0] && data.data[0].response) {
+        responseContent = data.data[0].response;
+      } else if (data.response) {
+        responseContent = data.response;
+      } else if (data.answer) {
+        responseContent = data.answer;
+      } else {
+        responseContent = "I apologize, but I couldn't process your request at the moment. Please try again.";
+      }
+      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: data.response || data.answer || "I apologize, but I couldn't process your request at the moment. Please try again.",
+        content: responseContent,
         type: 'assistant',
         timestamp: new Date(),
       };
