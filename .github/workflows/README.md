@@ -1,6 +1,6 @@
-# 🚀 Enhanced GitHub Workflows for TracSeq 2.0
+# 🚀 GitHub Workflows for TracSeq 2.0
 
-This directory contains a comprehensive suite of advanced GitHub Actions workflows designed for the TracSeq 2.0 laboratory management platform. These workflows implement modern DevOps practices including comprehensive testing, security scanning, performance monitoring, and intelligent deployment strategies.
+This directory contains GitHub Actions workflows for the TracSeq 2.0 laboratory management platform. These workflows implement modern DevOps practices including continuous integration, security scanning, performance monitoring, and deployment automation.
 
 ## 📁 Workflow Overview
 
@@ -8,426 +8,277 @@ This directory contains a comprehensive suite of advanced GitHub Actions workflo
 
 | Workflow | Purpose | Triggers | Key Features |
 |----------|---------|----------|--------------|
-| [**ci.yml**](./ci.yml) | Continuous Integration | Push, PR | Matrix testing, component isolation, coverage |
-| [**security.yml**](./security.yml) | Security & Compliance | Push, PR, Schedule | SBOM generation, policy scanning, runtime security |
-| [**performance.yml**](./performance.yml) | Performance Monitoring | Push, PR, Schedule | Benchmarking, regression detection, trend analysis |
-| [**azure-deploy.yml**](./azure-deploy.yml) | Azure Deployment | Push, Manual | Blue-green deployment, auto-rollback, monitoring |
-| [**deploy.yml**](./deploy.yml) | Universal Deployment | Push, PR, Manual | Multi-platform, canary releases, health checks |
+| [**ci.yml**](./ci.yml) | Continuous Integration | Push, PR | Lint, test, build validation |
+| [**microservices-ci-cd.yml**](./microservices-ci-cd.yml) | Microservices CI/CD | Push, PR | Service-specific testing and deployment |
+| [**security.yml**](./security.yml) | Security & Compliance | Push, PR, Schedule | Dependency scanning, secret detection, SBOM |
+| [**performance.yml**](./performance.yml) | Performance Testing | Push, PR, Schedule | Benchmarks, load testing, frontend metrics |
+| [**deploy.yml**](./deploy.yml) | Deployment Pipeline | Push, Tags, Manual | Multi-environment deployment |
 
-## 🎯 Enhanced Features
+## �️ Project Structure
 
-### 🧪 Advanced Testing & CI (ci.yml)
+The workflows are designed to work with the following project structure:
 
-**Matrix Testing with Cross-Platform Support**
-- **Operating Systems**: Ubuntu, Windows, macOS
-- **Rust Versions**: Stable, Beta, Nightly, MSRV (1.75)
-- **Component Testing**: Independent module verification
-- **Coverage Analysis**: Statistical code coverage with tarpaulin
-
-**Key Improvements:**
-- **Parallel Execution**: Maximum efficiency with concurrent jobs
-- **Smart Caching**: Optimized dependency caching strategies
-- **Component Isolation**: Test each module independently
-- **Quality Gates**: Formatting, linting, and security checks
-
-```yaml
-# Example: Matrix testing across platforms
-strategy:
-  fail-fast: false
-  matrix:
-    os: [ubuntu-latest, windows-latest, macos-latest]
-    rust_version: [stable, beta, nightly]
-    include:
-      - os: ubuntu-latest
-        rust_version: stable
-        coverage: true
+```
+tracseq2.0/
+├── lims-core/          # Rust microservices
+│   ├── auth_service/
+│   ├── sample_service/
+│   ├── enhanced_storage_service/
+│   ├── api_gateway/    # Python API Gateway
+│   └── ...
+├── lims-ai/            # AI/ML services
+│   ├── lab_submission_rag/
+│   └── enhanced_rag_service/
+├── lims-ui/            # Frontend (React/TypeScript)
+└── docker/             # Docker configurations
 ```
 
-### 🔒 Comprehensive Security (security.yml)
+## 🎯 Workflow Features
 
-**Multi-Layer Security Analysis**
-- **Vulnerability Scanning**: Cargo audit, Trivy, CodeQL
-- **SBOM Generation**: Software Bill of Materials with CycloneDX
-- **Policy Enforcement**: OPA-based compliance checking
-- **Secret Scanning**: TruffleHog, detect-secrets, Gitleaks
-- **Runtime Security**: Falco rules and incident response plans
+### 🧪 Continuous Integration (ci.yml)
 
-**Advanced Security Features:**
-```yaml
-# SBOM Generation Example
-- name: Generate SBOM
-  run: |
-    cargo cyclonedx --format json --output-file rust-sbom.json
-    syft . -o spdx-json=project-sbom.json
-```
+**Features:**
+- Multi-language support (Rust, Python, TypeScript)
+- Parallel linting and type checking
+- Comprehensive test suites
+- Service architecture validation
+- Coverage reporting
 
-**Compliance Standards Supported:**
-- **OWASP**: Dependency vulnerability scanning
-- **CIS**: Container security benchmarks  
-- **NIST**: Software supply chain security
-- **GDPR**: Data protection compliance
+**Key Jobs:**
+- `lint-and-typecheck`: Code quality checks
+- `test-suite`: Unit and integration tests
+- `microservices-validation`: Service structure validation
+- `build-validation`: Docker and deployment validation
 
-### ⚡ Performance Monitoring (performance.yml)
+### 🚀 Microservices CI/CD (microservices-ci-cd.yml)
 
-**Statistical Performance Analysis**
-- **Baseline Tracking**: Historical performance metrics
-- **Regression Detection**: Z-score based statistical analysis
-- **Load Testing**: k6-based performance validation
-- **Memory Profiling**: Heap and allocation analysis
+**Features:**
+- Service-specific pipelines
+- Matrix strategy for parallel builds
+- Container security scanning
+- Automated deployment to staging/production
 
-**Performance Metrics Tracked:**
-- Build time and binary size
-- Memory usage (baseline, peak, average)
-- Request latency (P50, P95, P99)
-- Throughput and concurrent capacity
-- Component-specific performance
+**Services Covered:**
+- Rust services in `lims-core/`
+- Python services in `lims-ai/` and `lims-core/api_gateway/`
+- Frontend in `lims-ui/`
 
-**Regression Analysis Example:**
-```python
-def calculate_regression_score(baseline, current, metric_name):
-    percentage_change = ((current - baseline["mean"]) / baseline["mean"]) * 100
-    z_score = (current - baseline["mean"]) / baseline["std"]
-    return percentage_change, z_score
-```
+### 🔒 Security & Compliance (security.yml)
 
-### 🚀 Intelligent Deployment (azure-deploy.yml)
+**Features:**
+- Dependency vulnerability scanning
+- Secret detection (TruffleHog, Gitleaks)
+- Container security analysis
+- SBOM generation
+- License compliance checks
 
-**Advanced Deployment Strategies**
-- **Pre-deployment Validation**: Configuration checks and backups
-- **Multiple Strategies**: Rolling, blue-green, canary deployments
-- **Automatic Rollback**: Health check failures trigger rollback
-- **Performance Testing**: Post-deployment validation
-- **Team Notifications**: Slack/Teams integration ready
+**Security Checks:**
+- Rust: cargo-audit
+- Python: safety, bandit
+- Node.js: npm audit
+- Containers: Trivy scanning
 
-**Deployment Features:**
-```yaml
-# Deployment strategy options
-deployment_strategy:
-  description: 'Deployment strategy'
-  type: choice
-  options:
-  - rolling
-  - blue-green
-  - canary
-```
+### ⚡ Performance Testing (performance.yml)
 
-**Health Monitoring:**
-- Comprehensive smoke tests
-- Integration validation
-- Performance benchmarking
-- Database connectivity checks
+**Features:**
+- Rust service benchmarks
+- Load testing with k6
+- Frontend performance with Lighthouse
+- Performance regression detection
 
-### 🌐 Universal Deployment (deploy.yml)
+**Metrics Tracked:**
+- API response times (p95 < 500ms)
+- Throughput and error rates
+- Frontend Core Web Vitals
+- Laboratory operation performance
 
-**Multi-Platform Support**
-- **Container Variants**: Full-stack, API-only, reports-only
-- **Platform Support**: Linux AMD64/ARM64
-- **Environment Management**: Development, staging, production
-- **Microservices Architecture**: Independent service deployment
+### 🚀 Deployment Pipeline (deploy.yml)
 
-**Deployment Variants:**
-- **Full-stack**: Complete application with frontend
-- **API-only**: Backend services only
-- **Reports-only**: Specialized reporting module
-- **Microservices**: Component-based deployment
+**Features:**
+- Multi-environment support
+- Service-specific deployment modes
+- Dockerfile generation for missing files
+- Health check validation
+- Deployment summaries
+
+**Environments:**
+- Development
+- Staging
+- Production
+- Preview (for PRs)
 
 ## 🛠️ Usage Guide
 
-### Running CI/CD Workflows
+### Running Workflows Manually
 
-**Automatic Triggers:**
 ```bash
-# Triggers CI on push to main/master
-git push origin main
-
-# Triggers CI and security scans on PR
-git push origin feature/new-feature
-```
-
-**Manual Triggers:**
-```bash
-# Trigger specific workflow manually
-gh workflow run "Enhanced Lab Manager CI/CD" --ref main
+# Trigger CI workflow
+gh workflow run "TracSeq 2.0 CI/CD Pipeline" --ref main
 
 # Trigger deployment with options
-gh workflow run "Deploy TracSeq 2.0 to Azure Container Apps" \
+gh workflow run "TracSeq 2.0 Deployment Pipeline" \
   --ref main \
   -f environment=staging \
-  -f deployment_strategy=blue-green \
-  -f run_performance_tests=true
+  -f deployment_mode=full-stack \
+  -f version_tag=v1.0.0
+
+# Trigger security scan
+gh workflow run "Security & Compliance" --ref main
+
+# Trigger performance tests
+gh workflow run "Performance Testing" \
+  --ref main \
+  -f test_type=comprehensive
 ```
 
-### Configuration Options
+### Environment Variables
 
-**Environment Variables:**
+**Common Variables:**
 ```yaml
 env:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
-  RUST_LOG: debug
-  SQLX_OFFLINE: true
+  RUST_VERSION: '1.82'
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+  PNPM_VERSION: '10.12.2'
 ```
 
-**Secrets Required:**
-- `AZURE_CREDENTIALS`: Azure service principal
-- `GITHUB_TOKEN`: GitHub access token (auto-provided)
-- `SLACK_WEBHOOK_URL`: Team notifications (optional)
-
-### Performance Baseline Management
-
-**Setting Performance Baselines:**
-```bash
-# Baselines are automatically updated on main branch pushes
-# Manual baseline creation:
-mkdir performance-baselines
-cat > performance-baselines/baseline-$(date +%Y%m%d).json << EOF
-{
-  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "commit": "$GITHUB_SHA",
-  "metrics": {
-    "build_time": 120.5,
-    "memory_usage": {"baseline": 45, "peak": 67},
-    "request_latency": {"p95": 45},
-    "throughput": {"requests_per_second": 850}
-  }
-}
-EOF
+**Laboratory-Specific Variables:**
+```yaml
+env:
+  LAB_TEMPERATURE_ZONES: "-80,-20,4,22,37"
+  RAG_CONFIDENCE_THRESHOLD: "0.85"
+  SAMPLE_LIFECYCLE_STATES: "Pending,Validated,InStorage,InSequencing,Completed"
 ```
+
+### Required Secrets
+
+- `GITHUB_TOKEN`: Automatically provided
+- `POSTGRES_PASSWORD`: Database password (optional)
+- Additional deployment-specific secrets as needed
 
 ## 📊 Workflow Artifacts
 
 ### Generated Artifacts
 
+**CI Artifacts:**
+- `coverage-reports/`: Test coverage reports
+- `performance-test-artifacts/`: Built binaries for testing
+
 **Security Artifacts:**
-- `software-bill-of-materials/`: SBOM files (SPDX, CycloneDX)
-- `compliance-report/`: Policy compliance analysis
-- `security-analysis/`: Vulnerability scan results
-- `runtime-security-config/`: Monitoring configurations
+- `bandit-reports/`: Python security analysis
+- `software-bill-of-materials/`: SBOM files
 
 **Performance Artifacts:**
-- `performance-baselines/`: Historical metrics
-- `benchmark-results/`: Component performance data
-- `load-test-results/`: Stress testing outcomes
-- `memory-analysis/`: Memory usage reports
-
-**Deployment Artifacts:**
-- `deployment-manifests/`: Kubernetes YAML files
-- `deployment-reports/`: Environment-specific summaries
-- `health-check-results/`: Post-deployment validation
+- `rust-benchmark-results/`: Benchmark outputs
+- `load-test-results/`: k6 test results
+- `lighthouse-results/`: Frontend performance metrics
 
 ### Artifact Retention
 
-```yaml
-# Artifact upload with retention
-- name: Upload artifacts
-  uses: actions/upload-artifact@v4
-  with:
-    name: comprehensive-results
-    path: |
-      reports/
-      artifacts/
-    retention-days: 30
-```
+- Build artifacts: 1 day
+- Test results: 7 days
+- Security reports: 30 days
 
-## 🔧 Advanced Configuration
+## 🔧 Configuration
 
-### Matrix Testing Customization
+### Service Matrix Configuration
+
+The workflows use matrix strategies to test services in parallel:
 
 ```yaml
-# Custom matrix for specific needs
-strategy:
-  matrix:
-    include:
-      - os: ubuntu-latest
-        rust_version: stable
-        features: "full-features"
-        coverage: true
-      - os: ubuntu-latest
-        rust_version: "1.75"  # MSRV testing
-        features: "minimal-features"
-        msrv: true
-```
-
-### Security Policy Configuration
-
-```yaml
-# Custom security policies with OPA
-policies/dependency_policy.rego:
-  - Deny high severity vulnerabilities
-  - Require license compliance
-  - Check for outdated packages
-
-policies/docker_policy.rego:
-  - Enforce non-root users
-  - Validate security best practices
-  - Check for exposed sensitive ports
+matrix:
+  include:
+    - service: auth_service
+      path: lims-core/auth_service
+      type: rust
+    - service: lab_submission_rag
+      path: lims-ai/lab_submission_rag
+      type: python
+    - service: frontend
+      path: lims-ui
+      type: frontend
 ```
 
 ### Performance Thresholds
 
 ```yaml
-# Performance regression thresholds
 thresholds:
-  build_time: "+5%"        # Max 5% increase allowed
-  memory_usage: "+10%"     # Max 10% increase allowed
-  latency_p95: "+15%"      # Max 15% increase allowed
-  throughput: "-5%"        # Max 5% decrease allowed
+  http_req_duration: ['p(95)<500']  # 95% under 500ms
+  http_req_failed: ['rate<0.1']     # <10% error rate
+  'categories:performance': ['error', {minScore: 0.8}]  # Lighthouse
 ```
 
-## 🚨 Monitoring & Alerting
+## 🚨 Monitoring & Notifications
 
-### Health Check Endpoints
+### Workflow Status
 
-```bash
-# Application health endpoints
-curl -f https://tracseq-backend.azurecontainerapps.io/health
-curl -f https://tracseq-rag.azurecontainerapps.io/health
-curl -f https://tracseq-frontend.azurecontainerapps.io/
-```
+All workflows generate summary reports in the GitHub Actions UI:
+- Job status tables
+- Key metrics and results
+- Actionable recommendations
 
-### Alert Conditions
+### Failure Handling
 
-**Critical Alerts:**
-- Deployment failures with automatic rollback
-- Security vulnerabilities (HIGH/CRITICAL)
-- Performance regressions >20%
-- Health check failures
+- Security vulnerabilities: Warnings (non-blocking)
+- Test failures: Blocking
+- Performance regressions: Warnings with details
+- Build failures: Immediate notification
 
-**Warning Alerts:**
-- Minor performance regressions
-- License compliance issues
-- Dependency updates available
-- Memory usage increases
+## 📚 Best Practices
 
-### Notification Integration
+### Workflow Development
 
-```yaml
-# Slack notification example
-- name: Send notification
-  run: |
-    curl -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
-      -H 'Content-Type: application/json' \
-      -d "{\"text\":\"🚀 TracSeq 2.0 deployed successfully!\"}"
-```
+1. **Use Matrix Strategies**: Parallelize similar jobs
+2. **Cache Dependencies**: Improve build times
+3. **Generate Summaries**: Use `$GITHUB_STEP_SUMMARY`
+4. **Handle Failures Gracefully**: Use `continue-on-error` where appropriate
+5. **Artifact Management**: Clean up old artifacts
 
-## 🎯 Benefits & ROI
+### Security
 
-### Development Efficiency
+1. **Scan Early**: Run security checks on every PR
+2. **Multiple Tools**: Use complementary security scanners
+3. **SBOM Generation**: Track dependencies
+4. **Secret Management**: Never hardcode secrets
 
-**Time Savings:**
-- **Parallel Testing**: 3-5x faster CI execution
-- **Smart Caching**: 40-60% faster builds
-- **Component Isolation**: Targeted debugging
-- **Automated Testing**: 90% test automation coverage
+### Performance
 
-**Quality Improvements:**
-- **Multi-platform Testing**: Cross-OS compatibility
-- **Security Integration**: Shift-left security
-- **Performance Monitoring**: Proactive optimization
-- **Compliance Automation**: Reduced manual audits
-
-### Operational Excellence
-
-**Deployment Reliability:**
-- **Zero-downtime Deployments**: Blue-green strategies
-- **Automatic Rollback**: 99.9% uptime maintenance
-- **Health Monitoring**: Proactive issue detection
-- **Environment Parity**: Consistent deployments
-
-**Security Posture:**
-- **Comprehensive Scanning**: Multi-tool coverage
-- **SBOM Generation**: Supply chain transparency
-- **Policy Enforcement**: Automated compliance
-- **Incident Response**: Prepared response plans
-
-### Cost Optimization
-
-**Infrastructure Efficiency:**
-- **Resource Optimization**: Right-sized deployments
-- **Caching Strategies**: Reduced build times
-- **Parallel Execution**: Efficient CI/CD usage
-- **Smart Scheduling**: Off-peak performance testing
-
-**Operational Costs:**
-- **Automated Testing**: Reduced manual QA
-- **Proactive Monitoring**: Fewer production issues
-- **Efficient Deployments**: Minimal rollback needs
-- **Compliance Automation**: Reduced audit costs
+1. **Baseline Tracking**: Compare against historical data
+2. **Multiple Metrics**: Measure various aspects
+3. **Regular Testing**: Schedule periodic runs
+4. **Actionable Results**: Provide clear recommendations
 
 ## 🔮 Future Enhancements
 
 ### Planned Improvements
 
-**AI/ML Integration:**
-- Predictive performance analysis
-- Intelligent test selection
-- Anomaly detection in metrics
-- Automated optimization suggestions
-
-**Advanced Deployment:**
-- Chaos engineering integration
-- Advanced canary analysis
-- Multi-region deployments
-- GitOps workflow adoption
-
-**Enhanced Security:**
-- Runtime security monitoring
-- Advanced threat detection
-- Automated security patching
-- Zero-trust architecture
+- **GitOps Integration**: ArgoCD deployment workflows
+- **Advanced Monitoring**: Prometheus/Grafana integration
+- **Chaos Engineering**: Reliability testing
+- **Cost Optimization**: Resource usage tracking
 
 ### Roadmap
 
 **Q1 2024:**
-- ✅ Matrix testing implementation
-- ✅ SBOM generation
+- ✅ Simplified workflow structure
+- ✅ Service-aware testing
+- ✅ Basic security scanning
 - ✅ Performance baselines
-- ✅ Automated rollback
 
 **Q2 2024:**
-- 🔄 Chaos engineering
-- 🔄 ML-powered analysis
-- 🔄 Multi-region deployment
-- 🔄 Advanced monitoring
+- 🔄 Advanced deployment strategies
+- � Enhanced monitoring
+- 🔄 ML model testing workflows
+- 🔄 Compliance automation
 
-**Q3 2024:**
-- 📋 GitOps integration
-- 📋 Service mesh deployment
-- 📋 Advanced security policies
-- 📋 Cost optimization
+## 📞 Support
 
-## 📚 References & Documentation
-
-### External Resources
-
-- [GitHub Actions Documentation](https://docs.github.com/actions)
-- [Azure Container Apps](https://docs.microsoft.com/azure/container-apps/)
-- [Rust Testing Guide](https://doc.rust-lang.org/book/ch11-00-testing.html)
-- [OWASP DevSecOps](https://owasp.org/www-project-devsecops-guideline/)
-
-### Internal Documentation
-
-- [Development Setup Guide](../../docs/DEVELOPMENT_SETUP.md)
-- [Security Guidelines](../../docs/SECURITY.md)
-- [Performance Tuning](../../docs/OPTIMIZATION_GUIDE.md)
-- [Deployment Procedures](../../docs/DEPLOYMENT.md)
-
-### Troubleshooting
-
-**Common Issues:**
-- Build failures: Check Rust version compatibility
-- Test timeouts: Increase timeout values in config
-- Deployment issues: Verify Azure credentials
-- Performance regressions: Check baseline accuracy
-
-**Support Channels:**
-- **Issues**: GitHub Issues for bug reports
-- **Discussions**: GitHub Discussions for questions
-- **Security**: security@tracseq.com for vulnerabilities
-- **DevOps**: devops@tracseq.com for CI/CD issues
+**Issues**: GitHub Issues for bug reports
+**Discussions**: GitHub Discussions for questions
+**Documentation**: See `/docs` for detailed guides
 
 ---
 
-**📝 Note**: This workflow suite represents enterprise-grade CI/CD practices tailored for the TracSeq 2.0 laboratory management platform. The modular architecture ensures scalability, maintainability, and reliability for production deployments.
+**📝 Note**: These workflows are designed for the TracSeq 2.0 monorepo structure. Ensure your local development environment matches the expected project layout before running workflows.
 
 *Context improved by Giga AI* 
