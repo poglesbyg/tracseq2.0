@@ -1,24 +1,27 @@
 [workspace]
 members = [
-    "lab_manager",
-    "auth_service",
-    "sample_service",
-    "sequencing_service",
-    "notification_service",
-    "template_service",
-    "transaction_service",
-    "enhanced_storage_service",
-    "event_service",
-    "spreadsheet_versioning_service",
+    "lims-core/lab_manager",
+    "lims-core/auth_service",
+    "lims-core/sample_service",
+    "lims-core/sequencing_service",
+    "lims-core/notification_service",
+    "lims-core/template_service",
+    "lims-core/transaction_service",
+    "lims-core/enhanced_storage_service",
+    "lims-core/event_service",
+    "lims-core/spreadsheet_versioning_service",
+    "lims-core/barcode_service",
     # Phase 2 Services
-    "qaqc_service",
-    "library_details_service",
+    "lims-core/qaqc_service",
+    "lims-core/library_details_service",
     "temp_auth_test",
     # Phase 10 Services - Next-Generation Intelligence
-    "cognitive_assistant_service",
+    "lims-core/cognitive_assistant_service",
     # Test utilities
-    "test-helpers"
-, "dashboard_service", "reports_service"]
+    "test-helpers",
+    "lims-core/dashboard_service", 
+    "lims-core/reports_service"
+]
 exclude = [
     "circuit-breaker-lib",
     "config-service"

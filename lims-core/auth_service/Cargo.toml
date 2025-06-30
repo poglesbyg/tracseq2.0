@@ -17,7 +17,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros", "migrate"] }
+sqlx = { workspace = true }
 
 # Authentication & Security
 jsonwebtoken = "9.2"
@@ -61,10 +61,8 @@ tower = { version = "0.4", features = ["util", "timeout", "load-shed", "limit"] 
 tower-http = { version = "0.5", features = ["fs", "trace", "cors", "timeout"] }
 
 # Database testing
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros", "migrate"] }
+sqlx = { workspace = true }
 
-# Test helpers
-# test-helpers = { path = "../test-helpers" } # Disabled for standalone service
 
 # Test utilities
 criterion = { version = "0.5", features = ["html_reports"] }
@@ -87,11 +85,14 @@ chrono = { version = "0.4", features = ["serde"] }
 # Security testing
 jsonwebtoken = "9.2"
 argon2 = "0.5"
-regex = "1.10"
 
 # Async testing utilities
 futures = "0.3"
 tokio = { version = "1.36", features = ["test-util", "rt-multi-thread", "macros"] }
+
+[lib]
+name = "auth_service"
+path = "src/lib.rs"
 
 [[bin]]
 name = "auth_service"

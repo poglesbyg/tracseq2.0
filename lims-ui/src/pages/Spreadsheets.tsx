@@ -40,7 +40,7 @@ import SpreadsheetDataViewer from '../components/SpreadsheetDataViewer';
     status?: string;
     description?: string;
     version?: string;
-    columns?: Array<{ name: string; type: string; [key: string]: any }>;
+    columns?: Array<{ name: string; type: string; [key: string]: unknown }>;
   }
 
 export default function Spreadsheets() {

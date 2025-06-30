@@ -48,6 +48,4 @@ jsonwebtoken = "9.0"
 time = "0.3"
 
 [dev-dependencies]
-tokio-test = "0.4" 
-[workspace]
-# This makes the service standalone
+tokio-test = "0.4"

@@ -63,13 +63,13 @@ export default function Templates() {
       const templatesArray = Array.isArray(rawTemplates) ? rawTemplates : [];
       
       // Transform API data to match Template interface
-      const transformedTemplates = templatesArray.map((apiTemplate: any) => ({
-        id: apiTemplate.id,
-        name: apiTemplate.name,
-        description: apiTemplate.description,
-        created_at: apiTemplate.created_at,
-        fields: apiTemplate.fields || [],
-        metadata: apiTemplate.metadata || {}
+      const transformedTemplates = templatesArray.map((apiTemplate: Record<string, unknown>) => ({
+        id: String(apiTemplate.id || ''),
+        name: String(apiTemplate.name || ''),
+        description: apiTemplate.description ? String(apiTemplate.description) : undefined,
+        created_at: String(apiTemplate.created_at || new Date().toISOString()),
+        fields: Array.isArray(apiTemplate.fields) ? apiTemplate.fields as TemplateField[] : [],
+        metadata: (apiTemplate.metadata || {}) as Record<string, unknown>
       }));
       
       console.log(`✅ Final templates count: ${transformedTemplates.length}`);

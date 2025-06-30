@@ -59,4 +59,5 @@ tokio-stream = "0.1"
 # Report scheduling
 tokio-cron-scheduler = "0.9"
 
-# Lints removed for standalone build
+[lints]
+workspace = true

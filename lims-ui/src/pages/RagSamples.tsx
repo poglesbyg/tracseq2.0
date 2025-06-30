@@ -95,7 +95,7 @@ export default function RagSamples() {
         const rawSamples = apiData.data || apiData.submissions || [];
         
         // Transform API data to RagSample format
-        let samples: RagSample[] = rawSamples.map((item: any, index: number) => ({
+        let samples: RagSample[] = rawSamples.map((item: Record<string, unknown>, index: number) => ({
           id: item.id || `rag-${index}`,
           name: item.filename || item.name || `Document ${index + 1}`,
           barcode: `RAG-${item.id || index}`,
