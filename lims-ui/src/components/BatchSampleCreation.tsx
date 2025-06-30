@@ -69,7 +69,11 @@ export default function BatchSampleCreation({ templateData, onClose, onComplete 
     queryFn: async () => {
       try {
         const response = await api.get('/api/storage/locations');
-        return response.data;
+        // Handle both response formats - direct array or nested in data/locations
+        const locations = Array.isArray(response.data) 
+          ? response.data 
+          : (response.data.data || response.data.locations || []);
+        return locations;
       } catch {
         // Return default locations if API fails
         return [

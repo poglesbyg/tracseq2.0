@@ -381,6 +381,9 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
     
     const strValue = String(value).trim();
     
+    // Empty string check after trimming
+    if (!strValue) return 'text';
+    
     // Email detection
     if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(strValue)) return 'email';
     
@@ -393,8 +396,8 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
     // Date detection (various formats)
     if (Date.parse(strValue) && /\d/.test(strValue)) return 'date';
     
-    // Boolean detection - safe toLowerCase() call
-    if (strValue && typeof strValue === 'string' && ['true', 'false', 'yes', 'no', '1', '0'].includes(strValue.toLowerCase())) return 'boolean';
+    // Boolean detection - safe toLowerCase() call with proper checks
+    if (strValue && ['true', 'false', 'yes', 'no', '1', '0'].includes(strValue.toLowerCase())) return 'boolean';
     
     return 'text';
   }, []);
@@ -666,7 +669,8 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
 
   // Utility functions
   const getFileIcon = (fileType: string) => {
-    switch (fileType.toLowerCase()) {
+    const safeFileType = fileType?.toLowerCase() || '';
+    switch (safeFileType) {
       case 'csv':
         return <DocumentTextIcon className="h-6 w-6 text-emerald-500" />;
       case 'xlsx':
@@ -813,8 +817,8 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
           </a>
         );
       case 'boolean': {
-        const lowerVal = stringValue && typeof stringValue === 'string' ? stringValue.toLowerCase() : '';
-        const isTrue = ['true', 'yes', '1'].includes(lowerVal);
+        const lowerVal = (stringValue && typeof stringValue === 'string') ? stringValue.toLowerCase() : '';
+        const isTrue = lowerVal && ['true', 'yes', '1'].includes(lowerVal);
         return (
           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
             isTrue ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
@@ -846,7 +850,7 @@ export default function SpreadsheetDataViewer({ dataset, onClose }: SpreadsheetD
                 <h2 className="text-xl font-bold text-gray-900">{dataset.original_filename}</h2>
                 <div className="flex items-center flex-wrap gap-3 text-sm text-gray-600 mt-1">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {dataset.file_type.toUpperCase()}
+                    {dataset.file_type?.toUpperCase() || 'UNKNOWN'}
                   </span>
                   {dataset.sheet_name && (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">

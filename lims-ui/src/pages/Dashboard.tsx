@@ -151,7 +151,7 @@ export default function Dashboard() {
             sample.status === 'InStorage' ? 'stored' as const :
             sample.status === 'InSequencing' ? 'sequencing_started' as const :
             'created' as const,
-      title: `Sample "${sample.name}" ${sample.status.toLowerCase()}`,
+                title: `Sample "${sample.name}" ${sample.status?.toLowerCase() || ''}`,
       description: `Barcode: ${sample.barcode} | Location: ${sample.location}`,
       timestamp: sample.updated_at || sample.created_at,
       entity: {

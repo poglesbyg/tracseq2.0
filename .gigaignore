@@ -1,0 +1,41 @@
+# Node (React frontend)
+lims-ui/node_modules/
+lims-ui/.next/
+lims-ui/dist/
+lims-ui/build/
+lims-ui/.turbo/
+
+# Python (AI service)
+lims-ai/__pycache__/
+lims-ai/.venv/
+lims-ai/env/
+lims-ai/.mypy_cache/
+lims-ai/.pytest_cache/
+lims-ai/.ipynb_checkpoints/
+lims-ai/.ruff_cache/
+
+# Rust (Backend)
+lims-core/target/
+lims-core/.cargo/
+lims-core/Cargo.lock
+
+# General
+.env
+*.log
+*.sqlite
+*.db
+*.tmp
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
+__pycache__/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker/volumes/
+**/tmp/

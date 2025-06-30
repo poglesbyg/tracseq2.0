@@ -68,7 +68,10 @@ export default function SampleSubmissionWizard({ onSuccess, onClose }: SampleSub
     queryKey: ['storage-locations'],
     queryFn: async () => {
       const response = await axios.get('/api/storage/locations');
-      return response.data;
+      // Handle both response formats - direct array or nested in data/locations
+      return Array.isArray(response.data) 
+        ? response.data 
+        : (response.data.data || response.data.locations || []);
     },
   });
 

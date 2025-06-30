@@ -130,8 +130,8 @@ export default function RagSamples() {
             if (searchTerm) {
               const searchLower = searchTerm.toLowerCase();
               matches = matches && (
-                sample.name.toLowerCase().includes(searchLower) ||
-                sample.barcode.toLowerCase().includes(searchLower) ||
+                (sample.name?.toLowerCase() || '').includes(searchLower) ||
+                (sample.barcode?.toLowerCase() || '').includes(searchLower) ||
                 !!(sample.metadata?.submitter_name && typeof sample.metadata.submitter_name === 'string' && sample.metadata.submitter_name.toLowerCase().includes(searchLower))
               );
             }

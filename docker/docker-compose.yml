@@ -29,11 +29,12 @@ services:
   auth-service:
     build: 
       context: ../lims-core/auth_service
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.fixed
     container_name: lims-auth
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
       REDIS_URL: redis://redis:6379
+      AUTH_PORT: "8000"  # Override default port
     depends_on:
       - postgres
       - redis
@@ -45,7 +46,7 @@ services:
   sample-service:
     build:
       context: ../lims-core/sample_service
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.fixed
     container_name: lims-samples
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
@@ -62,34 +63,49 @@ services:
   storage-service:
     build:
       context: ../lims-core/enhanced_storage_service
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.simple  # Use simplified version
     container_name: lims-storage
     environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      STORAGE_DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db  # Keep for SQLx
       REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://auth-service:8000
+      STORAGE_PORT: "8080"  # Match the Dockerfile EXPOSE
+      # Disable all advanced features for initial deployment
+      IOT_ENABLED: "false"
+      ANALYTICS_ENABLED: "false"
+      DIGITAL_TWIN_ENABLED: "false"
+      BLOCKCHAIN_ENABLED: "false"
+      AUTOMATION_ENABLED: "false"
+      # Add debug logging
+      RUST_LOG: "debug,enhanced_storage_service=trace"
+      RUST_BACKTRACE: "1"
+    # Remove the command override now that we have a working binary
     depends_on:
       - postgres
       - redis
     ports:
-      - "8013:8000"  # Using 8013 to avoid conflict
+      - "8013:8080"  # Match the Dockerfile EXPOSE port
     networks:
       - lims-network
 
-  # reports-service:
-  #   build:
-  #     context: ../lims-core/reports_service
-  #     dockerfile: Dockerfile
-  #   container_name: lims-reports
-  #   environment:
-  #     DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
-  #     REDIS_URL: redis://redis:6379
-  #   depends_on:
-  #     - postgres
-  #     - redis
-  #   ports:
-  #     - "8014:8000"  # Using 8014 for reports service
-  #   networks:
-  #     - lims-network
+  reports-service:
+    build: 
+      context: ../lims-core/reports_service
+      dockerfile: Dockerfile.minimal
+    container_name: lims-reports
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
+      REPORTS_PORT: "8000"
+      RUST_LOG: "debug,reports_service=trace"
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "8014:8000"  # Using 8014 for reports service
+    networks:
+      - lims-network
 
   # AI Services
   rag-service:
@@ -133,7 +149,7 @@ services:
     environment:
       AUTH_SERVICE_URL: http://auth-service:8000
       SAMPLE_SERVICE_URL: http://sample-service:8000
-      STORAGE_SERVICE_URL: http://storage-service:8000
+      STORAGE_SERVICE_URL: http://storage-service:8080
       RAG_SERVICE_URL: http://rag-service:8000
       REPORTS_SERVICE_URL: http://reports-service:8000
       USE_REPORTS_SERVICE: "true"
@@ -141,6 +157,7 @@ services:
       - auth-service
       - sample-service
       - storage-service
+      - reports-service
     ports:
       - "8089:8000"  # API Gateway runs on 8000 internally
     networks:

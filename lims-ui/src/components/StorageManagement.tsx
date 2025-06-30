@@ -4,15 +4,18 @@ import api from '../utils/axios';
 import { MapPinIcon, QrCodeIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 interface StorageLocation {
-  id: number;
+  id: number | string;
   name: string;
-  description: string | null;
-  temperature_zone: string;
+  description?: string | null;
+  temperature_zone?: string;
+  temperature?: number;
   capacity: number;
-  available: number;
-  utilization_percentage: number;
-  is_active: boolean;
-  samples: StoredSample[];
+  available?: number;
+  occupied?: number;
+  utilization_percentage?: number;
+  is_active?: boolean;
+  status?: string;
+  samples?: StoredSample[];
 }
 
 interface StoredSample {
@@ -35,7 +38,8 @@ export default function StorageManagement() {
     queryKey: ['storage-locations'],
     queryFn: async () => {
       const response = await api.get('/api/storage/locations');
-      return response.data;
+      // Handle both response formats - direct array or nested in data/locations
+      return Array.isArray(response.data) ? response.data : (response.data.data || response.data.locations || []);
     },
   });
 
@@ -77,7 +81,8 @@ export default function StorageManagement() {
   };
 
   const getLocationStatus = (location: StorageLocation) => {
-    const percentage = (location.available / location.capacity) * 100;
+    const available = location.available ?? (location.capacity - (location.occupied ?? 0));
+    const percentage = (available / location.capacity) * 100;
     if (percentage === 0) return 'bg-red-100 text-red-800';
     if (percentage < 25) return 'bg-yellow-100 text-yellow-800';
     return 'bg-green-100 text-green-800';
@@ -149,13 +154,13 @@ export default function StorageManagement() {
                       location
                     )}`}
                   >
-                    {location.available} / {location.capacity} slots available
+                    {location.available ?? (location.capacity - (location.occupied ?? 0))} / {location.capacity} slots available
                   </span>
                 </div>
                 <div className="mt-4">
                   <h4 className="text-sm font-medium text-gray-900">Stored Samples</h4>
                   <ul className="mt-2 divide-y divide-gray-200">
-                    {location.samples.map((sample) => (
+                    {(location.samples || []).map((sample) => (
                       <li key={sample.id} className="py-2">
                         <div className="flex items-center justify-between">
                           <div>
@@ -174,7 +179,7 @@ export default function StorageManagement() {
                             <option value="">Move to...</option>
                             {locations?.filter(loc => loc.id !== location.id).map((loc) => (
                               <option key={loc.id} value={loc.id}>
-                                {loc.name} ({loc.available} slots)
+                                {loc.name} ({loc.available ?? (loc.capacity - (loc.occupied ?? 0))} slots)
                               </option>
                             ))}
                           </select>

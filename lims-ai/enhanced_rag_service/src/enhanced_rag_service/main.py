@@ -6,15 +6,20 @@ A comprehensive microservice for AI-powered laboratory document processing.
 
 import asyncio
 import logging
+import time
+import uuid
 from contextlib import asynccontextmanager
-from typing import Any
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import structlog
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 # Configure structured logging
 structlog.configure(
@@ -37,6 +42,29 @@ structlog.configure(
 
 logger = structlog.get_logger(__name__)
 
+# Pydantic models for request/response
+class DocumentProcessResponse(BaseModel):
+    success: bool
+    confidence_score: float
+    samples_found: int
+    processing_time: float
+    extracted_data: Dict[str, Any]
+    message: str
+    submission_id: Optional[str] = None
+
+class QueryRequest(BaseModel):
+    query: str
+    session_id: Optional[str] = "default"
+
+class QueryResponse(BaseModel):
+    answer: str
+    session_id: Optional[str]
+    confidence_score: float
+    processing_time: float
+    sources: List[Dict[str, Any]]
+
+# In-memory storage for demo purposes
+submissions_storage: List[Dict[str, Any]] = []
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -45,6 +73,10 @@ async def lifespan(app: FastAPI):
 
     # Initialize services here
     try:
+        # Create upload directory
+        upload_dir = Path("/app/uploads")
+        upload_dir.mkdir(exist_ok=True)
+        
         logger.info("✅ Enhanced RAG Service startup complete")
         yield
     except Exception as e:
@@ -86,7 +118,12 @@ def create_app() -> FastAPI:
             "version": "0.1.0",
             "status": "operational",
             "docs": "/docs",
-            "health": "/api/v1/health"
+            "health": "/api/v1/health",
+            "endpoints": {
+                "document_processing": "/api/rag/process",
+                "file_upload": "/upload",
+                "query": "/api/samples/rag/query"
+            }
         }
 
     # Health check endpoint
@@ -96,10 +133,236 @@ def create_app() -> FastAPI:
         return {
             "status": "healthy",
             "service": "Enhanced RAG Service",
-            "version": "0.1.0"
+            "version": "0.1.0",
+            "features": ["document_processing", "file_upload", "intelligent_queries"]
         }
 
+    # Document processing endpoint
+    @app.post("/api/rag/process", response_model=DocumentProcessResponse)
+    async def process_document_upload(file: UploadFile = File(...)):
+        """Process uploaded document and extract laboratory information"""
+        start_time = time.time()
+        
+        logger.info(f"Processing document upload: {file.filename}")
+
+        try:
+            # Read file content
+            content = await file.read()
+
+            # Convert to text (basic text extraction)
+            if file.content_type == "text/plain":
+                text = content.decode('utf-8')
+            else:
+                # For non-text files, try to decode as UTF-8
+                try:
+                    text = content.decode('utf-8')
+                except UnicodeDecodeError:
+                    return DocumentProcessResponse(
+                        success=False,
+                        confidence_score=0.0,
+                        samples_found=0,
+                        processing_time=time.time() - start_time,
+                        extracted_data={"error": "Unable to process file. Please upload a text file."},
+                        message="Unable to process file. Please upload a text file."
+                    )
+
+            # Basic information extraction using regex patterns
+            extraction_result = extract_sample_info_basic(text)
+            
+            # Calculate confidence score
+            confidence_score = calculate_confidence_score_basic(extraction_result)
+            
+            # Count samples found
+            samples_found = 1 if extraction_result.get('sample', {}).get('sample_id') else 0
+            
+            processing_time = time.time() - start_time
+            submission_id = str(uuid.uuid4())[:8]
+
+            # Store in memory for demo
+            if samples_found > 0:
+                submission_data = {
+                    "id": submission_id,
+                    "filename": file.filename,
+                    "extracted_data": extraction_result,
+                    "confidence_score": confidence_score,
+                    "created_at": datetime.utcnow().isoformat(),
+                    "status": "completed"
+                }
+                submissions_storage.append(submission_data)
+
+            logger.info(f"Document processing completed: {samples_found} samples found, confidence: {confidence_score}")
+
+            return DocumentProcessResponse(
+                success=True,
+                confidence_score=confidence_score,
+                samples_found=samples_found,
+                processing_time=processing_time,
+                extracted_data=extraction_result,
+                message="Document processed successfully" if samples_found > 0 else "Document processed but no complete sample information found",
+                submission_id=submission_id
+            )
+
+        except Exception as e:
+            processing_time = time.time() - start_time
+            logger.error(f"Document processing failed: {e}")
+
+            return DocumentProcessResponse(
+                success=False,
+                confidence_score=0.0,
+                samples_found=0,
+                processing_time=processing_time,
+                extracted_data={"error": str(e)},
+                message=f"Processing failed: {str(e)}"
+            )
+
+    # File upload endpoint (alternative endpoint)
+    @app.post("/upload")
+    async def upload_document(file: UploadFile = File(...)):
+        """Upload and process a laboratory document"""
+        logger.info(f"Document upload via /upload endpoint: {file.filename}")
+        return await process_document_upload(file)
+
+    # Document processing endpoint (alternative)
+    @app.post("/process-document")
+    async def process_document_alt(file: UploadFile = File(...)):
+        """Process a laboratory submission document - alternative endpoint"""
+        logger.info(f"Document processing via /process-document endpoint: {file.filename}")
+        return await process_document_upload(file)
+
+    # Query endpoint for intelligent queries
+    @app.post("/api/samples/rag/query", response_model=QueryResponse)
+    async def query_rag_system(request: QueryRequest):
+        """Handle intelligent queries about laboratory management"""
+        start_time = time.time()
+        
+        logger.info(f"Processing RAG query: {request.query}")
+        
+        try:
+            # Generate intelligent response (mock implementation)
+            answer = get_intelligent_rag_response(request.query, request.session_id or "default")
+            processing_time = time.time() - start_time
+            
+            return QueryResponse(
+                answer=answer,
+                session_id=request.session_id,
+                confidence_score=0.85,
+                processing_time=processing_time,
+                sources=[
+                    {"title": "Laboratory Management Knowledge Base", "relevance": 0.9},
+                    {"title": "Sample Processing Guidelines", "relevance": 0.85},
+                    {"title": "Quality Control Standards", "relevance": 0.8}
+                ]
+            )
+            
+        except Exception as e:
+            logger.error(f"Query processing failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Query processing failed: {str(e)}")
+
+    # Get submissions endpoint
+    @app.get("/api/submissions")
+    async def get_submissions():
+        """Get all processed submissions"""
+        return {"submissions": submissions_storage, "total": len(submissions_storage)}
+
     return app
+
+
+def extract_sample_info_basic(text: str) -> Dict[str, Any]:
+    """Basic extraction of sample information using regex patterns"""
+    import re
+    
+    extraction_result = {
+        "administrative": {},
+        "sample": {},
+        "sequencing": {},
+        "storage": {}
+    }
+    
+    # Extract email addresses
+    email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+    emails = re.findall(email_pattern, text)
+    if emails:
+        extraction_result["administrative"]["submitter_email"] = emails[0]
+    
+    # Extract sample IDs (pattern: letters followed by numbers)
+    sample_id_pattern = r'\b[A-Z]{2,4}[-_]?\d{3,8}\b'
+    sample_ids = re.findall(sample_id_pattern, text)
+    if sample_ids:
+        extraction_result["sample"]["sample_id"] = sample_ids[0]
+    
+    # Extract sample types
+    sample_types = ["DNA", "RNA", "Protein", "Plasma", "Serum", "Tissue", "Blood"]
+    for sample_type in sample_types:
+        if sample_type.lower() in text.lower():
+            extraction_result["sample"]["sample_type"] = sample_type
+            break
+    
+    # Extract concentration (μg/μL, ng/μL, etc.)
+    conc_pattern = r'(\d+\.?\d*)\s*(μg/μL|ng/μL|μg/ml|ng/ml|mg/ml)'
+    conc_matches = re.findall(conc_pattern, text, re.IGNORECASE)
+    if conc_matches:
+        extraction_result["sample"]["concentration"] = f"{conc_matches[0][0]} {conc_matches[0][1]}"
+    
+    # Extract volume
+    vol_pattern = r'(\d+\.?\d*)\s*(μL|ml|L|ul)'
+    vol_matches = re.findall(vol_pattern, text, re.IGNORECASE)
+    if vol_matches:
+        extraction_result["sample"]["volume"] = f"{vol_matches[0][0]} {vol_matches[0][1]}"
+    
+    # Extract submitter name (basic pattern)
+    name_pattern = r'(?:submitter|contact|name):\s*([A-Za-z\s]+)'
+    name_matches = re.findall(name_pattern, text, re.IGNORECASE)
+    if name_matches:
+        extraction_result["administrative"]["submitter_name"] = name_matches[0].strip()
+    
+    return extraction_result
+
+
+def calculate_confidence_score_basic(extraction_result: Dict[str, Any]) -> float:
+    """Calculate confidence score based on extracted information"""
+    score = 0.0
+    total_fields = 0
+    
+    # Check administrative fields
+    admin_fields = ["submitter_email", "submitter_name"]
+    for field in admin_fields:
+        total_fields += 1
+        if extraction_result.get("administrative", {}).get(field):
+            score += 1
+    
+    # Check sample fields
+    sample_fields = ["sample_id", "sample_type", "concentration", "volume"]
+    for field in sample_fields:
+        total_fields += 1
+        if extraction_result.get("sample", {}).get(field):
+            score += 1
+    
+    return (score / total_fields) if total_fields > 0 else 0.0
+
+
+def get_intelligent_rag_response(query: str, session_id: str) -> str:
+    """Generate intelligent response to laboratory management queries"""
+    query_lower = query.lower()
+    
+    # Sample handling queries
+    if any(word in query_lower for word in ["sample", "storage", "temperature"]):
+        return f"For sample storage, TracSeq 2.0 supports multiple temperature zones: -80°C for long-term storage, -20°C for intermediate storage, 4°C for short-term storage, and room temperature for immediate processing. Each zone has IoT monitoring for temperature excursions and automated alerts."
+    
+    # Submission queries
+    elif any(word in query_lower for word in ["submission", "submit", "upload"]):
+        return f"To submit samples to TracSeq 2.0, upload your laboratory documents through the web interface. Our AI system will automatically extract sample information, validate the data, and assign storage locations. You'll receive a submission ID for tracking."
+    
+    # Quality control queries
+    elif any(word in query_lower for word in ["quality", "qc", "validation"]):
+        return f"TracSeq 2.0 implements comprehensive quality control including automated data validation, sample integrity checks, and chain of custody tracking. All QC metrics are recorded and available in the dashboard."
+    
+    # Sequencing queries
+    elif any(word in query_lower for word in ["sequencing", "sequence", "analysis"]):
+        return f"TracSeq 2.0 supports multiple sequencing platforms and analysis pipelines. The system automatically assigns samples to appropriate workflows based on sample type and analysis requirements specified in your submission."
+    
+    # Default response
+    else:
+        return f"I'm here to help with TracSeq 2.0 laboratory management. I can assist with sample submissions, storage management, quality control, and sequencing workflows. What specific aspect would you like to know more about?"
 
 
 # Create the application instance

@@ -17,20 +17,30 @@ import SpreadsheetDataViewer from '../components/SpreadsheetDataViewer';
 
   interface SpreadsheetDataset {
     id: string;
-    filename: string;
-    original_filename: string;
-    file_type: string;
-    file_size: number;
+    filename?: string;
+    original_filename?: string;
+    file_type?: string;
+    file_size?: number;
     sheet_name?: string;
-    total_rows: number;
-    total_columns: number;
-    column_headers: string[];
-    upload_status: 'processing' | 'completed' | 'failed';
+    total_rows?: number;
+    total_columns?: number;
+    column_headers?: string[];
+    upload_status?: 'processing' | 'completed' | 'failed';
     error_message?: string;
     uploaded_by?: string;
-    created_at: string;
-    updated_at: string;
-    metadata: Record<string, unknown>;
+    created_at?: string;
+    updated_at?: string;
+    metadata?: Record<string, unknown>;
+    // API returns these fields
+    name?: string;
+    fileName?: string;
+    recordCount?: number;
+    lastModified?: string;
+    createdBy?: string;
+    status?: string;
+    description?: string;
+    version?: string;
+    columns?: Array<{ name: string; type: string; [key: string]: any }>;
   }
 
 export default function Spreadsheets() {
@@ -59,7 +69,8 @@ export default function Spreadsheets() {
   });
 
   const handleDelete = async (dataset: SpreadsheetDataset) => {
-          if (window.confirm(`Are you sure you want to delete "${dataset.original_filename}"? This action cannot be undone.`)) {
+    const displayName = dataset.original_filename || dataset.fileName || dataset.name || 'this dataset';
+    if (window.confirm(`Are you sure you want to delete "${displayName}"? This action cannot be undone.`)) {
       try {
         await deleteDatasetMutation.mutateAsync(dataset.id);
       } catch (error) {
@@ -84,7 +95,8 @@ export default function Spreadsheets() {
   };
 
   const getFileTypeIcon = (fileType: string) => {
-    switch (fileType.toLowerCase()) {
+    const safeFileType = fileType?.toLowerCase() || '';
+    switch (safeFileType) {
       case 'csv':
         return <DocumentTextIcon className="h-5 w-5 text-green-500" />;
       case 'xlsx':
@@ -101,6 +113,12 @@ export default function Spreadsheets() {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const getFileExtension = (filename: string): string => {
+    if (!filename) return '';
+    const parts = filename.split('.');
+    return parts.length > 1 ? parts[parts.length - 1] : '';
   };
 
   if (error) {
@@ -174,7 +192,9 @@ export default function Spreadsheets() {
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Total Records</dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      {Array.isArray(datasets) ? datasets.reduce((sum, dataset) => sum + dataset.total_rows, 0).toLocaleString() : '0'}
+                      {Array.isArray(datasets) && datasets.length > 0 
+                        ? datasets.reduce((sum, dataset) => sum + (dataset.total_rows || dataset.recordCount || 0), 0).toLocaleString() 
+                        : '0'}
                     </dd>
                   </dl>
                 </div>
@@ -265,67 +285,71 @@ export default function Spreadsheets() {
                       </td>
                     </tr>
                   ) : (
-                    Array.isArray(datasets) && datasets.map((dataset) => (
+                    Array.isArray(datasets) && datasets.map((dataset) => {
+                      const isViewable = dataset.upload_status?.toLowerCase() === 'completed' || 
+                                       dataset.status?.toLowerCase() === 'active' ||
+                                       (dataset.recordCount && dataset.recordCount > 0);
+                      return (
                       <tr 
                         key={dataset.id}
                         className={`${
-                          dataset.upload_status?.toLowerCase() === 'completed' 
+                          isViewable
                             ? 'hover:bg-gray-50 cursor-pointer' 
                             : ''
                         }`}
                         title={
-                          dataset.upload_status?.toLowerCase() === 'completed'
+                          isViewable
                             ? 'Click to view spreadsheet data'
                             : dataset.upload_status?.toLowerCase() === 'failed'
                             ? 'Upload failed - cannot view data'
                             : 'Processing - data not yet available'
                         }
                         onClick={() => {
-                          if (dataset.upload_status?.toLowerCase() === 'completed') {
+                          if (isViewable) {
                             setViewingDataset(dataset);
                           }
                         }}
                       >
                         <td className="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
                           <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                              {getFileTypeIcon(dataset.file_type)}
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">
-                                {dataset.original_filename}
+                                                          <div className="flex-shrink-0">
+                                {getFileTypeIcon(dataset.file_type || getFileExtension(dataset.original_filename || dataset.fileName || ''))}
                               </div>
-                              {dataset.sheet_name && (
-                                <div className="text-sm text-gray-500">
-                                  Sheet: {dataset.sheet_name}
+                              <div className="ml-4">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {dataset.original_filename || dataset.fileName || dataset.name || 'Unnamed'}
                                 </div>
-                              )}
-                              {dataset.uploaded_by && (
-                                <div className="text-xs text-gray-400 flex items-center mt-1">
-                                  <UserIcon className="h-3 w-3 mr-1" />
-                                  {dataset.uploaded_by}
-                                </div>
-                              )}
-                            </div>
+                                {dataset.sheet_name && (
+                                  <div className="text-sm text-gray-500">
+                                    Sheet: {dataset.sheet_name}
+                                  </div>
+                                )}
+                                {(dataset.uploaded_by || dataset.createdBy) && (
+                                  <div className="text-xs text-gray-400 flex items-center mt-1">
+                                    <UserIcon className="h-3 w-3 mr-1" />
+                                    {dataset.uploaded_by || dataset.createdBy}
+                                  </div>
+                                )}
+                              </div>
                           </div>
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                           <span className="uppercase font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                            {dataset.file_type}
+                            {dataset.file_type || getFileExtension(dataset.original_filename || dataset.fileName || '') || 'UNKNOWN'}
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          {formatFileSize(dataset.file_size)}
+                          {dataset.file_size ? formatFileSize(dataset.file_size) : '-'}
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                           <div>
-                            <div className="font-medium">{dataset.total_rows.toLocaleString()}</div>
-                            <div className="text-xs text-gray-400">{dataset.total_columns} cols</div>
+                            <div className="font-medium">{(dataset.total_rows || dataset.recordCount || 0).toLocaleString()}</div>
+                            <div className="text-xs text-gray-400">{dataset.total_columns || dataset.columns?.length || 0} cols</div>
                           </div>
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm">
-                          <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusColor(dataset.upload_status)}`}>
-                            {dataset.upload_status}
+                          <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusColor(dataset.upload_status || dataset.status || '')}`}>
+                            {dataset.upload_status || dataset.status || 'Unknown'}
                           </span>
                           {dataset.error_message && (
                             <div className="text-xs text-red-600 mt-1" title={dataset.error_message}>
@@ -336,12 +360,12 @@ export default function Spreadsheets() {
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                           <div className="flex items-center">
                             <CalendarDaysIcon className="h-4 w-4 mr-1 text-gray-400" />
-                            {new Date(dataset.created_at).toLocaleDateString()}
+                            {dataset.created_at || dataset.lastModified ? new Date(dataset.created_at || dataset.lastModified || '').toLocaleDateString() : '-'}
                           </div>
                         </td>
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                           <div className="flex items-center space-x-2">
-                            {dataset.upload_status?.toLowerCase() === 'completed' && (
+                            {isViewable && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -367,7 +391,8 @@ export default function Spreadsheets() {
                           </div>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -402,13 +427,13 @@ export default function Spreadsheets() {
         <SpreadsheetDataViewer
           dataset={{
             id: viewingDataset.id,
-            original_filename: viewingDataset.original_filename,
-            file_type: viewingDataset.file_type,
-            total_rows: viewingDataset.total_rows,
-            total_columns: viewingDataset.total_columns,
-            column_headers: viewingDataset.column_headers,
-            created_at: viewingDataset.created_at,
-            uploaded_by: viewingDataset.uploaded_by,
+            original_filename: viewingDataset.original_filename || viewingDataset.fileName || viewingDataset.name || 'Unknown',
+            file_type: viewingDataset.file_type || getFileExtension(viewingDataset.original_filename || viewingDataset.fileName || '') || 'csv',
+            total_rows: viewingDataset.total_rows || viewingDataset.recordCount || 0,
+            total_columns: viewingDataset.total_columns || viewingDataset.columns?.length || 0,
+            column_headers: viewingDataset.column_headers || viewingDataset.columns?.map(col => col.name) || [],
+            created_at: viewingDataset.created_at || viewingDataset.lastModified || new Date().toISOString(),
+            uploaded_by: viewingDataset.uploaded_by || viewingDataset.createdBy,
             sheet_name: viewingDataset.sheet_name,
           }}
           onClose={() => setViewingDataset(null)}

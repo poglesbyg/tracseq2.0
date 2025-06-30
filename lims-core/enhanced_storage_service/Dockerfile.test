@@ -1,0 +1,14 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Create a simple test script
+RUN echo '#!/bin/sh\necho "Test script running"\nexit 0' > /app/test.sh && chmod +x /app/test.sh
+
+# Copy the binary from the build stage of the original image
+COPY --from=docker-storage-service /app/enhanced_storage_service /app/enhanced_storage_service
+
+# Try to run both
+CMD echo "Running test script:" && /app/test.sh && echo "Running binary:" && /app/enhanced_storage_service 

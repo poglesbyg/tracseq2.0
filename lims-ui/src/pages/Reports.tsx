@@ -13,10 +13,13 @@ import {
 
 interface ReportResult {
   columns: string[];
-  rows: Record<string, unknown>[];
-  row_count: number;
-  execution_time_ms: number;
-  query: string;
+  rows?: Record<string, unknown>[];
+  data?: Record<string, unknown>[];
+  row_count?: number;
+  rowCount?: number;
+  execution_time_ms?: number;
+  executionTime?: number;
+  query?: string;
 }
 
 interface ReportTemplate {
@@ -38,9 +41,11 @@ interface TableInfo {
 
 interface ColumnInfo {
   name: string;
-  data_type: string;
-  is_nullable: boolean;
-  is_primary_key: boolean;
+  data_type?: string;
+  type?: string;
+  is_nullable?: boolean;
+  nullable?: boolean;
+  is_primary_key?: boolean;
 }
 
 
@@ -56,7 +61,10 @@ export default function Reports() {
     queryKey: ['reportTemplates'],
     queryFn: async () => {
       const response = await axios.get('/api/reports/templates');
-      return response.data;
+      // Handle both response formats - direct array or nested in data/templates
+      return Array.isArray(response.data) 
+        ? response.data 
+        : (response.data.data || response.data.templates || []);
     },
   });
 
@@ -110,9 +118,10 @@ export default function Reports() {
   const exportToCSV = () => {
     if (!reportResult) return;
 
+    const rows = reportResult.rows || reportResult.data || [];
     const csvContent = [
       reportResult.columns.join(','),
-      ...reportResult.rows.map(row =>
+      ...rows.map(row =>
         reportResult.columns.map(col => {
           const value = row[col];
           // Escape quotes and wrap in quotes if contains comma
@@ -255,10 +264,10 @@ export default function Reports() {
                     <div>
                       <h2 className="text-lg font-medium text-gray-900">Query Results</h2>
                       <div className="mt-1 flex items-center space-x-4 text-sm text-gray-500">
-                        <span>{reportResult.row_count} rows</span>
-                        <span className="flex items-center">
-                          <ClockIcon className="w-4 h-4 mr-1" />
-                          {reportResult.execution_time_ms}ms
+                                              <span>{reportResult.row_count || reportResult.rowCount || 0} rows</span>
+                      <span className="flex items-center">
+                        <ClockIcon className="w-4 h-4 mr-1" />
+                        {reportResult.execution_time_ms || reportResult.executionTime || 0}ms
                         </span>
                       </div>
                     </div>
@@ -286,7 +295,7 @@ export default function Reports() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {reportResult.rows.map((row, index) => (
+                      {(reportResult.rows || reportResult.data || []).map((row, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           {reportResult.columns.map((column) => (
                             <td key={column} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -360,9 +369,9 @@ export default function Reports() {
                         {table.columns.map((column) => (
                           <tr key={column.name}>
                             <td className="px-4 py-2 text-sm font-medium text-gray-900">{column.name}</td>
-                            <td className="px-4 py-2 text-sm text-gray-600">{column.data_type}</td>
+                            <td className="px-4 py-2 text-sm text-gray-600">{column.data_type || column.type || 'unknown'}</td>
                             <td className="px-4 py-2 text-sm text-gray-600">
-                              {column.is_nullable ? 'Yes' : 'No'}
+                              {(column.is_nullable ?? column.nullable) ? 'Yes' : 'No'}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-600">
                               {column.is_primary_key ? (

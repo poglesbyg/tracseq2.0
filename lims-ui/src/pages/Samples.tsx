@@ -103,8 +103,8 @@ export default function Samples() {
   // Filter samples based on current filters with safety checks
   const filteredSamples = Array.isArray(samples) ? samples.filter((sample: Sample) => {
     // Search filter
-    if (searchQuery && !sample.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
-        !sample.barcode.toLowerCase().includes(searchQuery.toLowerCase())) {
+        if (searchQuery && !(sample.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) &&
+        !(sample.barcode?.toLowerCase() || '').includes(searchQuery.toLowerCase())) {
       return false;
     }
     

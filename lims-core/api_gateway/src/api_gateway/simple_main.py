@@ -437,6 +437,29 @@ async def get_storage_locations():
         "locations": locations_data  # For other consumers
     }
 
+# Storage Service Proxy (forward to actual storage service)
+storage_service_url = os.getenv("STORAGE_SERVICE_URL", "http://storage-service:8000")
+
+@app.get("/api/storage/health")
+async def storage_health():
+    """Check storage service health"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{storage_service_url}/api/storage/health", timeout=5.0)
+            return response.json()
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}, 503
+
+@app.get("/api/storage/status")
+async def storage_status():
+    """Get storage service status"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{storage_service_url}/api/storage/status", timeout=5.0)
+            return response.json()
+    except Exception as e:
+        return {"operational": False, "error": str(e)}, 503
+
 # Reports endpoints
 @app.get("/api/reports/templates")
 async def get_report_templates():
@@ -448,6 +471,7 @@ async def get_report_templates():
                 "name": "Sample Summary Report",
                 "description": "Summary of all samples in the system",
                 "category": "samples",
+                "sql": "SELECT status, COUNT(*) as count FROM samples GROUP BY status ORDER BY count DESC;",
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat()
             },
@@ -456,6 +480,7 @@ async def get_report_templates():
                 "name": "Storage Utilization Report",
                 "description": "Current storage usage by temperature zone",
                 "category": "storage",
+                "sql": "SELECT temperature_zone, SUM(capacity) as total_capacity, SUM(current_usage) as total_usage FROM storage_locations GROUP BY temperature_zone;",
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat()
             },
@@ -464,6 +489,7 @@ async def get_report_templates():
                 "name": "Monthly Activity Report",
                 "description": "Summary of all activities in the past month",
                 "category": "activity",
+                "sql": "SELECT DATE(created_at) as date, COUNT(*) as activity_count FROM samples WHERE created_at >= CURRENT_DATE - INTERVAL '30 days' GROUP BY DATE(created_at) ORDER BY date;",
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat()
             }
@@ -473,19 +499,22 @@ async def get_report_templates():
                 "id": "RPT-001",
                 "name": "Sample Summary Report",
                 "description": "Summary of all samples in the system",
-                "category": "samples"
+                "category": "samples",
+                "sql": "SELECT status, COUNT(*) as count FROM samples GROUP BY status ORDER BY count DESC;"
             },
             {
                 "id": "RPT-002",
                 "name": "Storage Utilization Report",
                 "description": "Current storage usage by temperature zone",
-                "category": "storage"
+                "category": "storage",
+                "sql": "SELECT temperature_zone, SUM(capacity) as total_capacity, SUM(current_usage) as total_usage FROM storage_locations GROUP BY temperature_zone;"
             },
             {
                 "id": "RPT-003",
                 "name": "Monthly Activity Report",
                 "description": "Summary of all activities in the past month",
-                "category": "activity"
+                "category": "activity",
+                "sql": "SELECT DATE(created_at) as date, COUNT(*) as activity_count FROM samples WHERE created_at >= CURRENT_DATE - INTERVAL '30 days' GROUP BY DATE(created_at) ORDER BY date;"
             }
         ],
         "totalCount": 3
