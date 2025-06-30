@@ -52,6 +52,13 @@ class ServiceFeatureFlags(BaseSettings):
     use_sequencing_service: bool = Field(default=False)
     use_notification_service: bool = Field(default=False)
     use_rag_service: bool = Field(default=False)
+    # Additional services from Phase 1
+    use_barcode_service: bool = Field(default=False)
+    use_qaqc_service: bool = Field(default=False)
+    use_library_service: bool = Field(default=False)
+    use_event_service: bool = Field(default=False)
+    use_transaction_service: bool = Field(default=False)
+    use_spreadsheet_service: bool = Field(default=False)
 
     class Config:
         """Pydantic configuration for reading environment variables."""
@@ -128,6 +135,49 @@ class MonolithRouterConfig(BaseSettings):
                 path_prefix="/api/rag",
                 health_check_path="/health"
             ),
+            # Additional services
+            "barcode": ServiceEndpoint(
+                name="Barcode Service",
+                host="barcode-service",
+                port=3020,
+                path_prefix="/api/barcodes",
+                health_check_path="/health"
+            ),
+            "qaqc": ServiceEndpoint(
+                name="QA/QC Service",
+                host="qaqc-service",
+                port=3018,
+                path_prefix="/api/qaqc",
+                health_check_path="/health"
+            ),
+            "library": ServiceEndpoint(
+                name="Library Details Service",
+                host="library-details-service",
+                port=3021,
+                path_prefix="/api/library",
+                health_check_path="/health"
+            ),
+            "event": ServiceEndpoint(
+                name="Event Service",
+                host="event-service",
+                port=3017,
+                path_prefix="/api/events",
+                health_check_path="/health"
+            ),
+            "transaction": ServiceEndpoint(
+                name="Transaction Service",
+                host="transaction-service",
+                port=8088,
+                path_prefix="/api/transactions",
+                health_check_path="/health"
+            ),
+            "spreadsheet": ServiceEndpoint(
+                name="Spreadsheet Service",
+                host="spreadsheet-versioning-service",
+                port=3015,
+                path_prefix="/api/spreadsheets",
+                health_check_path="/health"
+            ),
         }
     )
 
@@ -160,6 +210,13 @@ class MonolithRouterConfig(BaseSettings):
             ("/api/sequencing", "sequencing", self.feature_flags.use_sequencing_service),
             ("/api/notifications", "notifications", self.feature_flags.use_notification_service),
             ("/api/rag", "rag", self.feature_flags.use_rag_service),
+            # Additional service routes
+            ("/api/barcodes", "barcode", self.feature_flags.use_barcode_service),
+            ("/api/qaqc", "qaqc", self.feature_flags.use_qaqc_service),
+            ("/api/library", "library", self.feature_flags.use_library_service),
+            ("/api/events", "event", self.feature_flags.use_event_service),
+            ("/api/transactions", "transaction", self.feature_flags.use_transaction_service),
+            ("/api/spreadsheets", "spreadsheet", self.feature_flags.use_spreadsheet_service),
         ]
 
         # Check if any microservice should handle this request
@@ -209,6 +266,31 @@ class MonolithRouterConfig(BaseSettings):
                 "rag": {
                     "enabled": self.feature_flags.use_rag_service,
                     "url": self.microservices["rag"].base_url if self.feature_flags.use_rag_service else None
+                },
+                # Additional services status
+                "barcode": {
+                    "enabled": self.feature_flags.use_barcode_service,
+                    "url": self.microservices["barcode"].base_url if self.feature_flags.use_barcode_service else None
+                },
+                "qaqc": {
+                    "enabled": self.feature_flags.use_qaqc_service,
+                    "url": self.microservices["qaqc"].base_url if self.feature_flags.use_qaqc_service else None
+                },
+                "library": {
+                    "enabled": self.feature_flags.use_library_service,
+                    "url": self.microservices["library"].base_url if self.feature_flags.use_library_service else None
+                },
+                "event": {
+                    "enabled": self.feature_flags.use_event_service,
+                    "url": self.microservices["event"].base_url if self.feature_flags.use_event_service else None
+                },
+                "transaction": {
+                    "enabled": self.feature_flags.use_transaction_service,
+                    "url": self.microservices["transaction"].base_url if self.feature_flags.use_transaction_service else None
+                },
+                "spreadsheet": {
+                    "enabled": self.feature_flags.use_spreadsheet_service,
+                    "url": self.microservices["spreadsheet"].base_url if self.feature_flags.use_spreadsheet_service else None
                 }
             }
         }
