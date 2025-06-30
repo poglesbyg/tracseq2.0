@@ -23,7 +23,7 @@ COPY src ./src
 RUN rm -f src/main.rs
 
 # Copy our minimal main as the actual main
-COPY src/main_minimal_working.rs ./src/main.rs
+COPY src/main_with_health.rs ./src/main.rs
 
 # Build the application
 RUN cargo build --release
