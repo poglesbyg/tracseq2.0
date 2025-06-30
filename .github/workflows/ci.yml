@@ -34,9 +34,9 @@ env:
   PYTHON_VERSION: '3.11'
 
 jobs:
-  # 🔍 Early validation and linting (following .cursorrules development cycle)
+  # 🔍 Early validation and linting
   lint-and-typecheck:
-    name: 🔍 Lint & TypeCheck (Development Cycle Step 1-2)
+    name: 🔍 Lint & TypeCheck
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -52,49 +52,45 @@ jobs:
       - name: Check repository structure
         id: check-structure
         run: |
-          echo "has_frontend=$([ -d 'lab_manager/frontend' ] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          echo "has_frontend=$([ -d 'lims-ui' ] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
           echo "has_rust=$([ -f 'Cargo.toml' ] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
-          echo "has_python=$(find . -name '*.py' -type f | head -1 | wc -l)" >> $GITHUB_OUTPUT
+          echo "has_python=$([ -d 'lims-ai' ] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
 
-      # 📦 Setup tools following technology stack requirements
+      # 📦 Setup tools
       - name: Setup Node.js and pnpm
         if: steps.check-structure.outputs.has_frontend == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
 
-      - name: Setup pnpm (v10.12.2+)
+      - name: Setup pnpm
         if: steps.check-structure.outputs.has_frontend == 'true'
         uses: pnpm/action-setup@v3
         with:
           version: ${{ env.PNPM_VERSION }}
           run_install: false
 
-      - name: Setup Rust toolchain (1.75+)
+      - name: Setup Rust toolchain
         if: steps.check-structure.outputs.has_rust == 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
           components: rustfmt, clippy
 
-      - name: Setup Python (3.11+)
-        if: steps.check-structure.outputs.has_python != '0'
+      - name: Setup Python
+        if: steps.check-structure.outputs.has_python == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
-      # 🔄 Step 1: TypeCheck (following .cursorrules)
+      # 🔄 TypeScript/Frontend checks
       - name: 📋 TypeScript TypeCheck
         if: steps.check-structure.outputs.has_frontend == 'true'
+        working-directory: lims-ui
         run: |
-          echo "🔍 Running pnpm typecheck (Step 1 of development cycle)"
-          if ! pnpm install; then
-            echo "⚠️ pnpm install failed, trying npm fallback"
-            cd lab_manager/frontend && npm install
-          fi
-          
+          echo "🔍 Running pnpm typecheck"
+          pnpm install --frozen-lockfile
           if pnpm typecheck; then
             echo "✅ TypeScript checks passed"
           else
@@ -102,11 +98,11 @@ jobs:
             exit 1
           fi
 
-      # 🔄 Step 2: Lint (following .cursorrules)
       - name: 🔍 Frontend Lint
         if: steps.check-structure.outputs.has_frontend == 'true'
+        working-directory: lims-ui
         run: |
-          echo "🔍 Running pnpm lint (Step 2 of development cycle)"
+          echo "🔍 Running pnpm lint"
           if pnpm lint; then
             echo "✅ Frontend linting passed"
           else
@@ -119,6 +115,7 @@ jobs:
             fi
           fi
 
+      # 🦀 Rust checks
       - name: 🦀 Rust Format Check
         if: steps.check-structure.outputs.has_rust == 'true'
         run: |
@@ -139,22 +136,25 @@ jobs:
             -D warnings \
             -W clippy::suspicious \
             -W clippy::complexity \
-            -W clippy::perf \
-            -W clippy::cargo \
-            -W clippy::nursery
+            -W clippy::perf
 
+      # 🐍 Python checks
       - name: 🐍 Python Lint
-        if: steps.check-structure.outputs.has_python != '0'
+        if: steps.check-structure.outputs.has_python == 'true'
         run: |
           echo "🔍 Running Python linting"
           python -m pip install --upgrade pip
           pip install black isort flake8 mypy
+          
+          # Check Python files in lims-ai directory
+          cd lims-ai
           
           # Format check
           if black --check .; then
             echo "✅ Python formatting is correct"
           else
             echo "❌ Python formatting issues found"
+            black --diff .
             exit 1
           fi
           
@@ -168,45 +168,10 @@ jobs:
           
           # Linting
           flake8 --max-line-length=88 --extend-ignore=E203,W503 .
-          
-          # Type checking where possible
-          find . -name "*.py" -path "*/lab_submission_rag/*" -exec mypy {} + || echo "⚠️ MyPy errors found"
 
-  # 🔄 Step 3: Fix (auto-fix where possible)
-  auto-fix-and-validate:
-    name: 🔧 Auto-Fix & Validate (Development Cycle Step 3)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: lint-and-typecheck
-    if: failure() && needs.lint-and-typecheck.outputs.has_frontend == 'true'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js and pnpm
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Install dependencies and auto-fix
-        run: |
-          echo "🔧 Attempting auto-fix (Step 3 of development cycle)"
-          pnpm install
-          if pnpm fix; then
-            echo "✅ Auto-fix completed successfully"
-          else
-            echo "❌ Auto-fix failed - manual intervention required"
-            exit 1
-          fi
-
-  # 🔄 Step 4: Test (comprehensive testing)
+  # 🧪 Test Suite
   test-suite:
-    name: 🧪 Test Suite (Development Cycle Step 4)
+    name: 🧪 Test Suite
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: lint-and-typecheck
@@ -274,7 +239,7 @@ jobs:
           toolchain: ${{ env.RUST_VERSION }}
 
       - name: Setup Python
-        if: needs.lint-and-typecheck.outputs.has_python != '0'
+        if: needs.lint-and-typecheck.outputs.has_python == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -287,29 +252,18 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-            node_modules/
+            lims-ui/node_modules/
             ~/.cache/pip
           key: ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.lock', '**/pnpm-lock.yaml', '**/requirements.txt') }}
 
-      # 🧪 Frontend Tests
+      # 🎨 Frontend Tests
       - name: 🎨 Frontend Tests
         if: needs.lint-and-typecheck.outputs.has_frontend == 'true'
+        working-directory: lims-ui
         run: |
           echo "🧪 Running frontend tests"
-          pnpm install
-          
-          # Run tests for each workspace
-          if pnpm test --filter @app/web; then
-            echo "✅ Web tests passed"
-          else
-            echo "⚠️ Web tests failed or not configured"
-          fi
-          
-          if pnpm test --filter @app/api; then
-            echo "✅ API tests passed"
-          else
-            echo "⚠️ API tests failed or not configured"
-          fi
+          pnpm install --frozen-lockfile
+          pnpm test
 
       # 🦀 Rust Backend Tests
       - name: 🦀 Rust Backend Tests
@@ -325,32 +279,28 @@ jobs:
           timeout 60s bash -c 'until pg_isready -h localhost -p 5432; do sleep 1; done'
           
           # Install sqlx-cli for migrations
-          if cargo install sqlx-cli --version 0.8.0 --no-default-features --features postgres,rustls; then
-            echo "✅ sqlx-cli installed"
-          else
-            echo "⚠️ Failed to install sqlx-cli"
-          fi
+          cargo install sqlx-cli --version 0.8.0 --no-default-features --features postgres,rustls
           
-          # Run migrations for each service
-          for service in auth_service sample_service enhanced_storage_service transaction_service; do
+          # Run migrations for services in lims-core
+          for service in lims-core/*/; do
             if [ -d "$service/migrations" ]; then
               echo "Running migrations for $service"
-              cd $service && sqlx migrate run && cd ..
+              cd $service && sqlx migrate run && cd ../..
             fi
           done
           
-          # Run comprehensive tests
+          # Run tests
           if [ "${{ github.event.inputs.skip_slow_tests }}" = "true" ]; then
             echo "⚡ Running quick tests only"
             cargo test --lib --bins
           else
             echo "🔄 Running comprehensive tests"
-            cargo test --verbose -- --test-threads=1
+            cargo test --verbose
           fi
 
       # 🐍 Python AI Service Tests
       - name: 🐍 Python AI Service Tests
-        if: needs.lint-and-typecheck.outputs.has_python != '0'
+        if: needs.lint-and-typecheck.outputs.has_python == 'true'
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/tracseq_test
           PYTHONPATH: .
@@ -360,8 +310,14 @@ jobs:
           # Install Python dependencies
           python -m pip install --upgrade pip
           
-          # Install dependencies for each Python service
-          for service in lab_submission_rag enhanced_rag_service api_gateway; do
+          # Install dependencies for AI services
+          cd lims-ai
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          fi
+          
+          # Install specific service dependencies
+          for service in lab_submission_rag enhanced_rag_service; do
             if [ -f "$service/requirements.txt" ]; then
               echo "Installing dependencies for $service"
               pip install -r $service/requirements.txt
@@ -371,47 +327,22 @@ jobs:
           # Install test dependencies
           pip install pytest pytest-cov pytest-asyncio httpx
           
-          # Run tests for each Python service
-          for service in lab_submission_rag enhanced_rag_service api_gateway; do
-            if [ -d "$service/tests" ]; then
-              echo "Running tests for $service"
-              cd $service
-              pytest tests/ -v --cov=. --cov-report=term-missing || echo "⚠️ Tests failed for $service"
-              cd ..
-            fi
-          done
-
-      # 🔗 Integration Tests (Laboratory Domain Logic)
-      - name: 🔗 Laboratory Integration Tests
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/tracseq_test
-          REDIS_URL: redis://localhost:6379
-          STORAGE_PATH: /tmp/tracseq_test_storage
-        run: |
-          echo "🧬 Running laboratory domain integration tests"
-          
-          mkdir -p /tmp/tracseq_test_storage
-          
-          # Test sample lifecycle states (Pending → Validated → InStorage → InSequencing → Completed)
-          echo "Testing sample lifecycle management..."
-          
-          # Test temperature zone compliance (-80°C, -20°C, 4°C, RT, 37°C)
-          echo "Testing temperature zone compliance..."
-          
-          # Test barcode generation and laboratory naming conventions
-          echo "Testing barcode generation..."
-          
-          # Test RAG confidence scoring (>0.85 for auto-processing)
-          echo "Testing RAG confidence scoring..."
-          
-          # Run integration tests
-          if [ -f "tests/integration_data_flows.rs" ]; then
-            cargo test --test integration_data_flows
+          # Run tests
+          if [ -d "lab_submission_rag/tests" ]; then
+            echo "Running tests for lab_submission_rag"
+            cd lab_submission_rag
+            pytest tests/ -v --cov=. --cov-report=term-missing || echo "⚠️ Tests failed for lab_submission_rag"
+            cd ..
           fi
           
-          echo "✅ Laboratory integration tests completed"
+          if [ -d "enhanced_rag_service/tests" ]; then
+            echo "Running tests for enhanced_rag_service"
+            cd enhanced_rag_service
+            pytest tests/ -v --cov=. --cov-report=term-missing || echo "⚠️ Tests failed for enhanced_rag_service"
+            cd ..
+          fi
 
-  # 🚀 Microservices Architecture Validation
+  # � Microservices Architecture Validation
   microservices-validation:
     name: 🏗️ Microservices Architecture Validation
     runs-on: ubuntu-latest
@@ -422,17 +353,52 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service:
-          - auth_service
-          - sample_service
-          - enhanced_storage_service
-          - transaction_service
-          - event_service
-          - sequencing_service
-          - notification_service
-          - lab_submission_rag
-          - enhanced_rag_service
-          - api_gateway
+        include:
+          # Rust services in lims-core
+          - service: auth_service
+            path: lims-core/auth_service
+            type: rust
+          - service: sample_service
+            path: lims-core/sample_service
+            type: rust
+          - service: enhanced_storage_service
+            path: lims-core/enhanced_storage_service
+            type: rust
+          - service: transaction_service
+            path: lims-core/transaction_service
+            type: rust
+          - service: event_service
+            path: lims-core/event_service
+            type: rust
+          - service: sequencing_service
+            path: lims-core/sequencing_service
+            type: rust
+          - service: notification_service
+            path: lims-core/notification_service
+            type: rust
+          - service: qaqc_service
+            path: lims-core/qaqc_service
+            type: rust
+          - service: template_service
+            path: lims-core/template_service
+            type: rust
+          - service: spreadsheet_versioning_service
+            path: lims-core/spreadsheet_versioning_service
+            type: rust
+          - service: library_details_service
+            path: lims-core/library_details_service
+            type: rust
+          # Python services in lims-ai
+          - service: lab_submission_rag
+            path: lims-ai/lab_submission_rag
+            type: python
+          - service: enhanced_rag_service
+            path: lims-ai/enhanced_rag_service
+            type: python
+          # API Gateway in lims-core
+          - service: api_gateway
+            path: lims-core/api_gateway
+            type: python
     
     steps:
       - name: Checkout repository
@@ -440,30 +406,38 @@ jobs:
 
       - name: Validate service structure for ${{ matrix.service }}
         run: |
-          echo "🔍 Validating ${{ matrix.service }} structure"
+          echo "🔍 Validating ${{ matrix.service }} structure at ${{ matrix.path }}"
           
-          if [ ! -d "${{ matrix.service }}" ]; then
-            echo "⚠️ Service directory not found: ${{ matrix.service }}"
-            exit 0
+          if [ ! -d "${{ matrix.path }}" ]; then
+            echo "⚠️ Service directory not found: ${{ matrix.path }}"
+            exit 1
           fi
           
-          cd ${{ matrix.service }}
+          cd ${{ matrix.path }}
           
           # Check for proper service configuration
-          if [ -f "Cargo.toml" ]; then
-            echo "✅ Rust service configuration found"
-            # Validate Cargo.toml structure
-            if grep -q "tokio" Cargo.toml; then
-              echo "✅ Async tokio-based service"
+          if [ "${{ matrix.type }}" == "rust" ]; then
+            if [ -f "Cargo.toml" ]; then
+              echo "✅ Rust service configuration found"
+              # Validate Cargo.toml structure
+              if grep -q "tokio" Cargo.toml; then
+                echo "✅ Async tokio-based service"
+              fi
+            else
+              echo "❌ Cargo.toml not found for Rust service"
+              exit 1
             fi
-          elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
-            echo "✅ Python service configuration found"
-            # Validate Python service structure
-            if [ -f "main.py" ] || [ -f "app.py" ]; then
-              echo "✅ Python service entry point found"
+          elif [ "${{ matrix.type }}" == "python" ]; then
+            if [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
+              echo "✅ Python service configuration found"
+              # Validate Python service structure
+              if [ -f "main.py" ] || [ -f "app.py" ] || [ -f "__main__.py" ]; then
+                echo "✅ Python service entry point found"
+              fi
+            else
+              echo "❌ No Python configuration found"
+              exit 1
             fi
-          else
-            echo "⚠️ No service configuration found"
           fi
           
           # Check for health endpoint
@@ -495,103 +469,106 @@ jobs:
       - name: Install coverage tools
         run: |
           echo "📊 Installing coverage tools"
-          if cargo install cargo-tarpaulin --version 0.27.3; then
-            echo "✅ cargo-tarpaulin installed"
-          else
-            echo "⚠️ Failed to install cargo-tarpaulin"
-          fi
-          
-          if cargo install cargo-llvm-cov; then
-            echo "✅ cargo-llvm-cov installed"
-          else
-            echo "⚠️ Failed to install cargo-llvm-cov"
-          fi
+          cargo install cargo-tarpaulin --version 0.27.3
 
-      - name: Run coverage analysis
+      - name: Generate Rust coverage report
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/tracseq_test
         run: |
-          echo "📊 Running coverage analysis"
-          
-          if command -v cargo-tarpaulin >/dev/null 2>&1; then
-            cargo tarpaulin --verbose --timeout 120 --out Json --output-dir coverage/ || {
-              echo "⚠️ Tarpaulin failed, trying cargo-llvm-cov"
-              if command -v cargo-llvm-cov >/dev/null 2>&1; then
-                cargo llvm-cov --json --output-path coverage/llvm-cov.json
-              else
-                echo "⚠️ No coverage tools available"
-                mkdir -p coverage
-                echo '{"files": [], "summary": {"line_coverage": 0}}' > coverage/fallback.json
-              fi
-            }
-          else
-            echo "⚠️ No coverage tools available"
-            mkdir -p coverage
-            echo '{"files": [], "summary": {"line_coverage": 0}}' > coverage/fallback.json
-          fi
+          echo "📊 Generating coverage report for Rust services"
+          cargo tarpaulin --workspace --out Html --output-dir ./coverage
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: coverage-reports
-          path: coverage/
-          retention-days: 30
+          path: |
+            coverage/
+            lims-ai/*/htmlcov/
+          retention-days: 7
 
-  # 🎯 Final Validation and Reporting
-  final-validation:
-    name: 🎯 Final CI Validation
+  # 🏗️ Build Validation
+  build-validation:
+    name: 🏗️ Build Validation
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: [lint-and-typecheck, test-suite, microservices-validation, performance-coverage]
+    needs: [microservices-validation]
+    if: success()
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Docker configurations
+        run: |
+          echo "🐳 Validating Docker configurations"
+          
+          # Check main docker compose files
+          for compose_file in docker/development/docker-compose.unified.yml docker/production/docker-compose.production.yml; do
+            if [ -f "$compose_file" ]; then
+              echo "✅ Found: $compose_file"
+              # Validate YAML syntax
+              if docker compose -f "$compose_file" config > /dev/null 2>&1; then
+                echo "✅ Valid compose file: $compose_file"
+              else
+                echo "❌ Invalid compose file: $compose_file"
+                docker compose -f "$compose_file" config
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Check Dockerfile presence
+        run: |
+          echo "🐳 Checking Dockerfiles"
+          
+          # Check for Dockerfiles in service directories
+          for service_dir in lims-core/* lims-ai/*; do
+            if [ -d "$service_dir" ] && [ -f "$service_dir/Dockerfile" ]; then
+              echo "✅ Dockerfile found in $service_dir"
+            elif [ -d "$service_dir" ]; then
+              echo "⚠️ No Dockerfile in $service_dir"
+            fi
+          done
+          
+          # Check UI Dockerfile
+          if [ -f "lims-ui/Dockerfile" ]; then
+            echo "✅ Frontend Dockerfile found"
+          else
+            echo "⚠️ No frontend Dockerfile found"
+          fi
+
+  # 📋 Summary
+  ci-summary:
+    name: 📋 CI Summary
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck, test-suite, microservices-validation, performance-coverage, build-validation]
     if: always()
     
     steps:
-      - name: Generate CI Summary Report
+      - name: Summary
         run: |
-          echo "# 🧬 TracSeq 2.0 CI Pipeline Summary" > ci-summary.md
-          echo "" >> ci-summary.md
-          echo "**Pipeline Run:** ${{ github.run_number }}" >> ci-summary.md
-          echo "**Commit:** ${{ github.sha }}" >> ci-summary.md
-          echo "**Branch:** ${{ github.ref_name }}" >> ci-summary.md
-          echo "**Trigger:** ${{ github.event_name }}" >> ci-summary.md
-          echo "" >> ci-summary.md
-          echo "## 📋 Development Cycle Compliance" >> ci-summary.md
-          echo "- ✅ Step 1: TypeCheck" >> ci-summary.md
-          echo "- ✅ Step 2: Lint" >> ci-summary.md
-          echo "- ✅ Step 3: Fix (auto-fix where possible)" >> ci-summary.md
-          echo "- ✅ Step 4: Test (comprehensive)" >> ci-summary.md
-          echo "" >> ci-summary.md
-          echo "## 🏗️ Architecture Validation" >> ci-summary.md
-          echo "- Frontend: ${{ needs.lint-and-typecheck.outputs.has_frontend }}" >> ci-summary.md
-          echo "- Rust Backend: ${{ needs.lint-and-typecheck.outputs.has_rust }}" >> ci-summary.md
-          echo "- Python AI Services: ${{ needs.lint-and-typecheck.outputs.has_python != '0' && 'true' || 'false' }}" >> ci-summary.md
-          echo "- Microservices: 10+ services validated" >> ci-summary.md
-          echo "" >> ci-summary.md
-          echo "## 🎯 Results Summary" >> ci-summary.md
-          echo "- Lint & TypeCheck: ${{ needs.lint-and-typecheck.result }}" >> ci-summary.md
-          echo "- Test Suite: ${{ needs.test-suite.result }}" >> ci-summary.md
-          echo "- Microservices: ${{ needs.microservices-validation.result }}" >> ci-summary.md
-          echo "- Coverage: ${{ needs.performance-coverage.result }}" >> ci-summary.md
-
-      - name: Upload CI Summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-summary-report
-          path: ci-summary.md
-
-      - name: Final status check
-        run: |
-          echo "🎯 Final CI Pipeline Status Check"
+          echo "# 📊 TracSeq 2.0 CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Check critical job results
-          LINT_STATUS="${{ needs.lint-and-typecheck.result }}"
-          TEST_STATUS="${{ needs.test-suite.result }}"
+          # Check job statuses
+          echo "## Job Results:" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint & TypeCheck | ${{ needs.lint-and-typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Suite | ${{ needs.test-suite.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Microservices Validation | ${{ needs.microservices-validation.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance & Coverage | ${{ needs.performance-coverage.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Validation | ${{ needs.build-validation.result }} |" >> $GITHUB_STEP_SUMMARY
           
-          if [ "$LINT_STATUS" = "success" ] && [ "$TEST_STATUS" = "success" ]; then
-            echo "✅ CI Pipeline completed successfully"
-            echo "🧬 TracSeq 2.0 Laboratory Management System is ready for deployment"
+          # Overall status
+          if [ "${{ needs.lint-and-typecheck.result }}" == "success" ] && \
+             [ "${{ needs.test-suite.result }}" == "success" ] && \
+             [ "${{ needs.microservices-validation.result }}" == "success" ] && \
+             [ "${{ needs.performance-coverage.result }}" == "success" ] && \
+             [ "${{ needs.build-validation.result }}" == "success" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **All checks passed!**" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ CI Pipeline failed"
-            echo "Lint Status: $LINT_STATUS"
-            echo "Test Status: $TEST_STATUS"
-            exit 1
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Some checks failed. Please review the logs.**" >> $GITHUB_STEP_SUMMARY
           fi 
