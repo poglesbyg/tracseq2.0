@@ -18,7 +18,7 @@ members = [
     "cognitive_assistant_service",
     # Test utilities
     "test-helpers"
-]
+, "dashboard_service", "reports_service"]
 exclude = [
     "circuit-breaker-lib",
     "config-service"

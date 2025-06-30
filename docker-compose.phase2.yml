@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # Dashboard Service - System metrics and KPIs
+  dashboard-service:
+    build:
+      context: ./dashboard_service
+      dockerfile: Dockerfile
+    container_name: tracseq-dashboard-service
+    ports:
+      - "3025:3025"
+    environment:
+      - RUST_LOG=info
+      - DASHBOARD_PORT=3025
+      - DASHBOARD_DATABASE_URL=postgresql://dashboard_user:dashboard_pass@postgres:5432/tracseq_dashboard
+      - DASHBOARD_SERVICE_URLS__AUTH_SERVICE=http://auth-service:8080
+      - DASHBOARD_SERVICE_URLS__SAMPLE_SERVICE=http://sample-service:8081
+      - DASHBOARD_SERVICE_URLS__STORAGE_SERVICE=http://enhanced-storage-service:8082
+      - DASHBOARD_SERVICE_URLS__SEQUENCING_SERVICE=http://sequencing-service:8084
+      - DASHBOARD_SERVICE_URLS__NOTIFICATION_SERVICE=http://notification-service:8085
+      - DASHBOARD_SERVICE_URLS__RAG_SERVICE=http://enhanced-rag-service:8086
+      - DASHBOARD_SERVICE_URLS__BARCODE_SERVICE=http://barcode-service:3020
+      - DASHBOARD_SERVICE_URLS__QAQC_SERVICE=http://qaqc-service:3018
+      - DASHBOARD_SERVICE_URLS__LIBRARY_SERVICE=http://library-details-service:3021
+      - DASHBOARD_SERVICE_URLS__EVENT_SERVICE=http://event-service:3017
+      - DASHBOARD_SERVICE_URLS__TRANSACTION_SERVICE=http://transaction-service:8088
+      - DASHBOARD_SERVICE_URLS__SPREADSHEET_SERVICE=http://spreadsheet-versioning-service:3015
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3025/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Reports Service - Analytics and report generation
+  reports-service:
+    build:
+      context: ./reports_service
+      dockerfile: Dockerfile
+    container_name: tracseq-reports-service
+    ports:
+      - "3026:3026"
+    environment:
+      - RUST_LOG=info
+      - REPORTS_PORT=3026
+      - REPORTS_DATABASE_URL=postgresql://reports_user:reports_pass@postgres:5432/tracseq_reports
+      - REPORTS_SERVICE_URLS__AUTH_SERVICE=http://auth-service:8080
+      - REPORTS_SERVICE_URLS__SAMPLE_SERVICE=http://sample-service:8081
+      - REPORTS_SERVICE_URLS__STORAGE_SERVICE=http://enhanced-storage-service:8082
+      - REPORTS_SERVICE_URLS__SEQUENCING_SERVICE=http://sequencing-service:8084
+      - REPORTS_SERVICE_URLS__DASHBOARD_SERVICE=http://dashboard-service:3025
+      - REPORTS_STORAGE__REPORTS_PATH=/data/reports
+      - REPORTS_STORAGE__TEMPLATES_PATH=/data/templates
+      - REPORTS_STORAGE__RETENTION_DAYS=90
+    volumes:
+      - reports-data:/data/reports
+      - report-templates:/data/templates
+    depends_on:
+      - postgres
+      - dashboard-service
+    networks:
+      - tracseq-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3026/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  reports-data:
+    driver: local
+  report-templates:
+    driver: local
+
+networks:
+  tracseq-network:
+    external: true

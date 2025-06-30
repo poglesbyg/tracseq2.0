@@ -147,7 +147,15 @@ def create_app() -> FastAPI:
                 "storage": config.feature_flags.use_storage_service,
                 "sequencing": config.feature_flags.use_sequencing_service,
                 "notifications": config.feature_flags.use_notification_service,
-                "rag": config.feature_flags.use_rag_service
+                "rag": config.feature_flags.use_rag_service,
+                "barcode": config.feature_flags.use_barcode_service,
+                "qaqc": config.feature_flags.use_qaqc_service,
+                "library": config.feature_flags.use_library_service,
+                "event": config.feature_flags.use_event_service,
+                "transaction": config.feature_flags.use_transaction_service,
+                "spreadsheet": config.feature_flags.use_spreadsheet_service,
+                "dashboard": config.feature_flags.use_dashboard_service,
+                "reports": config.feature_flags.use_reports_service
             }
         }
 
