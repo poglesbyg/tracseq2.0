@@ -1,6 +1,9 @@
 # Build stage
 FROM node:18-alpine AS build
 
+# Accept build arguments
+ARG VITE_API_URL=""
+
 WORKDIR /app
 
 # Copy package files first for better caching
@@ -15,6 +18,9 @@ COPY public/ ./public/
 COPY *.config.* ./
 COPY *.json ./
 COPY index.html ./
+
+# Set environment variable for Vite build
+ENV VITE_API_URL=$VITE_API_URL
 
 # Build the application
 RUN npm run build

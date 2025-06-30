@@ -3,7 +3,8 @@ import axios from 'axios';
 // CACHE-BUSTING: New axios instance to fix double /api issue
 // This file replaces utils/axios.ts with correct Vite proxy configuration
 const api = axios.create({
-  baseURL: '', // Empty baseURL - let Vite proxy handle /api routing
+  // Use the API URL from environment or default to empty for Vite proxy
+  baseURL: import.meta.env.VITE_API_URL || '',
   headers: {
     'Content-Type': 'application/json',
   },

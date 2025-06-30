@@ -1,10 +1,16 @@
 # Build stage
-FROM rust:1.75 as builder
+FROM rustlang/rust:nightly-slim as builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Copy manifests
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
 # Build dependencies (this is cached if Cargo.toml doesn't change)
 RUN mkdir src && \

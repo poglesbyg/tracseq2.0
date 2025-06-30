@@ -437,6 +437,114 @@ async def get_storage_locations():
         "locations": locations_data  # For other consumers
     }
 
+# Reports endpoints
+@app.get("/api/reports/templates")
+async def get_report_templates():
+    """Get available report templates."""
+    return {
+        "data": [
+            {
+                "id": "RPT-001",
+                "name": "Sample Summary Report",
+                "description": "Summary of all samples in the system",
+                "category": "samples",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            },
+            {
+                "id": "RPT-002",
+                "name": "Storage Utilization Report",
+                "description": "Current storage usage by temperature zone",
+                "category": "storage",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            },
+            {
+                "id": "RPT-003",
+                "name": "Monthly Activity Report",
+                "description": "Summary of all activities in the past month",
+                "category": "activity",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+        ],
+        "templates": [
+            {
+                "id": "RPT-001",
+                "name": "Sample Summary Report",
+                "description": "Summary of all samples in the system",
+                "category": "samples"
+            },
+            {
+                "id": "RPT-002",
+                "name": "Storage Utilization Report",
+                "description": "Current storage usage by temperature zone",
+                "category": "storage"
+            },
+            {
+                "id": "RPT-003",
+                "name": "Monthly Activity Report",
+                "description": "Summary of all activities in the past month",
+                "category": "activity"
+            }
+        ],
+        "totalCount": 3
+    }
+
+@app.get("/api/reports/schema")
+async def get_database_schema():
+    """Get database schema information."""
+    return {
+        "tables": [
+            {
+                "name": "samples",
+                "columns": [
+                    {"name": "id", "type": "uuid", "nullable": False},
+                    {"name": "name", "type": "varchar", "nullable": False},
+                    {"name": "type", "type": "varchar", "nullable": False},
+                    {"name": "status", "type": "varchar", "nullable": False},
+                    {"name": "created_at", "type": "timestamp", "nullable": False},
+                    {"name": "updated_at", "type": "timestamp", "nullable": False}
+                ]
+            },
+            {
+                "name": "storage_locations",
+                "columns": [
+                    {"name": "id", "type": "uuid", "nullable": False},
+                    {"name": "name", "type": "varchar", "nullable": False},
+                    {"name": "temperature_zone", "type": "varchar", "nullable": False},
+                    {"name": "capacity", "type": "integer", "nullable": False},
+                    {"name": "current_usage", "type": "integer", "nullable": False}
+                ]
+            },
+            {
+                "name": "users",
+                "columns": [
+                    {"name": "id", "type": "uuid", "nullable": False},
+                    {"name": "email", "type": "varchar", "nullable": False},
+                    {"name": "name", "type": "varchar", "nullable": False},
+                    {"name": "role", "type": "varchar", "nullable": False},
+                    {"name": "created_at", "type": "timestamp", "nullable": False}
+                ]
+            }
+        ]
+    }
+
+@app.post("/api/reports/execute")
+async def execute_report(request: Request):
+    """Execute a custom SQL report."""
+    # Mock response - in production this would execute the SQL safely
+    return {
+        "data": [
+            {"sample_count": 150, "status": "active"},
+            {"sample_count": 25, "status": "pending"},
+            {"sample_count": 10, "status": "completed"}
+        ],
+        "columns": ["sample_count", "status"],
+        "rowCount": 3,
+        "executionTime": 0.125
+    }
+
 # RAG Service endpoints
 @app.get("/api/rag/submissions")
 async def get_rag_submissions():
