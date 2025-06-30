@@ -1,0 +1,58 @@
+[workspace]
+resolver = "2"
+members = [
+    "api_gateway",
+    "auth_service",
+    "barcode_service",
+    "circuit-breaker-lib",
+    "cognitive_assistant_service",
+    "config-service",
+    "dashboard_service",
+    "enhanced_storage_service",
+    "event_service",
+    "lab_manager",
+    "library_details_service",
+    "notification_service",
+    "qaqc_service",
+    "reports_service",
+    "sample_service",
+    "sequencing_service",
+    "spreadsheet_versioning_service",
+    "template_service",
+    "transaction_service"
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["TracSeq Team"]
+license = "MIT"
+repository = "https://github.com/tracseq/lims-core"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.41", features = ["full"] }
+# Web frameworks
+axum = "0.7"
+actix-web = "4.4"
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"] }
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+# UUID
+uuid = { version = "1.11", features = ["v4", "serde"] }
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+# Environment
+dotenv = "0.15"
+# HTTP client
+reqwest = { version = "0.12", features = ["json"] }
+# Testing
+rstest = "0.23" 

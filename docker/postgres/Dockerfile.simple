@@ -1,0 +1,11 @@
+FROM postgres:15-alpine
+
+# Just use the standard PostgreSQL image with our initialization script
+# This avoids complex build dependencies
+
+# Copy initialization scripts
+COPY init-databases.sql /docker-entrypoint-initdb.d/
+
+# Health check
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
+    CMD pg_isready -U postgres -d lims_db || exit 1 
