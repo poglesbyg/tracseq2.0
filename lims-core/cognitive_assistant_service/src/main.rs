@@ -111,8 +111,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ollama_url = std::env::var("OLLAMA_BASE_URL")
         .unwrap_or_else(|_| "http://ollama:11434".to_string());
     
-    let port = std::env::var("PORT")
-        .unwrap_or_else(|_| "8090".to_string())
+    let port = std::env::var("COGNITIVE_PORT")
+        .unwrap_or_else(|_| "8015".to_string())
         .parse::<u16>()?;
 
     info!("🧠 Starting Cognitive Laboratory Assistant Service on port {}", port);

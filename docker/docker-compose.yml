@@ -108,6 +108,23 @@ services:
       - lims-network
 
   # AI Services
+  ollama:
+    image: ollama/ollama:latest
+    container_name: lims-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - lims-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   rag-service:
     build:
       context: ../lims-ai/enhanced_rag_service
@@ -120,6 +137,7 @@ services:
     depends_on:
       - postgres
       - redis
+      - ollama
     ports:
       - "8100:8000"
     networks:
@@ -165,6 +183,7 @@ services:
 
 volumes:
   postgres_data:
+  ollama_data:
 
 networks:
   lims-network:

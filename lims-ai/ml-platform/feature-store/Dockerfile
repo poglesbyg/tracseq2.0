@@ -14,6 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application
 COPY feature_store.py .
 
-EXPOSE 8095
+EXPOSE 8000
+
+ENV PORT=8000
 
 CMD ["python", "feature_store.py"]

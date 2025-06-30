@@ -1,0 +1,179 @@
+version: '3.8'
+
+services:
+  # Cognitive Assistant Service
+  cognitive-assistant:
+    build:
+      context: ../lims-core/cognitive_assistant_service
+      dockerfile: Dockerfile
+    container_name: lims-cognitive
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
+      OLLAMA_HOST: http://ollama:11434
+      COGNITIVE_PORT: "8015"
+      RUST_LOG: "debug,cognitive_assistant_service=trace"
+    depends_on:
+      - postgres
+      - redis
+      - ollama
+    ports:
+      - "8015:8015"
+    networks:
+      - lims-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8015/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ML Platform Services
+  feature-store:
+    build: 
+      context: ../lims-ai/ml-platform/feature-store
+      dockerfile: Dockerfile
+    container_name: lims-feature-store
+    ports:
+      - "8090:8000"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lims_db
+      - REDIS_URL=redis://redis:6379
+      - FEATURE_STORE_ENV=production
+    volumes:
+      - feature_store_data:/app/data
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - lims-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  model-serving:
+    build:
+      context: ../lims-ai/ml-platform/model-serving
+      dockerfile: Dockerfile
+    container_name: lims-model-serving
+    ports:
+      - "8091:8000"
+    environment:
+      - MODEL_REGISTRY_URL=http://mlops:8000
+      - FEATURE_STORE_URL=http://feature-store:8000
+      - OLLAMA_URL=http://ollama:11434
+      - SERVING_ENV=production
+      - MAX_WORKERS=4
+    volumes:
+      - model_store:/app/models
+    depends_on:
+      - feature-store
+      - mlops
+      - ollama
+    networks:
+      - lims-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mlops:
+    build:
+      context: ../lims-ai/ml-platform/mlops
+      dockerfile: Dockerfile
+    container_name: lims-mlops
+    ports:
+      - "8092:8000"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lims_db
+      - FEATURE_STORE_URL=http://feature-store:8000
+      - MODEL_REGISTRY_PATH=/app/model_registry
+      - EXPERIMENT_TRACKING_URL=http://mlops:8000
+      - MLOPS_ENV=production
+    volumes:
+      - model_registry:/app/model_registry
+      - experiment_data:/app/experiments
+    depends_on:
+      - postgres
+      - redis
+      - feature-store
+    networks:
+      - lims-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  automl:
+    build:
+      context: ../lims-ai/ml-platform/automl
+      dockerfile: Dockerfile
+    container_name: lims-automl
+    ports:
+      - "8093:8000"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lims_db
+      - FEATURE_STORE_URL=http://feature-store:8000
+      - MLOPS_URL=http://mlops:8000
+      - MODEL_SERVING_URL=http://model-serving:8000
+      - AUTOML_ENV=production
+      - MAX_TRAINING_TIME=3600
+    volumes:
+      - automl_workspace:/app/workspace
+    depends_on:
+      - feature-store
+      - mlops
+      - model-serving
+    networks:
+      - lims-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 4GB
+          cpus: '2.0'
+        reservations:
+          memory: 2GB
+          cpus: '1.0'
+
+  # ML Worker for background tasks
+  ml-worker:
+    build:
+      context: ../lims-ai/ml-platform
+      dockerfile: Dockerfile.worker
+    container_name: lims-ml-worker
+    environment:
+      - WORKER_QUEUE=lims_ml_tasks
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lims_db
+      - FEATURE_STORE_URL=http://feature-store:8000
+      - MLOPS_URL=http://mlops:8000
+    volumes:
+      - worker_data:/app/data
+    depends_on:
+      - redis
+      - postgres
+      - feature-store
+      - mlops
+    networks:
+      - lims-network
+    restart: unless-stopped
+
+volumes:
+  feature_store_data:
+  model_store:
+  model_registry:
+  experiment_data:
+  automl_workspace:
+  worker_data:
+
+networks:
+  lims-network:
+    external: true 

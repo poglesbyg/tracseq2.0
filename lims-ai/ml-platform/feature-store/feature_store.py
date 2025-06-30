@@ -41,8 +41,16 @@ app.add_middleware(
 
 # Initialize connections
 try:
-    redis_host = os.getenv('REDIS_HOST', 'localhost')
-    redis_port = int(os.getenv('REDIS_PORT', '6379'))
+    # Extract Redis host from REDIS_URL or use REDIS_HOST
+    redis_url = os.getenv('REDIS_URL', '')
+    if redis_url and redis_url.startswith('redis://'):
+        # Parse redis://host:port format
+        redis_parts = redis_url.replace('redis://', '').split(':')
+        redis_host = redis_parts[0]
+        redis_port = int(redis_parts[1]) if len(redis_parts) > 1 else 6379
+    else:
+        redis_host = os.getenv('REDIS_HOST', 'localhost')
+        redis_port = int(os.getenv('REDIS_PORT', '6379'))
     redis_client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
     redis_client.ping()
     logger.info(f"Connected to Redis at {redis_host}:{redis_port}")
