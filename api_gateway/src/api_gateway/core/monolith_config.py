@@ -59,6 +59,9 @@ class ServiceFeatureFlags(BaseSettings):
     use_event_service: bool = Field(default=False)
     use_transaction_service: bool = Field(default=False)
     use_spreadsheet_service: bool = Field(default=False)
+    # Phase 2 services
+    use_dashboard_service: bool = Field(default=False)
+    use_reports_service: bool = Field(default=False)
 
     class Config:
         """Pydantic configuration for reading environment variables."""
@@ -178,6 +181,21 @@ class MonolithRouterConfig(BaseSettings):
                 path_prefix="/api/spreadsheets",
                 health_check_path="/health"
             ),
+            # Phase 2 services
+            "dashboard": ServiceEndpoint(
+                name="Dashboard Service",
+                host="dashboard-service",
+                port=3025,
+                path_prefix="/api/dashboard",
+                health_check_path="/health"
+            ),
+            "reports": ServiceEndpoint(
+                name="Reports Service",
+                host="reports-service",
+                port=3026,
+                path_prefix="/api/reports",
+                health_check_path="/health"
+            ),
         }
     )
 
@@ -217,6 +235,9 @@ class MonolithRouterConfig(BaseSettings):
             ("/api/events", "event", self.feature_flags.use_event_service),
             ("/api/transactions", "transaction", self.feature_flags.use_transaction_service),
             ("/api/spreadsheets", "spreadsheet", self.feature_flags.use_spreadsheet_service),
+            # Phase 2 service routes
+            ("/api/dashboard", "dashboard", self.feature_flags.use_dashboard_service),
+            ("/api/reports", "reports", self.feature_flags.use_reports_service),
         ]
 
         # Check if any microservice should handle this request
@@ -291,6 +312,15 @@ class MonolithRouterConfig(BaseSettings):
                 "spreadsheet": {
                     "enabled": self.feature_flags.use_spreadsheet_service,
                     "url": self.microservices["spreadsheet"].base_url if self.feature_flags.use_spreadsheet_service else None
+                },
+                # Phase 2 services status
+                "dashboard": {
+                    "enabled": self.feature_flags.use_dashboard_service,
+                    "url": self.microservices["dashboard"].base_url if self.feature_flags.use_dashboard_service else None
+                },
+                "reports": {
+                    "enabled": self.feature_flags.use_reports_service,
+                    "url": self.microservices["reports"].base_url if self.feature_flags.use_reports_service else None
                 }
             }
         }

@@ -153,7 +153,9 @@ def create_app() -> FastAPI:
                 "library": config.feature_flags.use_library_service,
                 "event": config.feature_flags.use_event_service,
                 "transaction": config.feature_flags.use_transaction_service,
-                "spreadsheet": config.feature_flags.use_spreadsheet_service
+                "spreadsheet": config.feature_flags.use_spreadsheet_service,
+                "dashboard": config.feature_flags.use_dashboard_service,
+                "reports": config.feature_flags.use_reports_service
             }
         }
 

@@ -1,0 +1,63 @@
+[package]
+name = "reports-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Web framework
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+hyper = "1.0"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Date/Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# HTTP client for fetching data from other services
+reqwest = { version = "0.11", features = ["json"] }
+
+# Configuration
+config = "0.13"
+
+# PDF generation
+printpdf = "0.6"
+
+# Excel generation
+rust_xlsxwriter = "0.60"
+
+# CSV handling
+csv = "1.3"
+
+# Templating for reports
+tera = "1.19"
+
+# Async stream processing
+futures = "0.3"
+tokio-stream = "0.1"
+
+# Report scheduling
+tokio-cron-scheduler = "0.9"
+
+[lints]
+workspace = true
