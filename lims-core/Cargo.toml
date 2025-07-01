@@ -59,3 +59,13 @@ dotenv = "0.15"
 reqwest = { version = "0.12", features = ["json"] }
 # Testing
 rstest = "0.23" 
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+unstable_features = "warn"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"
+cargo = "warn" 

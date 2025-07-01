@@ -2,7 +2,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Json, Response},
-    routing::{get, post},
+    routing::{get, post, put, delete},
     Router,
 };
 use chrono::{DateTime, Utc};
@@ -13,10 +13,10 @@ use tower_http::cors::CorsLayer;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-mod config;
-mod handlers;
-mod models;
-mod services;
+pub mod config;
+pub mod handlers;
+pub mod models;
+pub mod services;
 
 use crate::config::Settings;
 
@@ -127,7 +127,7 @@ async fn health_check() -> Json<serde_json::Value> {
 }
 
 // Stub modules - will be implemented next
-mod config {
+pub mod config {
     use serde::{Deserialize, Serialize};
     use config::{Config, ConfigError, Environment, File};
 
@@ -176,7 +176,7 @@ mod config {
     }
 }
 
-mod handlers {
+pub mod handlers {
     pub mod reports {
         use axum::{extract::{State, Path}, Json};
         use std::sync::Arc;
@@ -442,10 +442,10 @@ mod handlers {
     }
 }
 
-mod models {
+pub mod models {
     // Report models will be added here
 }
 
-mod services {
+pub mod services {
     // Report generation logic will be added here
 }
