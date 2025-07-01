@@ -1,0 +1,16 @@
+TracSeq 2.0 Initial Setup Information
+=====================================
+Setup Date: Tue Jul  1 11:07:07 EDT 2025
+
+Default Users:
+  admin@tracseq.com / Admin123!
+  lab.manager@tracseq.com / LabManager123!
+  tech@tracseq.com / Tech123!
+
+Services:
+  API Gateway: http://localhost:18089
+  Auth Service: http://localhost:8080
+  Sample Service: http://localhost:8081
+  Sequencing Service: http://localhost:8084
+  Notification Service: http://localhost:8085
+
