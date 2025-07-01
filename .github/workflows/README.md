@@ -1,281 +1,213 @@
-# 🚀 GitHub Workflows for TracSeq 2.0
+# TracSeq 2.0 GitHub Workflows
 
-This directory contains GitHub Actions workflows for the TracSeq 2.0 laboratory management platform. These workflows implement modern DevOps practices including continuous integration, security scanning, performance monitoring, and deployment automation.
+This directory contains the CI/CD workflows for the TracSeq 2.0 Laboratory Management System.
 
-## 📁 Workflow Overview
+## 🔄 Workflows Overview
 
-### Core Workflows
+### 1. **Main CI Pipeline** (`ci.yml`)
+The primary continuous integration workflow that runs on every push and pull request.
 
-| Workflow | Purpose | Triggers | Key Features |
-|----------|---------|----------|--------------|
-| [**ci.yml**](./ci.yml) | Continuous Integration | Push, PR | Lint, test, build validation |
-| [**microservices-ci-cd.yml**](./microservices-ci-cd.yml) | Microservices CI/CD | Push, PR | Service-specific testing and deployment |
-| [**security.yml**](./security.yml) | Security & Compliance | Push, PR, Schedule | Dependency scanning, secret detection, SBOM |
-| [**performance.yml**](./performance.yml) | Performance Testing | Push, PR, Schedule | Benchmarks, load testing, frontend metrics |
-| [**deploy.yml**](./deploy.yml) | Deployment Pipeline | Push, Tags, Manual | Multi-environment deployment |
-
-## �️ Project Structure
-
-The workflows are designed to work with the following project structure:
-
-```
-tracseq2.0/
-├── lims-core/          # Rust microservices
-│   ├── auth_service/
-│   ├── sample_service/
-│   ├── enhanced_storage_service/
-│   ├── api_gateway/    # Python API Gateway
-│   └── ...
-├── lims-ai/            # AI/ML services
-│   ├── lab_submission_rag/
-│   └── enhanced_rag_service/
-├── lims-ui/            # Frontend (React/TypeScript)
-└── docker/             # Docker configurations
-```
-
-## 🎯 Workflow Features
-
-### 🧪 Continuous Integration (ci.yml)
+**Triggers:**
+- Push to `main`, `master`, or `dev` branches
+- Pull requests to these branches
+- Manual workflow dispatch
 
 **Features:**
-- Multi-language support (Rust, Python, TypeScript)
-- Parallel linting and type checking
-- Comprehensive test suites
-- Service architecture validation
-- Coverage reporting
+- 🔍 Automatic change detection for different components
+- 🎨 Frontend checks (TypeScript, ESLint, tests, build)
+- 🦀 Rust service checks (format, clippy, tests) with matrix builds
+- 🐍 Python service checks (black, isort, flake8, mypy, tests)
+- 🧪 Integration tests
+- 📊 Test result summaries
 
-**Key Jobs:**
-- `lint-and-typecheck`: Code quality checks
-- `test-suite`: Unit and integration tests
-- `microservices-validation`: Service structure validation
-- `build-validation`: Docker and deployment validation
+### 2. **Deployment Pipeline** (`deploy.yml`)
+Handles deployment to different environments.
 
-### 🚀 Microservices CI/CD (microservices-ci-cd.yml)
-
-**Features:**
-- Service-specific pipelines
-- Matrix strategy for parallel builds
-- Container security scanning
-- Automated deployment to staging/production
-
-**Services Covered:**
-- Rust services in `lims-core/`
-- Python services in `lims-ai/` and `lims-core/api_gateway/`
-- Frontend in `lims-ui/`
-
-### 🔒 Security & Compliance (security.yml)
+**Triggers:**
+- Push to `main` or `master` branches
+- Version tags (`v*`)
+- Manual workflow dispatch with environment selection
 
 **Features:**
-- Dependency vulnerability scanning
-- Secret detection (TruffleHog, Gitleaks)
-- Container security analysis
-- SBOM generation
-- License compliance checks
+- 🏗️ Multi-platform Docker image builds (amd64, arm64)
+- 🔍 Automatic Dockerfile generation if missing
+- 🚀 Environment-specific deployments (development, staging, production)
+- 📊 Post-deployment validation
+- 🏷️ Proper image tagging and versioning
 
-**Security Checks:**
-- Rust: cargo-audit
-- Python: safety, bandit
-- Node.js: npm audit
-- Containers: Trivy scanning
+### 3. **Microservices CI/CD** (`microservices-ci-cd.yml`)
+Specialized workflow for microservice changes with optimized builds.
 
-### ⚡ Performance Testing (performance.yml)
+**Triggers:**
+- Push/PR with changes to `lims-core/**` or `lims-ai/**`
 
 **Features:**
-- Rust service benchmarks
-- Load testing with k6
-- Frontend performance with Lighthouse
-- Performance regression detection
+- 🔍 Smart change detection per service
+- 🎯 Targeted builds only for changed services
+- 🐳 Automatic Docker image building and pushing
+- 🔒 Security scanning with Trivy
+- 📈 Test coverage tracking per service
 
-**Metrics Tracked:**
-- API response times (p95 < 500ms)
-- Throughput and error rates
-- Frontend Core Web Vitals
-- Laboratory operation performance
+### 4. **Playwright E2E Tests** (`playwright.yml`)
+End-to-end testing for the frontend application.
 
-### 🚀 Deployment Pipeline (deploy.yml)
+**Triggers:**
+- Push/PR with changes to `lims-ui/**`
+- Manual workflow dispatch
 
 **Features:**
-- Multi-environment support
-- Service-specific deployment modes
-- Dockerfile generation for missing files
-- Health check validation
-- Deployment summaries
+- 🎭 Full browser automation tests
+- 📸 Test report artifacts
+- 🔄 Automatic browser installation
+- 💾 Efficient pnpm caching
 
-**Environments:**
-- Development
-- Staging
-- Production
-- Preview (for PRs)
+### 5. **Security Scanning** (`security.yml`)
+Comprehensive security analysis across all components.
 
-## 🛠️ Usage Guide
+**Triggers:**
+- Push to main branches
+- Weekly scheduled scans (Sundays)
+- Manual workflow dispatch
 
-### Running Workflows Manually
+**Features:**
+- 🔍 Dependency vulnerability scanning (Rust, Python, Node.js)
+- 🐍 Python code security with Bandit
+- 🦀 Rust security with cargo-deny
+- 🔐 Secret scanning with Gitleaks
+- 🐳 Container security with Trivy
+- 📊 CodeQL analysis for JavaScript and Python
 
-```bash
-# Trigger CI workflow
-gh workflow run "TracSeq 2.0 CI/CD Pipeline" --ref main
+### 6. **Performance Testing** (`performance.yml`)
+Performance benchmarking and load testing.
 
-# Trigger deployment with options
-gh workflow run "TracSeq 2.0 Deployment Pipeline" \
-  --ref main \
-  -f environment=staging \
-  -f deployment_mode=full-stack \
-  -f version_tag=v1.0.0
+**Triggers:**
+- Push to `main` branch
+- PRs with `performance` label
+- Weekly scheduled runs (Mondays)
+- Manual workflow dispatch with custom parameters
 
-# Trigger security scan
-gh workflow run "Security & Compliance" --ref main
+**Features:**
+- 🚀 k6 load testing for Rust services
+- � Locust testing for Python services
+- 🎨 Lighthouse CI for frontend performance
+- 📊 Consolidated performance reports
+- ⚡ Configurable test duration and concurrent users
 
-# Trigger performance tests
-gh workflow run "Performance Testing" \
-  --ref main \
-  -f test_type=comprehensive
-```
+## 🛠️ Workflow Configuration
 
 ### Environment Variables
-
-**Common Variables:**
+All workflows use consistent environment variables:
 ```yaml
 env:
-  RUST_VERSION: '1.82'
+  RUST_VERSION: '1.75'
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '20'
   PNPM_VERSION: '10.12.2'
 ```
 
-**Laboratory-Specific Variables:**
+### Service Matrix
+The workflows automatically detect and build these services:
+
+**Rust Services** (in `lims-core/`):
+- auth_service
+- sample_service
+- enhanced_storage_service
+- event_service
+- notification_service
+- transaction_service
+- sequencing_service
+- qaqc_service
+- template_service
+- spreadsheet_versioning_service
+- library_details_service
+- dashboard_service
+- reports_service
+- cognitive_assistant_service
+- barcode_service
+
+**Python Services**:
+- api_gateway (in `lims-core/`)
+- lab_submission_rag (in `lims-ai/`)
+- enhanced_rag_service (in `lims-ai/`)
+
+**Frontend**:
+- lims-ui (React/TypeScript application)
+
+## 🚀 Usage
+
+### Running Workflows Manually
+
+Most workflows support manual triggering via GitHub's UI:
+
+1. Go to Actions tab
+2. Select the workflow
+3. Click "Run workflow"
+4. Configure parameters (if available)
+5. Click "Run workflow" button
+
+### Workflow Badges
+
+Add these badges to your README:
+
+```markdown
+![CI](https://github.com/YOUR_ORG/tracseq2.0/workflows/🧬%20TracSeq%202.0%20CI%20Pipeline/badge.svg)
+![Security](https://github.com/YOUR_ORG/tracseq2.0/workflows/🔒%20Security%20Scan/badge.svg)
+![Deploy](https://github.com/YOUR_ORG/tracseq2.0/workflows/🚀%20TracSeq%202.0%20Deploy/badge.svg)
+```
+
+## 🔧 Maintenance
+
+### Updating Dependencies
+
+To update tool versions, modify the environment variables at the top of each workflow:
+
 ```yaml
 env:
-  LAB_TEMPERATURE_ZONES: "-80,-20,4,22,37"
-  RAG_CONFIDENCE_THRESHOLD: "0.85"
-  SAMPLE_LIFECYCLE_STATES: "Pending,Validated,InStorage,InSequencing,Completed"
+  RUST_VERSION: '1.75'  # Update to latest stable
+  PYTHON_VERSION: '3.11'  # Update to latest stable
+  NODE_VERSION: '20'  # Update to latest LTS
 ```
 
-### Required Secrets
+### Adding New Services
 
-- `GITHUB_TOKEN`: Automatically provided
-- `POSTGRES_PASSWORD`: Database password (optional)
-- Additional deployment-specific secrets as needed
+1. Add the service to the appropriate matrix in workflows
+2. Ensure the service has proper test commands
+3. Create a Dockerfile (or let workflows auto-generate)
+4. Update this README
 
-## 📊 Workflow Artifacts
+### Debugging Failed Workflows
 
-### Generated Artifacts
+1. Check the workflow run logs in the Actions tab
+2. Look for specific error messages in failed steps
+3. Use `workflow_dispatch` to run with different parameters
+4. Add debug logging with `echo` statements
+5. Use action artifacts to save debug information
 
-**CI Artifacts:**
-- `coverage-reports/`: Test coverage reports
-- `performance-test-artifacts/`: Built binaries for testing
+## � Best Practices
 
-**Security Artifacts:**
-- `bandit-reports/`: Python security analysis
-- `software-bill-of-materials/`: SBOM files
+1. **Keep workflows DRY**: Use matrix builds and reusable patterns
+2. **Cache aggressively**: Cache dependencies to speed up builds
+3. **Fail fast**: Use `fail-fast: false` only when needed
+4. **Security first**: Run security scans on every PR
+5. **Monitor performance**: Regular performance testing prevents degradation
+6. **Document changes**: Update this README when modifying workflows
 
-**Performance Artifacts:**
-- `rust-benchmark-results/`: Benchmark outputs
-- `load-test-results/`: k6 test results
-- `lighthouse-results/`: Frontend performance metrics
+## 🆘 Troubleshooting
 
-### Artifact Retention
+### Common Issues
 
-- Build artifacts: 1 day
-- Test results: 7 days
-- Security reports: 30 days
+1. **PostgreSQL connection failures**: Ensure service health checks pass
+2. **Cache misses**: Check if lock files have changed
+3. **Docker build failures**: Verify Dockerfile syntax and base images
+4. **Test timeouts**: Increase timeout values for slower tests
+5. **Permission errors**: Check GITHUB_TOKEN permissions
 
-## 🔧 Configuration
+### Getting Help
 
-### Service Matrix Configuration
-
-The workflows use matrix strategies to test services in parallel:
-
-```yaml
-matrix:
-  include:
-    - service: auth_service
-      path: lims-core/auth_service
-      type: rust
-    - service: lab_submission_rag
-      path: lims-ai/lab_submission_rag
-      type: python
-    - service: frontend
-      path: lims-ui
-      type: frontend
-```
-
-### Performance Thresholds
-
-```yaml
-thresholds:
-  http_req_duration: ['p(95)<500']  # 95% under 500ms
-  http_req_failed: ['rate<0.1']     # <10% error rate
-  'categories:performance': ['error', {minScore: 0.8}]  # Lighthouse
-```
-
-## 🚨 Monitoring & Notifications
-
-### Workflow Status
-
-All workflows generate summary reports in the GitHub Actions UI:
-- Job status tables
-- Key metrics and results
-- Actionable recommendations
-
-### Failure Handling
-
-- Security vulnerabilities: Warnings (non-blocking)
-- Test failures: Blocking
-- Performance regressions: Warnings with details
-- Build failures: Immediate notification
-
-## 📚 Best Practices
-
-### Workflow Development
-
-1. **Use Matrix Strategies**: Parallelize similar jobs
-2. **Cache Dependencies**: Improve build times
-3. **Generate Summaries**: Use `$GITHUB_STEP_SUMMARY`
-4. **Handle Failures Gracefully**: Use `continue-on-error` where appropriate
-5. **Artifact Management**: Clean up old artifacts
-
-### Security
-
-1. **Scan Early**: Run security checks on every PR
-2. **Multiple Tools**: Use complementary security scanners
-3. **SBOM Generation**: Track dependencies
-4. **Secret Management**: Never hardcode secrets
-
-### Performance
-
-1. **Baseline Tracking**: Compare against historical data
-2. **Multiple Metrics**: Measure various aspects
-3. **Regular Testing**: Schedule periodic runs
-4. **Actionable Results**: Provide clear recommendations
-
-## 🔮 Future Enhancements
-
-### Planned Improvements
-
-- **GitOps Integration**: ArgoCD deployment workflows
-- **Advanced Monitoring**: Prometheus/Grafana integration
-- **Chaos Engineering**: Reliability testing
-- **Cost Optimization**: Resource usage tracking
-
-### Roadmap
-
-**Q1 2024:**
-- ✅ Simplified workflow structure
-- ✅ Service-aware testing
-- ✅ Basic security scanning
-- ✅ Performance baselines
-
-**Q2 2024:**
-- 🔄 Advanced deployment strategies
-- � Enhanced monitoring
-- 🔄 ML model testing workflows
-- 🔄 Compliance automation
-
-## 📞 Support
-
-**Issues**: GitHub Issues for bug reports
-**Discussions**: GitHub Discussions for questions
-**Documentation**: See `/docs` for detailed guides
+1. Check workflow logs for detailed error messages
+2. Review recent changes that might have broken workflows
+3. Consult GitHub Actions documentation
+4. Open an issue with workflow logs attached
 
 ---
 

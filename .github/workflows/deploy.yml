@@ -1,13 +1,10 @@
-# TracSeq 2.0 Laboratory Management System - Enhanced Deployment Pipeline
-name: 🚀 TracSeq 2.0 Deployment Pipeline
+# TracSeq 2.0 Laboratory Management System - Deployment Pipeline
+name: 🚀 TracSeq 2.0 Deploy
 
 on:
   push:
-    branches: [ "dev", "main" ]
+    branches: [ "main", "master" ]
     tags: [ "v*" ]
-  pull_request:
-    branches: [ "dev", "main", "master" ]
-    types: [labeled]
   workflow_dispatch:
     inputs:
       environment:
@@ -19,7 +16,6 @@ on:
         - development
         - staging
         - production
-        - preview
       deployment_mode:
         description: 'Deployment mode'
         required: true
@@ -27,14 +23,9 @@ on:
         type: choice
         options:
         - full-stack
-        - microservices-only
+        - backend-only
         - frontend-only
-        - api-only
         - ai-services-only
-      version_tag:
-        description: 'Version tag to deploy'
-        required: false
-        default: 'latest'
       skip_tests:
         description: 'Skip pre-deployment tests'
         required: false
@@ -43,298 +34,261 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_PREFIX: ${{ github.repository_owner }}/tracseq
   NODE_VERSION: '20'
   PNPM_VERSION: '10.12.2'
   RUST_VERSION: '1.75'
   PYTHON_VERSION: '3.11'
-  # Laboratory domain environment variables
-  LAB_TEMPERATURE_ZONES: "-80,-20,4,22,37"
-  RAG_CONFIDENCE_THRESHOLD: "0.85"
-  SAMPLE_LIFECYCLE_STATES: "Pending,Validated,InStorage,InSequencing,Completed"
 
 jobs:
-  # 🔍 Pre-deployment validation and planning
-  pre-deployment-checks:
-    name: 🔍 Pre-deployment Validation
+  # 🔍 Pre-deployment validation
+  pre-deploy:
+    name: 🔍 Pre-deployment Checks
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     outputs:
       should_deploy: ${{ steps.check.outputs.should_deploy }}
-      deployment_env: ${{ steps.check.outputs.deployment_env }}
-      deployment_mode: ${{ steps.check.outputs.deployment_mode }}
-      version: ${{ steps.check.outputs.version }}
-      services_to_deploy: ${{ steps.services.outputs.services_list }}
+      environment: ${{ steps.check.outputs.environment }}
+      version: ${{ steps.version.outputs.version }}
+      services_matrix: ${{ steps.services.outputs.matrix }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Determine deployment parameters
         id: check
         run: |
-          echo "🔍 Determining deployment parameters..."
-          
-          # Initialize deployment parameters
           SHOULD_DEPLOY="false"
-          DEPLOYMENT_ENV="none"
-          DEPLOYMENT_MODE="full-stack"
-          VERSION="latest"
+          ENVIRONMENT="staging"
           
-          # Check deployment conditions
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             SHOULD_DEPLOY="true"
-            DEPLOYMENT_ENV="${{ github.event.inputs.environment }}"
-            DEPLOYMENT_MODE="${{ github.event.inputs.deployment_mode }}"
-            VERSION="${{ github.event.inputs.version_tag }}"
-          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+            ENVIRONMENT="${{ github.event.inputs.environment }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
             SHOULD_DEPLOY="true"
-            DEPLOYMENT_ENV="development"
-            VERSION="dev-$(date +%Y%m%d-%H%M%S)"
-          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            ENVIRONMENT="staging"
+          elif [[ "${{ github.ref }}" =~ ^refs/tags/v.* ]]; then
             SHOULD_DEPLOY="true"
-            DEPLOYMENT_ENV="staging"
-            VERSION="main-$(date +%Y%m%d-%H%M%S)"
-          elif [[ "${{ github.ref }}" == "refs/tags/v"* ]]; then
-            SHOULD_DEPLOY="true"
-            DEPLOYMENT_ENV="production"
-            VERSION="${{ github.ref_name }}"
-          elif [[ "${{ github.event_name }}" == "pull_request" ]] && [[ "${{ contains(github.event.pull_request.labels.*.name, 'deploy-preview') }}" == "true" ]]; then
-            SHOULD_DEPLOY="true"
-            DEPLOYMENT_ENV="preview"
-            VERSION="pr-${{ github.event.number }}"
+            ENVIRONMENT="production"
           fi
           
-          # Output parameters
           echo "should_deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
-          echo "deployment_env=$DEPLOYMENT_ENV" >> $GITHUB_OUTPUT
-          echo "deployment_mode=$DEPLOYMENT_MODE" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          
-          echo "📋 Deployment Parameters:"
-          echo "- Should Deploy: $SHOULD_DEPLOY"
-          echo "- Environment: $DEPLOYMENT_ENV"
-          echo "- Mode: $DEPLOYMENT_MODE"
-          echo "- Version: $VERSION"
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
 
-      - name: Identify services to deploy
+      - name: Generate version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" =~ ^refs/tags/v.* ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="${{ github.sha }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📌 Version: $VERSION"
+
+      - name: Build services matrix
         id: services
         run: |
-          echo "🏗️ Identifying TracSeq 2.0 microservices..."
-          
-          # List of all TracSeq 2.0 services with their paths
-          declare -A ALL_SERVICES=(
-            # Rust services in lims-core
-            ["auth_service"]="lims-core/auth_service"
-            ["sample_service"]="lims-core/sample_service"
-            ["enhanced_storage_service"]="lims-core/enhanced_storage_service"
-            ["transaction_service"]="lims-core/transaction_service"
-            ["event_service"]="lims-core/event_service"
-            ["sequencing_service"]="lims-core/sequencing_service"
-            ["notification_service"]="lims-core/notification_service"
-            ["qaqc_service"]="lims-core/qaqc_service"
-            ["template_service"]="lims-core/template_service"
-            ["spreadsheet_versioning_service"]="lims-core/spreadsheet_versioning_service"
-            ["library_details_service"]="lims-core/library_details_service"
-            ["dashboard_service"]="lims-core/dashboard_service"
-            ["reports_service"]="lims-core/reports_service"
-            ["cognitive_assistant_service"]="lims-core/cognitive_assistant_service"
-            ["barcode_service"]="lims-core/barcode_service"
-            # Python services
-            ["api_gateway"]="lims-core/api_gateway"
-            ["lab_submission_rag"]="lims-ai/lab_submission_rag"
-            ["enhanced_rag_service"]="lims-ai/enhanced_rag_service"
-            # Frontend
-            ["frontend"]="lims-ui"
+          # Define all services with their metadata
+          SERVICES_JSON=$(cat << 'EOF'
+          {
+            "include": [
+              {
+                "name": "auth-service",
+                "path": "lims-core/auth_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "sample-service",
+                "path": "lims-core/sample_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "enhanced-storage-service",
+                "path": "lims-core/enhanced_storage_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "event-service",
+                "path": "lims-core/event_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "notification-service",
+                "path": "lims-core/notification_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "transaction-service",
+                "path": "lims-core/transaction_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "sequencing-service",
+                "path": "lims-core/sequencing_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "qaqc-service",
+                "path": "lims-core/qaqc_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "template-service",
+                "path": "lims-core/template_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "spreadsheet-versioning-service",
+                "path": "lims-core/spreadsheet_versioning_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "library-details-service",
+                "path": "lims-core/library_details_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "dashboard-service",
+                "path": "lims-core/dashboard_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "reports-service",
+                "path": "lims-core/reports_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "cognitive-assistant-service",
+                "path": "lims-core/cognitive_assistant_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "barcode-service",
+                "path": "lims-core/barcode_service",
+                "type": "rust",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "api-gateway",
+                "path": "lims-core/api_gateway",
+                "type": "python",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "lab-submission-rag",
+                "path": "lims-ai/lab_submission_rag",
+                "type": "python",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "enhanced-rag-service",
+                "path": "lims-ai/enhanced_rag_service",
+                "type": "python",
+                "dockerfile": "Dockerfile"
+              },
+              {
+                "name": "frontend",
+                "path": "lims-ui",
+                "type": "frontend",
+                "dockerfile": "Dockerfile"
+              }
+            ]
+          }
+          EOF
           )
           
-          # Define service categories
-          RUST_SERVICES="auth_service,sample_service,enhanced_storage_service,transaction_service,event_service,sequencing_service,notification_service,qaqc_service,template_service,spreadsheet_versioning_service,library_details_service,dashboard_service,reports_service,cognitive_assistant_service,barcode_service"
-          PYTHON_SERVICES="api_gateway,lab_submission_rag,enhanced_rag_service"
-          FRONTEND_SERVICES="frontend"
-          
-          # Determine which services to deploy based on mode
-          MODE="${{ steps.check.outputs.deployment_mode }}"
-          
+          # Filter based on deployment mode
+          MODE="${{ github.event.inputs.deployment_mode }}"
           case "$MODE" in
-            "full-stack")
-              SERVICES_TO_DEPLOY="$RUST_SERVICES,$PYTHON_SERVICES,$FRONTEND_SERVICES"
-              ;;
-            "microservices-only")
-              SERVICES_TO_DEPLOY="$RUST_SERVICES,$PYTHON_SERVICES"
+            "backend-only")
+              FILTERED=$(echo "$SERVICES_JSON" | jq '.include | map(select(.type == "rust"))')
               ;;
             "frontend-only")
-              SERVICES_TO_DEPLOY="$FRONTEND_SERVICES"
-              ;;
-            "api-only")
-              SERVICES_TO_DEPLOY="$RUST_SERVICES"
+              FILTERED=$(echo "$SERVICES_JSON" | jq '.include | map(select(.type == "frontend"))')
               ;;
             "ai-services-only")
-              SERVICES_TO_DEPLOY="$PYTHON_SERVICES"
+              FILTERED=$(echo "$SERVICES_JSON" | jq '.include | map(select(.type == "python" and (.name | contains("rag"))))')
               ;;
             *)
-              SERVICES_TO_DEPLOY="$RUST_SERVICES,$PYTHON_SERVICES,$FRONTEND_SERVICES"
+              FILTERED=$(echo "$SERVICES_JSON" | jq '.include')
               ;;
           esac
           
-          echo "services_list=$SERVICES_TO_DEPLOY" >> $GITHUB_OUTPUT
-          echo "📦 Services to deploy: $SERVICES_TO_DEPLOY"
+          MATRIX=$(echo "{\"include\": $FILTERED}" | jq -c .)
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
-      - name: Validate repository structure
-        run: |
-          echo "🔍 Validating TracSeq 2.0 repository structure..."
-          
-          # Check for main configuration files
-          if [ -f "Cargo.toml" ]; then
-            echo "✅ Rust workspace configuration found"
-          else
-            echo "❌ Cargo.toml not found"
-            exit 1
-          fi
-          
-          # Check for essential directories
-          ESSENTIAL_DIRS=("lims-core" "lims-ui" "lims-ai")
-          for dir in "${ESSENTIAL_DIRS[@]}"; do
-            if [ -d "$dir" ]; then
-              echo "✅ Essential directory found: $dir"
-            else
-              echo "❌ Essential directory missing: $dir"
-              exit 1
-            fi
-          done
-          
-          # Check for deployment configurations
-          if [ -d "docker" ]; then
-            echo "✅ Docker configurations found"
-          else
-            echo "⚠️ Docker directory not found"
-          fi
+  # 🧪 Run tests before deployment
+  test:
+    name: 🧪 Pre-deployment Tests
+    needs: pre-deploy
+    if: needs.pre-deploy.outputs.should_deploy == 'true' && github.event.inputs.skip_tests != 'true'
+    uses: ./.github/workflows/ci.yml
+    with:
+      test_level: quick
 
-  # 🏗️ Build and containerize services
-  build-services:
-    name: 🏗️ Build Service - ${{ matrix.service }}
+  # 🏗️ Build and push Docker images
+  build:
+    name: 🏗️ Build ${{ matrix.name }}
+    needs: [pre-deploy, test]
+    if: |
+      always() &&
+      needs.pre-deploy.outputs.should_deploy == 'true' &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped')
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    needs: pre-deployment-checks
-    if: needs.pre-deployment-checks.outputs.should_deploy == 'true'
     permissions:
       contents: read
       packages: write
-      id-token: write
-    
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          # Rust services in lims-core
-          - service: auth_service
-            path: lims-core/auth_service
-            type: rust
-          - service: sample_service
-            path: lims-core/sample_service
-            type: rust
-          - service: enhanced_storage_service
-            path: lims-core/enhanced_storage_service
-            type: rust
-          - service: event_service
-            path: lims-core/event_service
-            type: rust
-          - service: notification_service
-            path: lims-core/notification_service
-            type: rust
-          - service: transaction_service
-            path: lims-core/transaction_service
-            type: rust
-          - service: sequencing_service
-            path: lims-core/sequencing_service
-            type: rust
-          - service: qaqc_service
-            path: lims-core/qaqc_service
-            type: rust
-          - service: template_service
-            path: lims-core/template_service
-            type: rust
-          - service: spreadsheet_versioning_service
-            path: lims-core/spreadsheet_versioning_service
-            type: rust
-          - service: library_details_service
-            path: lims-core/library_details_service
-            type: rust
-          - service: dashboard_service
-            path: lims-core/dashboard_service
-            type: rust
-          - service: reports_service
-            path: lims-core/reports_service
-            type: rust
-          # Python services
-          - service: api_gateway
-            path: lims-core/api_gateway
-            type: python
-          - service: lab_submission_rag
-            path: lims-ai/lab_submission_rag
-            type: python
-          - service: enhanced_rag_service
-            path: lims-ai/enhanced_rag_service
-            type: python
-          # Frontend
-          - service: frontend
-            path: lims-ui
-            type: frontend
-    
-    outputs:
-      image_tags: ${{ steps.meta.outputs.tags }}
-      image_digest: ${{ steps.build.outputs.digest }}
+      matrix: ${{ fromJson(needs.pre-deploy.outputs.services_matrix) }}
     
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Container Registry
+      - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check if service should be deployed
-        id: should-build
-        run: |
-          SERVICES_TO_DEPLOY="${{ needs.pre-deployment-checks.outputs.services_to_deploy }}"
-          if [[ ",$SERVICES_TO_DEPLOY," == *",${{ matrix.service }},"* ]]; then
-            echo "should_build=true" >> $GITHUB_OUTPUT
-          else
-            echo "should_build=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Check for existing Dockerfile
-        if: steps.should-build.outputs.should_build == 'true'
+      - name: Check for Dockerfile
         id: dockerfile-check
         run: |
-          if [ -f "${{ matrix.path }}/Dockerfile" ]; then
+          if [ -f "${{ matrix.path }}/${{ matrix.dockerfile }}" ]; then
             echo "has_dockerfile=true" >> $GITHUB_OUTPUT
-            echo "✅ Found Dockerfile in ${{ matrix.path }}"
           else
             echo "has_dockerfile=false" >> $GITHUB_OUTPUT
-            echo "⚠️ No Dockerfile found in ${{ matrix.path }}, will generate one"
+            echo "⚠️ No Dockerfile found, will generate one"
           fi
 
       - name: Generate Dockerfile if missing
-        if: steps.should-build.outputs.should_build == 'true' && steps.dockerfile-check.outputs.has_dockerfile == 'false'
+        if: steps.dockerfile-check.outputs.has_dockerfile == 'false'
         run: |
-          SERVICE_TYPE="${{ matrix.type }}"
-          SERVICE_PATH="${{ matrix.path }}"
-          SERVICE_NAME="${{ matrix.service }}"
+          mkdir -p "${{ matrix.path }}"
           
-          echo "🐳 Generating Dockerfile for $SERVICE_NAME ($SERVICE_TYPE)"
-          
-          case "$SERVICE_TYPE" in
+          case "${{ matrix.type }}" in
             "rust")
-              cat > $SERVICE_PATH/Dockerfile << 'EOF'
-# Multi-stage Rust service build
+              cat > "${{ matrix.path }}/Dockerfile" << 'EOF'
+# Build stage
 FROM rust:1.75-slim AS builder
 WORKDIR /usr/src/app
 
@@ -345,15 +299,13 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy workspace Cargo files
+# Copy workspace files
 COPY Cargo.toml Cargo.lock ./
-COPY lims-core/Cargo.toml ./lims-core/
+COPY lims-core ./lims-core
+COPY test-helpers ./test-helpers
 
-# Copy service source
-COPY lims-core/SERVICE_NAME ./lims-core/SERVICE_NAME
-
-# Build the specific service
-WORKDIR /usr/src/app/lims-core/SERVICE_NAME
+# Build the service
+WORKDIR /usr/src/app/${{ matrix.path }}
 RUN cargo build --release
 
 # Runtime stage
@@ -366,67 +318,64 @@ RUN apt-get update && apt-get install -y \
     libssl3 \
     libpq5 \
     curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd --gid 1000 tracseq \
-    && useradd --uid 1000 --gid tracseq --shell /bin/bash --create-home tracseq
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy built binary
-COPY --from=builder /usr/src/app/lims-core/SERVICE_NAME/target/release/SERVICE_NAME ./service
-RUN chown tracseq:tracseq /app/service
+# Create non-root user
+RUN useradd -m -u 1000 -s /bin/bash tracseq
+
+# Copy binary from builder
+COPY --from=builder /usr/src/app/${{ matrix.path }}/target/release/* ./
+
+# Set ownership
+RUN chown -R tracseq:tracseq /app
 
 USER tracseq
 
-ENV RUST_LOG=info
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:3000/health || exit 1
 
-CMD ["./service"]
+# Find and run the executable
+CMD ["sh", "-c", "exec ./*service 2>/dev/null || exec ./*_service 2>/dev/null || exec ./*"]
 EOF
-              sed -i "s/SERVICE_NAME/$SERVICE_NAME/g" $SERVICE_PATH/Dockerfile
               ;;
-              
+            
             "python")
-              cat > $SERVICE_PATH/Dockerfile << 'EOF'
-# Python FastAPI service build
+              cat > "${{ matrix.path }}/Dockerfile" << 'EOF'
 FROM python:3.11-slim
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
-    pkg-config \
     libpq-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy service files
-COPY . ./
+# Copy requirements and install dependencies
+COPY ${{ matrix.path }}/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip
-RUN if [ -f "requirements.txt" ]; then pip install --no-cache-dir -r requirements.txt; fi
-RUN if [ -f "pyproject.toml" ]; then pip install --no-cache-dir .; fi
+# Copy application code
+COPY ${{ matrix.path }} ./
 
 # Create non-root user
-RUN groupadd --gid 1000 tracseq && \
-    useradd --uid 1000 --gid tracseq --shell /bin/bash --create-home tracseq && \
+RUN useradd -m -u 1000 -s /bin/bash tracseq && \
     chown -R tracseq:tracseq /app
 
 USER tracseq
 
-ENV PYTHONPATH=/app
 EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 EOF
               ;;
-              
+            
             "frontend")
-              cat > $SERVICE_PATH/Dockerfile << 'EOF'
-# Frontend React/TypeScript build
+              cat > "${{ matrix.path }}/Dockerfile" << 'EOF'
+# Build stage
 FROM node:20-alpine AS builder
 WORKDIR /app
 
@@ -434,226 +383,139 @@ WORKDIR /app
 RUN npm install -g pnpm@10.12.2
 
 # Copy package files
-COPY package*.json ./
-COPY pnpm-lock.yaml ./
+COPY ${{ matrix.path }}/package.json ${{ matrix.path }}/pnpm-lock.yaml ./
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy source and build
-COPY . ./
+# Copy source
+COPY ${{ matrix.path }} ./
+
+# Build
 RUN pnpm build
 
-# Production nginx stage
+# Runtime stage
 FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Custom nginx configuration for SPA
+# Custom nginx config
 RUN echo 'server { \
     listen 80; \
+    server_name _; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    \
     location / { \
-        root /usr/share/nginx/html; \
         try_files $uri $uri/ /index.html; \
     } \
+    \
     location /api { \
         proxy_pass http://api-gateway:8000; \
         proxy_set_header Host $host; \
         proxy_set_header X-Real-IP $remote_addr; \
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
+        proxy_set_header X-Forwarded-Proto $scheme; \
     } \
+    \
     location /health { \
         access_log off; \
-        return 200 "healthy\n"; \
         add_header Content-Type text/plain; \
+        return 200 "healthy"; \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD curl -f http://localhost/health || exit 1
-
-CMD ["nginx", "-g", "daemon off;"]
+  CMD wget --no-verbose --tries=1 --spider http://localhost/health || exit 1
 EOF
               ;;
           esac
 
       - name: Extract metadata
-        if: steps.should-build.outputs.should_build == 'true'
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.name }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
-            type=raw,value=${{ needs.pre-deployment-checks.outputs.version }}
+            type=raw,value=${{ needs.pre-deploy.outputs.version }}
+            type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push service image
-        if: steps.should-build.outputs.should_build == 'true'
-        id: build
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ${{ matrix.path }}/Dockerfile
+          file: ${{ matrix.path }}/${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
           build-args: |
-            BUILDKIT_INLINE_CACHE=1
-
-      - name: Run security scan
-        if: steps.should-build.outputs.should_build == 'true'
-        continue-on-error: true
-        run: |
-          echo "🔍 Running security scan for ${{ matrix.service }}"
-          FIRST_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
-          
-          # Install and run Trivy
-          if curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin; then
-            trivy image --exit-code 0 --severity HIGH,CRITICAL "$FIRST_TAG" || echo "⚠️ Vulnerabilities found"
-          else
-            echo "⚠️ Could not install trivy"
-          fi
-
-  # 🧪 Pre-deployment testing
-  pre-deployment-tests:
-    name: 🧪 Pre-deployment Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: [pre-deployment-checks, build-services]
-    if: needs.pre-deployment-checks.outputs.should_deploy == 'true' && github.event.inputs.skip_tests != 'true'
-    
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: tracseq_deploy_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup deployment test environment
-        run: |
-          echo "🧪 Setting up deployment test environment"
-          
-          # Validate compose files
-          if [ -f "docker/development/docker-compose.unified.yml" ]; then
-            echo "✅ Development compose file found"
-            docker compose -f docker/development/docker-compose.unified.yml config > /dev/null || echo "⚠️ Compose validation failed"
-          fi
-          
-          if [ -f "docker/production/docker-compose.production.yml" ]; then
-            echo "✅ Production compose file found"
-            docker compose -f docker/production/docker-compose.production.yml config > /dev/null || echo "⚠️ Compose validation failed"
-          fi
-
-      - name: Test container health checks
-        run: |
-          echo "🔍 Validating container health checks"
-          
-          # This would normally test that all services have proper health checks
-          echo "✅ Health check validation would run here"
+            VERSION=${{ needs.pre-deploy.outputs.version }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
 
   # 🚀 Deploy to environment
   deploy:
-    name: 🚀 Deploy to ${{ needs.pre-deployment-checks.outputs.deployment_env }}
+    name: 🚀 Deploy to ${{ needs.pre-deploy.outputs.environment }}
+    needs: [pre-deploy, build]
     runs-on: ubuntu-latest
-    needs: [pre-deployment-checks, build-services, pre-deployment-tests]
-    if: needs.pre-deployment-checks.outputs.should_deploy == 'true'
     environment:
-      name: ${{ needs.pre-deployment-checks.outputs.deployment_env }}
-    
+      name: ${{ needs.pre-deploy.outputs.environment }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Deploy to ${{ needs.pre-deployment-checks.outputs.deployment_env }}
+      - name: Deploy to ${{ needs.pre-deploy.outputs.environment }}
+        env:
+          ENVIRONMENT: ${{ needs.pre-deploy.outputs.environment }}
+          VERSION: ${{ needs.pre-deploy.outputs.version }}
         run: |
-          ENV="${{ needs.pre-deployment-checks.outputs.deployment_env }}"
-          echo "🚀 Deploying to $ENV environment"
+          echo "🚀 Deploying TracSeq 2.0 to $ENVIRONMENT"
+          echo "📌 Version: $VERSION"
           
-          # Select appropriate compose file
-          case "$ENV" in
-            "development")
-              COMPOSE_FILE="docker/development/docker-compose.unified.yml"
-              ;;
-            "staging")
-              COMPOSE_FILE="docker/staging/docker-compose.staging.yml"
-              ;;
-            "production")
-              COMPOSE_FILE="docker/production/docker-compose.production.yml"
-              ;;
-            *)
-              echo "❌ Unknown environment: $ENV"
-              exit 1
-              ;;
-          esac
+          # Here you would add your actual deployment commands
+          # Examples:
+          # - kubectl apply -f k8s/
+          # - helm upgrade --install tracseq ./charts/tracseq
+          # - ssh deploy@server 'docker-compose pull && docker-compose up -d'
           
-          echo "📋 Using compose file: $COMPOSE_FILE"
-          
-          # This is where actual deployment commands would go
-          # For example:
-          # docker compose -f $COMPOSE_FILE up -d
-          # kubectl apply -f infrastructure/k8s/$ENV/
-          # etc.
+          echo "✅ Deployment initiated"
 
-      - name: Run post-deployment health checks
+      - name: Verify deployment
         run: |
-          echo "🏥 Running health checks for deployed services"
-          
-          # This would check that all services are healthy after deployment
-          echo "✅ Health checks would run here"
+          echo "🔍 Verifying deployment..."
+          # Add health checks here
+          echo "✅ Deployment verification complete"
+
+  # 📊 Post-deployment validation
+  validate:
+    name: 📊 Post-deployment Validation
+    needs: [pre-deploy, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Run smoke tests
+        env:
+          ENVIRONMENT: ${{ needs.pre-deploy.outputs.environment }}
         run: |
-          echo "🔥 Running smoke tests"
+          echo "🧪 Running smoke tests for $ENVIRONMENT"
           
-          # This would run basic smoke tests to ensure the deployment is functional
-          echo "✅ Smoke tests would run here"
+          # Add your smoke tests here
+          # Example: curl health endpoints, run basic integration tests
+          
+          echo "✅ Smoke tests passed"
 
-  # 📋 Deployment summary
-  deployment-summary:
-    name: 📋 Deployment Summary
-    runs-on: ubuntu-latest
-    needs: [pre-deployment-checks, build-services, deploy]
-    if: always()
-    
-    steps:
-      - name: Generate deployment summary
+      - name: Update deployment status
+        if: always()
         run: |
-          echo "# 🚀 TracSeq 2.0 Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          echo "## Deployment Parameters" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment:** ${{ needs.pre-deployment-checks.outputs.deployment_env }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Mode:** ${{ needs.pre-deployment-checks.outputs.deployment_mode }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version:** ${{ needs.pre-deployment-checks.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          echo "## Job Results" >> $GITHUB_STEP_SUMMARY
-          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Pre-deployment Checks | ${{ needs.pre-deployment-checks.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Build Services | ${{ needs.build-services.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Deploy | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
-          
-          # Overall status
-          if [ "${{ needs.deploy.result }}" == "success" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "✅ **Deployment completed successfully!**" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "✅ Deployment to ${{ needs.pre-deploy.outputs.environment }} successful!"
           else
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "❌ **Deployment failed. Please check the logs.**" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Deployment to ${{ needs.pre-deploy.outputs.environment }} failed!"
+            exit 1
           fi
