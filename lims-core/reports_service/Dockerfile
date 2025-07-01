@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy manifests
-COPY Cargo.toml ./
+# Copy manifests (use standalone version)
+COPY Cargo.toml.standalone ./Cargo.toml
 
 # Build dependencies (this is cached if Cargo.toml doesn't change)
 RUN mkdir src && \

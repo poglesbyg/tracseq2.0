@@ -10,7 +10,7 @@ use crate::{
     assembly::AppComponents,
     handlers::{
         dashboard, health, proxy_handlers, rag_proxy, reports, samples, sequencing, spreadsheets,
-        templates, users,
+        templates, users, projects, library_prep, qc, flow_cell,
     },
 };
 
@@ -202,6 +202,81 @@ pub fn user_routes() -> Router<AppComponents> {
     Router::new().merge(public_routes).merge(protected_routes)
 }
 
+/// Project management routes
+pub fn project_routes() -> Router<AppComponents> {
+    Router::new()
+        .route("/api/projects", get(projects::list_projects))
+        .route("/api/projects", post(projects::create_project))
+        .route("/api/projects/:id", get(projects::get_project))
+        .route("/api/projects/:id", put(projects::update_project))
+        .route("/api/projects/:id", delete(projects::delete_project))
+        .route("/api/projects/:id/files", get(projects::get_project_files))
+        .route("/api/projects/:id/files", post(projects::upload_project_file))
+        .route("/api/projects/:id/signoffs", get(projects::list_project_signoffs))
+        .route("/api/batches", get(projects::list_batches))
+        .route("/api/batches", post(projects::create_batch))
+        .route("/api/batches/:id", get(projects::get_batch))
+        .route("/api/signoffs", post(projects::create_signoff))
+        .route("/api/signoffs/:id", put(projects::update_signoff))
+        .route("/api/templates-repository", get(projects::list_templates_repository))
+        .route("/api/templates-repository/:id/download", post(projects::download_template_repository))
+        .route("/api/permission-queue", get(projects::list_permission_queue))
+        .route("/api/permission-queue", post(projects::create_permission_request))
+        .route("/api/permission-queue/:id", put(projects::update_permission_request))
+}
+
+/// Library preparation routes
+pub fn library_prep_routes() -> Router<AppComponents> {
+    Router::new()
+        .route("/api/library-prep/protocols", get(library_prep::list_protocols))
+        .route("/api/library-prep/protocols", post(library_prep::create_protocol))
+        .route("/api/library-prep/protocols/:id", get(library_prep::get_protocol))
+        .route("/api/library-prep/protocols/:id", put(library_prep::update_protocol))
+        .route("/api/library-prep/preparations", get(library_prep::list_library_preps))
+        .route("/api/library-prep/preparations", post(library_prep::create_library_prep))
+        .route("/api/library-prep/preparations/:id", get(library_prep::get_library_prep))
+        .route("/api/library-prep/preparations/:id", put(library_prep::update_library_prep))
+        .route("/api/library-prep/preparations/:id/complete", post(library_prep::complete_library_prep))
+        .route("/api/library-prep/stats", get(library_prep::get_library_prep_stats))
+        .route("/api/library-prep/search", get(library_prep::search_library_preps))
+}
+
+/// Quality control routes
+pub fn qc_routes() -> Router<AppComponents> {
+    Router::new()
+        .route("/api/qc/dashboard", get(qc::get_qc_dashboard))
+        .route("/api/qc/reviews", get(qc::list_qc_reviews))
+        .route("/api/qc/reviews", post(qc::create_qc_review))
+        .route("/api/qc/reviews/:id", get(qc::get_qc_review))
+        .route("/api/qc/reviews/:id/complete", post(qc::complete_qc_review))
+        .route("/api/qc/library-prep", post(qc::create_library_prep_qc))
+        .route("/api/qc/library-prep/:id", get(qc::get_library_prep_qc))
+        .route("/api/qc/metrics/trends", get(qc::get_qc_metric_trends))
+        .route("/api/qc/metrics/recent", get(qc::get_recent_qc_metrics))
+        .route("/api/qc/metrics/definitions", get(qc::list_qc_metrics))
+        .route("/api/qc/metrics/definitions", post(qc::upsert_qc_metric))
+        .route("/api/qc/control-samples", get(qc::list_control_samples))
+        .route("/api/qc/control-samples", post(qc::create_control_sample))
+        .route("/api/qc/control-samples/results", post(qc::record_control_result))
+        .route("/api/qc/control-samples/:id/results", get(qc::get_control_results))
+}
+
+/// Flow cell design routes
+pub fn flow_cell_routes() -> Router<AppComponents> {
+    Router::new()
+        .route("/api/flow-cells/types", get(flow_cell::list_flow_cell_types))
+        .route("/api/flow-cells/types/:id/stats", get(flow_cell::get_flow_cell_type_stats))
+        .route("/api/flow-cells/designs", get(flow_cell::list_flow_cell_designs))
+        .route("/api/flow-cells/designs", post(flow_cell::create_flow_cell_design))
+        .route("/api/flow-cells/designs/:id", get(flow_cell::get_flow_cell_design))
+        .route("/api/flow-cells/designs/:id", put(flow_cell::update_flow_cell_design))
+        .route("/api/flow-cells/designs/:id", delete(flow_cell::delete_flow_cell_design))
+        .route("/api/flow-cells/designs/:id/approve", post(flow_cell::approve_flow_cell_design))
+        .route("/api/flow-cells/designs/:id/lanes", get(flow_cell::get_flow_cell_lanes))
+        .route("/api/flow-cells/designs/:design_id/lanes/:lane_number", put(flow_cell::update_flow_cell_lane))
+        .route("/api/flow-cells/optimize", post(flow_cell::optimize_flow_cell_design))
+}
+
 /// Create authenticated routes (middleware applied at app level)
 pub fn create_authenticated_routes() -> Router<AppComponents> {
     Router::new()
@@ -213,6 +288,10 @@ pub fn create_authenticated_routes() -> Router<AppComponents> {
         .merge(reports_routes())
         .merge(spreadsheet_routes())
         .merge(user_routes())
+        .merge(project_routes())
+        .merge(library_prep_routes())
+        .merge(qc_routes())
+        .merge(flow_cell_routes())
 }
 
 /// Assemble all routes into a complete application router
@@ -369,6 +448,11 @@ fn create_monolith_app_router() -> Router<AppComponents> {
         .route("/users/:id", get(users::get_user))
         .route("/users/:id", put(users::update_user))
         .route("/users/:id", delete(users::delete_user))
+        // Merge new feature routes
+        .merge(project_routes())
+        .merge(library_prep_routes())
+        .merge(qc_routes())
+        .merge(flow_cell_routes())
         // CORS layer
         .layer(create_cors_layer())
 }

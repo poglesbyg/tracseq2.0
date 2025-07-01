@@ -10,12 +10,20 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy workspace files
-COPY Cargo.toml ./
-COPY library_details_service/ ./library_details_service/
+# Copy service-specific files (use standalone version)
+COPY Cargo.toml.standalone ./Cargo.toml
+
+# Create dummy source for dependency caching
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+
+# Build dependencies
+RUN cargo build --release
+RUN rm src/main.rs
+
+# Copy source code
+COPY src ./src
 
 # Build the service
-WORKDIR /usr/src/app/library_details_service
 RUN cargo build --release
 
 # Runtime stage

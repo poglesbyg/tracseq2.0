@@ -8,6 +8,10 @@ pub mod sequencing;
 pub mod spreadsheets;
 pub mod templates;
 pub mod users;
+pub mod projects;       // New module for project management
+pub mod library_prep;   // New module for library prep
+pub mod qc;            // New module for quality control
+pub mod flow_cell;     // New module for flow cell design
 
 pub use dashboard::{get_dashboard_stats, DashboardStats};
 pub use health::{

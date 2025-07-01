@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /app
 
-# Copy Cargo files
-COPY Cargo.toml ./
+# Copy Cargo files (use standalone version)
+COPY Cargo.toml.standalone ./Cargo.toml
 
 # Create dummy source for dependency caching
 RUN mkdir src && echo "fn main() {}" > src/main.rs
