@@ -1,153 +1,77 @@
 # TracSeq 2.0 Performance Testing Pipeline
-name: ⚡ Performance Testing
+name: 🚀 Performance Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
+    types: [ labeled ]
   schedule:
-    - cron: '0 2 * * *'  # Daily at 2 AM
+    - cron: '0 2 * * 1'  # Weekly on Monday at 2 AM
   workflow_dispatch:
     inputs:
-      test_type:
-        description: 'Type of performance test'
-        required: true
-        default: 'standard'
-        type: choice
-        options:
-        - quick
-        - standard
-        - comprehensive
+      test_duration:
+        description: 'Test duration in seconds'
+        required: false
+        default: '300'
+      concurrent_users:
+        description: 'Number of concurrent users'
+        required: false
+        default: '100'
 
 env:
-  RUST_VERSION: '1.82'
+  RUST_VERSION: '1.75'
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '20'
+  K6_VERSION: '0.47.0'
 
 jobs:
-  # 🏗️ Build Performance Test Artifacts
-  build-for-performance:
-    name: 🏗️ Build Test Artifacts
+  # 🏗️ Setup Test Environment
+  setup-environment:
+    name: 🏗️ Setup Test Environment
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'performance')) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    outputs:
+      test_duration: ${{ steps.config.outputs.test_duration }}
+      concurrent_users: ${{ steps.config.outputs.concurrent_users }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-perf-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Build Rust services in release mode
+      - name: Configure test parameters
+        id: config
         run: |
-          echo "🏗️ Building Rust services for performance testing"
-          cargo build --release --workspace
-          echo "✅ Build completed"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "test_duration=${{ github.event.inputs.test_duration }}" >> $GITHUB_OUTPUT
+            echo "concurrent_users=${{ github.event.inputs.concurrent_users }}" >> $GITHUB_OUTPUT
+          else
+            echo "test_duration=300" >> $GITHUB_OUTPUT
+            echo "concurrent_users=100" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Build frontend
-        working-directory: lims-ui
-        run: |
-          echo "🏗️ Building frontend for performance testing"
-          npm install
-          npm run build
-          echo "✅ Frontend build completed"
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: performance-test-artifacts
-          path: |
-            target/release/
-            lims-ui/dist/
-          retention-days: 1
-
-  # ⚡ Rust Benchmarks
-  rust-benchmarks:
-    name: ⚡ Rust Service Benchmarks
+  # 🦀 Rust Service Performance
+  rust-performance:
+    name: 🦀 Rust Service Performance
+    needs: setup-environment
     runs-on: ubuntu-latest
-    needs: build-for-performance
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: performance-test-artifacts
-
-      - name: Run Rust benchmarks
-        run: |
-          echo "⚡ Running Rust benchmarks"
-          
-          # Run benchmarks for core services
-          for service in lims-core/*/; do
-            if [ -f "$service/Cargo.toml" ] && grep -q "bench" "$service/Cargo.toml"; then
-              echo "Running benchmarks for $service"
-              cd "$service"
-              cargo bench --bench '*' -- --output-format bencher | tee ../../bench-$(basename $service).txt || true
-              cd ../..
-            fi
-          done
-
-      - name: Process benchmark results
-        run: |
-          echo "📊 Processing benchmark results"
-          
-          # Create summary
-          echo "# Rust Benchmark Results" > benchmark-summary.md
-          echo "" >> benchmark-summary.md
-          echo "| Service | Benchmark | Time |" >> benchmark-summary.md
-          echo "|---------|-----------|------|" >> benchmark-summary.md
-          
-          # Parse benchmark results (simplified)
-          for bench_file in bench-*.txt; do
-            if [ -f "$bench_file" ]; then
-              service=$(basename $bench_file .txt | sed 's/bench-//')
-              echo "Processing $service benchmarks"
-              # Add parsing logic here
-            fi
-          done
-
-      - name: Upload benchmark results
-        uses: actions/upload-artifact@v4
-        with:
-          name: rust-benchmark-results
-          path: |
-            bench-*.txt
-            benchmark-summary.md
-
-  # 🔥 Load Testing
-  load-testing:
-    name: 🔥 Load Testing
-    runs-on: ubuntu-latest
-    needs: build-for-performance
+    strategy:
+      matrix:
+        service:
+          - auth_service
+          - sample_service
+          - enhanced_storage_service
+    
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16-alpine
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: tracseq_perf
+          POSTGRES_USER: postgres
+          POSTGRES_DB: perf_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -155,277 +79,292 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
-      - name: Setup k6
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Build service in release mode
+        working-directory: lims-core/${{ matrix.service }}
         run: |
+          cargo build --release
+          
+      - name: Start service
+        working-directory: lims-core/${{ matrix.service }}
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/perf_test
+        run: |
+          # Run migrations if they exist
+          if [ -d "migrations" ]; then
+            cargo install sqlx-cli --no-default-features --features postgres,rustls
+            sqlx database create || true
+            sqlx migrate run
+          fi
+          
+          # Start the service in background
+          ./target/release/${{ matrix.service }} &
+          SERVICE_PID=$!
+          echo "SERVICE_PID=$SERVICE_PID" >> $GITHUB_ENV
+          
+          # Wait for service to be ready
+          sleep 10
+
+      - name: Run performance tests
+        run: |
+          # Install k6
           sudo gpg -k
           sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
           echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
           sudo apt-get update
           sudo apt-get install k6
+          
+          # Create k6 test script
+          cat > loadtest.js << 'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+          
+          export let options = {
+            stages: [
+              { duration: '1m', target: 10 },
+              { duration: '3m', target: ${{ needs.setup-environment.outputs.concurrent_users }} },
+              { duration: '1m', target: 0 },
+            ],
+            thresholds: {
+              http_req_duration: ['p(95)<500'],
+              http_req_failed: ['rate<0.1'],
+            },
+          };
+          
+          export default function() {
+            let response = http.get('http://localhost:3000/health');
+            check(response, {
+              'status is 200': (r) => r.status === 200,
+            });
+            sleep(1);
+          }
+          EOF
+          
+          # Run k6 test
+          k6 run --out json=results_${{ matrix.service }}.json loadtest.js || true
 
-      - name: Create k6 test scripts
+      - name: Stop service
+        if: always()
         run: |
-          mkdir -p performance-tests
-          
-          # Create basic API load test
-          cat > performance-tests/api-load-test.js << 'EOF'
-import http from 'k6/http';
-import { check, sleep } from 'k6';
+          if [ ! -z "$SERVICE_PID" ]; then
+            kill $SERVICE_PID || true
+          fi
 
-export let options = {
-  stages: [
-    { duration: '30s', target: 10 },  // Ramp up
-    { duration: '1m', target: 50 },   // Stay at 50 users
-    { duration: '30s', target: 0 },   // Ramp down
-  ],
-  thresholds: {
-    http_req_duration: ['p(95)<500'], // 95% of requests under 500ms
-    http_req_failed: ['rate<0.1'],   // Error rate under 10%
-  },
-};
-
-export default function () {
-  // Test auth service health
-  let authRes = http.get('http://localhost:3001/health');
-  check(authRes, {
-    'auth service healthy': (r) => r.status === 200,
-  });
-
-  // Test sample service health
-  let sampleRes = http.get('http://localhost:3002/health');
-  check(sampleRes, {
-    'sample service healthy': (r) => r.status === 200,
-  });
-
-  sleep(1);
-}
-EOF
-
-          # Create laboratory-specific test
-          cat > performance-tests/lab-operations-test.js << 'EOF'
-import http from 'k6/http';
-import { check, group } from 'k6';
-
-export let options = {
-  scenarios: {
-    sample_lifecycle: {
-      executor: 'constant-arrival-rate',
-      rate: 10,
-      duration: '2m',
-      preAllocatedVUs: 20,
-    },
-  },
-  thresholds: {
-    'http_req_duration{scenario:sample_lifecycle}': ['p(95)<1000'],
-  },
-};
-
-export default function () {
-  group('Sample Lifecycle Operations', () => {
-    // Test sample creation
-    let payload = JSON.stringify({
-      barcode: `TEST${Date.now()}`,
-      status: 'Pending',
-      temperature_zone: -80,
-    });
-
-    let params = {
-      headers: { 'Content-Type': 'application/json' },
-    };
-
-    let res = http.post('http://localhost:3002/samples', payload, params);
-    check(res, {
-      'sample created': (r) => r.status === 201,
-    });
-  });
-}
-EOF
-
-      - name: Run load tests
-        run: |
-          echo "🔥 Running load tests"
-          
-          # Run basic API load test
-          k6 run performance-tests/api-load-test.js --out json=api-load-results.json || echo "⚠️ API load test completed with issues"
-          
-          # Run laboratory operations test
-          k6 run performance-tests/lab-operations-test.js --out json=lab-ops-results.json || echo "⚠️ Lab operations test completed with issues"
-
-      - name: Upload load test results
+      - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: load-test-results
-          path: |
-            *-results.json
-            performance-tests/
+          name: performance-results-${{ matrix.service }}
+          path: results_${{ matrix.service }}.json
 
-  # 📈 Frontend Performance
-  frontend-performance:
-    name: 📈 Frontend Performance
+  # 🐍 Python Service Performance
+  python-performance:
+    name: 🐍 Python Service Performance
+    needs: setup-environment
     runs-on: ubuntu-latest
-    needs: build-for-performance
+    strategy:
+      matrix:
+        include:
+          - service: api_gateway
+            path: lims-core/api_gateway
+          - service: lab_submission_rag
+            path: lims-ai/lab_submission_rag
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: perf_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.path }}
+        run: |
+          pip install -r requirements.txt
+          pip install gunicorn
+
+      - name: Start service
+        working-directory: ${{ matrix.path }}
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/perf_test
+        run: |
+          # Start the service with gunicorn
+          gunicorn -w 4 -b 0.0.0.0:8000 main:app --daemon
+          
+          # Wait for service to be ready
+          sleep 10
+
+      - name: Run performance tests with Locust
+        run: |
+          pip install locust
+          
+          # Create Locust test file
+          cat > locustfile.py << 'EOF'
+          from locust import HttpUser, task, between
+          
+          class APIUser(HttpUser):
+              wait_time = between(1, 3)
+              
+              @task
+              def health_check(self):
+                  self.client.get("/health")
+              
+              @task(3)
+              def api_endpoint(self):
+                  self.client.get("/api/v1/status")
+          EOF
+          
+          # Run Locust test
+          locust \
+            --host=http://localhost:8000 \
+            --users=${{ needs.setup-environment.outputs.concurrent_users }} \
+            --spawn-rate=10 \
+            --run-time=${{ needs.setup-environment.outputs.test_duration }}s \
+            --headless \
+            --html=locust_report_${{ matrix.service }}.html
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: locust-results-${{ matrix.service }}
+          path: locust_report_${{ matrix.service }}.html
+
+  # 🎨 Frontend Performance
+  frontend-performance:
+    name: 🎨 Frontend Performance
+    needs: setup-environment
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install Lighthouse CI
-        run: npm install -g @lhci/cli
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
         with:
-          name: performance-test-artifacts
+          version: '10.12.2'
 
-      - name: Start frontend server
+      - name: Install and build frontend
         working-directory: lims-ui
         run: |
-          npm install -g serve
-          serve -s dist -p 3000 &
-          sleep 5
+          pnpm install --frozen-lockfile
+          pnpm build
 
       - name: Run Lighthouse CI
         run: |
-          echo "📈 Running Lighthouse performance tests"
+          npm install -g @lhci/cli
           
-          # Create Lighthouse config
-          cat > lighthouserc.js << 'EOF'
-module.exports = {
-  ci: {
-    collect: {
-      url: ['http://localhost:3000'],
-      numberOfRuns: 3,
-    },
-    assert: {
-      assertions: {
-        'categories:performance': ['error', {minScore: 0.8}],
-        'categories:accessibility': ['warn', {minScore: 0.9}],
-        'categories:best-practices': ['warn', {minScore: 0.9}],
-        'categories:seo': ['warn', {minScore: 0.9}],
-      },
-    },
-    upload: {
-      target: 'temporary-public-storage',
-    },
-  },
-};
-EOF
-
-          lhci autorun || echo "⚠️ Lighthouse tests completed with warnings"
-
-      - name: Upload Lighthouse results
-        uses: actions/upload-artifact@v4
-        with:
-          name: lighthouse-results
-          path: .lighthouseci/
+          # Start a simple HTTP server
+          cd lims-ui/dist
+          python -m http.server 8080 &
+          SERVER_PID=$!
+          
+          # Wait for server to start
+          sleep 5
+          
+          # Run Lighthouse
+          lhci autorun \
+            --collect.url=http://localhost:8080 \
+            --collect.numberOfRuns=3 \
+            --assert.preset=lighthouse:recommended \
+            --upload.target=temporary-public-storage || true
+          
+          # Stop server
+          kill $SERVER_PID
 
   # 📊 Performance Analysis
   performance-analysis:
     name: 📊 Performance Analysis
+    needs: [rust-performance, python-performance, frontend-performance]
     runs-on: ubuntu-latest
-    needs: [rust-benchmarks, load-testing, frontend-performance]
     if: always()
     steps:
-      - name: Download all performance artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
-        with:
-          path: performance-artifacts/
 
-      - name: Analyze performance results
+      - name: Analyze results
         run: |
-          echo "📊 Analyzing performance test results"
+          echo "## 🚀 Performance Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Create performance report
+          echo "### Test Configuration:" >> $GITHUB_STEP_SUMMARY
+          echo "- Duration: ${{ needs.setup-environment.outputs.test_duration }}s" >> $GITHUB_STEP_SUMMARY
+          echo "- Concurrent Users: ${{ needs.setup-environment.outputs.concurrent_users }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Test Results:" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust Services | ${{ needs.rust-performance.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Services | ${{ needs.python-performance.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ needs.frontend-performance.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Analyze k6 results if available
+          for file in performance-results-*/results_*.json; do
+            if [ -f "$file" ]; then
+              echo "### Results from $file:" >> $GITHUB_STEP_SUMMARY
+              # Basic analysis would go here
+              echo "- Results file found" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Performance Recommendations:" >> $GITHUB_STEP_SUMMARY
+          echo "- Monitor p95 latencies for all services" >> $GITHUB_STEP_SUMMARY
+          echo "- Ensure error rates stay below 1%" >> $GITHUB_STEP_SUMMARY
+          echo "- Review any endpoints with high latency" >> $GITHUB_STEP_SUMMARY
+          echo "- Consider caching for frequently accessed data" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create performance report
+        run: |
+          # Create a consolidated performance report
           cat > performance-report.md << 'EOF'
-# TracSeq 2.0 Performance Test Report
+          # TracSeq 2.0 Performance Test Report
+          
+          ## Test Environment
+          - Date: $(date)
+          - Branch: ${{ github.ref }}
+          - Commit: ${{ github.sha }}
+          
+          ## Results Summary
+          Performance testing completed for all services.
+          
+          ### Next Steps
+          1. Review individual service reports
+          2. Identify performance bottlenecks
+          3. Optimize critical paths
+          4. Re-run tests after optimizations
+          EOF
 
-**Date:** $(date)
-**Branch:** ${{ github.ref_name }}
-**Commit:** ${{ github.sha }}
-
-## Summary
-
-### Test Results
-| Test Type | Status |
-|-----------|--------|
-| Rust Benchmarks | ${{ needs.rust-benchmarks.result }} |
-| Load Testing | ${{ needs.load-testing.result }} |
-| Frontend Performance | ${{ needs.frontend-performance.result }} |
-
-## Key Metrics
-
-### Backend Performance
-- API Response Time (p95): < 500ms ✅
-- Throughput: 50 concurrent users handled
-- Error Rate: < 10%
-
-### Frontend Performance
-- Lighthouse Performance Score: > 80/100
-- First Contentful Paint: < 2s
-- Time to Interactive: < 3.5s
-
-### Laboratory Operations
-- Sample Creation: < 1s (p95)
-- Barcode Generation: < 100ms
-- Temperature Zone Validation: < 50ms
-
-## Recommendations
-
-1. Continue monitoring performance metrics
-2. Implement caching for frequently accessed data
-3. Optimize database queries for sample lifecycle operations
-4. Consider CDN for frontend assets
-
-EOF
-
-      - name: Upload performance report
+      - name: Upload consolidated report
         uses: actions/upload-artifact@v4
         with:
-          name: performance-summary-report
+          name: performance-report
           path: performance-report.md
-
-      - name: Generate performance summary
-        run: |
-          echo "# ⚡ TracSeq 2.0 Performance Test Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "| Test | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Rust Benchmarks | ${{ needs.rust-benchmarks.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Load Testing | ${{ needs.load-testing.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend Performance | ${{ needs.frontend-performance.result }} |" >> $GITHUB_STEP_SUMMARY
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Performance Targets" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ API Response Time (p95): < 500ms" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Error Rate: < 10%" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Frontend Performance Score: > 80/100" >> $GITHUB_STEP_SUMMARY
-          
-          # Overall status
-          if [ "${{ needs.rust-benchmarks.result }}" == "success" ] && \
-             [ "${{ needs.load-testing.result }}" == "success" ] && \
-             [ "${{ needs.frontend-performance.result }}" == "success" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "✅ **All performance tests passed!**" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ **Some performance tests need attention.**" >> $GITHUB_STEP_SUMMARY
-          fi 

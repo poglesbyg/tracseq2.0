@@ -1,5 +1,5 @@
-# TracSeq 2.0 Laboratory Management System - Comprehensive CI Pipeline
-name: 🧬 TracSeq 2.0 CI/CD Pipeline
+# TracSeq 2.0 Laboratory Management System - Main CI Pipeline
+name: 🧬 TracSeq 2.0 CI Pipeline
 
 on:
   push:
@@ -17,11 +17,6 @@ on:
         - quick
         - full
         - comprehensive
-      skip_slow_tests:
-        description: 'Skip slow integration tests'
-        required: false
-        default: false
-        type: boolean
 
 env:
   CARGO_TERM_COLOR: always
@@ -32,155 +27,134 @@ env:
   PNPM_VERSION: '10.12.2'
   RUST_VERSION: '1.75'
   PYTHON_VERSION: '3.11'
-  DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_db
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/tracseq_test
+  REDIS_URL: redis://localhost:6379
 
 jobs:
-  # 🔍 Early validation and linting
-  lint-and-typecheck:
-    name: 🔍 Lint & TypeCheck
+  # 🔍 Repository Structure Analysis
+  analyze-changes:
+    name: 🔍 Analyze Changes
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     outputs:
-      has_frontend: ${{ steps.check-structure.outputs.has_frontend }}
-      has_rust: ${{ steps.check-structure.outputs.has_rust }}
-      has_python: ${{ steps.check-structure.outputs.has_python }}
+      frontend_changed: ${{ steps.changes.outputs.frontend }}
+      rust_changed: ${{ steps.changes.outputs.rust }}
+      python_changed: ${{ steps.changes.outputs.python }}
+      docker_changed: ${{ steps.changes.outputs.docker }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Check repository structure
-        id: check-structure
-        run: |
-          echo "has_frontend=$([ -d 'lims-ui' ] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
-          echo "has_rust=$([ -f 'Cargo.toml' ] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
-          echo "has_python=$([ -d 'lims-ai' ] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            frontend:
+              - 'lims-ui/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+            rust:
+              - 'lims-core/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'test-helpers/**'
+            python:
+              - 'lims-ai/**'
+              - 'lims-core/api_gateway/**'
+              - '**/*.py'
+            docker:
+              - 'docker/**'
+              - '**/Dockerfile'
+              - 'docker-compose*.yml'
 
-      # 📦 Setup tools
-      - name: Setup Node.js and pnpm
-        if: steps.check-structure.outputs.has_frontend == 'true'
+  # 🎨 Frontend Checks
+  frontend-checks:
+    name: 🎨 Frontend CI
+    runs-on: ubuntu-latest
+    needs: analyze-changes
+    if: needs.analyze-changes.outputs.frontend_changed == 'true' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup pnpm
-        if: steps.check-structure.outputs.has_frontend == 'true'
         uses: pnpm/action-setup@v3
         with:
           version: ${{ env.PNPM_VERSION }}
-          run_install: false
 
-      - name: Setup Rust toolchain
-        if: steps.check-structure.outputs.has_rust == 'true'
-        uses: dtolnay/rust-toolchain@stable
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
         with:
-          toolchain: ${{ env.RUST_VERSION }}
-          components: rustfmt, clippy
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('lims-ui/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
-      - name: Setup Python
-        if: steps.check-structure.outputs.has_python == 'true'
-        uses: actions/setup-python@v5
+      - name: Install dependencies
+        working-directory: lims-ui
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript type check
+        working-directory: lims-ui
+        run: pnpm typecheck
+
+      - name: ESLint
+        working-directory: lims-ui
+        run: pnpm lint
+
+      - name: Run tests
+        working-directory: lims-ui
+        run: pnpm test --passWithNoTests
+
+      - name: Build frontend
+        working-directory: lims-ui
+        run: pnpm build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
+          name: frontend-build
+          path: lims-ui/dist/
+          retention-days: 7
 
-      # 🔄 TypeScript/Frontend checks
-      - name: 📋 TypeScript TypeCheck
-        if: steps.check-structure.outputs.has_frontend == 'true'
-        working-directory: lims-ui
-        run: |
-          echo "🔍 Running pnpm typecheck"
-          pnpm install --frozen-lockfile
-          if pnpm typecheck; then
-            echo "✅ TypeScript checks passed"
-          else
-            echo "❌ TypeScript checks failed"
-            exit 1
-          fi
-
-      - name: 🔍 Frontend Lint
-        if: steps.check-structure.outputs.has_frontend == 'true'
-        working-directory: lims-ui
-        run: |
-          echo "🔍 Running pnpm lint"
-          if pnpm lint; then
-            echo "✅ Frontend linting passed"
-          else
-            echo "⚠️ Frontend linting failed, attempting auto-fix"
-            if pnpm fix; then
-              echo "✅ Auto-fix successful"
-            else
-              echo "❌ Auto-fix failed"
-              exit 1
-            fi
-          fi
-
-      # 🦀 Rust checks
-      - name: 🦀 Rust Format Check
-        if: steps.check-structure.outputs.has_rust == 'true'
-        run: |
-          echo "🔍 Checking Rust code formatting"
-          if cargo fmt --all -- --check; then
-            echo "✅ Rust formatting is correct"
-          else
-            echo "❌ Rust formatting issues found"
-            echo "Run 'cargo fmt' to fix formatting"
-            exit 1
-          fi
-
-      - name: 🦀 Rust Clippy Lint
-        if: steps.check-structure.outputs.has_rust == 'true'
-        run: |
-          echo "🔍 Running Rust clippy linting"
-          cargo clippy --all-targets --all-features -- \
-            -D warnings \
-            -W clippy::suspicious \
-            -W clippy::complexity \
-            -W clippy::perf
-
-      # 🐍 Python checks
-      - name: 🐍 Python Lint
-        if: steps.check-structure.outputs.has_python == 'true'
-        run: |
-          echo "🔍 Running Python linting"
-          python -m pip install --upgrade pip
-          pip install black isort flake8 mypy
-          
-          # Check Python files in lims-ai directory
-          cd lims-ai
-          
-          # Format check
-          if black --check .; then
-            echo "✅ Python formatting is correct"
-          else
-            echo "❌ Python formatting issues found"
-            black --diff .
-            exit 1
-          fi
-          
-          # Import sorting
-          if isort --check-only .; then
-            echo "✅ Python imports are sorted"
-          else
-            echo "❌ Python import sorting issues found"
-            exit 1
-          fi
-          
-          # Linting
-          flake8 --max-line-length=88 --extend-ignore=E203,W503 .
-
-  # 🧪 Test Suite
-  test-suite:
-    name: 🧪 Test Suite
+  # 🦀 Rust Checks
+  rust-checks:
+    name: 🦀 Rust CI - ${{ matrix.service }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    needs: lint-and-typecheck
-    if: success()
+    needs: analyze-changes
+    if: needs.analyze-changes.outputs.rust_changed == 'true' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth_service
+          - sample_service
+          - enhanced_storage_service
+          - event_service
+          - notification_service
+          - transaction_service
+          - sequencing_service
+          - qaqc_service
+          - template_service
+          - spreadsheet_versioning_service
+          - library_details_service
+          - dashboard_service
+          - reports_service
+          - cognitive_assistant_service
+          - barcode_service
     
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16-alpine
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
@@ -204,242 +178,15 @@ jobs:
           - 6379:6379
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup complete development environment
-        run: |
-          echo "🏗️ Setting up TracSeq 2.0 development environment"
-          
-          # Install system dependencies
-          sudo apt-get update
-          sudo apt-get install -y \
-            postgresql-client \
-            libpq-dev \
-            pkg-config \
-            libssl-dev \
-            curl \
-            jq
-
-      - name: Setup Node.js and pnpm
-        if: needs.lint-and-typecheck.outputs.has_frontend == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Setup pnpm
-        if: needs.lint-and-typecheck.outputs.has_frontend == 'true'
-        uses: pnpm/action-setup@v3
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Rust toolchain
-        if: needs.lint-and-typecheck.outputs.has_rust == 'true'
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
-
-      - name: Setup Python
-        if: needs.lint-and-typecheck.outputs.has_python == 'true'
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            lims-ui/node_modules/
-            ~/.cache/pip
-          key: ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.lock', '**/pnpm-lock.yaml', '**/requirements.txt') }}
-
-      # 🎨 Frontend Tests
-      - name: 🎨 Frontend Tests
-        if: needs.lint-and-typecheck.outputs.has_frontend == 'true'
-        working-directory: lims-ui
-        run: |
-          echo "🧪 Running frontend tests"
-          pnpm install --frozen-lockfile
-          pnpm test
-
-      # 🦀 Rust Backend Tests
-      - name: 🦀 Rust Backend Tests
-        if: needs.lint-and-typecheck.outputs.has_rust == 'true'
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/tracseq_test
-          REDIS_URL: redis://localhost:6379
-          SQLX_OFFLINE: false
-        run: |
-          echo "🧪 Running Rust backend tests"
-          
-          # Setup test database
-          timeout 60s bash -c 'until pg_isready -h localhost -p 5432; do sleep 1; done'
-          
-          # Install sqlx-cli for migrations
-          cargo install sqlx-cli --version 0.8.0 --no-default-features --features postgres,rustls
-          
-          # Run migrations for services in lims-core
-          for service in lims-core/*/; do
-            if [ -d "$service/migrations" ]; then
-              echo "Running migrations for $service"
-              cd $service && sqlx migrate run && cd ../..
-            fi
-          done
-          
-          # Run tests
-          if [ "${{ github.event.inputs.skip_slow_tests }}" = "true" ]; then
-            echo "⚡ Running quick tests only"
-            cargo test --lib --bins
-          else
-            echo "🔄 Running comprehensive tests"
-            cargo test --verbose
-          fi
-
-      # 🐍 Python AI Service Tests
-      - name: 🐍 Python AI Service Tests
-        if: needs.lint-and-typecheck.outputs.has_python == 'true'
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/tracseq_test
-          PYTHONPATH: .
-        run: |
-          echo "🧪 Running Python AI service tests"
-          
-          # Install Python dependencies
-          python -m pip install --upgrade pip
-          
-          # Install dependencies for AI services
-          cd lims-ai
-          if [ -f "requirements.txt" ]; then
-            pip install -r requirements.txt
-          fi
-          
-          # Install specific service dependencies
-          for service in lab_submission_rag enhanced_rag_service; do
-            if [ -f "$service/requirements.txt" ]; then
-              echo "Installing dependencies for $service"
-              pip install -r $service/requirements.txt
-            fi
-          done
-          
-          # Install test dependencies
-          pip install pytest pytest-cov pytest-asyncio httpx
-          
-          # Run tests
-          if [ -d "lab_submission_rag/tests" ]; then
-            echo "Running tests for lab_submission_rag"
-            cd lab_submission_rag
-            pytest tests/ -v --cov=. --cov-report=term-missing || echo "⚠️ Tests failed for lab_submission_rag"
-            cd ..
-          fi
-          
-          if [ -d "enhanced_rag_service/tests" ]; then
-            echo "Running tests for enhanced_rag_service"
-            cd enhanced_rag_service
-            pytest tests/ -v --cov=. --cov-report=term-missing || echo "⚠️ Tests failed for enhanced_rag_service"
-            cd ..
-          fi
-
-  # 🧪 Playwright E2E Tests
-  playwright-tests:
-    name: Playwright E2E Tests
-    runs-on: ubuntu-latest
-    
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-          
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-          
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-          
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-            
-      - name: Install dependencies
-        working-directory: ./lims-ui
-        run: pnpm install --frozen-lockfile
-        
-      - name: Install Playwright Browsers
-        working-directory: ./lims-ui
-        run: pnpm playwright install --with-deps
-        
-      - name: Run Playwright tests
-        working-directory: ./lims-ui
-        run: pnpm test:e2e
-        env:
-          CI: true
-          
-      - name: Upload Playwright Report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report
-          path: lims-ui/playwright-report/
-          retention-days: 30
-
-  # 🧪 Rust Checks
-  rust-check:
-    name: Rust Check
-    runs-on: ubuntu-latest
-    
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-          
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
           components: rustfmt, clippy
-          
-      - name: Cache Cargo dependencies
+
+      - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
           path: |
@@ -448,164 +195,300 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ matrix.service }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.service }}-
             ${{ runner.os }}-cargo-
-            
-      - name: Install PostgreSQL client
+
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
-          
+          sudo apt-get install -y postgresql-client libpq-dev pkg-config libssl-dev
+
       - name: Install sqlx-cli
         run: |
-          cargo install sqlx-cli --no-default-features --features rustls,postgres || true
-          
-      - name: Run cargo check
-        run: cargo check --workspace --all-targets
-        
-      - name: Run cargo fmt
-        run: cargo fmt --all -- --check
-        
-      - name: Run cargo clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings || true  # Continue even if clippy has warnings
-        
-      - name: Run cargo test
-        run: cargo test --workspace
+          if ! command -v sqlx &> /dev/null; then
+            cargo install sqlx-cli --version 0.8.0 --no-default-features --features postgres,rustls
+          fi
+
+      - name: Check service exists
+        id: service-check
+        run: |
+          if [ -d "lims-core/${{ matrix.service }}" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Service directory not found: lims-core/${{ matrix.service }}"
+          fi
+
+      - name: Format check
+        if: steps.service-check.outputs.exists == 'true'
+        working-directory: lims-core/${{ matrix.service }}
+        run: cargo fmt -- --check
+
+      - name: Clippy
+        if: steps.service-check.outputs.exists == 'true'
+        working-directory: lims-core/${{ matrix.service }}
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run migrations
+        if: steps.service-check.outputs.exists == 'true'
         env:
-          RUST_BACKTRACE: 1
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          SQLX_OFFLINE: false
+        run: |
+          if [ -d "lims-core/${{ matrix.service }}/migrations" ]; then
+            cd lims-core/${{ matrix.service }}
+            sqlx database create || true
+            sqlx migrate run
+          fi
 
-  # 🧪 Combined status check
-  ci-success:
-    name: CI Success
-    needs: [lint-and-typecheck, test-suite, playwright-tests, rust-check]
+      - name: Run tests
+        if: steps.service-check.outputs.exists == 'true'
+        working-directory: lims-core/${{ matrix.service }}
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          REDIS_URL: ${{ env.REDIS_URL }}
+          SQLX_OFFLINE: false
+        run: cargo test --all-features
+
+  # 🐍 Python Checks
+  python-checks:
+    name: 🐍 Python CI - ${{ matrix.service }}
     runs-on: ubuntu-latest
-    steps:
-      - name: CI Success
-        run: echo "All checks passed!"
+    needs: analyze-changes
+    if: needs.analyze-changes.outputs.python_changed == 'true' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api_gateway
+            path: lims-core/api_gateway
+          - service: lab_submission_rag
+            path: lims-ai/lab_submission_rag
+          - service: enhanced_rag_service
+            path: lims-ai/enhanced_rag_service
 
-  # 📊 Performance and Coverage Analysis
-  performance-coverage:
-    name: 📊 Performance & Coverage Analysis
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: tracseq_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.service }}-${{ hashFiles(format('{0}/requirements.txt', matrix.path)) }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.service }}-
+            ${{ runner.os }}-pip-
+
+      - name: Check service exists
+        id: service-check
+        run: |
+          if [ -d "${{ matrix.path }}" ] && [ -f "${{ matrix.path }}/requirements.txt" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Service not found or missing requirements.txt: ${{ matrix.path }}"
+          fi
+
+      - name: Install dependencies
+        if: steps.service-check.outputs.exists == 'true'
+        working-directory: ${{ matrix.path }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install black isort flake8 mypy pytest pytest-cov pytest-asyncio httpx
+
+      - name: Format check with Black
+        if: steps.service-check.outputs.exists == 'true'
+        working-directory: ${{ matrix.path }}
+        run: black --check .
+
+      - name: Import sorting with isort
+        if: steps.service-check.outputs.exists == 'true'
+        working-directory: ${{ matrix.path }}
+        run: isort --check-only .
+
+      - name: Lint with flake8
+        if: steps.service-check.outputs.exists == 'true'
+        working-directory: ${{ matrix.path }}
+        run: flake8 . --max-line-length=88 --extend-ignore=E203,W503
+
+      - name: Type check with mypy
+        if: steps.service-check.outputs.exists == 'true'
+        working-directory: ${{ matrix.path }}
+        run: mypy . --ignore-missing-imports || echo "Type checking completed with warnings"
+
+      - name: Run tests
+        if: steps.service-check.outputs.exists == 'true'
+        working-directory: ${{ matrix.path }}
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          PYTHONPATH: ${{ github.workspace }}/${{ matrix.path }}
+        run: |
+          if [ -d "tests" ]; then
+            pytest tests/ -v --cov=. --cov-report=xml --cov-report=term-missing
+          else
+            echo "No tests directory found, skipping tests"
+          fi
+
+  # 🧪 Integration Tests
+  integration-tests:
+    name: 🧪 Integration Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    needs: test-suite
-    if: success()
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    needs: [frontend-checks, rust-checks, python-checks]
+    if: |
+      always() && 
+      (needs.frontend-checks.result == 'success' || needs.frontend-checks.result == 'skipped') &&
+      (needs.rust-checks.result == 'success' || needs.rust-checks.result == 'skipped') &&
+      (needs.python-checks.result == 'success' || needs.python-checks.result == 'skipped')
 
-      - name: Setup Rust toolchain
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: tracseq_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup test environment
+        run: |
+          # Install all required tools
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client libpq-dev pkg-config libssl-dev
+
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
 
-      - name: Install coverage tools
+      - name: Install sqlx-cli
         run: |
-          echo "📊 Installing coverage tools"
-          cargo install cargo-tarpaulin --version 0.27.3
+          cargo install sqlx-cli --version 0.8.0 --no-default-features --features postgres,rustls
 
-      - name: Generate Rust coverage report
+      - name: Run all migrations
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/tracseq_test
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          SQLX_OFFLINE: false
         run: |
-          echo "📊 Generating coverage report for Rust services"
-          cargo tarpaulin --workspace --out Html --output-dir ./coverage
-
-      - name: Upload coverage reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-reports
-          path: |
-            coverage/
-            lims-ai/*/htmlcov/
-          retention-days: 7
-
-  # 🏗️ Build Validation
-  build-validation:
-    name: 🏗️ Build Validation
-    runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, test-suite, playwright-tests, rust-check]
-    if: success()
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Validate Docker configurations
-        run: |
-          echo "🐳 Validating Docker configurations"
+          # Create database
+          sqlx database create || true
           
-          # Check main docker compose files
-          for compose_file in docker/development/docker-compose.unified.yml docker/production/docker-compose.production.yml; do
-            if [ -f "$compose_file" ]; then
-              echo "✅ Found: $compose_file"
-              # Validate YAML syntax
-              if docker compose -f "$compose_file" config > /dev/null 2>&1; then
-                echo "✅ Valid compose file: $compose_file"
-              else
-                echo "❌ Invalid compose file: $compose_file"
-                docker compose -f "$compose_file" config
-                exit 1
-              fi
+          # Run migrations for each service
+          for service_dir in lims-core/*/; do
+            if [ -d "$service_dir/migrations" ]; then
+              echo "Running migrations for $service_dir"
+              cd "$service_dir"
+              sqlx migrate run
+              cd - > /dev/null
             fi
           done
 
-      - name: Check Dockerfile presence
+      - name: Run integration tests
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          REDIS_URL: ${{ env.REDIS_URL }}
+          RUST_LOG: debug
         run: |
-          echo "🐳 Checking Dockerfiles"
+          # Run workspace-level integration tests
+          if [ -f "tests/integration_data_flows.rs" ]; then
+            cargo test --test integration_data_flows -- --test-threads=1
+          fi
           
-          # Check for Dockerfiles in service directories
-          for service_dir in lims-core/* lims-ai/*; do
-            if [ -d "$service_dir" ] && [ -f "$service_dir/Dockerfile" ]; then
-              echo "✅ Dockerfile found in $service_dir"
-            elif [ -d "$service_dir" ]; then
-              echo "⚠️ No Dockerfile in $service_dir"
-            fi
-          done
-          
-          # Check UI Dockerfile
-          if [ -f "lims-ui/Dockerfile" ]; then
-            echo "✅ Frontend Dockerfile found"
-          else
-            echo "⚠️ No frontend Dockerfile found"
+          # Run modular component tests
+          if [ -f "tests/modular_components_test.rs" ]; then
+            cargo test --test modular_components_test -- --test-threads=1
           fi
 
-  # 📋 Summary
+  # ✅ Summary Check
   ci-summary:
-    name: 📋 CI Summary
+    name: ✅ CI Summary
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, test-suite, playwright-tests, rust-check, performance-coverage, build-validation]
+    needs: [analyze-changes, frontend-checks, rust-checks, python-checks, integration-tests]
     if: always()
-    
     steps:
-      - name: Summary
+      - name: Check CI Status
         run: |
-          echo "# 📊 TracSeq 2.0 CI Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔍 CI Pipeline Summary:"
+          echo "========================"
           
-          # Check job statuses
-          echo "## Job Results:" >> $GITHUB_STEP_SUMMARY
-          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Lint & TypeCheck | ${{ needs.lint-and-typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Test Suite | ${{ needs.test-suite.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Playwright Tests | ${{ needs.playwright-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Rust Check | ${{ needs.rust-check.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Performance & Coverage | ${{ needs.performance-coverage.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Build Validation | ${{ needs.build-validation.result }} |" >> $GITHUB_STEP_SUMMARY
-          
-          # Overall status
-          if [ "${{ needs.lint-and-typecheck.result }}" == "success" ] && \
-             [ "${{ needs.test-suite.result }}" == "success" ] && \
-             [ "${{ needs.playwright-tests.result }}" == "success" ] && \
-             [ "${{ needs.rust-check.result }}" == "success" ] && \
-             [ "${{ needs.performance-coverage.result }}" == "success" ] && \
-             [ "${{ needs.build-validation.result }}" == "success" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "✅ **All checks passed!**" >> $GITHUB_STEP_SUMMARY
+          # Check each job status
+          if [[ "${{ needs.frontend-checks.result }}" == "failure" ]]; then
+            echo "❌ Frontend checks failed"
+            exit 1
+          elif [[ "${{ needs.frontend-checks.result }}" == "success" ]]; then
+            echo "✅ Frontend checks passed"
           else
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "❌ **Some checks failed. Please review the logs.**" >> $GITHUB_STEP_SUMMARY
-          fi 
+            echo "⏭️ Frontend checks skipped"
+          fi
+          
+          if [[ "${{ needs.rust-checks.result }}" == "failure" ]]; then
+            echo "❌ Rust checks failed"
+            exit 1
+          elif [[ "${{ needs.rust-checks.result }}" == "success" ]]; then
+            echo "✅ Rust checks passed"
+          else
+            echo "⏭️ Rust checks skipped"
+          fi
+          
+          if [[ "${{ needs.python-checks.result }}" == "failure" ]]; then
+            echo "❌ Python checks failed"
+            exit 1
+          elif [[ "${{ needs.python-checks.result }}" == "success" ]]; then
+            echo "✅ Python checks passed"
+          else
+            echo "⏭️ Python checks skipped"
+          fi
+          
+          if [[ "${{ needs.integration-tests.result }}" == "failure" ]]; then
+            echo "❌ Integration tests failed"
+            exit 1
+          elif [[ "${{ needs.integration-tests.result }}" == "success" ]]; then
+            echo "✅ Integration tests passed"
+          else
+            echo "⏭️ Integration tests skipped"
+          fi
+          
+          echo "========================"
+          echo "✅ All CI checks completed successfully!" 

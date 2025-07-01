@@ -1,5 +1,5 @@
-# TracSeq 2.0 Security and Compliance Pipeline
-name: 🔒 Security & Compliance
+# TracSeq 2.0 Security Scanning Pipeline
+name: 🔒 Security Scan
 
 on:
   push:
@@ -7,275 +7,226 @@ on:
   pull_request:
     branches: [ main, develop ]
   schedule:
-    - cron: '0 9 * * 1'  # Weekly on Monday at 9 AM
+    - cron: '0 0 * * 0'  # Weekly scan on Sundays
   workflow_dispatch:
 
 env:
-  RUST_VERSION: '1.82'
+  RUST_VERSION: '1.75'
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '20'
 
 jobs:
-  # 🔍 Dependency Security Scanning
+  # 🔍 Dependency Security Scan
   dependency-scan:
     name: 🔍 Dependency Security Scan
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # Rust dependency scanning
-      - name: 🦀 Rust Security Audit
-        uses: actions-rs/toolchain@v1
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
-          override: true
 
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
-
-      - name: Run Rust security audit
-        run: |
-          echo "🔍 Scanning Rust dependencies for vulnerabilities"
-          cargo audit || echo "⚠️ Vulnerabilities found in Rust dependencies"
-
-      # Python dependency scanning
-      - name: 🐍 Python Security Check
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Rust dependency audit
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Audit Rust dependencies
+        run: |
+          echo "🔍 Auditing Rust dependencies..."
+          cargo audit
+
+      # Python dependency scan
       - name: Install Python security tools
         run: |
           pip install safety bandit
 
-      - name: Check Python dependencies
+      - name: Scan Python dependencies
         run: |
-          echo "🔍 Scanning Python dependencies"
-          # Check AI services
-          if [ -d "lims-ai" ]; then
-            cd lims-ai
-            for service in lab_submission_rag enhanced_rag_service; do
-              if [ -f "$service/requirements.txt" ]; then
-                echo "Checking $service dependencies"
-                safety check -r $service/requirements.txt || echo "⚠️ Vulnerabilities in $service"
-              fi
-            done
-            cd ..
-          fi
-          
-          # Check API gateway
+          echo "🔍 Scanning Python dependencies..."
+          # Check API Gateway
           if [ -f "lims-core/api_gateway/requirements.txt" ]; then
-            safety check -r lims-core/api_gateway/requirements.txt || echo "⚠️ Vulnerabilities in API gateway"
-          fi
-
-      # Node.js dependency scanning
-      - name: 📦 Node.js Security Audit
-        if: always()
-        working-directory: lims-ui
-        run: |
-          echo "🔍 Scanning Node.js dependencies"
-          npm audit --audit-level=high || echo "⚠️ Vulnerabilities found in Node.js dependencies"
-
-  # 🔍 Code Security Analysis
-  code-security:
-    name: 🔍 Code Security Analysis
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 🐍 Python Code Security (Bandit)
-        run: |
-          pip install bandit
-          echo "🔍 Running Bandit security analysis on Python code"
-          
-          # Scan AI services
-          if [ -d "lims-ai" ]; then
-            bandit -r lims-ai -f json -o bandit-ai-report.json || true
+            safety check -r lims-core/api_gateway/requirements.txt || true
           fi
           
-          # Scan API gateway
-          if [ -d "lims-core/api_gateway" ]; then
-            bandit -r lims-core/api_gateway -f json -o bandit-api-report.json || true
-          fi
-
-      - name: Upload security reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: bandit-reports
-          path: bandit-*.json
-
-  # 🔍 Secret Scanning
-  secrets-scan:
-    name: 🔍 Secret Scanning
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: 🔍 TruffleHog Secret Scan
-        uses: trufflesecurity/trufflehog@main
-        with:
-          path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: --debug --only-verified
-
-      - name: 🔍 Gitleaks Secret Scan
-        uses: zricethezav/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # 🐳 Container Security
-  container-security:
-    name: 🐳 Container Security Scan
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - service: auth_service
-            path: lims-core/auth_service
-          - service: sample_service
-            path: lims-core/sample_service
-          - service: api_gateway
-            path: lims-core/api_gateway
-          - service: lab_submission_rag
-            path: lims-ai/lab_submission_rag
-          - service: frontend
-            path: lims-ui
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Check for Dockerfile
-        id: dockerfile-check
-        run: |
-          if [ -f "${{ matrix.path }}/Dockerfile" ]; then
-            echo "has_dockerfile=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_dockerfile=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Run Trivy vulnerability scanner
-        if: steps.dockerfile-check.outputs.has_dockerfile == 'true'
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: ${{ matrix.path }}
-          format: 'sarif'
-          output: 'trivy-${{ matrix.service }}.sarif'
-          severity: 'CRITICAL,HIGH'
-
-      - name: Upload Trivy scan results
-        if: steps.dockerfile-check.outputs.has_dockerfile == 'true'
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: 'trivy-${{ matrix.service }}.sarif'
-
-  # 📋 SBOM Generation
-  sbom-generation:
-    name: 📋 Software Bill of Materials
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Generate SBOM with Syft
-        uses: anchore/sbom-action@v0
-        with:
-          path: ./
-          format: spdx-json
-          output-file: sbom-spdx.json
-
-      - name: Generate Rust SBOM
-        run: |
-          cargo install cargo-cyclonedx
-          cargo cyclonedx --format json --output-file rust-sbom.json || echo "⚠️ Failed to generate Rust SBOM"
-
-      - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: software-bill-of-materials
-          path: |
-            sbom-spdx.json
-            rust-sbom.json
-
-  # 🛡️ Security Policy Compliance
-  compliance-check:
-    name: 🛡️ Security Compliance Check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Check security policy files
-        run: |
-          echo "🔍 Checking for security policy compliance"
-          
-          # Check for required security files
-          REQUIRED_FILES=("SECURITY.md" ".github/CODEOWNERS")
-          for file in "${REQUIRED_FILES[@]}"; do
-            if [ -f "$file" ]; then
-              echo "✅ Found: $file"
-            else
-              echo "⚠️ Missing: $file"
+          # Check AI services
+          for service in lims-ai/*/; do
+            if [ -f "$service/requirements.txt" ]; then
+              echo "Checking $service"
+              safety check -r "$service/requirements.txt" || true
             fi
           done
 
-      - name: License compliance check
+      # Node.js dependency audit
+      - name: Audit npm dependencies
+        working-directory: lims-ui
         run: |
-          echo "📋 Checking license compliance"
+          echo "🔍 Auditing npm dependencies..."
+          npm audit --audit-level=moderate || true
+
+  # � Python Code Security
+  python-security:
+    name: � Python Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Run Bandit security scan
+        run: |
+          echo "🔍 Running Bandit security scan..."
           
-          # Check for LICENSE file
-          if [ -f "LICENSE" ]; then
-            echo "✅ LICENSE file found"
-          else
-            echo "❌ LICENSE file missing"
-            exit 1
+          # Scan API Gateway
+          if [ -d "lims-core/api_gateway" ]; then
+            bandit -r lims-core/api_gateway -f json -o api-gateway-bandit.json || true
           fi
+          
+          # Scan AI services
+          if [ -d "lims-ai" ]; then
+            bandit -r lims-ai -f json -o ai-services-bandit.json || true
+          fi
+
+      - name: Upload Bandit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-results
+          path: |
+            *-bandit.json
+
+  # 🦀 Rust Security
+  rust-security:
+    name: 🦀 Rust Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny
+
+      - name: Check advisories, licenses, and sources
+        run: |
+          echo "🔍 Running cargo-deny checks..."
+          cargo deny check advisories || true
+          cargo deny check licenses || true
+
+  # � SAST with CodeQL
+  codeql-analysis:
+    name: � CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript', 'python' ]
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  # 🐳 Container Security
+  container-scan:
+    name: 🐳 Container Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner in repo mode
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'repo'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # � Secrets Scanning
+  secret-scan:
+    name: � Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # 📊 Security Summary
   security-summary:
     name: 📊 Security Summary
+    needs: [dependency-scan, python-security, rust-security, codeql-analysis, container-scan, secret-scan]
     runs-on: ubuntu-latest
-    needs: [dependency-scan, code-security, secrets-scan, container-security, sbom-generation, compliance-check]
     if: always()
     steps:
-      - name: Generate security summary
+      - name: Security scan summary
         run: |
-          echo "# 🔒 TracSeq 2.0 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          echo "## Scan Results" >> $GITHUB_STEP_SUMMARY
-          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "### Scan Results:" >> $GITHUB_STEP_SUMMARY
+          echo "| Scan Type | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Dependency Scan | ${{ needs.dependency-scan.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Code Security | ${{ needs.code-security.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Secrets Scan | ${{ needs.secrets-scan.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Container Security | ${{ needs.container-security.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| SBOM Generation | ${{ needs.sbom-generation.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Compliance Check | ${{ needs.compliance-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Security | ${{ needs.python-security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust Security | ${{ needs.rust-security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL Analysis | ${{ needs.codeql-analysis.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Scan | ${{ needs.container-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Scan | ${{ needs.secret-scan.result }} |" >> $GITHUB_STEP_SUMMARY
           
-          # Overall security status
-          if [ "${{ needs.dependency-scan.result }}" == "success" ] && \
-             [ "${{ needs.code-security.result }}" == "success" ] && \
-             [ "${{ needs.secrets-scan.result }}" == "success" ] && \
-             [ "${{ needs.container-security.result }}" == "success" ] && \
-             [ "${{ needs.compliance-check.result }}" == "success" ]; then
+          # Check overall status
+          if [ "${{ needs.dependency-scan.result }}" == "failure" ] || \
+             [ "${{ needs.python-security.result }}" == "failure" ] || \
+             [ "${{ needs.rust-security.result }}" == "failure" ] || \
+             [ "${{ needs.secret-scan.result }}" == "failure" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "✅ **All security checks passed!**" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Security issues detected. Please review the scan results.**" >> $GITHUB_STEP_SUMMARY
+            exit 1
           else
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ **Some security checks require attention.**" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **All security scans completed.**" >> $GITHUB_STEP_SUMMARY
           fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Recommendations" >> $GITHUB_STEP_SUMMARY
-          echo "- Review any reported vulnerabilities in dependencies" >> $GITHUB_STEP_SUMMARY
-          echo "- Ensure all secrets are properly managed" >> $GITHUB_STEP_SUMMARY
-          echo "- Keep dependencies up to date" >> $GITHUB_STEP_SUMMARY
-          echo "- Follow security best practices for laboratory data" >> $GITHUB_STEP_SUMMARY

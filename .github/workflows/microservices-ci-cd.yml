@@ -1,257 +1,115 @@
-name: TracSeq 2.0 Microservices CI/CD
+# TracSeq 2.0 Microservices CI/CD Pipeline
+name: 🔬 Microservices CI/CD
 
 on:
   push:
-    branches: [ main, develop, 'release/*' ]
+    branches: [ main, develop ]
+    paths:
+      - 'lims-core/**'
+      - 'lims-ai/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/microservices-ci-cd.yml'
   pull_request:
     branches: [ main, develop ]
-  workflow_dispatch:
-    inputs:
-      deploy_environment:
-        description: 'Environment to deploy to'
-        required: false
-        default: 'staging'
-        type: choice
-        options:
-          - staging
-          - production
+    paths:
+      - 'lims-core/**'
+      - 'lims-ai/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
 
 env:
-  RUST_VERSION: '1.82'
+  RUST_VERSION: '1.75'
+  PYTHON_VERSION: '3.11'
   DOCKER_REGISTRY: 'ghcr.io'
-  NAMESPACE: 'tracseq'
+  IMAGE_PREFIX: '${{ github.repository_owner }}/tracseq'
 
 jobs:
-  # ========================================
-  # Stage 1: Code Quality & Security Checks
-  # ========================================
-  code-quality:
-    name: Code Quality Checks
+  # 🔍 Detect changed services
+  detect-changes:
+    name: 🔍 Detect Changed Services
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          # Rust services in lims-core
-          - service: auth_service
-            path: lims-core/auth_service
-          - service: sample_service
-            path: lims-core/sample_service
-          - service: template_service
-            path: lims-core/template_service
-          - service: sequencing_service
-            path: lims-core/sequencing_service
-          - service: notification_service
-            path: lims-core/notification_service
-          - service: transaction_service
-            path: lims-core/transaction_service
-          - service: event_service
-            path: lims-core/event_service
-          - service: enhanced_storage_service
-            path: lims-core/enhanced_storage_service
-          - service: qaqc_service
-            path: lims-core/qaqc_service
-          - service: spreadsheet_versioning_service
-            path: lims-core/spreadsheet_versioning_service
-          - service: library_details_service
-            path: lims-core/library_details_service
-          - service: dashboard_service
-            path: lims-core/dashboard_service
-          - service: reports_service
-            path: lims-core/reports_service
-          - service: cognitive_assistant_service
-            path: lims-core/cognitive_assistant_service
+    outputs:
+      rust_services: ${{ steps.detect.outputs.rust_services }}
+      python_services: ${{ steps.detect.outputs.python_services }}
+      any_changed: ${{ steps.detect.outputs.any_changed }}
     steps:
       - uses: actions/checkout@v4
-        
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ env.RUST_VERSION }}
-          components: rustfmt, clippy
-          
-      - name: Cache Rust dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ matrix.service }}-${{ hashFiles('Cargo.lock') }}
-          
-      - name: Format check
-        working-directory: ${{ matrix.path }}
-        run: cargo fmt -- --check
-        
-      - name: Clippy analysis
-        working-directory: ${{ matrix.path }}
-        run: cargo clippy -- -D warnings
-        
-      - name: Security audit
-        working-directory: ${{ matrix.path }}
-        run: |
-          cargo install cargo-audit
-          cargo audit
+          fetch-depth: 0
 
-  python-quality:
-    name: Python Code Quality
+      - name: Detect changed services
+        id: detect
+        run: |
+          # Get list of changed files
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD~1...HEAD)
+          fi
+          
+          # Initialize arrays
+          RUST_SERVICES=()
+          PYTHON_SERVICES=()
+          
+          # Check Rust services
+          for service_dir in lims-core/*/; do
+            service=$(basename "$service_dir")
+            if [ -f "$service_dir/Cargo.toml" ]; then
+              # Check if this service has changes
+              if echo "$CHANGED_FILES" | grep -q "lims-core/$service/"; then
+                RUST_SERVICES+=("$service")
+              fi
+            fi
+          done
+          
+          # Check Python services
+          if echo "$CHANGED_FILES" | grep -q "lims-core/api_gateway/"; then
+            PYTHON_SERVICES+=("api_gateway")
+          fi
+          if echo "$CHANGED_FILES" | grep -q "lims-ai/lab_submission_rag/"; then
+            PYTHON_SERVICES+=("lab_submission_rag")
+          fi
+          if echo "$CHANGED_FILES" | grep -q "lims-ai/enhanced_rag_service/"; then
+            PYTHON_SERVICES+=("enhanced_rag_service")
+          fi
+          
+          # Convert to JSON arrays
+          RUST_JSON=$(printf '%s\n' "${RUST_SERVICES[@]}" | jq -R . | jq -s .)
+          PYTHON_JSON=$(printf '%s\n' "${PYTHON_SERVICES[@]}" | jq -R . | jq -s .)
+          
+          # Output results
+          echo "rust_services=$RUST_JSON" >> $GITHUB_OUTPUT
+          echo "python_services=$PYTHON_JSON" >> $GITHUB_OUTPUT
+          
+          # Check if any services changed
+          if [ ${#RUST_SERVICES[@]} -gt 0 ] || [ ${#PYTHON_SERVICES[@]} -gt 0 ]; then
+            echo "any_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "any_changed=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "Changed Rust services: ${RUST_SERVICES[@]}"
+          echo "Changed Python services: ${PYTHON_SERVICES[@]}"
+
+  # 🦀 Rust Service Tests
+  rust-tests:
+    name: 🦀 Test ${{ matrix.service }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.any_changed == 'true' && needs.detect-changes.outputs.rust_services != '[]'
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          - service: api_gateway
-            path: lims-core/api_gateway
-          - service: lab_submission_rag
-            path: lims-ai/lab_submission_rag
-          - service: enhanced_rag_service
-            path: lims-ai/enhanced_rag_service
-    steps:
-      - uses: actions/checkout@v4
-        
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-          
-      - name: Install dependencies
-        working-directory: ${{ matrix.path }}
-        run: |
-          pip install -r requirements.txt
-          pip install black flake8 mypy safety bandit
-          
-      - name: Black formatting
-        working-directory: ${{ matrix.path }}
-        run: black --check .
-        
-      - name: Flake8 linting
-        working-directory: ${{ matrix.path }}
-        run: flake8 .
-        
-      - name: Type checking
-        working-directory: ${{ matrix.path }}
-        run: mypy . || echo "Type checking warnings"
-        
-      - name: Security scan
-        working-directory: ${{ matrix.path }}
-        run: |
-          safety check
-          bandit -r .
-
-  # ========================================
-  # Stage 2: Unit Tests
-  # ========================================
-  unit-tests:
-    name: Unit Tests
-    needs: [code-quality]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          # Rust services
-          - service: auth_service
-            path: lims-core/auth_service
-          - service: sample_service
-            path: lims-core/sample_service
-          - service: template_service
-            path: lims-core/template_service
-          - service: sequencing_service
-            path: lims-core/sequencing_service
-          - service: notification_service
-            path: lims-core/notification_service
-          - service: transaction_service
-            path: lims-core/transaction_service
-          - service: event_service
-            path: lims-core/event_service
-          - service: enhanced_storage_service
-            path: lims-core/enhanced_storage_service
-    steps:
-      - uses: actions/checkout@v4
-        
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-          
-      - name: Cache Rust dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ matrix.service }}-${{ hashFiles('Cargo.lock') }}
-          
-      - name: Run unit tests
-        working-directory: ${{ matrix.path }}
-        run: |
-          cargo test --lib --bins
-          cargo test --doc
-        env:
-          RUST_BACKTRACE: 1
-          
-      - name: Generate test coverage
-        working-directory: ${{ matrix.path }}
-        run: |
-          cargo install cargo-tarpaulin
-          cargo tarpaulin --out Xml --output-dir coverage
-          
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          file: ${{ matrix.path }}/coverage/cobertura.xml
-          flags: ${{ matrix.service }}
-          name: ${{ matrix.service }}-coverage
-
-  python-unit-tests:
-    name: Python Unit Tests
-    needs: [python-quality]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - service: api_gateway
-            path: lims-core/api_gateway
-          - service: lab_submission_rag
-            path: lims-ai/lab_submission_rag
-          - service: enhanced_rag_service
-            path: lims-ai/enhanced_rag_service
-    steps:
-      - uses: actions/checkout@v4
-        
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-          
-      - name: Install dependencies
-        working-directory: ${{ matrix.path }}
-        run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-cov pytest-asyncio
-          
-      - name: Run unit tests
-        working-directory: ${{ matrix.path }}
-        run: |
-          pytest tests/unit -v --cov=. --cov-report=xml || pytest tests/ -v --cov=. --cov-report=xml
-          
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-        with:
-          file: ${{ matrix.path }}/coverage.xml
-          flags: ${{ matrix.service }}
-
-  # ========================================
-  # Stage 3: Integration Tests
-  # ========================================
-  integration-tests:
-    name: Integration Tests
-    needs: [unit-tests, python-unit-tests]
-    runs-on: ubuntu-latest
+        service: ${{ fromJson(needs.detect-changes.outputs.rust_services) }}
+    
     services:
       postgres:
-        image: postgres:15
+        image: postgres:16-alpine
         env:
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: tracseq_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_db
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -259,6 +117,7 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+      
       redis:
         image: redis:7-alpine
         options: >-
@@ -268,199 +127,263 @@ jobs:
           --health-retries 5
         ports:
           - 6379:6379
+
     steps:
       - uses: actions/checkout@v4
-        
-      - name: Setup test environment
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ matrix.service }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install system dependencies
         run: |
-          cp .env.example .env.test || echo "No .env.example found"
-          echo "DATABASE_URL=postgresql://postgres:testpass@localhost:5432/tracseq_test" >> .env.test
-          echo "REDIS_URL=redis://localhost:6379" >> .env.test
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client libpq-dev pkg-config libssl-dev
+
+      - name: Format check
+        working-directory: lims-core/${{ matrix.service }}
+        run: cargo fmt -- --check
+
+      - name: Clippy
+        working-directory: lims-core/${{ matrix.service }}
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        working-directory: lims-core/${{ matrix.service }}
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+        run: |
+          # Install sqlx-cli if needed
+          if [ -d "migrations" ]; then
+            cargo install sqlx-cli --no-default-features --features postgres,rustls
+            sqlx database create || true
+            sqlx migrate run
+          fi
           
-      - name: Run integration tests
+          # Run tests with coverage
+          cargo install cargo-tarpaulin
+          cargo tarpaulin --out Xml --output-dir coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: lims-core/${{ matrix.service }}/coverage/cobertura.xml
+          flags: ${{ matrix.service }}
+
+  # 🐍 Python Service Tests
+  python-tests:
+    name: 🐍 Test ${{ matrix.service }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.any_changed == 'true' && needs.detect-changes.outputs.python_services != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.python_services) }}
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Determine service path
+        id: service-path
+        run: |
+          case "${{ matrix.service }}" in
+            "api_gateway")
+              echo "path=lims-core/api_gateway" >> $GITHUB_OUTPUT
+              ;;
+            "lab_submission_rag")
+              echo "path=lims-ai/lab_submission_rag" >> $GITHUB_OUTPUT
+              ;;
+            "enhanced_rag_service")
+              echo "path=lims-ai/enhanced_rag_service" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Install dependencies
+        working-directory: ${{ steps.service-path.outputs.path }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install black isort flake8 mypy pytest pytest-cov pytest-asyncio
+
+      - name: Format check
+        working-directory: ${{ steps.service-path.outputs.path }}
+        run: |
+          black --check .
+          isort --check-only .
+
+      - name: Lint
+        working-directory: ${{ steps.service-path.outputs.path }}
+        run: flake8 . --max-line-length=88 --extend-ignore=E203,W503
+
+      - name: Type check
+        working-directory: ${{ steps.service-path.outputs.path }}
+        run: mypy . --ignore-missing-imports || true
+
+      - name: Run tests
+        working-directory: ${{ steps.service-path.outputs.path }}
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_db
         run: |
           if [ -d "tests" ]; then
-            cd tests
-            if [ -f "integration_data_flows.rs" ]; then
-              cargo test --test integration_data_flows -- --test-threads=1
-            fi
+            pytest tests/ -v --cov=. --cov-report=xml
+          else
+            echo "No tests directory found"
           fi
-        env:
-          TEST_DATABASE_URL: postgresql://postgres:testpass@localhost:5432/tracseq_test
-          
-      - name: Collect service logs
-        if: failure()
-        run: echo "Integration test logs would be collected here"
 
-  # ========================================
-  # Stage 4: Build Docker Images
-  # ========================================
+      - name: Upload coverage
+        if: always()
+        uses: codecov/codecov-action@v3
+        with:
+          file: ${{ steps.service-path.outputs.path }}/coverage.xml
+          flags: ${{ matrix.service }}
+
+  # 🐳 Build Docker Images
   build-images:
-    name: Build Docker Images
-    needs: [integration-tests]
+    name: 🐳 Build ${{ matrix.service }}
+    needs: [detect-changes, rust-tests, python-tests]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.any_changed == 'true' &&
+      (needs.rust-tests.result == 'success' || needs.rust-tests.result == 'skipped') &&
+      (needs.python-tests.result == 'success' || needs.python-tests.result == 'skipped') &&
+      github.event_name == 'push'
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          # Rust services
-          - service: auth_service
-            path: lims-core/auth_service
-            dockerfile: Dockerfile
-          - service: sample_service
-            path: lims-core/sample_service
-            dockerfile: Dockerfile
-          - service: enhanced_storage_service
-            path: lims-core/enhanced_storage_service
-            dockerfile: Dockerfile
-          - service: event_service
-            path: lims-core/event_service
-            dockerfile: Dockerfile
-          - service: notification_service
-            path: lims-core/notification_service
-            dockerfile: Dockerfile
-          # Python services
-          - service: api_gateway
-            path: lims-core/api_gateway
-            dockerfile: Dockerfile
-          - service: lab_submission_rag
-            path: lims-ai/lab_submission_rag
-            dockerfile: Dockerfile
-          - service: enhanced_rag_service
-            path: lims-ai/enhanced_rag_service
-            dockerfile: Dockerfile
-          # Frontend
-          - service: frontend
-            path: lims-ui
-            dockerfile: Dockerfile
+        service: ${{ fromJson(format('[{0},{1}]', join(fromJson(needs.detect-changes.outputs.rust_services), ','), join(fromJson(needs.detect-changes.outputs.python_services), ','))) }}
+    
     steps:
       - uses: actions/checkout@v4
-        
+
+      - name: Determine service info
+        id: service-info
+        run: |
+          SERVICE="${{ matrix.service }}"
+          
+          # Determine path and type
+          if [ -d "lims-core/$SERVICE" ]; then
+            echo "path=lims-core/$SERVICE" >> $GITHUB_OUTPUT
+            if [ -f "lims-core/$SERVICE/Cargo.toml" ]; then
+              echo "type=rust" >> $GITHUB_OUTPUT
+            else
+              echo "type=python" >> $GITHUB_OUTPUT
+            fi
+          elif [ -d "lims-ai/$SERVICE" ]; then
+            echo "path=lims-ai/$SERVICE" >> $GITHUB_OUTPUT
+            echo "type=python" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ github.repository_owner }}/${{ env.NAMESPACE }}-${{ matrix.service }}
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service }}
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=sha
-            
+            type=raw,value=latest,enable={{is_default_branch}}
+
       - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
-          file: ${{ matrix.path }}/${{ matrix.dockerfile }}
+          file: ${{ steps.service-info.outputs.path }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            BUILD_DATE=${{ github.event.head_commit.timestamp }}
-            VCS_REF=${{ github.sha }}
-            VERSION=${{ steps.meta.outputs.version }}
 
-  # ========================================
-  # Stage 5: Security Scanning
-  # ========================================
+  # 🔒 Security Scan
   security-scan:
-    name: Security Scanning
-    needs: [build-images]
+    name: 🔒 Security Scan
+    needs: build-images
+    if: always() && needs.build-images.result == 'success'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service:
-          - auth_service
-          - sample_service
-          - enhanced_storage_service
-          - api_gateway
-          - lab_submission_rag
-          - frontend
     steps:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.DOCKER_REGISTRY }}/${{ github.repository_owner }}/${{ env.NAMESPACE }}-${{ matrix.service }}:${{ github.sha }}
+          scan-type: 'repo'
+          scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
-          
-      - name: Upload Trivy scan results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v2
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
 
-  # ========================================
-  # Stage 6: Deploy to Staging
-  # ========================================
-  deploy-staging:
-    name: Deploy to Staging
-    needs: [security-scan]
+  # ✅ CI/CD Summary
+  summary:
+    name: ✅ CI/CD Summary
+    needs: [detect-changes, rust-tests, python-tests, build-images, security-scan]
+    if: always()
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    environment:
-      name: staging
-      url: https://staging.tracseq.io
     steps:
-      - uses: actions/checkout@v4
-        
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'v1.28.0'
+      - name: Summary
+        run: |
+          echo "## 🔬 Microservices CI/CD Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           
-      - name: Deploy to staging
-        run: |
-          echo "Deployment to staging would happen here"
-          # Actual deployment commands would go here
-            
-      - name: Run smoke tests
-        run: |
-          echo "Smoke tests would run here"
-          # cd tests/smoke
-          # npm install
-          # npm run test:staging
-
-  # ========================================
-  # Stage 7: Deploy to Production
-  # ========================================
-  deploy-production:
-    name: Deploy to Production
-    needs: [security-scan]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
-    environment:
-      name: production
-      url: https://tracseq.io
-    steps:
-      - uses: actions/checkout@v4
-        
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'v1.28.0'
+          echo "### Changed Services:" >> $GITHUB_STEP_SUMMARY
+          echo "- Rust: ${{ needs.detect-changes.outputs.rust_services }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Python: ${{ needs.detect-changes.outputs.python_services }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           
-      - name: Deploy to production
-        run: |
-          echo "Deployment to production would happen here"
-          # Actual deployment commands would go here
-            
-      - name: Run smoke tests
-        run: |
-          echo "Production smoke tests would run here"
-          # cd tests/smoke
-          # npm install
-          # npm run test:production
+          echo "### Job Results:" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust Tests | ${{ needs.rust-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Tests | ${{ needs.python-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Images | ${{ needs.build-images.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scan | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
