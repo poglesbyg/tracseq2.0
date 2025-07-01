@@ -19,6 +19,10 @@ import Storage from './pages/Storage';
 import Reports from './pages/Reports';
 import Profile from './pages/Profile';
 import Users from './pages/Users';
+import LibraryPrep from './pages/LibraryPrep';
+import QualityControl from './pages/QualityControl';
+import ProjectManagement from './pages/ProjectManagement';
+import FlowCellDesign from './pages/FlowCellDesign';
 
 const queryClient = new QueryClient();
 
@@ -85,6 +89,46 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <RagSamples />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/library-prep" element={
+              <ProtectedRoute>
+                <Layout>
+                  <LibraryPrep />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/quality-control" element={
+              <ProtectedRoute>
+                <Layout>
+                  <QualityControl />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/projects" element={
+              <ProtectedRoute>
+                <Layout>
+                  <ProjectManagement />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/flow-cell-design" element={
+              <ProtectedRoute>
+                <Layout>
+                  <FlowCellDesign />
                   {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
                   <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
                 </Layout>

@@ -13,6 +13,8 @@ import {
   UsersIcon,
   SparklesIcon,
   CpuChipIcon,
+  FolderIcon,
+  ClipboardDocumentCheckIcon,
 } from '@heroicons/react/24/outline';
 import { UserMenu } from './UserMenu';
 import { useAuth } from '../auth';
@@ -30,8 +32,12 @@ export default function Layout({ children }: LayoutProps) {
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, testId: 'nav-dashboard' },
     { name: 'AI Submissions', href: '/rag-submissions', icon: SparklesIcon, testId: 'nav-rag-submissions' },
     { name: 'AI Samples', href: '/rag-samples', icon: CpuChipIcon, testId: 'nav-rag-samples' },
+    { name: 'Projects', href: '/projects', icon: FolderIcon, testId: 'nav-projects' },
     { name: 'Templates', href: '/templates', icon: DocumentIcon, testId: 'nav-templates' },
     { name: 'Samples', href: '/samples', icon: BeakerIcon, testId: 'nav-samples' },
+    { name: 'Library Prep', href: '/library-prep', icon: BeakerIcon, testId: 'nav-library-prep' },
+    { name: 'Quality Control', href: '/quality-control', icon: ClipboardDocumentCheckIcon, testId: 'nav-quality-control' },
+    { name: 'Flow Cell Design', href: '/flow-cell-design', icon: CpuChipIcon, testId: 'nav-flow-cell-design' },
     { name: 'Sequencing', href: '/sequencing', icon: QueueListIcon, testId: 'nav-sequencing' },
     { name: 'Spreadsheets', href: '/spreadsheets', icon: TableCellsIcon, testId: 'nav-spreadsheets' },
     { name: 'Storage', href: '/storage', icon: MapPinIcon, testId: 'nav-storage' },
@@ -104,7 +110,7 @@ export default function Layout({ children }: LayoutProps) {
                 </div>
                 <div className="ml-3">
                   <h1 className="text-xl font-bold text-indigo-600">Lab Manager</h1>
-                  <p className="text-xs text-gray-500">v1.0.0</p>
+                  <p className="text-xs text-gray-500">v2.0.0</p>
                 </div>
               </div>
             </div>
