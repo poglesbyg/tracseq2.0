@@ -53,6 +53,7 @@ impl Default for CircuitBreakerState {
     }
 }
 
+#[derive(Clone)]
 pub struct CircuitBreaker {
     config: CircuitBreakerConfig,
     state: Arc<RwLock<CircuitBreakerState>>,

@@ -9,10 +9,10 @@ categories = ["network-programming", "asynchronous"]
 
 [dependencies]
 # Async runtime
-tokio = { version = "1.35", features = ["sync", "time", "rt"] }
+tokio = { version = "1", features = ["full"] }
 
 # HTTP client
-reqwest = { version = "0.11", features = ["json"], optional = true }
+reqwest = { version = "0.11", features = ["json"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -30,4 +30,7 @@ http-client = ["reqwest"]
 
 [dev-dependencies]
 tokio-test = "0.4"
-tracing-subscriber = "0.3"
+wiremock = "0.5"
+rand = "0.8"
+rstest = { workspace = true }
+futures = "0.3"
