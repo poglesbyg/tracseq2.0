@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy service-specific Cargo.toml
-COPY Cargo.toml ./
+# Copy service-specific Cargo.toml (use standalone version)
+COPY Cargo.toml.standalone ./Cargo.toml
 
 # Create dummy source for dependency caching
 RUN mkdir src && echo "fn main() {}" > src/main.rs

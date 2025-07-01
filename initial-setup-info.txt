@@ -1,6 +1,6 @@
 TracSeq 2.0 Initial Setup Information
 =====================================
-Setup Date: Tue Jul  1 11:07:07 EDT 2025
+Setup Date: Tue Jul  1 11:34:52 EDT 2025
 
 Default Users:
   admin@tracseq.com / Admin123!
