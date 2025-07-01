@@ -182,9 +182,11 @@ impl Config {
                     .parse()
                     .unwrap_or(30),
             },
-            database_url: env::var("NOTIFICATION_DATABASE_URL").unwrap_or_else(|_| {
-                "postgresql://notification_user:password@localhost:5432/notification_db".to_string()
-            }),
+            database_url: env::var("DATABASE_URL")
+                .or_else(|_| env::var("NOTIFICATION_DATABASE_URL"))
+                .unwrap_or_else(|_| {
+                    "postgresql://notification_user:password@localhost:5432/notification_db".to_string()
+                }),
             auth_service_url: env::var("AUTH_SERVICE_URL")
                 .unwrap_or_else(|_| "http://auth-service:8080".to_string()),
             email: EmailConfig {
@@ -192,14 +194,22 @@ impl Config {
                     .unwrap_or_else(|_| "true".to_string())
                     .parse()
                     .unwrap_or(true),
-                smtp_host: env::var("EMAIL_SMTP_HOST").unwrap_or_else(|_| "localhost".to_string()),
-                smtp_port: env::var("EMAIL_SMTP_PORT")
+                smtp_host: env::var("SMTP_HOST")
+                    .or_else(|_| env::var("EMAIL_SMTP_HOST"))
+                    .unwrap_or_else(|_| "localhost".to_string()),
+                smtp_port: env::var("SMTP_PORT")
+                    .or_else(|_| env::var("EMAIL_SMTP_PORT"))
                     .unwrap_or_else(|_| "587".to_string())
                     .parse()
                     .unwrap_or(587),
-                smtp_username: env::var("EMAIL_SMTP_USERNAME").unwrap_or_else(|_| "".to_string()),
-                smtp_password: env::var("EMAIL_SMTP_PASSWORD").unwrap_or_else(|_| "".to_string()),
-                from_address: env::var("EMAIL_FROM_ADDRESS")
+                smtp_username: env::var("SMTP_USERNAME")
+                    .or_else(|_| env::var("EMAIL_SMTP_USERNAME"))
+                    .unwrap_or_else(|_| "".to_string()),
+                smtp_password: env::var("SMTP_PASSWORD")
+                    .or_else(|_| env::var("EMAIL_SMTP_PASSWORD"))
+                    .unwrap_or_else(|_| "".to_string()),
+                from_address: env::var("EMAIL_FROM")
+                    .or_else(|_| env::var("EMAIL_FROM_ADDRESS"))
                     .unwrap_or_else(|_| "noreply@lab-management.com".to_string()),
                 from_name: env::var("EMAIL_FROM_NAME")
                     .unwrap_or_else(|_| "Lab Management System".to_string()),

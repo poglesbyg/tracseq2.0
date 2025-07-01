@@ -36,7 +36,7 @@ RUN cargo build --release
 
 # Verify the binary was built correctly
 RUN ls -la target/release/ && \
-    ldd target/release/transaction-service || true
+    ldd target/release/transaction_service || true
 
 # Stage 2: Runtime stage
 FROM debian:bookworm-slim
@@ -57,14 +57,14 @@ RUN mkdir -p /app/logs /app/config && \
     chown -R appuser:appuser /app
 
 # Copy the binary from builder stage
-COPY --from=builder /usr/src/app/target/release/transaction-service /app/transaction-service
+COPY --from=builder /usr/src/app/target/release/transaction_service /app/transaction_service
 
 # Copy migrations
 COPY --from=builder /usr/src/app/migrations /app/migrations
 
 # Set permissions
-RUN chmod +x /app/transaction-service && \
-    chown appuser:appuser /app/transaction-service
+RUN chmod +x /app/transaction_service && \
+    chown appuser:appuser /app/transaction_service
 
 # Switch to non-root user
 USER appuser
@@ -85,4 +85,4 @@ ENV RUST_LOG=info \
     PORT=8088
 
 # Run the binary
-CMD ["./transaction-service"] 
+CMD ["./transaction_service"] 

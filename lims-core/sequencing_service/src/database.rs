@@ -465,47 +465,101 @@ impl DatabasePool {
     }
 
     async fn create_indexes(&self) -> Result<()> {
-        // Performance indexes
-        sqlx::query(
-            r#"
-            CREATE INDEX IF NOT EXISTS idx_sequencing_jobs_status ON sequencing_jobs(status);
-            CREATE INDEX IF NOT EXISTS idx_sequencing_jobs_platform ON sequencing_jobs(platform_id);
-            CREATE INDEX IF NOT EXISTS idx_sequencing_jobs_created_by ON sequencing_jobs(created_by);
-            CREATE INDEX IF NOT EXISTS idx_sequencing_jobs_created_at ON sequencing_jobs(created_at);
-            CREATE INDEX IF NOT EXISTS idx_sequencing_jobs_priority ON sequencing_jobs(priority);
+        // Performance indexes - Sequencing Jobs
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sequencing_jobs_status ON sequencing_jobs(status)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sequencing_jobs_platform ON sequencing_jobs(platform_id)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sequencing_jobs_created_by ON sequencing_jobs(created_by)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sequencing_jobs_created_at ON sequencing_jobs(created_at)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sequencing_jobs_priority ON sequencing_jobs(priority)")
+            .execute(&self.pool)
+            .await?;
             
-            CREATE INDEX IF NOT EXISTS idx_sequencing_runs_status ON sequencing_runs(status);
-            CREATE INDEX IF NOT EXISTS idx_sequencing_runs_platform ON sequencing_runs(platform_id);
-            CREATE INDEX IF NOT EXISTS idx_sequencing_runs_flowcell ON sequencing_runs(flowcell_id);
+        // Sequencing Runs indexes
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sequencing_runs_status ON sequencing_runs(status)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sequencing_runs_platform ON sequencing_runs(platform_id)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sequencing_runs_flowcell ON sequencing_runs(flowcell_id)")
+            .execute(&self.pool)
+            .await?;
             
-            CREATE INDEX IF NOT EXISTS idx_sample_sheets_status ON sample_sheets(status);
-            CREATE INDEX IF NOT EXISTS idx_sample_sheets_platform ON sample_sheets(platform_id);
+        // Sample Sheets indexes
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sample_sheets_status ON sample_sheets(status)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sample_sheets_platform ON sample_sheets(platform_id)")
+            .execute(&self.pool)
+            .await?;
             
-            CREATE INDEX IF NOT EXISTS idx_sample_sheet_entries_sheet_id ON sample_sheet_entries(sample_sheet_id);
-            CREATE INDEX IF NOT EXISTS idx_sample_sheet_entries_sample_id ON sample_sheet_entries(sample_id);
+        // Sample Sheet Entries indexes
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sample_sheet_entries_sheet_id ON sample_sheet_entries(sample_sheet_id)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sample_sheet_entries_sample_id ON sample_sheet_entries(sample_id)")
+            .execute(&self.pool)
+            .await?;
             
-            CREATE INDEX IF NOT EXISTS idx_workflow_executions_job_id ON workflow_executions(job_id);
-            CREATE INDEX IF NOT EXISTS idx_workflow_executions_status ON workflow_executions(status);
+        // Workflow Executions indexes
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_workflow_executions_job_id ON workflow_executions(job_id)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_workflow_executions_status ON workflow_executions(status)")
+            .execute(&self.pool)
+            .await?;
             
-            CREATE INDEX IF NOT EXISTS idx_analysis_jobs_sequencing_job_id ON analysis_jobs(sequencing_job_id);
-            CREATE INDEX IF NOT EXISTS idx_analysis_jobs_status ON analysis_jobs(status);
-            CREATE INDEX IF NOT EXISTS idx_analysis_jobs_pipeline_id ON analysis_jobs(pipeline_id);
+        // Analysis Jobs indexes
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_analysis_jobs_sequencing_job_id ON analysis_jobs(sequencing_job_id)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_analysis_jobs_status ON analysis_jobs(status)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_analysis_jobs_pipeline_id ON analysis_jobs(pipeline_id)")
+            .execute(&self.pool)
+            .await?;
             
-            CREATE INDEX IF NOT EXISTS idx_quality_metrics_entity ON quality_metrics(entity_type, entity_id);
-            CREATE INDEX IF NOT EXISTS idx_quality_metrics_type ON quality_metrics(metric_type);
-            CREATE INDEX IF NOT EXISTS idx_quality_metrics_status ON quality_metrics(status);
+        // Quality Metrics indexes
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_quality_metrics_entity ON quality_metrics(entity_type, entity_id)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_quality_metrics_type ON quality_metrics(metric_type)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_quality_metrics_status ON quality_metrics(status)")
+            .execute(&self.pool)
+            .await?;
             
-            CREATE INDEX IF NOT EXISTS idx_quality_reports_entity ON quality_reports(entity_type, entity_id);
-            CREATE INDEX IF NOT EXISTS idx_quality_reports_type ON quality_reports(report_type);
+        // Quality Reports indexes
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_quality_reports_entity ON quality_reports(entity_type, entity_id)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_quality_reports_type ON quality_reports(report_type)")
+            .execute(&self.pool)
+            .await?;
             
-            CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_sequencing_job_id ON scheduled_jobs(sequencing_job_id);
-            CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_status ON scheduled_jobs(status);
-            CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_platform ON scheduled_jobs(platform_id);
-            CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_scheduled_start ON scheduled_jobs(scheduled_start);
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
+        // Scheduled Jobs indexes
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_sequencing_job_id ON scheduled_jobs(sequencing_job_id)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_status ON scheduled_jobs(status)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_platform ON scheduled_jobs(platform_id)")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_scheduled_start ON scheduled_jobs(scheduled_start)")
+            .execute(&self.pool)
+            .await?;
 
         Ok(())
     }

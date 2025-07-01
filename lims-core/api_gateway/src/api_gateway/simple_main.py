@@ -34,6 +34,9 @@ app.add_middleware(
 
 # Service URLs from environment
 RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service:8000")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8080")
+SEQUENCING_SERVICE_URL = os.getenv("SEQUENCING_SERVICE_URL", "http://sequencing-service:8084")
+NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://notification-service:8085")
 
 # Pydantic models for API requests
 class LoginRequest(BaseModel):
@@ -985,6 +988,73 @@ async def proxy_rag(path: str, request: Request):
 
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Service unavailable: {e!s}")
+
+# Proxy routes for other services
+@app.api_route("/api/auth/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_auth(path: str, request: Request):
+    """Proxy requests to Auth service"""
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{AUTH_SERVICE_URL}/api/v1/{path}"
+            body = None
+            if request.method in ["POST", "PUT", "PATCH"]:
+                body = await request.body()
+
+            response = await client.request(
+                method=request.method,
+                url=url,
+                headers=dict(request.headers),
+                params=request.query_params,
+                content=body,
+                timeout=30.0
+            )
+            return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Auth service unavailable: {e!s}")
+
+@app.api_route("/api/sequencing/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_sequencing(path: str, request: Request):
+    """Proxy requests to Sequencing service"""
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{SEQUENCING_SERVICE_URL}/api/v1/{path}"
+            body = None
+            if request.method in ["POST", "PUT", "PATCH"]:
+                body = await request.body()
+
+            response = await client.request(
+                method=request.method,
+                url=url,
+                headers=dict(request.headers),
+                params=request.query_params,
+                content=body,
+                timeout=30.0
+            )
+            return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Sequencing service unavailable: {e!s}")
+
+@app.api_route("/api/notification/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_notification(path: str, request: Request):
+    """Proxy requests to Notification service"""
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{NOTIFICATION_SERVICE_URL}/api/v1/{path}"
+            body = None
+            if request.method in ["POST", "PUT", "PATCH"]:
+                body = await request.body()
+
+            response = await client.request(
+                method=request.method,
+                url=url,
+                headers=dict(request.headers),
+                params=request.query_params,
+                content=body,
+                timeout=30.0
+            )
+            return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Notification service unavailable: {e!s}")
 
 # Add dedicated endpoint for RAG samples search
 @app.get("/api/rag/samples")

@@ -91,8 +91,8 @@ services:
     ports:
       - "18089:8089"
     environment:
-      GATEWAY_HOST: 0.0.0.0
-      GATEWAY_PORT: 8089
+      HOST: 0.0.0.0
+      PORT: 8089
       GATEWAY_DEBUG: false
       
       # Service Discovery
@@ -102,7 +102,7 @@ services:
       STORAGE_SERVICE_URL: http://storage-service:8082
       SEQUENCING_SERVICE_URL: http://sequencing-service:8084
       NOTIFICATION_SERVICE_URL: http://notification-service:8085
-      RAG_SERVICE_URL: http://rag-service:8086
+      RAG_SERVICE_URL: http://lims-rag:8000
       TRANSACTION_SERVICE_URL: http://transaction-service:8088
       EVENT_SERVICE_URL: http://event-service:8087
       
@@ -207,7 +207,7 @@ services:
       
       # Service Integration
       AUTH_SERVICE_URL: http://auth-service:8080
-      STORAGE_SERVICE_URL: http://storage-service:8082
+      STORAGE_SERVICE_URL: http://lims-storage:8080
       NOTIFICATION_SERVICE_URL: http://notification-service:8085
       EVENT_SERVICE_URL: http://event-service:8087
       
@@ -300,6 +300,7 @@ services:
       
       # Database
       DATABASE_URL: postgresql://tracseq_admin:${POSTGRES_PASSWORD}@postgres-primary:5432/tracseq_prod
+      NOTIFICATION_DATABASE_URL: postgresql://tracseq_admin:${POSTGRES_PASSWORD}@postgres-primary:5432/tracseq_prod
       DB_MAX_CONNECTIONS: 20
       DB_MIN_CONNECTIONS: 5
       
@@ -429,7 +430,7 @@ services:
       STORAGE_SERVICE_URL: http://storage-service:8082
       SEQUENCING_SERVICE_URL: http://sequencing-service:8084
       NOTIFICATION_SERVICE_URL: http://notification-service:8085
-      RAG_SERVICE_URL: http://rag-service:8086
+      RAG_SERVICE_URL: http://lims-rag:8000
       EVENT_SERVICE_URL: http://event-service:8087
       
       # Transaction Configuration

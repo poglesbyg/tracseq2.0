@@ -46,7 +46,7 @@ impl DatabasePool {
         sqlx::query(
             r#"
             DO $$ BEGIN
-                CREATE TYPE priority AS ENUM (
+                CREATE TYPE notification_priority AS ENUM (
                     'low', 'medium', 'high', 'critical', 'urgent'
                 );
             EXCEPTION
@@ -95,7 +95,7 @@ impl DatabasePool {
                 title VARCHAR(255) NOT NULL,
                 message TEXT NOT NULL,
                 notification_type notification_type NOT NULL,
-                priority priority NOT NULL DEFAULT 'medium',
+                priority notification_priority NOT NULL DEFAULT 'medium',
                 status notification_status NOT NULL DEFAULT 'pending',
                 channels channel[] NOT NULL,
                 recipients TEXT[] NOT NULL,
@@ -234,23 +234,25 @@ impl DatabasePool {
         .await?;
 
         // Create indexes for performance
-        sqlx::query(
-            r#"
-            CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications(status);
-            CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at);
-            CREATE INDEX IF NOT EXISTS idx_notifications_scheduled_at ON notifications(scheduled_at);
-            CREATE INDEX IF NOT EXISTS idx_notifications_priority ON notifications(priority);
-            CREATE INDEX IF NOT EXISTS idx_delivery_attempts_notification_id ON delivery_attempts(notification_id);
-            CREATE INDEX IF NOT EXISTS idx_delivery_attempts_status ON delivery_attempts(status);
-            CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);
-            CREATE INDEX IF NOT EXISTS idx_subscriptions_event_type ON subscriptions(event_type);
-            CREATE INDEX IF NOT EXISTS idx_events_event_type ON events(event_type);
-            CREATE INDEX IF NOT EXISTS idx_events_source_service ON events(source_service);
-            CREATE INDEX IF NOT EXISTS idx_rate_limits_key ON rate_limits(key_identifier);
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
+        let indexes = vec![
+            "CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications(status)",
+            "CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_notifications_scheduled_at ON notifications(scheduled_at)",
+            "CREATE INDEX IF NOT EXISTS idx_notifications_priority ON notifications(priority)",
+            "CREATE INDEX IF NOT EXISTS idx_delivery_attempts_notification_id ON delivery_attempts(notification_id)",
+            "CREATE INDEX IF NOT EXISTS idx_delivery_attempts_status ON delivery_attempts(status)",
+            "CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_subscriptions_event_type ON subscriptions(event_type)",
+            "CREATE INDEX IF NOT EXISTS idx_events_event_type ON events(event_type)",
+            "CREATE INDEX IF NOT EXISTS idx_events_source_service ON events(source_service)",
+            "CREATE INDEX IF NOT EXISTS idx_rate_limits_key ON rate_limits(key_identifier)",
+        ];
+
+        for index_query in indexes {
+            sqlx::query(index_query)
+                .execute(&self.pool)
+                .await?;
+        }
 
         info!("Database migrations completed successfully");
         Ok(())

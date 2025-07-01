@@ -3,6 +3,7 @@
 #[cfg(feature = "database-persistence")]
 use crate::persistence::{DatabaseConfig, SagaPersistenceService};
 use crate::saga::{SagaError, SagaExecutionResult, SagaStatus, TransactionSaga};
+
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -11,6 +12,21 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
+
+// Dummy event service client for now
+#[derive(Clone)]
+struct EventServiceClient;
+
+impl EventServiceClient {
+    fn new(_url: &str, _name: &str) -> Self {
+        Self
+    }
+    
+    async fn publish_event(&self, event_type: &str, payload: serde_json::Value) -> Result<()> {
+        tracing::info!("Event published: {} with payload: {}", event_type, payload);
+        Ok(())
+    }
+}
 
 /// Trait for saga persistence operations
 #[async_trait]
@@ -125,7 +141,7 @@ pub struct TransactionCoordinator {
     persistence: Option<Arc<dyn SagaPersistence>>,
 
     /// Event client for publishing transaction events
-    event_client: Option<Arc<event_service::services::client::EventServiceClient>>,
+    event_client: Option<Arc<EventServiceClient>>,
 
     /// Coordinator configuration
     config: CoordinatorConfig,
@@ -263,7 +279,7 @@ impl TransactionCoordinator {
     pub fn new(config: CoordinatorConfig) -> Self {
         let event_client = if config.enable_events {
             Some(Arc::new(
-                event_service::services::client::EventServiceClient::new(
+                EventServiceClient::new(
                     &config.event_service_url,
                     "transaction-service",
                 ),
@@ -290,7 +306,7 @@ impl TransactionCoordinator {
     pub async fn with_persistence(config: CoordinatorConfig) -> Result<Self, anyhow::Error> {
         let event_client = if config.enable_events {
             Some(Arc::new(
-                event_service::services::client::EventServiceClient::new(
+                EventServiceClient::new(
                     &config.event_service_url,
                     "transaction-service",
                 ),
