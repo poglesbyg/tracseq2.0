@@ -1,0 +1,50 @@
+{
+  "name": "tracseq-python-playwright-tests",
+  "version": "1.0.0",
+  "description": "End-to-end tests for TracSeq 2.0 Python services using Playwright",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:headed": "playwright test --headed",
+    "test:mcp": "playwright test --project=mcp-dashboard",
+    "test:rag": "playwright test --project=enhanced-rag-service --project=lab-submission-rag",
+    "test:ml": "playwright test --project=ml-platform",
+    "test:api": "playwright test tests/api/",
+    "test:websocket": "playwright test tests/websocket/",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:integration": "playwright test --grep @integration",
+    "test:report": "playwright show-report",
+    "codegen": "playwright codegen",
+    "install:browsers": "playwright install --with-deps",
+    "lint": "eslint tests/**/*.ts",
+    "format": "prettier --write 'tests/**/*.{ts,js,json}'"
+  },
+  "keywords": [
+    "playwright",
+    "e2e",
+    "testing",
+    "tracseq"
+  ],
+  "author": "TracSeq Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.41.0",
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "dotenv": "^16.3.1",
+    "eslint": "^8.56.0",
+    "eslint-plugin-playwright": "^0.21.0",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3",
+    "ws": "^8.16.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.5",
+    "form-data": "^4.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^9.0.1"
+  }
+} 
