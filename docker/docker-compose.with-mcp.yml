@@ -1,0 +1,210 @@
+version: '3.9'
+
+# This is an enhanced version of the TracSeq 2.0 docker-compose that includes MCP integration
+# It extends the base services with Model Context Protocol capabilities
+
+services:
+  # Include all MCP services
+  mcp-proxy:
+    extends:
+      file: mcp/docker-compose.mcp.yml
+      service: mcp-proxy
+
+  mcp-dashboard:
+    extends:
+      file: mcp/docker-compose.mcp.yml
+      service: mcp-dashboard
+
+  cognitive-assistant-mcp:
+    extends:
+      file: mcp/docker-compose.mcp.yml
+      service: cognitive-assistant-mcp
+
+  consul:
+    extends:
+      file: mcp/docker-compose.mcp.yml
+      service: consul
+
+  # Enhanced Cognitive Assistant Service with MCP integration
+  cognitive-assistant-service:
+    image: tracseq/cognitive-assistant-service:latest
+    container_name: cognitive-assistant-service
+    hostname: cognitive-assistant-service
+    build:
+      context: ../lims-core/cognitive_assistant_service
+      dockerfile: Dockerfile
+    ports:
+      - "8015:8015"
+    environment:
+      - RUST_LOG=info
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/tracseq_cognitive
+      - MCP_ENABLED=true
+      - MCP_PROXY_URL=ws://mcp-proxy:9500
+      - MCP_COGNITIVE_URL=ws://cognitive-assistant-mcp:9501
+      - OLLAMA_API_URL=http://ollama:11434
+    networks:
+      - tracseq-network
+    depends_on:
+      - postgres
+      - mcp-proxy
+      - cognitive-assistant-mcp
+    restart: unless-stopped
+
+  # Enhanced Storage Service with MCP integration
+  enhanced-storage-service:
+    image: tracseq/enhanced-storage-service:latest
+    container_name: enhanced-storage-service
+    hostname: enhanced-storage-service
+    build:
+      context: ../lims-core/enhanced_storage_service
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - RUST_LOG=info
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/tracseq_storage
+      - MCP_ENABLED=true
+      - MCP_PROXY_URL=ws://mcp-proxy:9500
+    networks:
+      - tracseq-network
+    depends_on:
+      - postgres
+      - mcp-proxy
+    restart: unless-stopped
+
+  # Enhanced RAG Service with MCP integration
+  enhanced-rag-service:
+    image: tracseq/enhanced-rag-service:latest
+    container_name: enhanced-rag-service
+    hostname: enhanced-rag-service
+    build:
+      context: ../lims-ai/enhanced_rag_service
+      dockerfile: Dockerfile
+    ports:
+      - "8100:8100"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/tracseq_rag
+      - OLLAMA_API_URL=http://ollama:11434
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - MCP_ENABLED=true
+      - MCP_PROXY_URL=ws://mcp-proxy:9500
+      - LOG_LEVEL=info
+    networks:
+      - tracseq-network
+    volumes:
+      - rag-documents:/app/documents
+      - rag-models:/app/models
+    depends_on:
+      - postgres
+      - ollama
+      - chromadb
+      - mcp-proxy
+    restart: unless-stopped
+
+  # Base services (from existing docker-compose)
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    hostname: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=tracseq
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    hostname: redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    hostname: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    environment:
+      - OLLAMA_MODELS=/root/.ollama/models
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    hostname: chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Lab Manager (main service)
+  lab-manager:
+    image: tracseq/lab-manager:latest
+    container_name: lab-manager
+    hostname: lab-manager
+    build:
+      context: ../lims-core/lab_manager
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - RUST_LOG=info
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/tracseq
+      - REDIS_URL=redis://redis:6379
+      - MCP_ENABLED=true
+      - MCP_PROXY_URL=ws://mcp-proxy:9500
+    networks:
+      - tracseq-network
+    depends_on:
+      - postgres
+      - redis
+      - mcp-proxy
+    restart: unless-stopped
+
+networks:
+  tracseq-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  ollama-models:
+    driver: local
+  chroma-data:
+    driver: local
+  rag-documents:
+    driver: local
+  rag-models:
+    driver: local
+  cognitive-logs:
+    driver: local
+  cognitive-cache:
+    driver: local
+  consul-data:
+    driver: local 

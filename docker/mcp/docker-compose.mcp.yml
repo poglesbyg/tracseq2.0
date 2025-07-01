@@ -1,0 +1,156 @@
+version: '3.9'
+
+services:
+  # MCP Proxy Server - Central coordination
+  mcp-proxy:
+    build:
+      context: ../../lims-ai/mcp-proxy
+      dockerfile: Dockerfile
+    container_name: mcp-proxy
+    hostname: mcp-proxy
+    ports:
+      - "9500:9500"  # MCP WebSocket API
+      - "9590:9590"  # Prometheus metrics
+    environment:
+      - LOG_LEVEL=info
+      - METRICS_ENABLED=true
+      - SERVICE_DISCOVERY_ENABLED=true
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    depends_on:
+      - consul
+    healthcheck:
+      test: ["CMD", "python", "/health_check.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MCP Monitoring Dashboard
+  mcp-dashboard:
+    build:
+      context: ../../lims-ai/mcp-dashboard
+      dockerfile: Dockerfile
+    container_name: mcp-dashboard
+    hostname: mcp-dashboard
+    ports:
+      - "7890:7890"  # Dashboard UI
+    environment:
+      - MCP_PROXY_URL=ws://mcp-proxy:9500
+      - FLASK_ENV=production
+      - LOG_LEVEL=info
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    depends_on:
+      - mcp-proxy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7890/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Cognitive Assistant MCP Service
+  cognitive-assistant-mcp:
+    build:
+      context: ../../lims-ai/cognitive_assistant
+      dockerfile: Dockerfile.mcp
+    container_name: cognitive-assistant-mcp
+    hostname: cognitive-assistant-mcp
+    ports:
+      - "9501:9501"  # MCP WebSocket API
+    environment:
+      - MCP_SERVICE_NAME=cognitive_assistant
+      - MCP_SERVICE_PORT=9501
+      - MCP_PROXY_URL=ws://mcp-proxy:9500
+      - OLLAMA_API_URL=http://ollama:11434
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/tracseq_cognitive
+      - LOG_LEVEL=info
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    depends_on:
+      - mcp-proxy
+      - ollama
+      - chromadb
+      - postgres
+    volumes:
+      - cognitive-logs:/app/logs
+      - cognitive-cache:/app/cache
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import asyncio, websockets, json; asyncio.run((lambda: asyncio.wait_for(websockets.connect('ws://localhost:9501'), timeout=5))())\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Service Discovery (Consul)
+  consul:
+    image: consul:1.17
+    container_name: consul
+    hostname: consul
+    ports:
+      - "8500:8500"  # HTTP API
+      - "8600:8600/udp"  # DNS
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+      - CONSUL_CLIENT_INTERFACE=eth0
+    command: agent -dev -ui -client=0.0.0.0
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    volumes:
+      - consul-data:/consul/data
+
+  # Additional MCP service templates (to be implemented)
+  # rag-service-mcp:
+  #   build:
+  #     context: ../../lims-ai/enhanced_rag_service
+  #     dockerfile: Dockerfile.mcp
+  #   container_name: rag-service-mcp
+  #   hostname: rag-service-mcp
+  #   ports:
+  #     - "9502:9502"
+  #   environment:
+  #     - MCP_SERVICE_NAME=rag_service
+  #     - MCP_SERVICE_PORT=9502
+  #     - MCP_PROXY_URL=ws://mcp-proxy:9500
+  #   networks:
+  #     - tracseq-network
+  #   depends_on:
+  #     - mcp-proxy
+
+  # notification-service-mcp:
+  #   build:
+  #     context: ../../lims-core/notification_service
+  #     dockerfile: Dockerfile.mcp
+  #   container_name: notification-service-mcp
+  #   hostname: notification-service-mcp
+  #   ports:
+  #     - "9503:9503"
+  #   environment:
+  #     - MCP_SERVICE_NAME=notification_service
+  #     - MCP_SERVICE_PORT=9503
+  #     - MCP_PROXY_URL=ws://mcp-proxy:9500
+  #   networks:
+  #     - tracseq-network
+  #   depends_on:
+  #     - mcp-proxy
+
+networks:
+  tracseq-network:
+    external: true
+
+volumes:
+  cognitive-logs:
+    driver: local
+  cognitive-cache:
+    driver: local
+  consul-data:
+    driver: local 

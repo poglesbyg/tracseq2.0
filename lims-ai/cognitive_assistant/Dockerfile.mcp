@@ -1,0 +1,62 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    make \
+    curl \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code
+COPY mcp_server.py .
+COPY __init__.py .
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/cache
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV MCP_SERVICE_NAME=cognitive_assistant
+ENV MCP_SERVICE_PORT=9501
+
+# Expose ports
+EXPOSE 9501
+
+# Health check script
+COPY <<'EOF' /health_check.py
+#!/usr/bin/env python3
+import sys
+import asyncio
+import websockets
+import json
+
+async def check_health():
+    try:
+        async with websockets.connect("ws://localhost:9501") as ws:
+            await ws.send(json.dumps({"jsonrpc": "2.0", "method": "ping", "id": 1}))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            sys.exit(0)
+    except:
+        sys.exit(1)
+
+asyncio.run(check_health())
+EOF
+
+RUN chmod +x /health_check.py
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python /health_check.py
+
+# Run the server
+CMD ["python", "-u", "mcp_server.py"] 
