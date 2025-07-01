@@ -7,6 +7,7 @@ Minimal working implementation for demonstration
 import json
 import os
 import sys
+import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
@@ -1058,154 +1059,118 @@ async def proxy_notification(path: str, request: Request):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Notification service unavailable: {e!s}")
 
-# Proxy endpoints for projects - root path
-@app.api_route("/api/projects", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def proxy_projects_root(request: Request):
-    """Proxy requests to Project service root"""
-    try:
-        async with httpx.AsyncClient() as client:
-            url = f"{PROJECT_SERVICE_URL}/projects"
-            body = None
-            if request.method in ["POST", "PUT", "PATCH"]:
-                body = await request.body()
+# NOTE: Removed proxy endpoints - using direct endpoints below
+# Project endpoints
+@app.get("/api/projects")
+async def get_projects():
+    """Get all projects"""
+    # Return empty list for now - in production, this would query the database
+    return []
 
-            response = await client.request(
-                method=request.method,
-                url=url,
-                headers=dict(request.headers),
-                params=request.query_params,
-                content=body,
-                timeout=30.0
-            )
-            return response.json()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Project service unavailable: {e!s}")
+@app.get("/api/projects/batches")
+async def get_batches():
+    """Get all batches"""
+    # Return empty list for now
+    return []
 
-# Proxy endpoints for projects - sub paths
-@app.api_route("/api/projects/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def proxy_projects(path: str, request: Request):
-    """Proxy requests to Project service"""
-    # Return mock data for testing
-    if request.method == "GET" and path == "":
-        # Return empty list of projects
-        return []
-    elif request.method == "GET" and path == "batches":
-        # Return empty list of batches
-        return []
-    
-    try:
-        async with httpx.AsyncClient() as client:
-            url = f"{PROJECT_SERVICE_URL}/projects/{path}"
-            body = None
-            if request.method in ["POST", "PUT", "PATCH"]:
-                body = await request.body()
+@app.post("/api/projects")
+async def create_project(project: dict):
+    """Create a new project"""
+    # In production, this would save to database
+    return {"id": str(uuid.uuid4()), **project}
 
-            response = await client.request(
-                method=request.method,
-                url=url,
-                headers=dict(request.headers),
-                params=request.query_params,
-                content=body,
-                timeout=30.0
-            )
-            return response.json()
-    except Exception as e:
-        # Return empty data on error for testing
-        if request.method == "GET":
-            return []
-        raise HTTPException(status_code=502, detail=f"Project service unavailable: {e!s}")
+@app.get("/api/projects/{project_id}")
+async def get_project(project_id: str):
+    """Get a specific project"""
+    # Return mock project
+    return {
+        "id": project_id,
+        "project_code": "PROJ-2024-001",
+        "name": "Sample Project",
+        "status": "active",
+        "priority": "high",
+        "created_at": datetime.now().isoformat()
+    }
 
-# Proxy endpoints for library prep - root path
-@app.api_route("/api/library-prep/preparations", methods=["GET", "POST"])
-async def proxy_library_prep_preparations(request: Request):
-    """Proxy requests to Library Prep service preparations"""
-    try:
-        async with httpx.AsyncClient() as client:
-            url = f"{LIBRARY_PREP_SERVICE_URL}/library-prep/preparations"
-            body = None
-            if request.method in ["POST", "PUT", "PATCH"]:
-                body = await request.body()
+@app.get("/api/projects/{project_id}/files")
+async def get_project_files(project_id: str):
+    """Get project files"""
+    return []
 
-            response = await client.request(
-                method=request.method,
-                url=url,
-                headers=dict(request.headers),
-                params=request.query_params,
-                content=body,
-                timeout=30.0
-            )
-            return response.json()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Library prep service unavailable: {e!s}")
+@app.get("/api/projects/{project_id}/signoffs")
+async def get_project_signoffs(project_id: str):
+    """Get project signoffs"""
+    return []
 
-# Proxy endpoints for library prep - sub paths
-@app.api_route("/api/library-prep/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def proxy_library_prep(path: str, request: Request):
-    """Proxy requests to Library Prep service"""
-    try:
-        async with httpx.AsyncClient() as client:
-            url = f"{LIBRARY_PREP_SERVICE_URL}/{path}"
-            body = None
-            if request.method in ["POST", "PUT", "PATCH"]:
-                body = await request.body()
+# NOTE: Removed proxy endpoints for library prep - using direct endpoints below
+# Library Prep endpoints
+@app.get("/api/library-prep/preparations")
+async def get_library_preparations():
+    """Get library preparations"""
+    return []
 
-            response = await client.request(
-                method=request.method,
-                url=url,
-                headers=dict(request.headers),
-                params=request.query_params,
-                content=body,
-                timeout=30.0
-            )
-            return response.json()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Library prep service unavailable: {e!s}")
+@app.get("/api/library-prep/protocols/active")
+async def get_active_protocols():
+    """Get active library prep protocols"""
+    return []
+
+@app.post("/api/library-prep/preparations")
+async def create_library_prep(prep: dict):
+    """Create a new library preparation"""
+    return {"id": str(uuid.uuid4()), **prep}
+
+@app.get("/api/library-prep/protocols")
+async def get_protocols():
+    """Get all library prep protocols"""
+    return []
 
 # Proxy endpoints for QC
-@app.api_route("/api/qc/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def proxy_qc(path: str, request: Request):
-    """Proxy requests to QC service"""
-    try:
-        async with httpx.AsyncClient() as client:
-            url = f"{QAQC_SERVICE_URL}/{path}"
-            body = None
-            if request.method in ["POST", "PUT", "PATCH"]:
-                body = await request.body()
+# QC endpoints
+@app.get("/api/qc/reviews")
+async def get_qc_reviews():
+    """Get QC reviews"""
+    return []
 
-            response = await client.request(
-                method=request.method,
-                url=url,
-                headers=dict(request.headers),
-                params=request.query_params,
-                content=body,
-                timeout=30.0
-            )
-            return response.json()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"QC service unavailable: {e!s}")
+@app.get("/api/qc/metrics")
+async def get_qc_metrics():
+    """Get QC metrics"""
+    return []
 
-# Proxy endpoints for flow cells
-@app.api_route("/api/flow-cells/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def proxy_flow_cells(path: str, request: Request):
-    """Proxy requests to Flow Cell service"""
-    try:
-        async with httpx.AsyncClient() as client:
-            url = f"{FLOW_CELL_SERVICE_URL}/{path}"
-            body = None
-            if request.method in ["POST", "PUT", "PATCH"]:
-                body = await request.body()
+@app.get("/api/qc/control-samples")
+async def get_control_samples():
+    """Get control samples"""
+    return []
 
-            response = await client.request(
-                method=request.method,
-                url=url,
-                headers=dict(request.headers),
-                params=request.query_params,
-                content=body,
-                timeout=30.0
-            )
-            return response.json()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Flow cell service unavailable: {e!s}")
+@app.post("/api/qc/reviews")
+async def create_qc_review(review: dict):
+    """Create a new QC review"""
+    return {"id": str(uuid.uuid4()), **review}
+
+# Flow Cell endpoints
+@app.get("/api/flow-cells/types")
+async def get_flow_cell_types():
+    """Get flow cell types"""
+    return [
+        {"id": str(uuid.uuid4()), "name": "NovaSeq S4", "lane_count": 4, "reads_per_lane": 3200000000},
+        {"id": str(uuid.uuid4()), "name": "NovaSeq S2", "lane_count": 2, "reads_per_lane": 1650000000},
+        {"id": str(uuid.uuid4()), "name": "MiSeq v3", "lane_count": 1, "reads_per_lane": 25000000}
+    ]
+
+@app.post("/api/flow-cells/designs")
+async def create_flow_cell_design(design: dict):
+    """Create a new flow cell design"""
+    return {"id": str(uuid.uuid4()), **design}
+
+@app.post("/api/flow-cells/optimize")
+async def optimize_flow_cell(optimization_request: dict):
+    """Optimize flow cell design"""
+    # Mock optimization result
+    return {
+        "optimized": True,
+        "lane_assignments": [],
+        "balance_score": 0.95,
+        "estimated_reads": 3200000000
+    }
 
 # Add dedicated endpoint for RAG samples search
 @app.get("/api/rag/samples")
