@@ -1,0 +1,351 @@
+version: '3.9'
+
+# Production-optimized MCP configuration with resource limits and security hardening
+
+services:
+  # MCP Proxy Server - Production Configuration
+  mcp-proxy:
+    image: tracseq/mcp-proxy:latest
+    container_name: mcp-proxy
+    hostname: mcp-proxy
+    ports:
+      - "127.0.0.1:9500:9500"  # Only bind to localhost
+      - "127.0.0.1:9590:9590"  # Metrics only on localhost
+    environment:
+      - LOG_LEVEL=warn
+      - METRICS_ENABLED=true
+      - SERVICE_DISCOVERY_ENABLED=true
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      # Production settings
+      - MAX_CONCURRENT_REQUESTS=500
+      - REQUEST_TIMEOUT_MS=60000
+      - CIRCUIT_BREAKER_THRESHOLD=10
+      - CIRCUIT_BREAKER_TIMEOUT=120
+      - ENABLE_TLS=${MCP_TLS_ENABLED:-false}
+      - TLS_CERT_PATH=/certs/server.crt
+      - TLS_KEY_PATH=/certs/server.key
+    networks:
+      - tracseq-internal
+    restart: always
+    depends_on:
+      - consul
+    volumes:
+      - ./certs:/certs:ro
+      - mcp-proxy-logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+  # MCP Dashboard - Production Configuration
+  mcp-dashboard:
+    image: tracseq/mcp-dashboard:latest
+    container_name: mcp-dashboard
+    hostname: mcp-dashboard
+    ports:
+      - "127.0.0.1:7890:7890"  # Only bind to localhost
+    environment:
+      - MCP_PROXY_URL=ws://mcp-proxy:9500
+      - FLASK_ENV=production
+      - LOG_LEVEL=warn
+      - SECRET_KEY=${DASHBOARD_SECRET_KEY}
+      - SESSION_COOKIE_SECURE=true
+      - SESSION_COOKIE_HTTPONLY=true
+      - SESSION_COOKIE_SAMESITE=Strict
+    networks:
+      - tracseq-internal
+    restart: always
+    depends_on:
+      - mcp-proxy
+    volumes:
+      - mcp-dashboard-logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # Cognitive Assistant MCP - Production Configuration
+  cognitive-assistant-mcp:
+    image: tracseq/cognitive-assistant-mcp:latest
+    container_name: cognitive-assistant-mcp
+    hostname: cognitive-assistant-mcp
+    expose:
+      - "9501"  # Only expose internally
+    environment:
+      - MCP_SERVICE_NAME=cognitive_assistant
+      - MCP_SERVICE_PORT=9501
+      - MCP_PROXY_URL=ws://mcp-proxy:9500
+      - OLLAMA_API_URL=http://ollama:11434
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - DATABASE_URL=${DATABASE_URL}
+      - LOG_LEVEL=warn
+      - PYTHONUNBUFFERED=1
+      # Performance settings
+      - MAX_WORKERS=4
+      - CONNECTION_POOL_SIZE=20
+      - CACHE_TTL=3600
+    networks:
+      - tracseq-internal
+      - tracseq-data
+    restart: always
+    depends_on:
+      - mcp-proxy
+      - ollama
+      - chromadb
+      - postgres
+    volumes:
+      - cognitive-logs:/app/logs
+      - cognitive-cache:/app/cache
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # Enhanced RAG Service MCP - Production Configuration
+  rag-service-mcp:
+    image: tracseq/rag-service-mcp:latest
+    container_name: rag-service-mcp
+    hostname: rag-service-mcp
+    expose:
+      - "8100"  # FastAPI HTTP internal
+      - "9502"  # MCP WebSocket internal
+    environment:
+      - MCP_SERVICE_NAME=rag_service
+      - MCP_SERVICE_PORT=9502
+      - MCP_PROXY_URL=ws://mcp-proxy:9500
+      - DATABASE_URL=${DATABASE_URL}
+      - OLLAMA_API_URL=http://ollama:11434
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - LOG_LEVEL=warn
+      - PYTHONUNBUFFERED=1
+      # Performance settings
+      - WORKERS=4
+      - MAX_BATCH_SIZE=100
+      - EMBEDDING_CACHE_SIZE=10000
+    networks:
+      - tracseq-internal
+      - tracseq-data
+    restart: always
+    depends_on:
+      - mcp-proxy
+      - postgres
+      - ollama
+      - chromadb
+    volumes:
+      - rag-documents:/app/documents:ro
+      - rag-models:/app/models:ro
+      - rag-logs:/app/logs
+      - rag-cache:/app/cache
+    deploy:
+      replicas: 2  # Run multiple instances
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # Consul - Production Configuration
+  consul:
+    image: consul:1.17
+    container_name: consul
+    hostname: consul
+    ports:
+      - "127.0.0.1:8500:8500"  # HTTP API localhost only
+      - "8600:8600/udp"        # DNS
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+      - CONSUL_CLIENT_INTERFACE=eth0
+      - CONSUL_DATACENTER=tracseq-prod
+      - CONSUL_ENCRYPT=${CONSUL_ENCRYPT_KEY}
+      - CONSUL_BOOTSTRAP_EXPECT=3
+      - CONSUL_UI=true
+      - CONSUL_LOG_LEVEL=warn
+    command: agent -server -ui -client=0.0.0.0
+    networks:
+      - tracseq-internal
+    restart: always
+    volumes:
+      - consul-data:/consul/data
+      - consul-config:/consul/config
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+  # Nginx Reverse Proxy for Production
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certs:/etc/nginx/ssl:ro
+      - nginx-cache:/var/cache/nginx
+    networks:
+      - tracseq-internal
+      - tracseq-public
+    restart: always
+    depends_on:
+      - mcp-proxy
+      - mcp-dashboard
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+
+networks:
+  tracseq-public:
+    driver: bridge
+  tracseq-internal:
+    driver: bridge
+    internal: true
+  tracseq-data:
+    driver: bridge
+    internal: true
+
+volumes:
+  # Application logs (backed up)
+  cognitive-logs:
+    driver: local
+  mcp-proxy-logs:
+    driver: local
+  mcp-dashboard-logs:
+    driver: local
+  rag-logs:
+    driver: local
+  
+  # Cache volumes (ephemeral)
+  cognitive-cache:
+    driver: local
+  rag-cache:
+    driver: local
+  nginx-cache:
+    driver: local
+  
+  # Data volumes (persistent, backed up)
+  consul-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/tracseq/consul/data
+  consul-config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/tracseq/consul/config
+  rag-documents:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/tracseq/documents
+  rag-models:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/tracseq/models 

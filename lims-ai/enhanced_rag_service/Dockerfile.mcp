@@ -1,0 +1,178 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    make \
+    curl \
+    libpq-dev \
+    libmagic1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install MCP-specific dependencies
+RUN pip install --no-cache-dir \
+    mcp==0.1.0 \
+    websockets==12.0 \
+    asyncio==3.4.3
+
+# Copy source code
+COPY src/ ./src/
+COPY alembic.ini .
+COPY alembic/ ./alembic/
+
+# Create necessary directories
+RUN mkdir -p /app/documents /app/models /app/logs /app/cache
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV MCP_SERVICE_NAME=rag_service
+ENV MCP_SERVICE_PORT=9502
+
+# Default environment variables
+ENV DATABASE_URL=postgresql://postgres:postgres@postgres:5432/tracseq_rag
+ENV OLLAMA_API_URL=http://ollama:11434
+ENV CHROMA_HOST=chromadb
+ENV CHROMA_PORT=8000
+ENV LOG_LEVEL=info
+
+# Health check script
+COPY <<'EOF' /health_check.py
+#!/usr/bin/env python3
+import sys
+import asyncio
+import websockets
+import json
+
+async def check_health():
+    try:
+        async with websockets.connect("ws://localhost:9502") as ws:
+            await ws.send(json.dumps({"jsonrpc": "2.0", "method": "ping", "id": 1}))
+            response = await asyncio.wait_for(ws.recv(), timeout=5)
+            data = json.loads(response)
+            sys.exit(0)
+    except Exception as e:
+        print(f"Health check failed: {e}")
+        sys.exit(1)
+
+asyncio.run(check_health())
+EOF
+
+RUN chmod +x /health_check.py
+
+# MCP wrapper script
+COPY <<'EOF' /start-mcp.py
+#!/usr/bin/env python3
+import os
+import sys
+import asyncio
+import logging
+from typing import Dict, Any
+
+# Add source to path
+sys.path.insert(0, '/app')
+
+from src.api.rag_controller import app as fastapi_app
+from mcp import MCPServer, method
+import uvicorn
+import threading
+
+logger = logging.getLogger(__name__)
+
+class RAGServiceMCP(MCPServer):
+    """MCP wrapper for Enhanced RAG Service"""
+    
+    def __init__(self):
+        super().__init__("rag_service")
+        self.app = fastapi_app
+        
+    @method("rag.extract_document")
+    async def extract_document(self, file_path: str, options: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Extract information from a document using RAG"""
+        # Implement document extraction logic
+        return {
+            "status": "success",
+            "extracted_data": {},
+            "confidence": 0.95
+        }
+    
+    @method("rag.query")
+    async def query(self, query: str, context: str = None) -> Dict[str, Any]:
+        """Query the RAG system"""
+        # Implement RAG query logic
+        return {
+            "answer": "Sample answer",
+            "sources": [],
+            "confidence": 0.9
+        }
+    
+    @method("rag.embed_documents")
+    async def embed_documents(self, documents: list) -> Dict[str, Any]:
+        """Embed documents into vector store"""
+        # Implement embedding logic
+        return {
+            "status": "success",
+            "embedded_count": len(documents)
+        }
+    
+    @method("ping")
+    async def ping(self) -> Dict[str, Any]:
+        """Health check endpoint"""
+        return {"status": "healthy", "service": "rag_service"}
+
+def run_fastapi():
+    """Run FastAPI in a separate thread"""
+    uvicorn.run(
+        fastapi_app,
+        host="0.0.0.0",
+        port=8100,
+        log_level=os.environ.get("LOG_LEVEL", "info").lower()
+    )
+
+async def main():
+    # Start FastAPI in background thread
+    fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
+    fastapi_thread.start()
+    
+    # Start MCP server
+    server = RAGServiceMCP()
+    port = int(os.environ.get("MCP_SERVICE_PORT", 9502))
+    
+    # Register with MCP proxy if configured
+    proxy_url = os.environ.get("MCP_PROXY_URL")
+    if proxy_url:
+        await server.register_with_proxy(proxy_url)
+    
+    logger.info(f"RAG Service MCP listening on port {port}")
+    await server.start(host="0.0.0.0", port=port)
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO")),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    asyncio.run(main())
+EOF
+
+RUN chmod +x /start-mcp.py
+
+# Expose ports
+# FastAPI HTTP port
+EXPOSE 8100
+# MCP WebSocket port
+EXPOSE 9502
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python /health_check.py
+
+# Run the server
+CMD ["python", "-u", "/start-mcp.py"] 

@@ -108,23 +108,43 @@ services:
     volumes:
       - consul-data:/consul/data
 
-  # Additional MCP service templates (to be implemented)
-  # rag-service-mcp:
-  #   build:
-  #     context: ../../lims-ai/enhanced_rag_service
-  #     dockerfile: Dockerfile.mcp
-  #   container_name: rag-service-mcp
-  #   hostname: rag-service-mcp
-  #   ports:
-  #     - "9502:9502"
-  #   environment:
-  #     - MCP_SERVICE_NAME=rag_service
-  #     - MCP_SERVICE_PORT=9502
-  #     - MCP_PROXY_URL=ws://mcp-proxy:9500
-  #   networks:
-  #     - tracseq-network
-  #   depends_on:
-  #     - mcp-proxy
+  # Enhanced RAG Service MCP
+  rag-service-mcp:
+    build:
+      context: ../../lims-ai/enhanced_rag_service
+      dockerfile: Dockerfile.mcp
+    container_name: rag-service-mcp
+    hostname: rag-service-mcp
+    ports:
+      - "8100:8100"  # FastAPI HTTP
+      - "9502:9502"  # MCP WebSocket
+    environment:
+      - MCP_SERVICE_NAME=rag_service
+      - MCP_SERVICE_PORT=9502
+      - MCP_PROXY_URL=ws://mcp-proxy:9500
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/tracseq_rag
+      - OLLAMA_API_URL=http://ollama:11434
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - LOG_LEVEL=info
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    depends_on:
+      - mcp-proxy
+      - postgres
+      - ollama
+      - chromadb
+    volumes:
+      - rag-documents:/app/documents
+      - rag-models:/app/models
+      - rag-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "/health_check.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   # notification-service-mcp:
   #   build:
@@ -153,4 +173,10 @@ volumes:
   cognitive-cache:
     driver: local
   consul-data:
+    driver: local
+  rag-documents:
+    driver: local
+  rag-models:
+    driver: local
+  rag-logs:
     driver: local 

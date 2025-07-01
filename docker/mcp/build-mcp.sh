@@ -39,6 +39,16 @@ docker build -t tracseq/cognitive-assistant-mcp:latest \
     -f "$PROJECT_ROOT/lims-ai/cognitive_assistant/Dockerfile.mcp" \
     "$PROJECT_ROOT/lims-ai/cognitive_assistant"
 
+# Build Enhanced RAG Service MCP
+echo -e "${YELLOW}Building Enhanced RAG Service MCP...${NC}"
+if [ -f "$PROJECT_ROOT/lims-ai/enhanced_rag_service/Dockerfile.mcp" ]; then
+    docker build -t tracseq/rag-service-mcp:latest \
+        -f "$PROJECT_ROOT/lims-ai/enhanced_rag_service/Dockerfile.mcp" \
+        "$PROJECT_ROOT/lims-ai/enhanced_rag_service"
+else
+    echo -e "${YELLOW}Warning: RAG Service Dockerfile.mcp not found, skipping...${NC}"
+fi
+
 echo -e "${GREEN}✓ All MCP Docker images built successfully!${NC}"
 
 # List built images
