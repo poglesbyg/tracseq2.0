@@ -26,7 +26,7 @@ services:
       - ./backups:/backups
       - ./init-scripts:/docker-entrypoint-initdb.d/
     ports:
-      - "5432:5432"
+      - "15432:5432"
     command: >
       postgres
       -c max_connections=200
@@ -85,11 +85,11 @@ services:
   # API Gateway - Intelligent Routing
   api-gateway:
     build:
-      context: ../../api_gateway
+      context: ../../lims-core/api_gateway
       dockerfile: Dockerfile
     container_name: tracseq-api-gateway
     ports:
-      - "8089:8089"
+      - "18089:8089"
     environment:
       GATEWAY_HOST: 0.0.0.0
       GATEWAY_PORT: 8089
@@ -145,7 +145,7 @@ services:
   # Authentication Service
   auth-service:
     build:
-      context: ../../auth_service
+      context: ../../lims-core/auth_service
       dockerfile: Dockerfile
     container_name: tracseq-auth-service
     ports:
@@ -190,7 +190,7 @@ services:
   # Sample Management Service
   sample-service:
     build:
-      context: ../../sample_service
+      context: ../../lims-core/sample_service
       dockerfile: Dockerfile
     container_name: tracseq-sample-service
     ports:
@@ -239,7 +239,7 @@ services:
   # Template Management Service
   template-service:
     build:
-      context: ../../template_service
+      context: ../../lims-core/template_service
       dockerfile: Dockerfile
     container_name: tracseq-template-service
     ports:
@@ -288,7 +288,7 @@ services:
   # Notification Service
   notification-service:
     build:
-      context: ../../notification_service
+      context: ../../lims-core/notification_service
       dockerfile: Dockerfile
     container_name: tracseq-notification-service
     ports:
@@ -350,7 +350,7 @@ services:
   # Sequencing Service
   sequencing-service:
     build:
-      context: ../../sequencing_service
+      context: ../../lims-core/sequencing_service
       dockerfile: Dockerfile
     container_name: tracseq-sequencing-service
     ports:
@@ -407,7 +407,7 @@ services:
   # Transaction Service (Saga Pattern)
   transaction-service:
     build:
-      context: ../../transaction_service
+      context: ../../lims-core/transaction_service
       dockerfile: Dockerfile
     container_name: tracseq-transaction-service
     ports:
@@ -469,7 +469,7 @@ services:
   # Enhanced Storage Service
   storage-service:
     build:
-      context: ../../enhanced_storage_service
+      context: ../../lims-core/enhanced_storage_service
       dockerfile: Dockerfile
     container_name: tracseq-storage-service
     ports:
@@ -519,7 +519,7 @@ services:
   # Event Service
   event-service:
     build:
-      context: ../../event_service
+      context: ../../lims-core/event_service
       dockerfile: Dockerfile
     container_name: tracseq-event-service
     ports:
@@ -549,17 +549,17 @@ services:
       - ./logs/event:/app/logs
     networks:
       - tracseq-prod-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    restart: "no"
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
 
   # Enhanced RAG Service
   rag-service:
     build:
-      context: ../../enhanced_rag_service
+      context: ../../lims-ai/enhanced_rag_service
       dockerfile: Dockerfile
     container_name: tracseq-rag-service
     ports:
@@ -627,7 +627,7 @@ services:
   # Spreadsheet Versioning Service
   spreadsheet-versioning-service:
     build:
-      context: ../../spreadsheet_versioning_service
+      context: ../../lims-core/spreadsheet_versioning_service
       dockerfile: Dockerfile
     container_name: tracseq-spreadsheet-versioning
     ports:
