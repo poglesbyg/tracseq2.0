@@ -10,7 +10,7 @@ description = "Centralized configuration management service for TracSeq microser
 axum = { version = "0.7", features = ["json", "query", "macros"] }
 tokio = { version = "1.35", features = ["full"] }
 tower = { version = "0.4", features = ["full"] }
-tower-http = { version = "0.5", features = ["cors", "trace", "compression"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
