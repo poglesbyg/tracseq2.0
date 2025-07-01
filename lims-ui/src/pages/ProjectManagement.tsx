@@ -83,7 +83,7 @@ export default function ProjectManagement() {
     queryKey: ['batches', searchTerm],
     queryFn: async () => {
       const params = searchTerm ? { batch_number: searchTerm } : {};
-      const response = await api.get('/api/batches', { params });
+      const response = await api.get('/api/projects/batches', { params });
       return response.data;
     },
     enabled: selectedTab === 'batches',
@@ -103,7 +103,7 @@ export default function ProjectManagement() {
   const { data: templates } = useQuery<TemplateFile[]>({
     queryKey: ['templates'],
     queryFn: async () => {
-      const response = await api.get('/api/templates/repository');
+      const response = await api.get('/api/templates');
       return response.data;
     },
     enabled: selectedTab === 'templates',

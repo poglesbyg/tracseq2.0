@@ -44,6 +44,16 @@ interface QCDashboardStats {
   failing_metrics_count: number;
 }
 
+interface QcControlSample {
+  id: string;
+  name: string;
+  sample_type: string;
+  lot_number: string;
+  expiry_date: string;
+  target_values: Record<string, number>;
+  is_active: boolean;
+}
+
 export default function QualityControl() {
   const [selectedTab, setSelectedTab] = useState<'dashboard' | 'reviews' | 'metrics' | 'controls'>('dashboard');
   const [selectedReview, setSelectedReview] = useState<QCReview | null>(null);
@@ -60,7 +70,7 @@ export default function QualityControl() {
 
   // Fetch pending QC reviews
   const { data: pendingReviews, isLoading: isLoadingReviews } = useQuery<QCReview[]>({
-    queryKey: ['qc-pending-reviews'],
+    queryKey: ['qc-reviews', 'pending'],
     queryFn: async () => {
       const response = await api.get('/api/qc/reviews', { params: { status: 'pending' } });
       return response.data;
@@ -74,6 +84,25 @@ export default function QualityControl() {
       const response = await api.get('/api/qc/metrics/recent');
       return response.data;
     },
+  });
+
+  // Fetch QC metrics
+  const { data: metrics, isLoading: isLoadingMetrics } = useQuery<QCMetric[]>({
+    queryKey: ['qc-metrics'],
+    queryFn: async () => {
+      const response = await api.get('/api/qc/metrics');
+      return response.data;
+    },
+  });
+
+  // Fetch control samples
+  const { data: controlSamples } = useQuery<QcControlSample[]>({
+    queryKey: ['qc-control-samples'],
+    queryFn: async () => {
+      const response = await api.get('/api/qc/control-samples');
+      return response.data;
+    },
+    enabled: selectedTab === 'controls',
   });
 
   // Submit QC review decision
@@ -311,6 +340,75 @@ export default function QualityControl() {
                 ))}
               </ul>
             )}
+          </div>
+        )}
+
+        {selectedTab === 'metrics' && (
+          <div className="bg-white shadow overflow-hidden sm:rounded-md">
+            {isLoadingMetrics ? (
+              <div className="flex justify-center py-8">
+                <ArrowPathIcon className="h-8 w-8 animate-spin text-indigo-600" />
+              </div>
+            ) : (
+              <ul className="divide-y divide-gray-200">
+                {metrics?.map((metric) => (
+                  <li key={metric.id}>
+                    <div className="px-4 py-4 sm:px-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          {getStatusIcon(metric.status)}
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{metric.name}</p>
+                            <p className="text-sm text-gray-500">
+                              {metric.value} {metric.unit}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {getTrendIcon(metric.trend)}
+                          {metric.threshold_low && metric.threshold_high && (
+                            <span className="text-xs text-gray-500">
+                              Range: {metric.threshold_low} - {metric.threshold_high}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {selectedTab === 'controls' && (
+          <div className="bg-white shadow overflow-hidden sm:rounded-md">
+            <ul className="divide-y divide-gray-200">
+              {controlSamples?.map((control) => (
+                <li key={control.id}>
+                  <div className="px-4 py-4 sm:px-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{control.name}</p>
+                        <p className="text-sm text-gray-500">
+                          Type: {control.sample_type} • Lot: {control.lot_number}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Expires: {format(new Date(control.expiry_date), 'MMM dd, yyyy')}
+                        </p>
+                      </div>
+                      <div className="flex items-center">
+                        <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
+                          control.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {control.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

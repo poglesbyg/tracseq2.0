@@ -1,78 +1,24 @@
+use sqlx::PgPool;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sqlx::PgPool;
-use std::sync::Arc;
+
 use uuid::Uuid;
 
-use crate::{
-    assembly::AppComponents,
-    models::library_prep::*,
-};
+use crate::models::*;
 
 // Request/Response structs
-#[derive(Debug, Deserialize)]
-pub struct ListLibraryPreparationsQuery {
-    pub batch_id: Option<Uuid>,
-    pub protocol_id: Option<Uuid>,
-    pub status: Option<String>,
-    pub search: Option<String>,
-}
 
-#[derive(Debug, Deserialize)]
-pub struct CreateLibraryPrepProtocolRequest {
-    pub name: String,
-    pub version: String,
-    pub description: Option<String>,
-    pub kit_name: Option<String>,
-    pub kit_catalog_number: Option<String>,
-    pub input_type: String,
-    pub output_type: String,
-    pub min_input_amount: Option<f64>,
-    pub max_input_amount: Option<f64>,
-    pub typical_yield: Option<f64>,
-    pub protocol_steps: Option<serde_json::Value>,
-    pub reagents: Option<serde_json::Value>,
-    pub equipment_required: Option<Vec<String>>,
-    pub estimated_time_hours: Option<f64>,
-    pub hazards: Option<Vec<String>>,
-    pub storage_conditions: Option<String>,
-    pub metadata: Option<serde_json::Value>,
-}
 
-#[derive(Debug, Deserialize)]
-pub struct UpdateLibraryPrepProtocolRequest {
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub protocol_steps: Option<serde_json::Value>,
-    pub is_active: Option<bool>,
-    pub metadata: Option<serde_json::Value>,
-}
 
-#[derive(Debug, Deserialize)]
-pub struct CreateLibraryPreparationRequest {
-    pub batch_id: Uuid,
-    pub protocol_id: Uuid,
-    pub prepared_by: Uuid,
-    pub input_samples: Vec<serde_json::Value>,
-    pub kit_lot_number: Option<String>,
-    pub reagent_lots: Option<serde_json::Value>,
-    pub notes: Option<String>,
-    pub metadata: Option<serde_json::Value>,
-}
 
-#[derive(Debug, Deserialize)]
-pub struct UpdateLibraryPreparationRequest {
-    pub status: Option<String>,
-    pub qc_status: Option<String>,
-    pub notes: Option<String>,
-    pub metadata: Option<serde_json::Value>,
-}
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LibraryPrepWithProtocol {
@@ -97,32 +43,24 @@ impl LibraryPrepManager {
         sqlx::query_as::<_, LibraryPrepProtocol>(
             r#"
             INSERT INTO library_prep_protocols (
-                name, version, description, kit_name, kit_catalog_number,
-                input_type, output_type, min_input_amount, max_input_amount,
-                typical_yield, protocol_steps, reagents, equipment_required,
-                estimated_time_hours, hazards, storage_conditions, metadata, created_by
+                name, version, protocol_type, kit_name, kit_manufacturer,
+                input_requirements, protocol_steps, reagents, equipment_required,
+                estimated_duration_hours, created_by
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
             "#,
         )
         .bind(&request.name)
         .bind(&request.version)
-        .bind(&request.description)
+        .bind(&request.protocol_type)
         .bind(&request.kit_name)
-        .bind(&request.kit_catalog_number)
-        .bind(&request.input_type)
-        .bind(&request.output_type)
-        .bind(&request.min_input_amount)
-        .bind(&request.max_input_amount)
-        .bind(&request.typical_yield)
+        .bind(&request.kit_manufacturer)
+        .bind(&request.input_requirements)
         .bind(&request.protocol_steps)
         .bind(&request.reagents)
         .bind(&request.equipment_required)
-        .bind(&request.estimated_time_hours)
-        .bind(&request.hazards)
-        .bind(&request.storage_conditions)
-        .bind(&request.metadata)
+        .bind(&request.estimated_duration_hours)
         .bind(created_by)
         .fetch_one(&self.pool)
         .await
@@ -161,10 +99,15 @@ impl LibraryPrepManager {
             r#"
             UPDATE library_prep_protocols
             SET name = COALESCE($2, name),
-                description = COALESCE($3, description),
-                protocol_steps = COALESCE($4, protocol_steps),
-                is_active = COALESCE($5, is_active),
-                metadata = COALESCE($6, metadata),
+                version = COALESCE($3, version),
+                kit_name = COALESCE($4, kit_name),
+                kit_manufacturer = COALESCE($5, kit_manufacturer),
+                input_requirements = COALESCE($6, input_requirements),
+                protocol_steps = COALESCE($7, protocol_steps),
+                reagents = COALESCE($8, reagents),
+                equipment_required = COALESCE($9, equipment_required),
+                estimated_duration_hours = COALESCE($10, estimated_duration_hours),
+                is_active = COALESCE($11, is_active),
                 updated_at = NOW()
             WHERE id = $1
             RETURNING *
@@ -172,41 +115,42 @@ impl LibraryPrepManager {
         )
         .bind(protocol_id)
         .bind(&request.name)
-        .bind(&request.description)
+        .bind(&request.version)
+        .bind(&request.kit_name)
+        .bind(&request.kit_manufacturer)
+        .bind(&request.input_requirements)
         .bind(&request.protocol_steps)
+        .bind(&request.reagents)
+        .bind(&request.equipment_required)
+        .bind(&request.estimated_duration_hours)
         .bind(&request.is_active)
-        .bind(&request.metadata)
         .fetch_one(&self.pool)
         .await
     }
 
     // Library preparation operations
     pub async fn create_library_prep(&self, request: CreateLibraryPreparationRequest) -> Result<LibraryPreparation, sqlx::Error> {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        let prep_number = format!("LP-{}-{:06}", Utc::now().format("%Y%m%d"), rng.gen_range(0..1000000));
-        
         sqlx::query_as::<_, LibraryPreparation>(
             r#"
             INSERT INTO library_preparations (
-                prep_number, batch_id, protocol_id, prepared_by,
-                input_samples, kit_lot_number, reagent_lots,
-                status, notes, metadata
+                batch_id, project_id, protocol_id, operator_id,
+                sample_ids, prep_date, input_metrics, reagent_lots,
+                status, notes
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
             "#,
         )
-        .bind(&prep_number)
         .bind(&request.batch_id)
+        .bind(&request.project_id)
         .bind(&request.protocol_id)
-        .bind(&request.prepared_by)
-        .bind(serde_json::to_value(&request.input_samples).unwrap())
-        .bind(&request.kit_lot_number)
+        .bind(&request.operator_id)
+        .bind(&request.sample_ids)
+        .bind(&request.prep_date)
+        .bind(&request.input_metrics)
         .bind(&request.reagent_lots)
         .bind("in_progress")
         .bind(&request.notes)
-        .bind(&request.metadata)
         .fetch_one(&self.pool)
         .await
     }
@@ -239,9 +183,9 @@ impl LibraryPrepManager {
         let mut bindings = vec![];
         let mut param_count = 1;
 
-        if let Some(batch_id) = filters.batch_id {
-            query.push_str(&format!(" AND batch_id = ${}", param_count));
-            bindings.push(format!("{}", batch_id));
+        if let Some(project_id) = filters.project_id {
+            query.push_str(&format!(" AND project_id = ${}", param_count));
+            bindings.push(format!("{}", project_id));
             param_count += 1;
         }
 
@@ -257,9 +201,9 @@ impl LibraryPrepManager {
             param_count += 1;
         }
 
-        if let Some(search) = filters.search {
-            query.push_str(&format!(" AND (prep_number ILIKE ${} OR notes ILIKE ${})", param_count, param_count));
-            bindings.push(format!("%{}%", search));
+        if let Some(batch_search) = filters.batch_search {
+            query.push_str(&format!(" AND batch_id ILIKE ${}", param_count));
+            bindings.push(format!("%{}%", batch_search));
             param_count += 1;
         }
 
@@ -290,9 +234,13 @@ impl LibraryPrepManager {
             r#"
             UPDATE library_preparations
             SET status = COALESCE($2, status),
-                qc_status = COALESCE($3, qc_status),
-                notes = COALESCE($4, notes),
-                metadata = COALESCE($5, metadata),
+                input_metrics = COALESCE($3, input_metrics),
+                output_metrics = COALESCE($4, output_metrics),
+                reagent_lots = COALESCE($5, reagent_lots),
+                notes = COALESCE($6, notes),
+                qc_status = COALESCE($7, qc_status),
+                qc_metrics = COALESCE($8, qc_metrics),
+                completed_at = COALESCE($9, completed_at),
                 updated_at = NOW()
             WHERE id = $1
             RETURNING *
@@ -300,9 +248,13 @@ impl LibraryPrepManager {
         )
         .bind(prep_id)
         .bind(&request.status)
-        .bind(&request.qc_status)
+        .bind(&request.input_metrics)
+        .bind(&request.output_metrics)
+        .bind(&request.reagent_lots)
         .bind(&request.notes)
-        .bind(&request.metadata)
+        .bind(&request.qc_status)
+        .bind(&request.qc_metrics)
+        .bind(&request.completed_at)
         .fetch_one(&self.pool)
         .await
     }
@@ -338,14 +290,24 @@ impl LibraryPrepManager {
     }
 
     pub async fn get_library_prep_stats(&self) -> Result<serde_json::Value, sqlx::Error> {
-        let stats = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct Stats {
+            total_preps: Option<i64>,
+            in_progress: Option<i64>,
+            completed: Option<i64>,
+            failed: Option<i64>,
+            avg_yield: Option<f64>,
+            success_rate: Option<f64>,
+        }
+
+        let stats = sqlx::query_as::<_, Stats>(
             r#"
             SELECT 
                 COUNT(*) as total_preps,
                 COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
                 COUNT(*) FILTER (WHERE status = 'completed') as completed,
                 COUNT(*) FILTER (WHERE status = 'failed') as failed,
-                AVG(total_yield_ng) FILTER (WHERE status = 'completed') as avg_yield,
+                AVG((output_metrics->>'total_yield_ng')::FLOAT) FILTER (WHERE status = 'completed') as avg_yield,
                 CAST(COUNT(*) FILTER (WHERE status = 'completed' AND qc_status = 'passed') AS FLOAT) / 
                     NULLIF(COUNT(*) FILTER (WHERE status = 'completed'), 0) * 100 as success_rate
             FROM library_preparations
@@ -367,10 +329,9 @@ impl LibraryPrepManager {
     pub async fn search_by_batch(&self, batch_search: &str) -> Result<Vec<LibraryPreparation>, sqlx::Error> {
         sqlx::query_as::<_, LibraryPreparation>(
             r#"
-            SELECT lp.* FROM library_preparations lp
-            JOIN batches b ON lp.batch_id = b.id
-            WHERE b.batch_number ILIKE $1
-            ORDER BY lp.created_at DESC
+            SELECT * FROM library_preparations
+            WHERE batch_id ILIKE $1
+            ORDER BY created_at DESC
             LIMIT 50
             "#
         )
@@ -382,10 +343,10 @@ impl LibraryPrepManager {
 
 /// List library prep protocols
 pub async fn list_protocols(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Query(params): Query<serde_json::Value>,
 ) -> Result<Json<Vec<LibraryPrepProtocol>>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = LibraryPrepManager::new(pool.clone());
     
@@ -400,10 +361,10 @@ pub async fn list_protocols(
 
 /// Get a protocol by ID
 pub async fn get_protocol(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(protocol_id): Path<Uuid>,
 ) -> Result<Json<LibraryPrepProtocol>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = LibraryPrepManager::new(pool.clone());
     
@@ -416,10 +377,10 @@ pub async fn get_protocol(
 
 /// Create a new library prep protocol
 pub async fn create_protocol(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Json(request): Json<CreateLibraryPrepProtocolRequest>,
 ) -> Result<Json<LibraryPrepProtocol>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = LibraryPrepManager::new(pool.clone());
     
@@ -434,11 +395,11 @@ pub async fn create_protocol(
 
 /// Update a library prep protocol
 pub async fn update_protocol(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(protocol_id): Path<Uuid>,
     Json(request): Json<UpdateLibraryPrepProtocolRequest>,
 ) -> Result<Json<LibraryPrepProtocol>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = LibraryPrepManager::new(pool.clone());
     
@@ -450,10 +411,10 @@ pub async fn update_protocol(
 
 /// List library preparations with filters
 pub async fn list_library_preps(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Query(query): Query<ListLibraryPreparationsQuery>,
 ) -> Result<Json<Vec<LibraryPrepWithProtocol>>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = LibraryPrepManager::new(pool.clone());
     
@@ -465,10 +426,10 @@ pub async fn list_library_preps(
 
 /// Get a library preparation by ID
 pub async fn get_library_prep(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(prep_id): Path<Uuid>,
 ) -> Result<Json<LibraryPrepWithProtocol>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = LibraryPrepManager::new(pool.clone());
     
@@ -481,10 +442,10 @@ pub async fn get_library_prep(
 
 /// Create a new library preparation
 pub async fn create_library_prep(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Json(request): Json<CreateLibraryPreparationRequest>,
 ) -> Result<Json<LibraryPreparation>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = LibraryPrepManager::new(pool.clone());
     
@@ -496,11 +457,11 @@ pub async fn create_library_prep(
 
 /// Update a library preparation
 pub async fn update_library_prep(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(prep_id): Path<Uuid>,
     Json(request): Json<UpdateLibraryPreparationRequest>,
 ) -> Result<Json<LibraryPreparation>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = LibraryPrepManager::new(pool.clone());
     
@@ -512,11 +473,11 @@ pub async fn update_library_prep(
 
 /// Complete a library preparation
 pub async fn complete_library_prep(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(prep_id): Path<Uuid>,
     Json(metrics): Json<LibraryPrepMetrics>,
 ) -> Result<Json<LibraryPreparation>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = LibraryPrepManager::new(pool.clone());
     
@@ -528,10 +489,10 @@ pub async fn complete_library_prep(
 
 /// Get library prep statistics
 pub async fn get_library_prep_stats(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Query(params): Query<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = LibraryPrepManager::new(pool.clone());
     
@@ -543,10 +504,10 @@ pub async fn get_library_prep_stats(
 
 /// Search library preps by batch number
 pub async fn search_library_preps(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Query(params): Query<serde_json::Value>,
 ) -> Result<Json<Vec<LibraryPreparation>>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = LibraryPrepManager::new(pool.clone());
     

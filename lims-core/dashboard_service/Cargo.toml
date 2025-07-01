@@ -5,37 +5,37 @@ edition = "2021"
 
 [dependencies]
 # Web framework
-axum = "0.7"
+axum = { workspace = true }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 hyper = "1.0"
 
 # Async runtime
-tokio = { version = "1", features = ["full"] }
+tokio = { workspace = true }
 
 # Database
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
+sqlx = { workspace = true }
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 # Date/Time
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { workspace = true }
 
 # UUID
-uuid = { version = "1.0", features = ["v4", "serde"] }
+uuid = { workspace = true }
 
 # Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 # Error handling
-thiserror = "1.0"
-anyhow = "1.0"
+thiserror = { workspace = true }
+anyhow = { workspace = true }
 
 # HTTP client for aggregating data from other services
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { workspace = true }
 
 # Configuration
 config = "0.13"
@@ -46,5 +46,4 @@ prometheus = "0.13"
 # Cache
 moka = { version = "0.12", features = ["future"] }
 
-[lints]
-workspace = true
+

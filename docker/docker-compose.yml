@@ -170,6 +170,10 @@ services:
       STORAGE_SERVICE_URL: http://storage-service:8080
       RAG_SERVICE_URL: http://rag-service:8000
       REPORTS_SERVICE_URL: http://reports-service:8000
+      PROJECT_SERVICE_URL: http://project-service:8101
+      LIBRARY_PREP_SERVICE_URL: http://library-prep-service:8102
+      QAQC_SERVICE_URL: http://qaqc-service:8103
+      FLOW_CELL_SERVICE_URL: http://flow-cell-service:8104
       USE_REPORTS_SERVICE: "true"
     depends_on:
       - auth-service

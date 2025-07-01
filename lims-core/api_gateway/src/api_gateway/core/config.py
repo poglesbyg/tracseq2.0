@@ -237,6 +237,34 @@ class TracSeqAPIGatewayConfig(BaseSettings):
                 path_prefix="/transactions",
                 health_check_path="/api/v1/health"
             ),
+            "projects": ServiceEndpoint(
+                name="Project Service",
+                host="project-service",
+                port=8101,
+                path_prefix="/projects",
+                health_check_path="/health"
+            ),
+            "library-prep": ServiceEndpoint(
+                name="Library Prep Service",
+                host="library-prep-service",
+                port=8102,
+                path_prefix="/library-prep",
+                health_check_path="/health"
+            ),
+            "qc": ServiceEndpoint(
+                name="QA/QC Service",
+                host="qaqc-service",
+                port=8103,
+                path_prefix="/qc",
+                health_check_path="/health"
+            ),
+            "flow-cells": ServiceEndpoint(
+                name="Flow Cell Service",
+                host="flow-cell-service",
+                port=8104,
+                path_prefix="/flow-cells",
+                health_check_path="/health"
+            ),
         }
     )
 

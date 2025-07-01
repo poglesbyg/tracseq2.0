@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc, NaiveDate};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
+use bigdecimal::BigDecimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Project {
@@ -18,8 +19,8 @@ pub struct Project {
     pub principal_investigator_id: Uuid,
     pub project_manager_id: Option<Uuid>,
     pub department: Option<String>,
-    pub budget_approved: Option<sqlx::types::BigDecimal>,
-    pub budget_used: Option<sqlx::types::BigDecimal>,
+    pub budget_approved: Option<BigDecimal>,
+    pub budget_used: Option<BigDecimal>,
     pub metadata: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -165,7 +166,7 @@ pub struct CreateProjectRequest {
     pub principal_investigator_id: Uuid,
     pub project_manager_id: Option<Uuid>,
     pub department: Option<String>,
-    pub budget_approved: Option<sqlx::types::BigDecimal>,
+    pub budget_approved: Option<BigDecimal>,
     pub metadata: Option<serde_json::Value>,
 }
 
@@ -180,7 +181,7 @@ pub struct UpdateProjectRequest {
     pub actual_end_date: Option<NaiveDate>,
     pub project_manager_id: Option<Uuid>,
     pub department: Option<String>,
-    pub budget_approved: Option<sqlx::types::BigDecimal>,
+    pub budget_approved: Option<BigDecimal>,
     pub metadata: Option<serde_json::Value>,
 }
 

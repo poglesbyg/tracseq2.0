@@ -1,3 +1,4 @@
+use sqlx::PgPool;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -5,15 +6,11 @@ use axum::{
 };
 use serde_json::json;
 use uuid::Uuid;
-use chrono::{Utc, NaiveDate};
-use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
-use std::sync::Arc;
+use chrono::NaiveDate;
+use serde::Deserialize;
+use bigdecimal::BigDecimal;
 
-use crate::{
-    assembly::AppComponents,
-    models::project::*,
-};
+use crate::models::*;
 
 // Request/Query structs
 #[derive(Debug, Deserialize)]
@@ -52,7 +49,7 @@ pub struct CreateProjectRequest {
     pub principal_investigator_id: Uuid,
     pub project_manager_id: Option<Uuid>,
     pub department: Option<String>,
-    pub budget_approved: Option<sqlx::types::BigDecimal>,
+    pub budget_approved: Option<BigDecimal>,
     pub metadata: Option<serde_json::Value>,
 }
 
@@ -64,7 +61,7 @@ pub struct UpdateProjectRequest {
     pub priority: Option<String>,
     pub target_end_date: Option<NaiveDate>,
     pub actual_end_date: Option<NaiveDate>,
-    pub budget_used: Option<sqlx::types::BigDecimal>,
+    pub budget_used: Option<BigDecimal>,
     pub metadata: Option<serde_json::Value>,
 }
 
@@ -475,10 +472,10 @@ impl ProjectManager {
 
 /// List projects with optional filters
 pub async fn list_projects(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Query(query): Query<ListProjectsQuery>,
 ) -> Result<Json<Vec<Project>>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -496,10 +493,10 @@ pub async fn list_projects(
 
 /// Get a project by ID
 pub async fn get_project(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(project_id): Path<Uuid>,
 ) -> Result<Json<Project>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -512,10 +509,10 @@ pub async fn get_project(
 
 /// Create a new project
 pub async fn create_project(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Json(request): Json<CreateProjectRequest>,
 ) -> Result<Json<Project>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -530,11 +527,11 @@ pub async fn create_project(
 
 /// Update a project
 pub async fn update_project(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(project_id): Path<Uuid>,
     Json(request): Json<UpdateProjectRequest>,
 ) -> Result<Json<Project>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -546,7 +543,7 @@ pub async fn update_project(
 
 /// Delete a project
 pub async fn delete_project(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(project_id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // TODO: Implement project deletion
@@ -555,10 +552,10 @@ pub async fn delete_project(
 
 /// List batches with optional filters
 pub async fn list_batches(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Query(query): Query<ListBatchesQuery>,
 ) -> Result<Json<Vec<Batch>>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -580,10 +577,10 @@ pub async fn list_batches(
 
 /// Get a batch by ID
 pub async fn get_batch(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(batch_id): Path<Uuid>,
 ) -> Result<Json<Batch>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -596,10 +593,10 @@ pub async fn get_batch(
 
 /// Create a new batch
 pub async fn create_batch(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Json(request): Json<CreateBatchRequest>,
 ) -> Result<Json<Batch>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -614,11 +611,11 @@ pub async fn create_batch(
 
 /// Get project files in a folder structure
 pub async fn get_project_files(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(project_id): Path<Uuid>,
     Query(params): Query<serde_json::Value>,
 ) -> Result<Json<Vec<ProjectFile>>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -634,7 +631,7 @@ pub async fn get_project_files(
 
 /// Upload a file to a project
 pub async fn upload_project_file(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(project_id): Path<Uuid>,
     Json(request): Json<UploadFileRequest>,
 ) -> Result<Json<ProjectFile>, (StatusCode, String)> {
@@ -644,10 +641,10 @@ pub async fn upload_project_file(
 
 /// List template repository items
 pub async fn list_templates_repository(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Query(params): Query<serde_json::Value>,
 ) -> Result<Json<Vec<TemplateRepository>>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -663,10 +660,10 @@ pub async fn list_templates_repository(
 
 /// Download a template from repository
 pub async fn download_template_repository(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(template_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -685,10 +682,10 @@ pub async fn download_template_repository(
 
 /// List project signoffs
 pub async fn list_project_signoffs(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(project_id): Path<Uuid>,
 ) -> Result<Json<Vec<ProjectSignoff>>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -700,10 +697,10 @@ pub async fn list_project_signoffs(
 
 /// Create a signoff request
 pub async fn create_signoff(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Json(request): Json<CreateSignoffRequest>,
 ) -> Result<Json<ProjectSignoff>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -718,7 +715,7 @@ pub async fn create_signoff(
 
 /// Make a signoff decision (approve/reject)
 pub async fn update_signoff(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(signoff_id): Path<Uuid>,
     Json(request): Json<SignoffDecisionRequest>,
 ) -> Result<Json<ProjectSignoff>, (StatusCode, String)> {
@@ -728,10 +725,10 @@ pub async fn update_signoff(
 
 /// List permission queue items
 pub async fn list_permission_queue(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Query(params): Query<serde_json::Value>,
 ) -> Result<Json<Vec<PermissionQueue>>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -743,10 +740,10 @@ pub async fn list_permission_queue(
 
 /// Create a permission request
 pub async fn create_permission_request(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Json(request): Json<CreatePermissionRequest>,
 ) -> Result<Json<PermissionQueue>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     
@@ -761,11 +758,11 @@ pub async fn create_permission_request(
 
 /// Approve or reject a permission request
 pub async fn update_permission_request(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(permission_id): Path<Uuid>,
     Json(request): Json<serde_json::Value>,
 ) -> Result<Json<PermissionQueue>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = ProjectManager::new(pool.clone());
     

@@ -6,7 +6,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sqlx::PgPool;
+use sqlx::{PgPool, FromRow};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -87,7 +87,7 @@ pub struct QcDashboardStats {
     pub average_turnaround_hours: f64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct QcMetricTrend {
     pub metric_name: String,
     pub date: DateTime<Utc>,
@@ -518,9 +518,7 @@ impl QcManager {
 pub async fn get_qc_dashboard(
     State(state): State<Arc<AppComponents>>,
 ) -> Result<Json<QcDashboardStats>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     
@@ -535,9 +533,7 @@ pub async fn list_qc_reviews(
     State(state): State<Arc<AppComponents>>,
     Query(query): Query<ListQcReviewsQuery>,
 ) -> Result<Json<Vec<QcReview>>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     
@@ -552,9 +548,7 @@ pub async fn get_qc_review(
     State(state): State<Arc<AppComponents>>,
     Path(review_id): Path<Uuid>,
 ) -> Result<Json<QcReview>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     
@@ -570,9 +564,7 @@ pub async fn create_qc_review(
     State(state): State<Arc<AppComponents>>,
     Json(request): Json<CreateQcReviewRequest>,
 ) -> Result<Json<QcReview>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     
@@ -588,9 +580,7 @@ pub async fn complete_qc_review(
     Path(review_id): Path<Uuid>,
     Json(request): Json<CompleteQcReviewRequest>,
 ) -> Result<Json<QcReview>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     
@@ -608,9 +598,7 @@ pub async fn create_library_prep_qc(
     State(state): State<Arc<AppComponents>>,
     Json(request): Json<CreateLibraryPrepQcRequest>,
 ) -> Result<Json<LibraryPrepQc>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     
@@ -625,9 +613,7 @@ pub async fn get_library_prep_qc(
     State(state): State<Arc<AppComponents>>,
     Path(library_prep_id): Path<Uuid>,
 ) -> Result<Json<LibraryPrepQc>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     
@@ -643,9 +629,7 @@ pub async fn get_qc_metric_trends(
     State(state): State<Arc<AppComponents>>,
     Query(params): Query<serde_json::Value>,
 ) -> Result<Json<Vec<QcMetricTrend>>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     
@@ -669,9 +653,7 @@ pub async fn list_control_samples(
     State(state): State<Arc<AppComponents>>,
     Query(params): Query<serde_json::Value>,
 ) -> Result<Json<Vec<QcControlSample>>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     
@@ -689,9 +671,7 @@ pub async fn create_control_sample(
     State(state): State<Arc<AppComponents>>,
     Json(request): Json<CreateControlSampleRequest>,
 ) -> Result<Json<QcControlSample>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     
@@ -709,9 +689,7 @@ pub async fn record_control_result(
     State(state): State<Arc<AppComponents>>,
     Json(request): Json<RecordControlResultRequest>,
 ) -> Result<Json<QcControlResult>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     
@@ -727,9 +705,7 @@ pub async fn get_control_results(
     Path(control_sample_id): Path<Uuid>,
     Query(params): Query<serde_json::Value>,
 ) -> Result<Json<Vec<QcControlResult>>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     
@@ -744,9 +720,7 @@ pub async fn list_qc_metrics(
     State(state): State<Arc<AppComponents>>,
     Query(params): Query<serde_json::Value>,
 ) -> Result<Json<Vec<QcMetricDefinition>>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     
@@ -774,9 +748,7 @@ pub async fn get_recent_qc_metrics(
     State(state): State<Arc<AppComponents>>,
     Query(params): Query<serde_json::Value>,
 ) -> Result<Json<Vec<serde_json::Value>>, (StatusCode, String)> {
-    let pool = state.database_component()
-        .pool()
-        .ok_or((StatusCode::INTERNAL_SERVER_ERROR, "Database not available".to_string()))?;
+    let pool = &state.database.pool;
     
     let manager = QcManager::new(pool.clone());
     

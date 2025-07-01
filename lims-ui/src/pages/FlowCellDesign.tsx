@@ -80,38 +80,41 @@ export default function FlowCellDesign() {
     },
   });
 
-  // Fetch available library preps
-  const { data: availableLibraries, isLoading: isLoadingLibraries } = useQuery<LibraryPrep[]>({
-    queryKey: ['available-library-preps'],
+  // Fetch available libraries
+  const { data: availableLibraries } = useQuery<LibraryPrep[]>({
+    queryKey: ['available-libraries'],
     queryFn: async () => {
-      const response = await api.get('/api/library-prep/available-for-sequencing');
+      const response = await api.get('/api/library-prep/preparations', { 
+        params: { status: 'ready_for_sequencing' } 
+      });
       return response.data;
     },
   });
 
-  // Get AI suggestions
-  const getAISuggestions = useMutation({
-    mutationFn: async (data: { flow_cell_type_id: string; library_preps: LibraryPrep[] }) => {
-      const response = await api.post('/api/flow-cells/ai-optimize', data);
-      return response.data;
-    },
-    onSuccess: (data) => {
-      // Apply AI suggestions to lane assignments
-      if (data.optimized_assignments) {
-        setLaneAssignments(data.optimized_assignments);
-      }
-      setShowAISuggestions(true);
-    },
-  });
-
-  // Save flow cell design
-  const saveDesign = useMutation({
-    mutationFn: async (data: { name: string; flow_cell_type_id: string; lane_assignments: LaneAssignment[] }) => {
-      const response = await api.post('/api/flow-cells/designs', data);
+  // Create flow cell design mutation
+  const createDesignMutation = useMutation({
+    mutationFn: async (design: { name: string; flow_cell_type_id: string; lane_assignments: LaneAssignment[] }) => {
+      const response = await api.post('/api/flow-cells/designs', design);
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['flow-cell-designs'] });
+      // Handle success
+      alert('Flow cell design created successfully!');
+    },
+  });
+
+  // AI optimization mutation
+  const optimizeMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post('/api/flow-cells/optimize', {
+        flow_cell_type_id: selectedFlowCellType?.id,
+        libraries: Object.values(laneAssignments).flat(),
+      });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      // Apply optimized assignments
+      setLaneAssignments(data.lane_assignments || {});
     },
   });
 
@@ -195,10 +198,7 @@ export default function FlowCellDesign() {
           <button
             type="button"
             onClick={() => selectedFlowCellType && availableLibraries && 
-              getAISuggestions.mutate({ 
-                flow_cell_type_id: selectedFlowCellType.id, 
-                library_preps: availableLibraries 
-              })
+              optimizeMutation.mutate()
             }
             disabled={!selectedFlowCellType || !availableLibraries?.length}
             className="inline-flex items-center justify-center rounded-md border border-transparent bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -208,7 +208,7 @@ export default function FlowCellDesign() {
           </button>
           <button
             type="button"
-            onClick={() => saveDesign.mutate({
+            onClick={() => createDesignMutation.mutate({
               name: `Flow Cell ${new Date().toISOString()}`,
               flow_cell_type_id: selectedFlowCellType!.id,
               lane_assignments: laneAssignments,
@@ -272,32 +272,26 @@ export default function FlowCellDesign() {
             <div className="lg:col-span-1">
               <div className="bg-white shadow rounded-lg p-4">
                 <h3 className="text-base font-medium text-gray-900 mb-4">Available Libraries</h3>
-                {isLoadingLibraries ? (
-                  <div className="flex justify-center py-8">
-                    <ArrowPathIcon className="h-8 w-8 animate-spin text-indigo-600" />
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {availableLibraries?.map((library) => (
-                      <div
-                        key={library.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, library)}
-                        className="p-3 border border-gray-200 rounded-md cursor-move hover:border-indigo-300 hover:shadow-sm"
-                      >
-                        <div className="flex items-center justify-between">
-                          <BeakerIcon className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                          <div className="ml-2 flex-1">
-                            <p className="text-sm font-medium text-gray-900">{library.batch_id}</p>
-                            <p className="text-xs text-gray-500">
-                              {library.sample_names.length} samples • {library.concentration} ng/μL
-                            </p>
-                          </div>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {availableLibraries?.map((library) => (
+                    <div
+                      key={library.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, library)}
+                      className="p-3 border border-gray-200 rounded-md cursor-move hover:border-indigo-300 hover:shadow-sm"
+                    >
+                      <div className="flex items-center justify-between">
+                        <BeakerIcon className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                        <div className="ml-2 flex-1">
+                          <p className="text-sm font-medium text-gray-900">{library.batch_id}</p>
+                          <p className="text-xs text-gray-500">
+                            {library.sample_names.length} samples • {library.concentration} ng/μL
+                          </p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Stats Panel */}
@@ -370,16 +364,16 @@ export default function FlowCellDesign() {
               </div>
 
               {/* AI Suggestions */}
-              {showAISuggestions && getAISuggestions.data && (
+              {showAISuggestions && optimizeMutation.data && (
                 <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-start">
                     <InformationCircleIcon className="h-5 w-5 text-blue-400 flex-shrink-0" />
                     <div className="ml-3">
                       <h3 className="text-sm font-medium text-blue-800">AI Optimization Applied</h3>
                       <div className="mt-2 text-sm text-blue-700">
-                        <p>Optimization Score: {getAISuggestions.data.score}%</p>
+                        <p>Optimization Score: {optimizeMutation.data.score}%</p>
                         <ul className="mt-2 list-disc list-inside">
-                          {getAISuggestions.data.suggestions?.map((suggestion: string, index: number) => (
+                          {optimizeMutation.data.suggestions?.map((suggestion: string, index: number) => (
                             <li key={index}>{suggestion}</li>
                           ))}
                         </ul>

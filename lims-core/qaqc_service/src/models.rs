@@ -1,533 +1,235 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, NaiveDate};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use sqlx::FromRow;
 use uuid::Uuid;
-use validator::Validate;
+use bigdecimal::BigDecimal;
 
-/// Quality Control Workflow Status
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "qc_workflow_status", rename_all = "lowercase")]
-pub enum QcWorkflowStatus {
-    Draft,
-    Active,
-    Executing,
-    Completed,
-    Failed,
-    Cancelled,
-    Suspended,
-}
-
-/// Quality Control Workflow
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QcWorkflow {
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct QcMetricDefinition {
     pub id: Uuid,
     pub name: String,
-    pub description: Option<String>,
-    pub workflow_type: QcWorkflowType,
-    pub status: QcWorkflowStatus,
-    pub steps: Vec<QcWorkflowStep>,
-    pub triggers: Vec<QcTrigger>,
-    pub quality_thresholds: HashMap<String, QualityThreshold>,
-    pub compliance_requirements: Vec<ComplianceRequirement>,
-    pub version: i32,
-    pub created_by: Uuid,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub last_executed: Option<DateTime<Utc>>,
-}
-
-/// Quality Control Workflow Type
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "qc_workflow_type", rename_all = "lowercase")]
-pub enum QcWorkflowType {
-    SampleValidation,
-    SequencingQc,
-    DataQuality,
-    ComplianceCheck,
-    PerformanceAnalysis,
-    LibraryQc,
-    SpreadsheetValidation,
-    Custom,
-}
-
-/// Quality Control Workflow Step
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QcWorkflowStep {
-    pub step_id: String,
-    pub name: String,
-    pub description: Option<String>,
-    pub step_type: QcStepType,
-    pub order: i32,
-    pub required: bool,
-    pub parameters: HashMap<String, serde_json::Value>,
-    pub expected_duration_minutes: Option<i32>,
-    pub dependencies: Vec<String>,
-    pub quality_checks: Vec<QualityCheck>,
-    pub automation_config: Option<AutomationConfig>,
-}
-
-/// Quality Control Step Type
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "qc_step_type", rename_all = "lowercase")]
-pub enum QcStepType {
-    Validation,
-    Measurement,
-    Analysis,
-    Comparison,
-    Approval,
-    Documentation,
-    Notification,
-    Integration,
-    CustomScript,
-}
-
-/// Quality Control Trigger
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QcTrigger {
-    pub trigger_id: String,
-    pub name: String,
-    pub trigger_type: QcTriggerType,
-    pub conditions: Vec<TriggerCondition>,
-    pub actions: Vec<TriggerAction>,
-    pub enabled: bool,
-}
-
-/// Quality Control Trigger Type
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "qc_trigger_type", rename_all = "lowercase")]
-pub enum QcTriggerType {
-    Scheduled,
-    EventBased,
-    ThresholdBased,
-    StatusChange,
-    DataAvailable,
-    Manual,
-}
-
-/// Quality Threshold
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QualityThreshold {
-    pub metric_name: String,
-    pub min_value: Option<f64>,
-    pub max_value: Option<f64>,
-    pub target_value: Option<f64>,
-    pub tolerance: Option<f64>,
-    pub severity: ThresholdSeverity,
+    pub metric_type: String,
+    pub data_type: String,
     pub unit: Option<String>,
+    pub min_value: Option<BigDecimal>,
+    pub max_value: Option<BigDecimal>,
+    pub warning_threshold_low: Option<BigDecimal>,
+    pub warning_threshold_high: Option<BigDecimal>,
+    pub fail_threshold_low: Option<BigDecimal>,
+    pub fail_threshold_high: Option<BigDecimal>,
     pub description: Option<String>,
-}
-
-/// Threshold Severity
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "threshold_severity", rename_all = "lowercase")]
-pub enum ThresholdSeverity {
-    Critical,
-    Warning,
-    Info,
-    Advisory,
-}
-
-/// Quality Check
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QualityCheck {
-    pub check_id: String,
-    pub name: String,
-    pub check_type: QualityCheckType,
-    pub parameters: HashMap<String, serde_json::Value>,
-    pub pass_criteria: Vec<PassCriteria>,
-    pub automated: bool,
-    pub required_role: Option<String>,
-}
-
-/// Quality Check Type
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "quality_check_type", rename_all = "lowercase")]
-pub enum QualityCheckType {
-    NumericRange,
-    StringMatch,
-    RegexMatch,
-    FileExists,
-    DatabaseQuery,
-    ServiceCall,
-    Statistical,
-    Visual,
-    Custom,
-}
-
-/// Pass Criteria
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PassCriteria {
-    pub field: String,
-    pub operator: ComparisonOperator,
-    pub value: serde_json::Value,
-    pub logic: LogicOperator,
-}
-
-/// Comparison Operator
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "comparison_operator", rename_all = "lowercase")]
-pub enum ComparisonOperator {
-    Equal,
-    NotEqual,
-    GreaterThan,
-    LessThan,
-    GreaterThanOrEqual,
-    LessThanOrEqual,
-    Contains,
-    StartsWith,
-    EndsWith,
-    Regex,
-    In,
-    NotIn,
-}
-
-/// Logic Operator
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "logic_operator", rename_all = "lowercase")]
-pub enum LogicOperator {
-    And,
-    Or,
-    Not,
-}
-
-/// Quality Metric
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QualityMetric {
-    pub id: Uuid,
-    pub name: String,
-    pub metric_type: QualityMetricType,
-    pub value: f64,
-    pub unit: Option<String>,
-    pub sample_id: Option<Uuid>,
-    pub workflow_id: Option<Uuid>,
-    pub step_id: Option<String>,
-    pub threshold_id: Option<Uuid>,
-    pub status: MetricStatus,
-    pub measured_at: DateTime<Utc>,
-    pub measured_by: Option<Uuid>,
-    pub metadata: HashMap<String, serde_json::Value>,
-    pub created_at: DateTime<Utc>,
-}
-
-/// Quality Metric Type
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "quality_metric_type", rename_all = "lowercase")]
-pub enum QualityMetricType {
-    Concentration,
-    Purity,
-    Integrity,
-    Yield,
-    Coverage,
-    Quality,
-    Error,
-    Performance,
-    Compliance,
-    Custom,
-}
-
-/// Metric Status
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "metric_status", rename_all = "lowercase")]
-pub enum MetricStatus {
-    Pass,
-    Fail,
-    Warning,
-    Pending,
-    NotApplicable,
-}
-
-/// Compliance Rule
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComplianceRule {
-    pub id: Uuid,
-    pub name: String,
-    pub description: Option<String>,
-    pub rule_type: ComplianceRuleType,
-    pub standard: String,
-    pub section: Option<String>,
-    pub severity: ComplianceSeverity,
-    pub conditions: Vec<ComplianceCondition>,
-    pub actions: Vec<ComplianceAction>,
-    pub active: bool,
+    pub calculation_method: Option<String>,
+    pub is_required: Option<bool>,
+    pub is_active: Option<bool>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-/// Compliance Rule Type
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "compliance_rule_type", rename_all = "lowercase")]
-pub enum ComplianceRuleType {
-    Validation,
-    Documentation,
-    Approval,
-    Retention,
-    Access,
-    Audit,
-    Reporting,
-    Custom,
-}
-
-/// Compliance Severity
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "compliance_severity", rename_all = "lowercase")]
-pub enum ComplianceSeverity {
-    Critical,
-    High,
-    Medium,
-    Low,
-    Info,
-}
-
-/// Trigger Condition
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TriggerCondition {
-    pub field: String,
-    pub operator: ComparisonOperator,
-    pub value: serde_json::Value,
-    pub logic: LogicOperator,
-}
-
-/// Trigger Action
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TriggerAction {
-    pub action_type: TriggerActionType,
-    pub parameters: HashMap<String, serde_json::Value>,
-    pub delay_seconds: Option<u64>,
-}
-
-/// Trigger Action Type
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "trigger_action_type", rename_all = "lowercase")]
-pub enum TriggerActionType {
-    StartWorkflow,
-    SendNotification,
-    UpdateStatus,
-    CreateTask,
-    LogEvent,
-    CallService,
-    Custom,
-}
-
-/// Compliance Condition
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComplianceCondition {
-    pub field: String,
-    pub operator: ComparisonOperator,
-    pub value: serde_json::Value,
-    pub required: bool,
-}
-
-/// Compliance Action
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComplianceAction {
-    pub action_type: ComplianceActionType,
-    pub parameters: HashMap<String, serde_json::Value>,
-    pub required: bool,
-}
-
-/// Compliance Action Type
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "compliance_action_type", rename_all = "lowercase")]
-pub enum ComplianceActionType {
-    Require,
-    Validate,
-    Document,
-    Approve,
-    Archive,
-    Notify,
-    Audit,
-    Custom,
-}
-
-/// Compliance Requirement
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComplianceRequirement {
-    pub requirement_id: String,
-    pub name: String,
-    pub standard: String,
-    pub section: Option<String>,
-    pub description: Option<String>,
-    pub required: bool,
-    pub automated: bool,
-}
-
-/// Automation Configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AutomationConfig {
-    pub enabled: bool,
-    pub script_path: Option<String>,
-    pub api_endpoint: Option<String>,
-    pub parameters: HashMap<String, serde_json::Value>,
-    pub timeout_seconds: Option<u64>,
-    pub retry_count: Option<u32>,
-}
-
-/// Quality Analysis Report
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QualityAnalysisReport {
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct LibraryPrepQc {
     pub id: Uuid,
-    pub report_type: ReportType,
-    pub title: String,
-    pub description: Option<String>,
-    pub time_period: TimePeriod,
-    pub metrics: Vec<MetricSummary>,
-    pub trends: Vec<TrendAnalysis>,
-    pub recommendations: Vec<String>,
-    pub generated_at: DateTime<Utc>,
-    pub generated_by: Uuid,
+    pub library_prep_id: Uuid,
+    pub qc_batch_id: String,
+    pub qc_date: NaiveDate,
+    pub performed_by: Uuid,
+    pub overall_status: String,
+    pub concentration_ngul: Option<BigDecimal>,
+    pub volume_ul: Option<BigDecimal>,
+    pub total_yield_ng: Option<BigDecimal>,
+    pub fragment_size_bp: Option<i32>,
+    pub fragment_size_cv: Option<BigDecimal>,
+    pub bioanalyzer_rin: Option<BigDecimal>,
+    pub bioanalyzer_trace_path: Option<String>,
+    pub qubit_concentration: Option<BigDecimal>,
+    pub nanodrop_260_280: Option<BigDecimal>,
+    pub nanodrop_260_230: Option<BigDecimal>,
+    pub contamination_status: Option<String>,
+    pub adapter_contamination: Option<BigDecimal>,
+    pub notes: Option<String>,
+    pub raw_data: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
-/// Report Type
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "report_type", rename_all = "lowercase")]
-pub enum ReportType {
-    Quality,
-    Compliance,
-    Performance,
-    Trend,
-    Summary,
-    Custom,
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct SequencingRunQc {
+    pub id: Uuid,
+    pub sequencing_run_id: Uuid,
+    pub flow_cell_id: Option<String>,
+    pub qc_type: String,
+    pub qc_timestamp: DateTime<Utc>,
+    pub overall_status: String,
+    pub cluster_density_k_per_mm2: Option<BigDecimal>,
+    pub cluster_pf_percent: Option<BigDecimal>,
+    pub phix_aligned_percent: Option<BigDecimal>,
+    pub error_rate_percent: Option<BigDecimal>,
+    pub q30_percent: Option<BigDecimal>,
+    pub total_reads_pf_m: Option<BigDecimal>,
+    pub total_yield_gb: Option<BigDecimal>,
+    pub intensity_cycle_1: Option<serde_json::Value>,
+    pub index_metrics: Option<serde_json::Value>,
+    pub lane_metrics: Option<serde_json::Value>,
+    pub run_summary: Option<serde_json::Value>,
+    pub alerts: Option<Vec<String>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
-/// Time Period
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TimePeriod {
-    pub start_date: DateTime<Utc>,
-    pub end_date: DateTime<Utc>,
-    pub period_type: PeriodType,
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct QcReview {
+    pub id: Uuid,
+    pub entity_type: String,
+    pub entity_id: Uuid,
+    pub review_type: String,
+    pub reviewer_id: Option<Uuid>,
+    pub review_status: String,
+    pub decision: Option<String>,
+    pub review_criteria: Option<serde_json::Value>,
+    pub review_results: Option<serde_json::Value>,
+    pub comments: Option<String>,
+    pub conditions_for_approval: Option<String>,
+    pub review_started_at: Option<DateTime<Utc>>,
+    pub review_completed_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
-/// Period Type
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "period_type", rename_all = "lowercase")]
-pub enum PeriodType {
-    Hour,
-    Day,
-    Week,
-    Month,
-    Quarter,
-    Year,
-    Custom,
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct QcMetricHistory {
+    pub id: Uuid,
+    pub metric_definition_id: Uuid,
+    pub entity_type: String,
+    pub entity_id: Uuid,
+    pub metric_value: Option<BigDecimal>,
+    pub metric_value_json: Option<serde_json::Value>,
+    pub status: String,
+    pub recorded_at: DateTime<Utc>,
+    pub recorded_by: Option<Uuid>,
+    pub instrument_id: Option<String>,
+    pub batch_id: Option<String>,
+    pub notes: Option<String>,
+    pub created_at: DateTime<Utc>,
 }
 
-/// Metric Summary
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MetricSummary {
-    pub metric_name: String,
-    pub count: i64,
-    pub min: f64,
-    pub max: f64,
-    pub mean: f64,
-    pub median: f64,
-    pub std_dev: f64,
-    pub pass_rate: f64,
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct QcControlSample {
+    pub id: Uuid,
+    pub control_type: String,
+    pub control_name: String,
+    pub lot_number: Option<String>,
+    pub expected_values: serde_json::Value,
+    pub tolerance_range: Option<serde_json::Value>,
+    pub expiry_date: Option<NaiveDate>,
+    pub storage_location: Option<String>,
+    pub is_active: Option<bool>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
-/// Trend Analysis
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrendAnalysis {
-    pub metric_name: String,
-    pub trend_direction: TrendDirection,
-    pub trend_strength: f64,
-    pub confidence: f64,
-    pub forecast: Option<Vec<f64>>,
-}
-
-/// Trend Direction
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "trend_direction", rename_all = "lowercase")]
-pub enum TrendDirection {
-    Increasing,
-    Decreasing,
-    Stable,
-    Volatile,
-    Unknown,
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct QcControlResult {
+    pub id: Uuid,
+    pub control_sample_id: Uuid,
+    pub run_id: Uuid,
+    pub run_type: String,
+    pub measured_values: serde_json::Value,
+    pub passed: bool,
+    pub deviation_from_expected: Option<serde_json::Value>,
+    pub notes: Option<String>,
+    pub created_at: DateTime<Utc>,
 }
 
 // Request/Response DTOs
-
-/// Create QC Workflow Request
-#[derive(Debug, Serialize, Deserialize, Validate)]
-pub struct CreateQcWorkflowRequest {
-    #[validate(length(min = 1, max = 255))]
-    pub name: String,
-    pub description: Option<String>,
-    pub workflow_type: QcWorkflowType,
-    pub steps: Vec<QcWorkflowStep>,
-    pub triggers: Vec<QcTrigger>,
-    pub quality_thresholds: HashMap<String, QualityThreshold>,
-    pub compliance_requirements: Vec<ComplianceRequirement>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateLibraryPrepQcRequest {
+    pub library_prep_id: Uuid,
+    pub qc_batch_id: String,
+    pub qc_date: NaiveDate,
+    pub concentration_ngul: Option<BigDecimal>,
+    pub volume_ul: Option<BigDecimal>,
+    pub fragment_size_bp: Option<i32>,
+    pub fragment_size_cv: Option<BigDecimal>,
+    pub bioanalyzer_rin: Option<BigDecimal>,
+    pub bioanalyzer_trace_path: Option<String>,
+    pub qubit_concentration: Option<BigDecimal>,
+    pub nanodrop_260_280: Option<BigDecimal>,
+    pub nanodrop_260_230: Option<BigDecimal>,
+    pub contamination_status: Option<String>,
+    pub adapter_contamination: Option<BigDecimal>,
+    pub notes: Option<String>,
+    pub raw_data: Option<serde_json::Value>,
 }
 
-/// Update QC Workflow Request
-#[derive(Debug, Serialize, Deserialize, Validate)]
-pub struct UpdateQcWorkflowRequest {
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub status: Option<QcWorkflowStatus>,
-    pub steps: Option<Vec<QcWorkflowStep>>,
-    pub triggers: Option<Vec<QcTrigger>>,
-    pub quality_thresholds: Option<HashMap<String, QualityThreshold>>,
-    pub compliance_requirements: Option<Vec<ComplianceRequirement>>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateQcReviewRequest {
+    pub entity_type: String,
+    pub entity_id: Uuid,
+    pub review_type: String,
+    pub review_criteria: Option<serde_json::Value>,
+    pub comments: Option<String>,
 }
 
-/// Create Quality Metric Request
-#[derive(Debug, Serialize, Deserialize, Validate)]
-pub struct CreateQualityMetricRequest {
-    #[validate(length(min = 1, max = 255))]
-    pub name: String,
-    pub metric_type: QualityMetricType,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompleteQcReviewRequest {
+    pub decision: String, // 'approved', 'rejected', 'conditional', 'repeat_required'
+    pub review_results: Option<serde_json::Value>,
+    pub comments: Option<String>,
+    pub conditions_for_approval: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListQcReviewsQuery {
+    pub entity_type: Option<String>,
+    pub entity_id: Option<Uuid>,
+    pub review_status: Option<String>,
+    pub reviewer_id: Option<Uuid>,
+    pub decision: Option<String>,
+    pub created_after: Option<DateTime<Utc>>,
+    pub created_before: Option<DateTime<Utc>>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QcDashboardStats {
+    pub pending_reviews: i64,
+    pub completed_today: i64,
+    pub failed_today: i64,
+    pub pass_rate_week: f64,
+    pub average_turnaround_hours: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QcMetricTrend {
+    pub metric_name: String,
+    pub data_points: Vec<QcMetricDataPoint>,
+    pub trend_direction: String, // 'up', 'down', 'stable'
+    pub trend_percentage: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QcMetricDataPoint {
+    pub timestamp: DateTime<Utc>,
     pub value: f64,
-    pub unit: Option<String>,
-    pub sample_id: Option<Uuid>,
-    pub workflow_id: Option<Uuid>,
-    pub step_id: Option<String>,
-    pub metadata: Option<HashMap<String, serde_json::Value>>,
+    pub status: String,
 }
 
-/// Create Compliance Rule Request
-#[derive(Debug, Serialize, Deserialize, Validate)]
-pub struct CreateComplianceRuleRequest {
-    #[validate(length(min = 1, max = 255))]
-    pub name: String,
-    pub description: Option<String>,
-    pub rule_type: ComplianceRuleType,
-    #[validate(length(min = 1, max = 100))]
-    pub standard: String,
-    pub section: Option<String>,
-    pub severity: ComplianceSeverity,
-    pub conditions: Vec<ComplianceCondition>,
-    pub actions: Vec<ComplianceAction>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateControlSampleRequest {
+    pub control_type: String,
+    pub control_name: String,
+    pub lot_number: Option<String>,
+    pub expected_values: serde_json::Value,
+    pub tolerance_range: Option<serde_json::Value>,
+    pub expiry_date: Option<NaiveDate>,
+    pub storage_location: Option<String>,
 }
 
-/// Quality Analysis Request
-#[derive(Debug, Serialize, Deserialize, Validate)]
-pub struct QualityAnalysisRequest {
-    pub report_type: ReportType,
-    pub time_period: TimePeriod,
-    pub metric_types: Option<Vec<QualityMetricType>>,
-    pub sample_ids: Option<Vec<Uuid>>,
-    pub workflow_ids: Option<Vec<Uuid>>,
-    pub include_trends: bool,
-    pub include_recommendations: bool,
-}
-
-/// Workflow Execution Request
-#[derive(Debug, Serialize, Deserialize, Validate)]
-pub struct WorkflowExecutionRequest {
-    pub workflow_id: Uuid,
-    pub target_id: Uuid, // Sample ID, Sequencing Job ID, etc.
-    pub target_type: String,
-    pub parameters: Option<HashMap<String, serde_json::Value>>,
-    pub priority: Option<ExecutionPriority>,
-}
-
-/// Execution Priority
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "execution_priority", rename_all = "lowercase")]
-pub enum ExecutionPriority {
-    Critical,
-    High,
-    Normal,
-    Low,
-}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordControlResultRequest {
+    pub control_sample_id: Uuid,
+    pub run_id: Uuid,
+    pub run_type: String,
+    pub measured_values: serde_json::Value,
+    pub notes: Option<String>,
+} 

@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
+use bigdecimal::BigDecimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct FlowCellType {
@@ -31,7 +32,7 @@ pub struct FlowCellDesign {
     pub lane_assignments: serde_json::Value,
     pub pooling_strategy: Option<serde_json::Value>,
     pub expected_coverage: Option<serde_json::Value>,
-    pub ai_optimization_score: Option<sqlx::types::BigDecimal>,
+    pub ai_optimization_score: Option<BigDecimal>,
     pub ai_suggestions: Option<serde_json::Value>,
     pub approved_by: Option<Uuid>,
     pub approved_at: Option<DateTime<Utc>>,
@@ -51,7 +52,7 @@ pub struct FlowCellLane {
     pub target_reads: Option<i64>,
     pub index_type: Option<String>,
     pub index_sequences: Option<serde_json::Value>,
-    pub loading_concentration_pm: Option<sqlx::types::BigDecimal>,
+    pub loading_concentration_pm: Option<BigDecimal>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -121,29 +122,37 @@ pub struct FlowCellDesignWithDetails {
     pub approver_name: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OptimizeFlowCellRequest {
     pub flow_cell_type_id: Uuid,
-    pub library_preparations: Vec<LibraryPrepInput>,
-    pub optimization_goals: Vec<String>, // 'balance_output', 'maximize_coverage', 'minimize_lanes'
-    pub constraints: Option<serde_json::Value>,
+    pub libraries: Vec<LibraryOptimizationInfo>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LibraryPrepInput {
-    pub library_prep_id: Uuid,
-    pub target_coverage: f64,
-    pub sample_priority: Option<i32>,
-    pub compatible_indices: Option<Vec<String>>,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LibraryOptimizationInfo {
+    pub id: Uuid,
+    pub concentration: f64,
+    pub fragment_size: i32,
+    pub index_type: String,
+    pub project_id: Option<Uuid>,
+    pub priority: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OptimizeFlowCellResponse {
+    pub lane_assignments: Vec<LaneAssignment>,
     pub optimization_score: f64,
-    pub suggested_assignments: Vec<LaneAssignmentRequest>,
-    pub expected_metrics: FlowCellMetrics,
-    pub warnings: Vec<String>,
-    pub alternative_designs: Option<Vec<AlternativeDesign>>,
+    pub balance_score: f64,
+    pub index_diversity_score: f64,
+    pub suggestions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaneAssignment {
+    pub lane_number: i32,
+    pub library_prep_ids: Vec<Uuid>,
+    pub target_reads: i64,
+    pub loading_concentration: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

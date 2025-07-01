@@ -1,19 +1,14 @@
+use sqlx::{PgPool, query_as};
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use sqlx::PgPool;
-use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::{
-    assembly::AppComponents,
-    models::flow_cell::*,
-};
+use crate::models::*;
+use crate::ai_optimizer::{FlowCellOptimizer, OptimizationRequest, OptimizationGoal, LibraryInfo};
 
 // Request/Response structs
 #[derive(Debug, Deserialize)]
@@ -151,7 +146,15 @@ impl FlowCellManager {
     }
 
     pub async fn get_flow_cell_type_stats(&self, type_id: Uuid) -> Result<FlowCellTypeStats, sqlx::Error> {
-        let stats = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct Stats {
+            total_runs: Option<i64>,
+            success_rate: Option<f64>,
+            avg_reads: Option<f64>,
+            avg_q30: Option<f64>,
+        }
+        
+        let stats = sqlx::query_as::<_, Stats>(
             r#"
             SELECT 
                 COUNT(DISTINCT fc.id) as total_runs,
@@ -162,9 +165,9 @@ impl FlowCellManager {
             FROM flow_cell_designs fd
             JOIN flow_cells fc ON fc.design_id = fd.id
             WHERE fd.flow_cell_type_id = $1
-            "#,
-            type_id
+            "#
         )
+        .bind(type_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -211,7 +214,7 @@ impl FlowCellManager {
 
     async fn create_lane_tx(&self, tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, design_id: Uuid, lane: LaneAssignmentRequest) -> Result<(), sqlx::Error> {
         // Create the lane
-        let lane_id = sqlx::query_scalar!(
+        let lane_id: Uuid = sqlx::query_scalar(
             r#"
             INSERT INTO flow_cell_lanes (
                 design_id, lane_number, target_reads, index_type,
@@ -219,30 +222,30 @@ impl FlowCellManager {
             )
             VALUES ($1, $2, $3, $4, $5, 'configured')
             RETURNING id
-            "#,
-            design_id,
-            lane.lane_number,
-            lane.target_reads,
-            lane.index_type,
-            lane.loading_concentration_pm
+            "#
         )
+        .bind(design_id)
+        .bind(lane.lane_number)
+        .bind(lane.target_reads)
+        .bind(&lane.index_type)
+        .bind(lane.loading_concentration_pm)
         .fetch_one(&mut **tx)
         .await?;
 
         // Add library assignments
         for (position, lib_id) in lane.library_prep_ids.iter().enumerate() {
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 INSERT INTO flow_cell_lane_libraries (
                     lane_id, library_prep_id, position, demux_index
                 )
                 VALUES ($1, $2, $3, $4)
-                "#,
-                lane_id,
-                lib_id,
-                position as i32,
-                lane.index_sequences.as_ref().and_then(|seqs| seqs.get(position).cloned())
+                "#
             )
+            .bind(lane_id)
+            .bind(lib_id)
+            .bind(position as i32)
+            .bind(lane.index_sequences.as_ref().and_then(|seqs| seqs.get(position).cloned()))
             .execute(&mut **tx)
             .await?;
         }
@@ -263,16 +266,12 @@ impl FlowCellManager {
         let design = self.get_flow_cell_design(design_id).await?;
         
         if let Some(design) = design {
-            let flow_cell_type = if let Some(type_id) = design.flow_cell_type_id {
-                sqlx::query_as::<_, FlowCellType>(
-                    "SELECT * FROM flow_cell_types WHERE id = $1"
-                )
-                .bind(type_id)
-                .fetch_optional(&self.pool)
-                .await?
-            } else {
-                None
-            };
+            let flow_cell_type = sqlx::query_as::<_, FlowCellType>(
+                "SELECT * FROM flow_cell_types WHERE id = $1"
+            )
+            .bind(design.flow_cell_type_id)
+            .fetch_optional(&self.pool)
+            .await?;
 
             let lanes = self.get_design_lanes(design_id).await?;
             let lane_count = lanes.len() as i32;
@@ -377,10 +376,10 @@ impl FlowCellManager {
 
     pub async fn delete_flow_cell_design(&self, design_id: Uuid) -> Result<(), sqlx::Error> {
         // Only allow deletion of draft designs
-        let result = sqlx::query!(
-            "DELETE FROM flow_cell_designs WHERE id = $1 AND status = 'draft'",
-            design_id
+        let result = sqlx::query(
+            "DELETE FROM flow_cell_designs WHERE id = $1 AND status = 'draft'"
         )
+        .bind(design_id)
         .execute(&self.pool)
         .await?;
 
@@ -426,27 +425,27 @@ impl FlowCellManager {
         .await?;
 
         // Remove existing library assignments
-        sqlx::query!(
-            "DELETE FROM flow_cell_lane_libraries WHERE lane_id = $1",
-            lane.id
+        sqlx::query(
+            "DELETE FROM flow_cell_lane_libraries WHERE lane_id = $1"
         )
+        .bind(lane.id)
         .execute(&mut *tx)
         .await?;
 
         // Add new library assignments
         for (position, lib_id) in request.library_prep_ids.iter().enumerate() {
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 INSERT INTO flow_cell_lane_libraries (
                     lane_id, library_prep_id, position, demux_index
                 )
                 VALUES ($1, $2, $3, $4)
-                "#,
-                lane.id,
-                lib_id,
-                position as i32,
-                request.index_sequences.as_ref().and_then(|seqs| seqs.get(position).cloned())
+                "#
             )
+            .bind(lane.id)
+            .bind(lib_id)
+            .bind(position as i32)
+            .bind(request.index_sequences.as_ref().and_then(|seqs| seqs.get(position).cloned()))
             .execute(&mut *tx)
             .await?;
         }
@@ -458,10 +457,16 @@ impl FlowCellManager {
     // AI Optimization
     pub async fn optimize_flow_cell_design(&self, request: OptimizeFlowCellRequest) -> Result<OptimizeFlowCellResponse, sqlx::Error> {
         // Get flow cell type info
-        let fc_type = sqlx::query!(
-            "SELECT lane_count, reads_per_lane FROM flow_cell_types WHERE id = $1",
-            request.flow_cell_type_id
+        #[derive(sqlx::FromRow)]
+        struct FcType {
+            lane_count: i32,
+            reads_per_lane: Option<i64>,
+        }
+        
+        let fc_type = sqlx::query_as::<_, FcType>(
+            "SELECT lane_count, reads_per_lane FROM flow_cell_types WHERE id = $1"
         )
+        .bind(request.flow_cell_type_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -558,11 +563,33 @@ impl FlowCellManager {
     }
 }
 
+// Helper function to get flow cell type by ID
+async fn get_flow_cell_type_by_id(
+    pool: &PgPool,
+    id: Uuid,
+) -> Result<Option<FlowCellType>, sqlx::Error> {
+    let flow_cell_type = query_as::<_, FlowCellType>(
+        r#"
+        SELECT 
+            id, name, manufacturer, model, lane_count, reads_per_lane,
+            chemistry_version, compatible_sequencers, specifications,
+            is_active, created_at, updated_at
+        FROM flow_cell_types
+        WHERE id = $1
+        "#
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    
+    Ok(flow_cell_type)
+}
+
 /// List available flow cell types
 pub async fn list_flow_cell_types(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
 ) -> Result<Json<Vec<FlowCellType>>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = FlowCellManager::new(pool.clone());
     
@@ -574,10 +601,10 @@ pub async fn list_flow_cell_types(
 
 /// Get flow cell type statistics
 pub async fn get_flow_cell_type_stats(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(type_id): Path<Uuid>,
 ) -> Result<Json<FlowCellTypeStats>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = FlowCellManager::new(pool.clone());
     
@@ -589,10 +616,10 @@ pub async fn get_flow_cell_type_stats(
 
 /// List flow cell designs
 pub async fn list_flow_cell_designs(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Query(query): Query<ListFlowCellDesignsQuery>,
 ) -> Result<Json<Vec<FlowCellDesignWithDetails>>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = FlowCellManager::new(pool.clone());
     
@@ -604,10 +631,10 @@ pub async fn list_flow_cell_designs(
 
 /// Get a flow cell design by ID
 pub async fn get_flow_cell_design(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(design_id): Path<Uuid>,
 ) -> Result<Json<FlowCellDesignWithDetails>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = FlowCellManager::new(pool.clone());
     
@@ -620,10 +647,10 @@ pub async fn get_flow_cell_design(
 
 /// Create a new flow cell design
 pub async fn create_flow_cell_design(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Json(request): Json<CreateFlowCellDesignRequest>,
 ) -> Result<Json<FlowCellDesign>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = FlowCellManager::new(pool.clone());
     
@@ -638,11 +665,11 @@ pub async fn create_flow_cell_design(
 
 /// Update a flow cell design
 pub async fn update_flow_cell_design(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(design_id): Path<Uuid>,
     Json(request): Json<UpdateFlowCellDesignRequest>,
 ) -> Result<Json<FlowCellDesign>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = FlowCellManager::new(pool.clone());
     
@@ -654,11 +681,11 @@ pub async fn update_flow_cell_design(
 
 /// Approve a flow cell design
 pub async fn approve_flow_cell_design(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(design_id): Path<Uuid>,
     Json(request): Json<ApproveFlowCellDesignRequest>,
 ) -> Result<Json<FlowCellDesign>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = FlowCellManager::new(pool.clone());
     
@@ -673,10 +700,10 @@ pub async fn approve_flow_cell_design(
 
 /// Delete a flow cell design
 pub async fn delete_flow_cell_design(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(design_id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = FlowCellManager::new(pool.clone());
     
@@ -688,26 +715,65 @@ pub async fn delete_flow_cell_design(
 }
 
 /// Optimize flow cell design using AI
-pub async fn optimize_flow_cell_design(
-    State(state): State<Arc<AppComponents>>,
+pub async fn optimize_flow_cell(
+    State(pool): State<PgPool>,
     Json(request): Json<OptimizeFlowCellRequest>,
 ) -> Result<Json<OptimizeFlowCellResponse>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    // Get flow cell type to determine lane count
+    let flow_cell_type = match get_flow_cell_type_by_id(&pool, request.flow_cell_type_id).await {
+        Ok(Some(fct)) => fct,
+        Ok(None) => return Err((StatusCode::NOT_FOUND, "Flow cell type not found".to_string())),
+        Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    };
     
-    let manager = FlowCellManager::new(pool.clone());
+    // Convert request to optimization format
+    let libraries: Vec<LibraryInfo> = request.libraries.into_iter().map(|lib| LibraryInfo {
+        id: lib.id,
+        concentration: lib.concentration,
+        fragment_size: lib.fragment_size,
+        index_type: lib.index_type,
+        project_id: lib.project_id,
+        priority: lib.priority.unwrap_or(1),
+    }).collect();
     
-    match manager.optimize_flow_cell_design(request).await {
-        Ok(response) => Ok(Json(response)),
-        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("Database error: {}", e)))
-    }
+    let optimization_request = OptimizationRequest {
+        flow_cell_type_id: request.flow_cell_type_id,
+        libraries,
+        optimization_goals: vec![
+            OptimizationGoal::MaximizeBalance,
+            OptimizationGoal::MinimizeIndexCollisions,
+        ],
+    };
+    
+    // Run optimization
+    let result = FlowCellOptimizer::optimize(optimization_request, flow_cell_type.lane_count);
+    
+    // Convert HashMap to Vec<LaneAssignment>
+    let lane_assignments: Vec<LaneAssignment> = result.lane_assignments
+        .into_iter()
+        .map(|(lane_number, library_ids)| LaneAssignment {
+            lane_number,
+            library_prep_ids: library_ids,
+            target_reads: flow_cell_type.reads_per_lane / flow_cell_type.lane_count as i64,
+            loading_concentration: 1.5, // Default concentration
+        })
+        .collect();
+    
+    Ok(Json(OptimizeFlowCellResponse {
+        lane_assignments,
+        optimization_score: result.score,
+        balance_score: result.balance_score,
+        index_diversity_score: result.index_diversity_score,
+        suggestions: result.suggestions,
+    }))
 }
 
 /// Get lane details for a flow cell design
 pub async fn get_flow_cell_lanes(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path(design_id): Path<Uuid>,
 ) -> Result<Json<Vec<FlowCellLane>>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = FlowCellManager::new(pool.clone());
     
@@ -719,11 +785,11 @@ pub async fn get_flow_cell_lanes(
 
 /// Update a specific lane in a flow cell design
 pub async fn update_flow_cell_lane(
-    State(state): State<Arc<AppComponents>>,
+    State(pool): State<PgPool>,
     Path((design_id, lane_number)): Path<(Uuid, i32)>,
     Json(request): Json<LaneAssignmentRequest>,
 ) -> Result<Json<FlowCellLane>, (StatusCode, String)> {
-    let pool = &state.database.pool;
+    let pool = &pool;
     
     let manager = FlowCellManager::new(pool.clone());
     

@@ -46,8 +46,8 @@ export default function LibraryPrep() {
   const [selectedPrep, setSelectedPrep] = useState<LibraryPreparation | null>(null);
 
   // Fetch library preparations
-  const { data: preparations, isLoading: isLoadingPreps } = useQuery<LibraryPreparation[]>({
-    queryKey: ['library-preparations', searchTerm],
+  const { data: preps, isLoading: isLoadingPreps } = useQuery<LibraryPreparation[]>({
+    queryKey: ['library-preps', searchTerm],
     queryFn: async () => {
       const params = searchTerm ? { search: searchTerm } : {};
       const response = await api.get('/api/library-prep/preparations', { params });
@@ -56,10 +56,10 @@ export default function LibraryPrep() {
   });
 
   // Fetch protocols
-  const { data: protocols, isLoading: isLoadingProtocols } = useQuery<LibraryPrepProtocol[]>({
-    queryKey: ['library-prep-protocols'],
+  const { data: protocols } = useQuery<LibraryPrepProtocol[]>({
+    queryKey: ['protocols'],
     queryFn: async () => {
-      const response = await api.get('/api/library-prep/protocols');
+      const response = await api.get('/api/library-prep/protocols/active');
       return response.data;
     },
   });
@@ -187,7 +187,7 @@ export default function LibraryPrep() {
               </div>
             ) : (
               <ul className="divide-y divide-gray-200">
-                {preparations?.map((prep) => (
+                {preps?.map((prep) => (
                   <li key={prep.id}>
                     <div className="px-4 py-4 sm:px-6 hover:bg-gray-50 cursor-pointer"
                          onClick={() => setSelectedPrep(prep)}>
@@ -230,45 +230,37 @@ export default function LibraryPrep() {
           </div>
         ) : (
           <div className="bg-white shadow overflow-hidden sm:rounded-md">
-            {isLoadingProtocols ? (
-              <div className="flex justify-center py-8">
-                <ArrowPathIcon className="h-8 w-8 animate-spin text-indigo-600" />
-              </div>
-            ) : (
-              <ul className="divide-y divide-gray-200">
-                {protocols?.filter(p => p.is_active).map((protocol) => (
-                  <li key={protocol.id}>
-                    <div className="px-4 py-4 sm:px-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0">
-                            <DocumentTextIcon className="h-10 w-10 text-gray-400" />
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {protocol.name} v{protocol.version}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              Type: {protocol.protocol_type} • Duration: {protocol.estimated_duration_hours}h
-                            </div>
-                            {protocol.kit_name && (
-                              <div className="text-sm text-gray-500">
-                                Kit: {protocol.kit_name} ({protocol.kit_manufacturer})
-                              </div>
-                            )}
-                          </div>
+            {protocols?.map((protocol) => (
+              <li key={protocol.id}>
+                <div className="px-4 py-4 sm:px-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <DocumentTextIcon className="h-10 w-10 text-gray-400" />
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {protocol.name} v{protocol.version}
                         </div>
-                        <div>
-                          <button className="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
-                            View Details
-                          </button>
+                        <div className="text-sm text-gray-500">
+                          Type: {protocol.protocol_type} • Duration: {protocol.estimated_duration_hours}h
                         </div>
+                        {protocol.kit_name && (
+                          <div className="text-sm text-gray-500">
+                            Kit: {protocol.kit_name} ({protocol.kit_manufacturer})
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    <div>
+                      <button className="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
+                        View Details
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            ))}
           </div>
         )}
       </div>

@@ -39,12 +39,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the binary
-COPY --from=builder /usr/src/app/target/release/qaqc-service ./service
+COPY --from=builder /usr/src/app/target/release/qaqc_service ./service
 
 # Expose default port
-EXPOSE 8080
+EXPOSE 8103
 
 # Set environment variables
 ENV RUST_LOG=info
 
-CMD ["./service"]
+CMD ["service"]

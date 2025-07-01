@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # Project Management Service
+  project-service:
+    image: docker:project-service
+    build:
+      context: ../lims-core/project_service
+      dockerfile: Dockerfile
+    container_name: lims-project-service
+    environment:
+      - DATABASE_URL=postgresql://tracseq_admin:TracSeq2024Prod!@host.docker.internal:15432/tracseq_prod
+      - PORT=8101
+      - SKIP_MIGRATIONS=true
+    ports:
+      - "8101:8101"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8101/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - tracseq-network
+
+  # Library Prep Service
+  library-prep-service:
+    image: docker:library-prep-service
+    build:
+      context: ../lims-core/library_prep_service
+      dockerfile: Dockerfile
+    container_name: lims-library-prep-service
+    environment:
+      - DATABASE_URL=postgresql://tracseq_admin:TracSeq2024Prod!@host.docker.internal:15432/tracseq_prod
+      - PORT=8102
+      - SKIP_MIGRATIONS=true
+    ports:
+      - "8102:8102"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8102/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - tracseq-network
+
+  # QA/QC Service (already exists, just add to this compose)
+  qaqc-service:
+    image: docker:qaqc-service
+    build:
+      context: ../lims-core/qaqc_service
+      dockerfile: Dockerfile
+    container_name: lims-qaqc-service
+    environment:
+      - DATABASE_URL=postgresql://tracseq_admin:TracSeq2024Prod!@host.docker.internal:15432/tracseq_prod
+      - QAQC_PORT=8103
+      - JWT_SECRET=your-secret-key-change-in-production
+      - SKIP_MIGRATIONS=true
+    ports:
+      - "8103:8103"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8103/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - tracseq-network
+
+  # Flow Cell Service
+  flow-cell-service:
+    image: docker:flow-cell-service
+    build:
+      context: ../lims-core/flow_cell_service
+      dockerfile: Dockerfile
+    container_name: lims-flow-cell-service
+    environment:
+      - DATABASE_URL=postgresql://tracseq_admin:TracSeq2024Prod!@host.docker.internal:15432/tracseq_prod
+      - PORT=8104
+      - SKIP_MIGRATIONS=true
+    ports:
+      - "8104:8104"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8104/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - tracseq-network
+
+networks:
+  tracseq-network:
+    external: true
+
+# External dependencies
+# These should already be running from the main docker-compose
+# - postgres-primary
+# - redis-primary
+# - api-gateway 
