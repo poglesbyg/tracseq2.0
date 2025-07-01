@@ -20,7 +20,9 @@ members = [
     # Test utilities
     "test-helpers",
     "lims-core/dashboard_service", 
-    "lims-core/reports_service"
+    "lims-core/reports_service",
+    # MCP Integration
+    "lims-core/mcp-bridge"
 ]
 exclude = [
     "circuit-breaker-lib",
