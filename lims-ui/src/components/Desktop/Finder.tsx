@@ -16,7 +16,7 @@ import { FolderIcon as FolderSolidIcon } from '@heroicons/react/24/solid';
 export interface FileSystemItem {
   id: string;
   name: string;
-  type: 'folder' | 'sample' | 'template' | 'document';
+  type: 'folder' | 'sample' | 'template' | 'document' | 'project' | 'report';
   parent: string | null;
   created: Date;
   modified: Date;
@@ -63,6 +63,10 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
         return <BeakerIcon className="w-12 h-12 text-green-500" />;
       case 'template':
         return <DocumentTextIcon className="w-12 h-12 text-purple-500" />;
+      case 'project':
+        return <FolderIcon className="w-12 h-12 text-amber-500" />;
+      case 'report':
+        return <DocumentTextIcon className="w-12 h-12 text-orange-500" />;
       default:
         return <DocumentIcon className="w-12 h-12 text-gray-500" />;
     }
@@ -76,6 +80,10 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
         return <BeakerIcon className="w-5 h-5 text-green-500" />;
       case 'template':
         return <DocumentTextIcon className="w-5 h-5 text-purple-500" />;
+      case 'project':
+        return <FolderIcon className="w-5 h-5 text-amber-500" />;
+      case 'report':
+        return <DocumentTextIcon className="w-5 h-5 text-orange-500" />;
       default:
         return <DocumentIcon className="w-5 h-5 text-gray-500" />;
     }
@@ -100,8 +108,6 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
     }
   };
 
-
-
   const renderSidebar = () => (
     <div className="w-48 bg-gray-50 border-r border-gray-200 p-3">
       <div className="space-y-1">
@@ -116,11 +122,37 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
         <button className="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-gray-100">
           Recent
         </button>
-        <button className="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-gray-100">
+        <button 
+          onClick={() => setCurrentFolderId('samples-folder')}
+          className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
+            currentFolderId === 'samples-folder' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+          }`}
+        >
           Samples
         </button>
-        <button className="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-gray-100">
+        <button 
+          onClick={() => setCurrentFolderId('templates-folder')}
+          className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
+            currentFolderId === 'templates-folder' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+          }`}
+        >
           Templates
+        </button>
+        <button 
+          onClick={() => setCurrentFolderId('projects-folder')}
+          className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
+            currentFolderId === 'projects-folder' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+          }`}
+        >
+          Projects
+        </button>
+        <button 
+          onClick={() => setCurrentFolderId('reports-folder')}
+          className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
+            currentFolderId === 'reports-folder' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+          }`}
+        >
+          Reports
         </button>
       </div>
     </div>

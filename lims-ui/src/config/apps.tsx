@@ -1,4 +1,3 @@
-import React from 'react';
 import { AppDefinition } from '../types/apps';
 import {
   BeakerIcon,
@@ -46,9 +45,11 @@ const FinderApp = ({ windowContext }: { windowContext?: any }) => {
     // Fetch real data from the API
     const fetchData = async () => {
       try {
-        const [samplesRes, templatesRes] = await Promise.all([
+        const [samplesRes, templatesRes, projectsRes, reportsRes] = await Promise.all([
           axios.get('/api/samples'),
-          axios.get('/api/templates')
+          axios.get('/api/templates'),
+          axios.get('/api/projects'),
+          axios.get('/api/reports')
         ]);
 
         const fileItems: FileSystemItem[] = [
@@ -98,6 +99,53 @@ const FinderApp = ({ windowContext }: { windowContext?: any }) => {
                 ...template,
                 version: template.version,
                 isActive: template.is_active
+              }
+            });
+          });
+        }
+
+        // Add projects to the projects folder
+        if (projectsRes.data && Array.isArray(projectsRes.data)) {
+          projectsRes.data.forEach((project: any) => {
+            fileItems.push({
+              id: `project-${project.id}`,
+              name: `${project.project_code} - ${project.name}`,
+              type: 'project',
+              parent: 'projects-folder',
+              created: new Date(project.created_at),
+              modified: new Date(project.updated_at || project.created_at),
+              size: project.budget_approved ? Math.round(project.budget_approved / 100) : 5120,
+              metadata: {
+                ...project,
+                projectCode: project.project_code,
+                projectType: project.project_type,
+                status: project.status,
+                priority: project.priority,
+                department: project.department,
+                budgetApproved: project.budget_approved,
+                budgetUsed: project.budget_used
+              }
+            });
+          });
+        }
+
+        // Add reports to the reports folder
+        if (reportsRes.data && Array.isArray(reportsRes.data)) {
+          reportsRes.data.forEach((report: any) => {
+            fileItems.push({
+              id: `report-${report.id}`,
+              name: report.name,
+              type: 'report',
+              parent: 'reports-folder',
+              created: new Date(report.created_at),
+              modified: new Date(report.completed_at || report.created_at),
+              size: report.file_size || 1024,
+              metadata: {
+                ...report,
+                format: report.format,
+                status: report.status,
+                filePath: report.file_path,
+                description: report.description
               }
             });
           });
@@ -279,6 +327,202 @@ const FinderApp = ({ windowContext }: { windowContext?: any }) => {
                   className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
                 >
                   Open in Templates App
+                </button>
+              )}
+              <button
+                onClick={() => setDetailView(null)}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        );
+      }
+    } else if (item.type === 'project') {
+      // Try to open in the Projects app
+      if (windowContext?.openApp) {
+        windowContext.openApp('projects', { 
+          selectedProjectId: item.metadata?.id,
+          selectedProject: item.metadata 
+        });
+      } else {
+        // Fallback to showing details in a modal
+        setDetailView(
+          <div className="p-6 bg-white rounded-lg shadow-lg max-w-2xl mx-auto">
+            <div className="flex justify-between items-start mb-4">
+              <h2 className="text-2xl font-bold">{item.metadata?.name}</h2>
+              <button
+                onClick={() => setDetailView(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-500">Project Code</label>
+                <p className="text-lg font-mono">{item.metadata?.projectCode}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Status</label>
+                <p className="text-lg">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    item.metadata?.status === 'active' ? 'bg-green-100 text-green-800' :
+                    item.metadata?.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                    item.metadata?.status === 'planning' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {item.metadata?.status?.toUpperCase()}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Priority</label>
+                <p className="text-lg">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    item.metadata?.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+                    item.metadata?.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                    item.metadata?.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {item.metadata?.priority?.toUpperCase()}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Type</label>
+                <p className="text-lg capitalize">{item.metadata?.projectType?.replace('_', ' ')}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Department</label>
+                <p className="text-lg">{item.metadata?.department}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Budget</label>
+                <p className="text-lg">
+                  ${item.metadata?.budgetUsed?.toLocaleString()} / ${item.metadata?.budgetApproved?.toLocaleString()}
+                </p>
+              </div>
+              {item.metadata?.description && (
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-gray-500">Description</label>
+                  <p className="text-base text-gray-700">{item.metadata.description}</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-6 flex gap-3">
+              {windowContext?.openApp && (
+                <button
+                  onClick={() => {
+                    windowContext.openApp('projects', { 
+                      selectedProjectId: item.metadata?.id,
+                      selectedProject: item.metadata 
+                    });
+                    setDetailView(null);
+                  }}
+                  className="px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600"
+                >
+                  Open in Projects App
+                </button>
+              )}
+              <button
+                onClick={() => setDetailView(null)}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        );
+      }
+    } else if (item.type === 'report') {
+      // Try to open in the Reports app
+      if (windowContext?.openApp) {
+        windowContext.openApp('reports', { 
+          selectedReportId: item.metadata?.id,
+          selectedReport: item.metadata 
+        });
+      } else {
+        // Fallback to showing details in a modal
+        setDetailView(
+          <div className="p-6 bg-white rounded-lg shadow-lg max-w-2xl mx-auto">
+            <div className="flex justify-between items-start mb-4">
+              <h2 className="text-2xl font-bold">{item.name}</h2>
+              <button
+                onClick={() => setDetailView(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-500">Format</label>
+                <p className="text-lg uppercase">{item.metadata?.format}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Status</label>
+                <p className="text-lg">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    item.metadata?.status === 'completed' ? 'bg-green-100 text-green-800' :
+                    item.metadata?.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                    item.metadata?.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {item.metadata?.status?.toUpperCase()}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Size</label>
+                <p className="text-lg">{((item.size || 0) / 1024).toFixed(1)} KB</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Created</label>
+                <p className="text-sm">{item.created.toLocaleDateString()}</p>
+              </div>
+              {item.metadata?.description && (
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-gray-500">Description</label>
+                  <p className="text-base text-gray-700">{item.metadata.description}</p>
+                </div>
+              )}
+              {item.metadata?.filePath && (
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-gray-500">File Path</label>
+                  <p className="text-sm font-mono text-gray-600">{item.metadata.filePath}</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-6 flex gap-3">
+              {windowContext?.openApp && (
+                <button
+                  onClick={() => {
+                    windowContext.openApp('reports', { 
+                      selectedReportId: item.metadata?.id,
+                      selectedReport: item.metadata 
+                    });
+                    setDetailView(null);
+                  }}
+                  className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
+                >
+                  Open in Reports App
+                </button>
+              )}
+              {item.metadata?.status === 'completed' && item.metadata?.filePath && (
+                <button
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  Download Report
                 </button>
               )}
               <button
