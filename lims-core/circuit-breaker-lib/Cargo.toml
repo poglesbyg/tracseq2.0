@@ -43,7 +43,7 @@ http-client = ["reqwest"]
 
 [dev-dependencies]
 tokio-test = "0.4"
-rstest = "0.18"
+rstest = { workspace = true }
 mockall = "0.11"
 wiremock = "0.5"
 rand = "0.8"
