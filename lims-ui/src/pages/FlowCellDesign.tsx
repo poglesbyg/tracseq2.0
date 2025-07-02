@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '../utils/axios';
 import {
   BeakerIcon,
@@ -8,7 +8,6 @@ import {
   CheckIcon,
   XMarkIcon,
   InformationCircleIcon,
-  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 
 interface FlowCellType {
@@ -68,8 +67,7 @@ export default function FlowCellDesign() {
   const [selectedFlowCellType, setSelectedFlowCellType] = useState<FlowCellType | null>(null);
   const [laneAssignments, setLaneAssignments] = useState<LaneAssignment[]>([]);
   const [draggedItem, setDraggedItem] = useState<DragItem | null>(null);
-  const [showAISuggestions, setShowAISuggestions] = useState(false);
-  const queryClient = useQueryClient();
+  const [showAISuggestions] = useState(false);
 
   // Fetch flow cell types
   const { data: flowCellTypes } = useQuery<FlowCellType[]>({

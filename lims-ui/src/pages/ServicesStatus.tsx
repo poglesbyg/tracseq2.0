@@ -60,7 +60,7 @@ export default function ServicesStatus() {
             ...service, 
             status: response.status === 200 ? 'healthy' : 'unhealthy' 
           } as ServiceStatus;
-        } catch (error) {
+        } catch {
           return { 
             ...service, 
             status: 'unhealthy' 
