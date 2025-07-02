@@ -155,6 +155,7 @@ const DesktopContent: React.FC<DesktopProps> = ({ apps }) => {
             onClose={() => handleCloseWindow(window.id)}
             onFocus={() => focusWindow(window.id)}
             onUpdate={(updates) => updateWindow(window.id, updates)}
+            onOpenApp={handleAppLaunch}
           />
         ))}
 

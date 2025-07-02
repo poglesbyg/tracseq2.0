@@ -7,7 +7,7 @@ export interface WindowState {
   appId: string;
   title: string;
   icon?: React.ReactNode;
-  component: React.ComponentType;
+  component: React.ComponentType<any>;
   position: { x: number; y: number };
   size: { width: number; height: number };
   isMinimized: boolean;
@@ -21,9 +21,10 @@ interface WindowProps {
   onClose: () => void;
   onFocus: () => void;
   onUpdate: (updates: Partial<WindowState>) => void;
+  onOpenApp?: (appId: string, context?: any) => void;
 }
 
-export const Window: React.FC<WindowProps> = ({ window, onClose, onFocus, onUpdate }) => {
+export const Window: React.FC<WindowProps> = ({ window, onClose, onFocus, onUpdate, onOpenApp }) => {
   const windowRef = useRef<HTMLDivElement>(null);
 
   const { isDragging, handleMouseDown } = useDraggable(
@@ -59,6 +60,14 @@ export const Window: React.FC<WindowProps> = ({ window, onClose, onFocus, onUpda
   };
 
   const Component = window.component;
+
+  // Create window context to pass to the component
+  const windowContext = {
+    windowId: window.id,
+    openApp: onOpenApp,
+    closeWindow: onClose,
+    updateWindow: (updates: Partial<WindowState>) => onUpdate(updates),
+  };
 
   if (window.isMinimized) {
     return null;
@@ -111,7 +120,7 @@ export const Window: React.FC<WindowProps> = ({ window, onClose, onFocus, onUpda
 
       {/* Window Content */}
       <div className="flex-1 overflow-auto" style={{ height: 'calc(100% - 2rem)' }}>
-        <Component />
+        <Component windowContext={windowContext} />
       </div>
 
       {/* Resize Handles */}
