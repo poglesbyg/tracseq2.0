@@ -15,6 +15,7 @@ import {
   CpuChipIcon,
   FolderIcon,
   ClipboardDocumentCheckIcon,
+  ServerStackIcon,
 } from '@heroicons/react/24/outline';
 import { UserMenu } from './UserMenu';
 import { useAuth } from '../auth';
@@ -42,6 +43,7 @@ export default function Layout({ children }: LayoutProps) {
     { name: 'Spreadsheets', href: '/spreadsheets', icon: TableCellsIcon, testId: 'nav-spreadsheets' },
     { name: 'Storage', href: '/storage', icon: MapPinIcon, testId: 'nav-storage' },
     { name: 'Reports', href: '/reports', icon: ChartBarIcon, testId: 'nav-reports' },
+    { name: 'Services', href: '/services', icon: ServerStackIcon, testId: 'nav-services' },
     // Only show Users for administrators
     ...(hasRole('lab_administrator') ? [{ name: 'Users', href: '/users', icon: UsersIcon, testId: 'nav-users' }] : []),
   ];

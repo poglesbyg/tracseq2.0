@@ -23,6 +23,7 @@ import LibraryPrep from './pages/LibraryPrep';
 import QualityControl from './pages/QualityControl';
 import ProjectManagement from './pages/ProjectManagement';
 import FlowCellDesign from './pages/FlowCellDesign';
+import ServicesStatus from './pages/ServicesStatus';
 
 const queryClient = new QueryClient();
 
@@ -189,6 +190,16 @@ export default function App() {
               <ProtectedRoute requireRoles="lab_administrator">
                 <Layout>
                   <Users />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/services" element={
+              <ProtectedRoute>
+                <Layout>
+                  <ServicesStatus />
                   {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
                   <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
                 </Layout>
