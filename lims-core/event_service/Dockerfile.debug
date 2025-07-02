@@ -1,0 +1,8 @@
+FROM tracseq-event_service:manual
+
+USER root
+COPY debug-wrapper.sh /app/debug-wrapper.sh
+RUN chmod +x /app/debug-wrapper.sh
+
+USER appuser
+ENTRYPOINT ["/app/debug-wrapper.sh"] 

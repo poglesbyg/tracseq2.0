@@ -1,0 +1,16 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY ../target/release/event_service /app/event_service
+
+RUN chmod +x /app/event_service
+
+EXPOSE 8087
+
+CMD ["/app/event_service"] 

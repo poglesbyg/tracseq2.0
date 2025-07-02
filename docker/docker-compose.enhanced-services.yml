@@ -21,7 +21,7 @@ services:
       - lims-redis:redis
 
   event-service:
-    image: tracseq-event_service:latest
+    image: tracseq-event_service:manual
     container_name: lims-events
     environment:
       DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
