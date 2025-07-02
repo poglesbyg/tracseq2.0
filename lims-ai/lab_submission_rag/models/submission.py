@@ -216,6 +216,7 @@ class ExtractionResult(BaseModel):
 
     success: bool
     submission: LabSubmission | None = None
+    extracted_data: dict[str, Any] | None = None
     confidence_score: float
     missing_fields: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
