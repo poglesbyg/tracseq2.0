@@ -29,9 +29,13 @@ export const useSpaces = () => {
       // Move windows from deleted space to primary
       const deletedSpace = prev.find(s => s.id === spaceId);
       if (deletedSpace && deletedSpace.windowIds.length > 0) {
-        const primarySpace = updatedSpaces.find(s => s.id === 'primary');
-        if (primarySpace) {
-          primarySpace.windowIds = [...primarySpace.windowIds, ...deletedSpace.windowIds];
+        const primarySpaceIndex = updatedSpaces.findIndex(s => s.id === 'primary');
+        if (primarySpaceIndex !== -1) {
+          // Create a new object instead of mutating the existing one
+          updatedSpaces[primarySpaceIndex] = {
+            ...updatedSpaces[primarySpaceIndex],
+            windowIds: [...updatedSpaces[primarySpaceIndex].windowIds, ...deletedSpace.windowIds]
+          };
         }
       }
       

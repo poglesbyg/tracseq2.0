@@ -133,7 +133,10 @@ export const Spotlight: React.FC<SpotlightProps> = ({ isOpen, onClose, apps, onA
                     className="w-full px-3 py-2 flex items-center gap-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
                   >
                     <div className={`w-8 h-8 ${app.dockIconClass} rounded-lg flex items-center justify-center text-white shadow-sm`}>
-                      {React.cloneElement(app.icon as React.ReactElement, { className: 'w-4 h-4' })}
+                      {React.isValidElement(app.icon) ? 
+                        React.cloneElement(app.icon as React.ReactElement<{className?: string}>, { className: 'w-4 h-4' }) : 
+                        app.icon
+                      }
                     </div>
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{app.name}</span>
                   </button>
