@@ -13,9 +13,10 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
 from enum import Enum
 
-from fastmcp import FastMCP
 from pydantic import BaseModel, Field
 import httpx
+import websockets
+from aiohttp import web
 
 # Configure logging
 logging.basicConfig(
@@ -24,8 +25,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize MCP proxy server
-mcp = FastMCP("TracSeq MCP Proxy", version="1.0.0")
+# Store for MCP tools and resources
+mcp_tools = {}
+mcp_resources = {}
+
+# Simple decorators to register tools and resources
+def tool(func):
+    """Register a function as an MCP tool."""
+    mcp_tools[func.__name__] = func
+    return func
+
+def resource(path):
+    """Register a function as an MCP resource."""
+    def decorator(func):
+        mcp_resources[path] = func
+        return func
+    return decorator
 
 # Service registry
 class ServiceStatus(str, Enum):
@@ -164,7 +179,7 @@ async def _invoke_service_internal(request: ServiceRequest) -> Dict[str, Any]:
             "response_time_ms": int((datetime.now() - start_time).total_seconds() * 1000)
         }
 
-@mcp.tool
+@tool
 async def invoke_service_tool(request: ServiceRequest) -> Dict[str, Any]:
     """
     Invoke a tool on a specific MCP service.
@@ -174,7 +189,7 @@ async def invoke_service_tool(request: ServiceRequest) -> Dict[str, Any]:
     """
     return await _invoke_service_internal(request)
 
-@mcp.tool
+@tool
 async def execute_workflow(request: WorkflowRequest) -> Dict[str, Any]:
     """
     Execute a multi-service workflow with optional transaction support.
@@ -266,7 +281,7 @@ async def execute_workflow(request: WorkflowRequest) -> Dict[str, Any]:
             "results": results
         }
 
-@mcp.tool
+@tool
 async def register_service(service: ServiceInfo) -> Dict[str, Any]:
     """
     Register a new MCP service with the proxy.
@@ -304,7 +319,7 @@ async def register_service(service: ServiceInfo) -> Dict[str, Any]:
             "details": health_result
         }
 
-@mcp.resource("proxy://services")
+@resource("proxy://services")
 async def list_services() -> str:
     """
     List all registered MCP services and their status.

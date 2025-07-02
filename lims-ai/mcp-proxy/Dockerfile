@@ -17,29 +17,24 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
+COPY simple_mcp_proxy.py .
 COPY mcp_proxy_server.py .
 
 # Health check script
 COPY <<'EOF' /health_check.py
 #!/usr/bin/env python3
 import sys
+import urllib.request
 import json
-import asyncio
-import websockets
 
-async def check_health():
-    try:
-        async with websockets.connect("ws://localhost:9500/health") as ws:
-            await ws.send(json.dumps({"type": "ping"}))
-            response = await ws.recv()
-            data = json.loads(response)
-            if data.get("status") == "healthy":
-                sys.exit(0)
-    except:
-        pass
-    sys.exit(1)
-
-asyncio.run(check_health())
+try:
+    with urllib.request.urlopen("http://localhost:9500/health", timeout=5) as response:
+        data = json.loads(response.read())
+        if data.get("status") == "healthy":
+            sys.exit(0)
+except:
+    pass
+sys.exit(1)
 EOF
 
 RUN chmod +x /health_check.py
@@ -52,4 +47,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python /health_check.py
 
 # Run the server
-CMD ["python", "-u", "mcp_proxy_server.py"] 
+CMD ["python", "-u", "simple_mcp_proxy.py"] 
