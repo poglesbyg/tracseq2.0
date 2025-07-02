@@ -266,6 +266,78 @@ pub async fn proxy_spreadsheet_request(
         })
 }
 
+/// Generic proxy handler for notifications service endpoints
+pub async fn proxy_notifications_request(
+    method: Method,
+    path: Path<String>,
+    headers: HeaderMap,
+    body: Option<Bytes>,
+) -> Result<Response, StatusCode> {
+    let path_str = format!("/api/notifications/{}", path.0);
+    
+    SERVICE_PROXY
+        .proxy_request("notifications", method, &path_str, headers, body)
+        .await
+        .map_err(|e| {
+            error!("Notifications proxy error: {}", e);
+            StatusCode::BAD_GATEWAY
+        })
+}
+
+/// Generic proxy handler for events service endpoints
+pub async fn proxy_events_request(
+    method: Method,
+    path: Path<String>,
+    headers: HeaderMap,
+    body: Option<Bytes>,
+) -> Result<Response, StatusCode> {
+    let path_str = format!("/api/events/{}", path.0);
+    
+    SERVICE_PROXY
+        .proxy_request("events", method, &path_str, headers, body)
+        .await
+        .map_err(|e| {
+            error!("Events proxy error: {}", e);
+            StatusCode::BAD_GATEWAY
+        })
+}
+
+/// Generic proxy handler for transactions service endpoints
+pub async fn proxy_transactions_request(
+    method: Method,
+    path: Path<String>,
+    headers: HeaderMap,
+    body: Option<Bytes>,
+) -> Result<Response, StatusCode> {
+    let path_str = format!("/api/transactions/{}", path.0);
+    
+    SERVICE_PROXY
+        .proxy_request("transactions", method, &path_str, headers, body)
+        .await
+        .map_err(|e| {
+            error!("Transactions proxy error: {}", e);
+            StatusCode::BAD_GATEWAY
+        })
+}
+
+/// Generic proxy handler for qaqc service endpoints
+pub async fn proxy_qaqc_request(
+    method: Method,
+    path: Path<String>,
+    headers: HeaderMap,
+    body: Option<Bytes>,
+) -> Result<Response, StatusCode> {
+    let path_str = format!("/api/qaqc/{}", path.0);
+    
+    SERVICE_PROXY
+        .proxy_request("qaqc", method, &path_str, headers, body)
+        .await
+        .map_err(|e| {
+            error!("QAQC proxy error: {}", e);
+            StatusCode::BAD_GATEWAY
+        })
+}
+
 /// Initialize the service proxy with circuit breakers
 pub async fn initialize_proxy() {
     info!("Initializing service proxy with circuit breakers");

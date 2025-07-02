@@ -10,7 +10,8 @@ use crate::{
         list_microservices, proxy_auth_request, proxy_create_sample, proxy_list_samples,
         proxy_login, proxy_logout, proxy_sample_request, proxy_sequencing_request,
         proxy_spreadsheet_request, proxy_storage_request, proxy_template_request,
-        service_discovery,
+        proxy_notifications_request, proxy_events_request, proxy_transactions_request,
+        proxy_qaqc_request, service_discovery,
     },
 };
 
@@ -61,6 +62,30 @@ pub fn create_proxy_routes() -> Router<AppComponents> {
         .route("/api/spreadsheets/*path", post(proxy_spreadsheet_request))
         .route("/api/spreadsheets/*path", put(proxy_spreadsheet_request))
         .route("/api/spreadsheets/*path", delete(proxy_spreadsheet_request))
+        
+        // Notifications service proxy routes
+        .route("/api/notifications/*path", get(proxy_notifications_request))
+        .route("/api/notifications/*path", post(proxy_notifications_request))
+        .route("/api/notifications/*path", put(proxy_notifications_request))
+        .route("/api/notifications/*path", delete(proxy_notifications_request))
+        
+        // Events service proxy routes
+        .route("/api/events/*path", get(proxy_events_request))
+        .route("/api/events/*path", post(proxy_events_request))
+        .route("/api/events/*path", put(proxy_events_request))
+        .route("/api/events/*path", delete(proxy_events_request))
+        
+        // Transactions service proxy routes
+        .route("/api/transactions/*path", get(proxy_transactions_request))
+        .route("/api/transactions/*path", post(proxy_transactions_request))
+        .route("/api/transactions/*path", put(proxy_transactions_request))
+        .route("/api/transactions/*path", delete(proxy_transactions_request))
+        
+        // QAQC service proxy routes
+        .route("/api/qaqc/*path", get(proxy_qaqc_request))
+        .route("/api/qaqc/*path", post(proxy_qaqc_request))
+        .route("/api/qaqc/*path", put(proxy_qaqc_request))
+        .route("/api/qaqc/*path", delete(proxy_qaqc_request))
 }
 
 /// Initialize proxy system

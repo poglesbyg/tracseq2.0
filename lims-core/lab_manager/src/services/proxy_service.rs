@@ -144,7 +144,7 @@ impl ServiceProxy {
             ServiceConfig {
                 name: "sequencing_service".to_string(),
                 url: std::env::var("SEQUENCING_SERVICE_URL")
-                    .unwrap_or_else(|_| "http://sequencing-service:3012".to_string()),
+                    .unwrap_or_else(|_| "http://lims-sequencing:8000".to_string()),
                 health_check_path: "/health".to_string(),
                 timeout_seconds: 30,
                 retry_attempts: 3,
@@ -156,7 +156,7 @@ impl ServiceProxy {
             ServiceConfig {
                 name: "template_service".to_string(),
                 url: std::env::var("TEMPLATE_SERVICE_URL")
-                    .unwrap_or_else(|_| "http://template-service:3013".to_string()),
+                    .unwrap_or_else(|_| "http://lims-templates:8000".to_string()),
                 health_check_path: "/health".to_string(),
                 timeout_seconds: 30,
                 retry_attempts: 3,
@@ -181,6 +181,55 @@ impl ServiceProxy {
                 name: "spreadsheet_versioning_service".to_string(),
                 url: std::env::var("SPREADSHEET_SERVICE_URL")
                     .unwrap_or_else(|_| "http://spreadsheet-versioning-service:3015".to_string()),
+                health_check_path: "/health".to_string(),
+                timeout_seconds: 30,
+                retry_attempts: 3,
+            },
+        );
+
+        // Enhanced services
+        services.insert(
+            "notifications".to_string(),
+            ServiceConfig {
+                name: "notification_service".to_string(),
+                url: std::env::var("NOTIFICATION_SERVICE_URL")
+                    .unwrap_or_else(|_| "http://lims-notification:8000".to_string()),
+                health_check_path: "/health".to_string(),
+                timeout_seconds: 30,
+                retry_attempts: 3,
+            },
+        );
+
+        services.insert(
+            "events".to_string(),
+            ServiceConfig {
+                name: "event_service".to_string(),
+                url: std::env::var("EVENT_SERVICE_URL")
+                    .unwrap_or_else(|_| "http://lims-events:8087".to_string()),
+                health_check_path: "/health".to_string(),
+                timeout_seconds: 30,
+                retry_attempts: 3,
+            },
+        );
+
+        services.insert(
+            "transactions".to_string(),
+            ServiceConfig {
+                name: "transaction_service".to_string(),
+                url: std::env::var("TRANSACTION_SERVICE_URL")
+                    .unwrap_or_else(|_| "http://lims-transactions:8000".to_string()),
+                health_check_path: "/health".to_string(),
+                timeout_seconds: 30,
+                retry_attempts: 3,
+            },
+        );
+
+        services.insert(
+            "qaqc".to_string(),
+            ServiceConfig {
+                name: "qaqc_service".to_string(),
+                url: std::env::var("QAQC_SERVICE_URL")
+                    .unwrap_or_else(|_| "http://lims-qaqc:8089".to_string()),
                 health_check_path: "/health".to_string(),
                 timeout_seconds: 30,
                 retry_attempts: 3,
