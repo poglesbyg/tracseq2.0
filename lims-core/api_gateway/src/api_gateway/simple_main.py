@@ -96,6 +96,64 @@ async def health():
         "timestamp": datetime.now().isoformat()
     }
 
+# Service-specific health endpoints
+@app.get("/api/templates/health")
+async def templates_health():
+    """Templates service health check"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{TEMPLATE_SERVICE_URL}/health", timeout=5.0)
+            return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Templates service unavailable: {str(e)}")
+
+@app.get("/api/notifications/health")
+async def notifications_health():
+    """Notifications service health check"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{NOTIFICATION_SERVICE_URL}/health", timeout=5.0)
+            return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Notifications service unavailable: {str(e)}")
+
+@app.get("/api/sequencing/health")
+async def sequencing_health():
+    """Sequencing service health check"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{SEQUENCING_SERVICE_URL}/health", timeout=5.0)
+            return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Sequencing service unavailable: {str(e)}")
+
+@app.get("/api/qaqc/health")
+async def qaqc_health():
+    """QA/QC service health check"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{QAQC_SERVICE_URL}/health", timeout=5.0)
+            response.raise_for_status()
+            # Handle plain text response
+            content_type = response.headers.get("content-type", "")
+            if "text/" in content_type:
+                return {"status": "healthy", "message": response.text.strip()}
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"QA/QC service unavailable: {str(e)}")
+
+@app.get("/api/transactions/health")
+async def transactions_health():
+    """Transaction service health check"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{TRANSACTION_SERVICE_URL}/health", timeout=5.0)
+            return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Transaction service unavailable: {str(e)}")
+
 # Authentication endpoints
 @app.post("/api/auth/login")
 async def login(request: Request):

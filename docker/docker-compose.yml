@@ -119,11 +119,6 @@ services:
       - OLLAMA_HOST=0.0.0.0
     networks:
       - lims-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
 
   rag-service:
     build:
@@ -172,8 +167,12 @@ services:
       REPORTS_SERVICE_URL: http://reports-service:8000
       PROJECT_SERVICE_URL: http://project-service:8101
       LIBRARY_PREP_SERVICE_URL: http://library-prep-service:8102
-      QAQC_SERVICE_URL: http://qaqc-service:8103
+      QAQC_SERVICE_URL: http://lims-qaqc:8089
+      TRANSACTION_SERVICE_URL: http://lims-transactions:8088
       FLOW_CELL_SERVICE_URL: http://flow-cell-service:8104
+      TEMPLATE_SERVICE_URL: http://lims-templates:8083
+      SEQUENCING_SERVICE_URL: http://lims-sequencing:8000
+      NOTIFICATION_SERVICE_URL: http://lims-notification:8085
       USE_REPORTS_SERVICE: "true"
     depends_on:
       - auth-service
