@@ -1,3 +1,4 @@
+import React from 'react';
 import { AppDefinition } from '../types/apps';
 import {
   BeakerIcon,
@@ -13,6 +14,7 @@ import {
   ServerStackIcon,
   UsersIcon
 } from '@heroicons/react/24/outline';
+import { Finder, FileSystemItem } from '../components/Desktop/Finder';
 
 // Import all pages
 import Dashboard from '../pages/Dashboard';
@@ -32,7 +34,43 @@ import ProjectManagement from '../pages/ProjectManagement';
 import FlowCellDesign from '../pages/FlowCellDesign';
 import ServicesStatus from '../pages/ServicesStatus';
 
+// Create a wrapper component for Finder
+const FinderApp = () => {
+  const [selectedItem, setSelectedItem] = React.useState<any>(null);
+  
+  // Mock file system items
+  const mockItems = [
+    { id: '1', name: 'Samples', type: 'folder' as const, parent: null, created: new Date(), modified: new Date() },
+    { id: '2', name: 'Templates', type: 'folder' as const, parent: null, created: new Date(), modified: new Date() },
+    { id: '3', name: 'Reports', type: 'folder' as const, parent: null, created: new Date(), modified: new Date() },
+    { id: '4', name: 'Sample-001', type: 'sample' as const, parent: '1', created: new Date(), modified: new Date(), size: 1024 },
+    { id: '5', name: 'Sample-002', type: 'sample' as const, parent: '1', created: new Date(), modified: new Date(), size: 2048 },
+    { id: '6', name: 'PCR Template', type: 'template' as const, parent: '2', created: new Date(), modified: new Date(), size: 512 },
+  ];
+  
+  return (
+    <Finder
+      items={mockItems}
+      onItemOpen={(item: FileSystemItem) => console.log('Open:', item)}
+      onItemSelect={setSelectedItem}
+      selectedItemId={selectedItem?.id}
+    />
+  );
+};
+
 export const apps: AppDefinition[] = [
+  // System Apps
+  {
+    id: 'finder',
+    name: 'Finder',
+    icon: <FolderIcon className="w-6 h-6" />,
+    component: FinderApp,
+    defaultSize: { width: 900, height: 600 },
+    dockIconClass: 'bg-gradient-to-br from-blue-400 to-blue-600',
+    category: 'system',
+    description: 'Browse laboratory files and samples'
+  },
+  
   // Laboratory Apps
   {
     id: 'dashboard',
@@ -40,7 +78,7 @@ export const apps: AppDefinition[] = [
     icon: <ChartBarIcon className="w-6 h-6" />,
     component: Dashboard,
     defaultSize: { width: 1200, height: 800 },
-    dockIconClass: 'bg-gradient-to-br from-blue-400 to-blue-600',
+    dockIconClass: 'bg-gradient-to-br from-indigo-400 to-indigo-600',
     category: 'laboratory',
     description: 'Laboratory overview and analytics'
   },
