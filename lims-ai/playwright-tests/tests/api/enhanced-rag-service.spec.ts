@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, APIRequestContext } from '@playwright/test';
 
 test.describe('Enhanced RAG Service API Tests', () => {
-  let apiContext;
+  let apiContext: APIRequestContext;
 
   test.beforeAll(async ({ playwright }) => {
     apiContext = await playwright.request.newContext({
@@ -205,10 +205,10 @@ test.describe('Enhanced RAG Service API Tests', () => {
     expect(embeddings.embeddings.length).toBe(3);
     
     // Check embedding dimensions
-    embeddings.embeddings.forEach(embedding => {
+    embeddings.embeddings.forEach((embedding: number[]) => {
       expect(Array.isArray(embedding)).toBeTruthy();
       expect(embedding.length).toBeGreaterThan(0); // Should have dimensions
-      embedding.forEach(value => {
+      embedding.forEach((value: number) => {
         expect(typeof value).toBe('number');
       });
     });

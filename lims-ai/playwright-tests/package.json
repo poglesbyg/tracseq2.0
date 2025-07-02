@@ -30,7 +30,7 @@
   "author": "TracSeq Team",
   "license": "MIT",
   "devDependencies": {
-    "@playwright/test": "^1.41.0",
+    "@playwright/test": "^1.53.2",
     "@types/node": "^20.11.0",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
@@ -47,4 +47,4 @@
     "jsonwebtoken": "^9.0.2",
     "uuid": "^9.0.1"
   }
-} 
+}
