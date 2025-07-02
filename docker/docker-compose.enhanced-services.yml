@@ -105,4 +105,5 @@ services:
 
 networks:
   lims-network:
-    external: true 
+    external: true
+    name: docker_lims-network 
