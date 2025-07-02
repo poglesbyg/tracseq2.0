@@ -47,22 +47,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build application router
     let app = Router::new()
         .route("/health", get(health_check))
-        // QC endpoints
-        .route("/api/v1/qc/dashboard", get(handlers::get_qc_dashboard))
-        .route("/api/v1/qc/reviews", get(handlers::list_qc_reviews))
-        .route("/api/v1/qc/reviews", post(handlers::create_qc_review))
-        .route("/api/v1/qc/reviews/:id", get(handlers::get_qc_review))
-        .route("/api/v1/qc/reviews/:id/complete", post(handlers::complete_qc_review))
-        .route("/api/v1/qc/library-prep", post(handlers::create_library_prep_qc))
-        .route("/api/v1/qc/library-prep/:id", get(handlers::get_library_prep_qc))
-        .route("/api/v1/qc/metrics/trends", get(handlers::get_qc_metric_trends))
-        .route("/api/v1/qc/metrics/recent", get(handlers::get_recent_qc_metrics))
-        .route("/api/v1/qc/metrics/definitions", get(handlers::list_qc_metrics))
-        .route("/api/v1/qc/metrics/definitions", post(handlers::upsert_qc_metric))
-        .route("/api/v1/qc/control-samples", get(handlers::list_control_samples))
-        .route("/api/v1/qc/control-samples", post(handlers::create_control_sample))
-        .route("/api/v1/qc/control-samples/results", post(handlers::record_control_result))
-        .route("/api/v1/qc/control-samples/:id/results", get(handlers::get_control_results))
+        .route("/api/v1/qc/status", get(qc_status))
+        // QC endpoints (commented out until handlers are updated)
+        // .route("/api/v1/qc/dashboard", get(handlers::get_qc_dashboard))
+        // .route("/api/v1/qc/reviews", get(handlers::list_qc_reviews))
+        // .route("/api/v1/qc/reviews", post(handlers::create_qc_review))
+        // .route("/api/v1/qc/reviews/:id", get(handlers::get_qc_review))
+        // .route("/api/v1/qc/reviews/:id/complete", post(handlers::complete_qc_review))
+        // .route("/api/v1/qc/library-prep", post(handlers::create_library_prep_qc))
+        // .route("/api/v1/qc/library-prep/:id", get(handlers::get_library_prep_qc))
+        // .route("/api/v1/qc/metrics/trends", get(handlers::get_qc_metric_trends))
+        // .route("/api/v1/qc/metrics/recent", get(handlers::get_recent_qc_metrics))
+        // .route("/api/v1/qc/metrics/definitions", get(handlers::list_qc_metrics))
+        // .route("/api/v1/qc/metrics/definitions", post(handlers::upsert_qc_metric))
+        // .route("/api/v1/qc/control-samples", get(handlers::list_control_samples))
+        // .route("/api/v1/qc/control-samples", post(handlers::create_control_sample))
+        // .route("/api/v1/qc/control-samples/results", post(handlers::record_control_result))
+        // .route("/api/v1/qc/control-samples/:id/results", get(handlers::get_control_results))
         .with_state(pool)
         // Middleware
         .layer(axum::middleware::from_fn(
@@ -82,4 +83,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn health_check() -> &'static str {
     "QA/QC Service is healthy"
+}
+
+async fn qc_status(axum::extract::State(pool): axum::extract::State<sqlx::PgPool>) -> axum::Json<serde_json::Value> {
+    // Check if we can connect to the database and query the qaqc schema
+    match sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM qaqc.qc_workflows")
+        .fetch_one(&pool)
+        .await
+    {
+        Ok(count) => axum::Json(serde_json::json!({
+            "status": "healthy",
+            "database": "connected",
+            "qaqc_schema": "available",
+            "workflows_count": count,
+            "service": "QA/QC Service v2"
+        })),
+        Err(e) => axum::Json(serde_json::json!({
+            "status": "error",
+            "database": "error",
+            "error": e.to_string(),
+            "service": "QA/QC Service v2"
+        }))
+    }
 } 

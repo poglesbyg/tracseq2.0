@@ -1,12 +1,15 @@
 services:
   # Enhanced Services that extend the base deployment
   notification-service:
+    build:
+      context: ../lims-core/notification_service
+      dockerfile: Dockerfile
     image: tracseq-notification_service:latest
     container_name: lims-notification
     environment:
       DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
       REDIS_URL: redis://lims-redis:6379
-      NOTIFICATION_PORT: "8000"
+      PORT: "8000"
       JWT_SECRET: "your-jwt-secret"
       SMTP_HOST: "smtp.gmail.com"
       SMTP_PORT: "587"
@@ -55,12 +58,15 @@ services:
       - lims-redis:redis
 
   template-service:
+    build:
+      context: ../lims-core/template_service
+      dockerfile: Dockerfile
     image: tracseq-template_service:latest
     container_name: lims-templates
     environment:
       DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
       REDIS_URL: redis://lims-redis:6379
-      TEMPLATE_PORT: "8000"
+      PORT: "8000"
       JWT_SECRET: "your-jwt-secret"
     ports:
       - "8018:8000"
@@ -71,12 +77,15 @@ services:
       - lims-redis:redis
 
   sequencing-service:
+    build:
+      context: ../lims-core/sequencing_service
+      dockerfile: Dockerfile
     image: tracseq-sequencing_service:latest
     container_name: lims-sequencing
     environment:
       DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
       REDIS_URL: redis://lims-redis:6379
-      SEQUENCING_PORT: "8000"
+      PORT: "8000"
       JWT_SECRET: "your-jwt-secret"
     ports:
       - "8019:8000"

@@ -18,8 +18,9 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release
 RUN rm -rf src
 
-# Copy source code
+# Copy source code and migrations
 COPY src ./src
+COPY migrations ./migrations
 
 # Build the actual application
 RUN touch src/main.rs
@@ -37,8 +38,9 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the binary
+# Copy the binary and migrations
 COPY --from=builder /usr/src/app/target/release/qaqc_service ./qaqc_service
+COPY --from=builder /usr/src/app/migrations ./migrations
 
 # Expose port
 EXPOSE 8103
