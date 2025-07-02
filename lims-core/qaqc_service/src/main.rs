@@ -21,7 +21,7 @@ use database::create_pool;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing
+    // Initialize tracing first so we can see logs
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -30,15 +30,55 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    println!("QAQC SERVICE: Starting up...");
+    tracing::info!("🚀 Starting QAQC service");
+
     // Load configuration
-    let config = Config::from_env()?;
+    println!("QAQC SERVICE: Loading configuration...");
+    let config = match Config::from_env() {
+        Ok(cfg) => {
+            println!("QAQC SERVICE: Configuration loaded successfully");
+            tracing::info!("Configuration loaded successfully");
+            cfg
+        }
+        Err(e) => {
+            println!("QAQC SERVICE: Failed to load configuration: {}", e);
+            tracing::error!("Failed to load configuration: {}", e);
+            return Err(e.into());
+        }
+    };
 
     // Create database connection pool
-    let pool = create_pool(&config.database_url).await?;
+    println!("QAQC SERVICE: Connecting to database at: {}", config.database_url);
+    let pool = match create_pool(&config.database_url).await {
+        Ok(p) => {
+            println!("QAQC SERVICE: Database connection successful");
+            tracing::info!("Database connection established");
+            p
+        }
+        Err(e) => {
+            println!("QAQC SERVICE: Failed to connect to database: {}", e);
+            tracing::error!("Failed to connect to database: {}", e);
+            return Err(e.into());
+        }
+    };
 
     // Run database migrations unless SKIP_MIGRATIONS is set
     if std::env::var("SKIP_MIGRATIONS").unwrap_or_default() != "true" {
-        database::run_migrations(&pool).await?;
+        println!("QAQC SERVICE: Running database migrations...");
+        match database::run_migrations(&pool).await {
+            Ok(_) => {
+                println!("QAQC SERVICE: Database migrations completed");
+                tracing::info!("Database migrations completed");
+            }
+            Err(e) => {
+                println!("QAQC SERVICE: Failed to run migrations: {}", e);
+                tracing::error!("Failed to run migrations: {}", e);
+                return Err(e.into());
+            }
+        }
+    } else {
+        println!("QAQC SERVICE: Skipping database migrations (SKIP_MIGRATIONS=true)");
     }
 
     // Build application router
@@ -72,14 +112,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(TraceLayer::new_for_http());
 
     // Start server
-    let listener =
-        tokio::net::TcpListener::bind(format!("{}:{}", config.host, config.port)).await?;
+    println!("QAQC SERVICE: Starting server on {}:{}", config.host, config.port);
+    let listener = match tokio::net::TcpListener::bind(format!("{}:{}", config.host, config.port)).await {
+        Ok(l) => {
+            println!("QAQC SERVICE: Successfully bound to {}:{}", config.host, config.port);
+            l
+        }
+        Err(e) => {
+            println!("QAQC SERVICE: Failed to bind to {}:{} - {}", config.host, config.port, e);
+            tracing::error!("Failed to bind to {}:{} - {}", config.host, config.port, e);
+            return Err(e.into());
+        }
+    };
 
-    tracing::info!("QAQC service listening on {}:{}", config.host, config.port);
+    println!("QAQC SERVICE: Server is ready, starting to serve requests...");
+    tracing::info!("🌐 QAQC service listening on {}:{}", config.host, config.port);
 
-    axum::serve(listener, app).await?;
-
-    Ok(())
+    match axum::serve(listener, app).await {
+        Ok(_) => {
+            println!("QAQC SERVICE: Server stopped gracefully");
+            Ok(())
+        }
+        Err(e) => {
+            println!("QAQC SERVICE: Server error: {}", e);
+            tracing::error!("Server error: {}", e);
+            Err(e.into())
+        }
+    }
 }
 
 async fn health_check() -> &'static str {

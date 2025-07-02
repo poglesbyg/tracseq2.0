@@ -21,15 +21,17 @@ services:
       - lims-redis:redis
 
   event-service:
-    image: tracseq-event_service:manual
+    image: tracseq-event_service:latest
     container_name: lims-events
     environment:
       DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
       REDIS_URL: redis://lims-redis:6379
-      EVENT_PORT: "8000"
+      PORT: "8087"
+      HOST: "0.0.0.0"
       JWT_SECRET: "your-jwt-secret"
+      RUST_LOG: info
     ports:
-      - "8016:8000"
+      - "8016:8087"
     networks:
       - lims-network
     external_links:
@@ -90,13 +92,15 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
       REDIS_URL: redis://lims-redis:6379
-      QAQC_PORT: "8000"
+      QAQC_HOST: "0.0.0.0"
+      QAQC_PORT: "8089"
       JWT_SECRET: "your-jwt-secret"
       DEFAULT_QUALITY_THRESHOLD: "80.0"
       ENABLE_REAL_TIME_MONITORING: "true"
       COMPLIANCE_STANDARDS: "ISO15189,CLIA,CAP,GLP"
+      RUST_LOG: debug
     ports:
-      - "8020:8000"
+      - "8020:8089"
     networks:
       - lims-network
     external_links:

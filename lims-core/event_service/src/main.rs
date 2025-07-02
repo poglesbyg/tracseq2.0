@@ -9,7 +9,7 @@ use axum::{
     extract::State,
     http::StatusCode,
     response::Json,
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,7 @@ use tower_http::cors::CorsLayer;
 use tracing::{info, Level};
 use tracing_subscriber;
 
-use events::{Event, EventPublicationResult, SubscriptionConfig};
+use events::{Event, SubscriptionConfig};
 
 /// Application state
 #[derive(Clone)]
@@ -89,23 +89,33 @@ async fn main() -> Result<()> {
     // Initialize event bus
     println!("EVENT SERVICE: Initializing event bus");
     info!("🔗 Connecting to Redis at {}", redis_url);
-    let _event_bus: Arc<dyn EventBus> = match RedisEventBus::new(&redis_url).await {
+    let event_bus: Arc<dyn EventBus> = match RedisEventBus::new(&redis_url).await {
         Ok(bus) => {
             println!("EVENT SERVICE: Redis event bus initialized successfully");
             Arc::new(bus)
         }
         Err(e) => {
             println!("EVENT SERVICE: Failed to initialize Redis event bus: {}", e);
-            return Err(e.into());
+            eprintln!("Warning: Event service running without Redis connectivity");
+            // Continue without Redis for now - this allows health checks to work
+            // In production, you might want to fail here
+            Arc::new(services::event_bus::MockEventBus::new())
         }
     };
+
+    // Create application state
+    let app_state = AppState { event_bus };
 
     // Build the application router  
     println!("EVENT SERVICE: Building application router");
     let app = Router::new()
         .route("/", get(root))
         .route("/health", get(simple_health_check))
-        .layer(CorsLayer::permissive());
+        .route("/api/v1/events/publish", post(publish_event))
+        .route("/api/v1/events/subscribe", post(subscribe_to_events))
+        .route("/api/v1/stats", get(get_stats))
+        .layer(CorsLayer::permissive())
+        .with_state(app_state);
 
     // Start the server
     let bind_address = format!("{}:{}", host, port);
@@ -179,11 +189,10 @@ async fn health_check(State(state): State<AppState>) -> Json<HealthResponse> {
 }
 
 /// Publish an event
-#[allow(dead_code)]
 async fn publish_event(
     State(state): State<AppState>,
     Json(request): Json<PublishEventRequest>,
-) -> Result<Json<EventPublicationResult>, StatusCode> {
+) -> (StatusCode, Json<serde_json::Value>) {
     // Create event
     let mut event = Event::new(
         request.event_type,
@@ -206,29 +215,31 @@ async fn publish_event(
 
     // Publish event
     match state.event_bus.publish(event).await {
-        Ok(result) => Ok(Json(result)),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Ok(result) => (StatusCode::OK, Json(serde_json::to_value(result).unwrap())),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
+            "error": format!("Failed to publish event: {}", e)
+        }))),
     }
 }
 
 /// Subscribe to events
-#[allow(dead_code)]
 async fn subscribe_to_events(
     State(state): State<AppState>,
     Json(config): Json<SubscriptionConfig>,
-) -> Result<Json<serde_json::Value>, StatusCode> {
+) -> (StatusCode, Json<serde_json::Value>) {
     match state.event_bus.subscribe(config.clone()).await {
-        Ok(_) => Ok(Json(serde_json::json!({
+        Ok(_) => (StatusCode::OK, Json(serde_json::json!({
             "status": "subscribed",
             "subscription_name": config.name,
             "event_types": config.event_types
         }))),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
+            "error": format!("Failed to subscribe: {}", e)
+        }))),
     }
 }
 
 /// Get event bus statistics
-#[allow(dead_code)]
 async fn get_stats(State(state): State<AppState>) -> Json<StatsResponse> {
     let stats = state.event_bus.get_stats().await;
     

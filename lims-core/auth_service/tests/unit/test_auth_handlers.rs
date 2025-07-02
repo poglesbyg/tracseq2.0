@@ -7,9 +7,9 @@ use auth_service::{
     handlers::auth::{
         register, login, get_current_user, change_password, forgot_password,
         get_sessions, revoke_session, logout, ForgotPasswordRequest,
-        ChangePasswordRequest, LogoutRequest
+        ChangePasswordRequest, LogoutRequest, RegisterRequest
     },
-    models::{RegisterRequest, LoginRequest, User, UserRole, UserStatus},
+    models::{LoginRequest, User, UserRole, UserStatus},
     error::{AuthError, AuthResult},
     services::AuthServiceImpl,
     AppState, Config, DatabasePool,
@@ -81,7 +81,7 @@ async fn test_register_validation_error() {
     let app_state = create_test_app_state().await;
     
     // Create an invalid request (empty email)
-    let request = auth_service::models::RegisterRequest {
+    let request = RegisterRequest {
         first_name: "John".to_string(),
         last_name: "Doe".to_string(),
         email: "".to_string(), // Invalid
@@ -231,7 +231,7 @@ async fn test_register_disabled_feature() {
         db_pool,
     };
     
-    let request = auth_service::models::RegisterRequest {
+    let request = RegisterRequest {
         first_name: "John".to_string(),
         last_name: "Doe".to_string(),
         email: "john@example.com".to_string(),

@@ -197,22 +197,22 @@ class TracSeqAPIGatewayConfig(BaseSettings):
             ),
             "templates": ServiceEndpoint(
                 name="Template Service",
-                host="template-service",
-                port=8083,
+                host="lims-templates",
+                port=8000,
                 path_prefix="/templates",
                 health_check_path="/api/v1/health"
             ),
             "sequencing": ServiceEndpoint(
                 name="Sequencing Service",
-                host="sequencing-service",
-                port=8084,
+                host="lims-sequencing",
+                port=8000,
                 path_prefix="/sequencing",
                 health_check_path="/api/v1/health"
             ),
             "notifications": ServiceEndpoint(
                 name="Notification Service",
-                host="notification-service",
-                port=8085,
+                host="lims-notification",
+                port=8000,
                 path_prefix="/notifications",
                 health_check_path="/api/v1/health"
             ),
@@ -225,15 +225,15 @@ class TracSeqAPIGatewayConfig(BaseSettings):
             ),
             "events": ServiceEndpoint(
                 name="Event Service",
-                host="event-service",
+                host="lims-events",
                 port=8087,
                 path_prefix="/events",
-                health_check_path="/api/v1/health"
+                health_check_path="/health"
             ),
             "transactions": ServiceEndpoint(
                 name="Transaction Service",
-                host="transaction-service",
-                port=8088,
+                host="lims-transactions",
+                port=8000,
                 path_prefix="/transactions",
                 health_check_path="/api/v1/health"
             ),
@@ -253,8 +253,8 @@ class TracSeqAPIGatewayConfig(BaseSettings):
             ),
             "qc": ServiceEndpoint(
                 name="QA/QC Service",
-                host="qaqc-service",
-                port=8103,
+                host="lims-qaqc",
+                port=8089,
                 path_prefix="/qc",
                 health_check_path="/health"
             ),

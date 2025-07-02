@@ -335,3 +335,51 @@ impl EventBus for RedisEventBus {
         self.get_stats().await
     }
 }
+
+/// Mock event bus for testing and when Redis is not available
+#[derive(Clone)]
+#[allow(dead_code)]
+pub struct MockEventBus {
+    stats: Arc<RwLock<EventBusStats>>,
+}
+
+impl MockEventBus {
+    #[allow(dead_code)]
+    pub fn new() -> Self {
+        Self {
+            stats: Arc::new(RwLock::new(EventBusStats::default())),
+        }
+    }
+}
+
+#[async_trait]
+impl EventBus for MockEventBus {
+    #[allow(dead_code)]
+    async fn publish(&self, event: Event) -> Result<EventPublicationResult> {
+        let mut stats = self.stats.write().await;
+        stats.events_published += 1;
+        
+        Ok(EventPublicationResult {
+            event_id: event.id,
+            stream_id: format!("mock-{}", uuid::Uuid::new_v4()),
+            published_at: Utc::now(),
+        })
+    }
+
+    #[allow(dead_code)]
+    async fn register_handler(&self, _handler: Arc<dyn EventHandler>) -> Result<()> {
+        let mut stats = self.stats.write().await;
+        stats.handlers_registered += 1;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    async fn subscribe(&self, _config: SubscriptionConfig) -> Result<()> {
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    async fn get_stats(&self) -> EventBusStats {
+        self.stats.read().await.clone()
+    }
+}

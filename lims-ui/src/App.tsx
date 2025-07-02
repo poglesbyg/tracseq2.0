@@ -24,6 +24,9 @@ import QualityControl from './pages/QualityControl';
 import ProjectManagement from './pages/ProjectManagement';
 import FlowCellDesign from './pages/FlowCellDesign';
 import ServicesStatus from './pages/ServicesStatus';
+import { NotificationCenter } from './components/notifications/NotificationCenter';
+import { EventMonitorDashboard } from './components/events/EventMonitorDashboard';
+import { QAQCWorkflowInterface } from './components/qaqc/QAQCWorkflowInterface';
 
 const queryClient = new QueryClient();
 
@@ -200,6 +203,36 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <ServicesStatus />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/notifications" element={
+              <ProtectedRoute>
+                <Layout>
+                  <NotificationCenter />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/events" element={
+              <ProtectedRoute>
+                <Layout>
+                  <EventMonitorDashboard />
+                  {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
+                  <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/qaqc" element={
+              <ProtectedRoute>
+                <Layout>
+                  <QAQCWorkflowInterface />
                   {!isChatOpen && <ChatBotFloat onClick={() => setIsChatOpen(true)} />}
                   <ChatBot isOpen={isChatOpen} onToggle={() => setIsChatOpen(!isChatOpen)} />
                 </Layout>

@@ -106,7 +106,7 @@ impl Event {
 }
 
 /// Event publication result
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct EventPublicationResult {
     pub event_id: Uuid,

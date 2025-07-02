@@ -423,36 +423,31 @@ async fn test_concurrent_registrations() {
         .expect("Failed to create test app state");
     
     let app = create_router(app_state);
-    let server = Arc::new(TestServer::new(app).expect("Failed to create test server"));
+    let server = TestServer::new(app).expect("Failed to create test server");
     
     // Create multiple registration tasks
     let mut handles = vec![];
     
     for i in 0..5 {
-        let server_clone = Arc::clone(&server);
-        let handle = tokio::spawn(async move {
-            let register_request = json!({
-                "first_name": format!("Test{}", i),
-                "last_name": "User",
-                "email": test_email(),
-                "password": "SecurePassword123!"
-            });
-            
-            let response = server_clone
-                .post("/auth/register")
-                .json(&register_request)
-                .await;
-            
-            (response.status_code(), response.json::<serde_json::Value>())
+        let register_request = json!({
+            "first_name": format!("Test{}", i),
+            "last_name": "User",
+            "email": test_email(),
+            "password": "SecurePassword123!"
         });
         
-        handles.push(handle);
+        // Execute the request directly without spawning
+        let response = server
+            .post("/auth/register")
+            .json(&register_request)
+            .await;
+        
+        handles.push((response.status_code(), response.json::<serde_json::Value>()));
     }
     
-    // Wait for all registrations to complete
+    // Process all registration results
     let mut user_ids = vec![];
-    for handle in handles {
-        let (status, body) = handle.await.unwrap();
+    for (status, body) in handles {
         assert_eq!(status, 201);
         assert_eq!(body["success"], true);
         

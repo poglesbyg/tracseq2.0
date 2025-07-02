@@ -5,12 +5,6 @@ use tracing::{info, warn};
 /// Database connection pool type alias
 pub type DatabasePool = PgPool;
 
-impl From<PgPool> for DatabasePool {
-    fn from(pool: PgPool) -> Self {
-        pool
-    }
-}
-
 /// Database connection module
 pub struct Database;
 
