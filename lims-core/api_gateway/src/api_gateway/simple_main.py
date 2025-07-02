@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -192,19 +192,10 @@ async def get_samples(request: Request):
                     "concentration": "50 ng/μL",
                     "volume": "100 μL",
                     "quality": "High",
-                    "extractionMethod": "Qiagen DNeasy",
-                    "purity": "1.8 A260/A280",
-                    "yield": "5.0 μg"
+                    "extractionMethod": "Qiagen DNeasy"
                 },
                 "confidenceScore": 0.94,
-                "ragStatus": "Completed",
-                "processingSteps": [
-                    {"step": "Document Upload", "status": "Completed", "timestamp": (datetime.now() - timedelta(hours=3)).isoformat()},
-                    {"step": "Text Extraction", "status": "Completed", "timestamp": (datetime.now() - timedelta(hours=2, minutes=30)).isoformat()},
-                    {"step": "AI Processing", "status": "Completed", "timestamp": (datetime.now() - timedelta(hours=2)).isoformat()},
-                    {"step": "Validation", "status": "Completed", "timestamp": (datetime.now() - timedelta(hours=1)).isoformat()}
-                ],
-                "extractionMethod": "ai_rag"
+                "ragStatus": "Completed"
             },
             {
                 "id": "SMPL-RAG-002",
@@ -220,19 +211,10 @@ async def get_samples(request: Request):
                     "concentration": "75 ng/μL",
                     "volume": "50 μL",
                     "quality": "Medium",
-                    "extractionMethod": "TRIzol",
-                    "purity": "1.9 A260/A280",
-                    "yield": "3.75 μg"
+                    "extractionMethod": "TRIzol"
                 },
                 "confidenceScore": 0.87,
-                "ragStatus": "Processing",
-                "processingSteps": [
-                    {"step": "Document Upload", "status": "Completed", "timestamp": (datetime.now() - timedelta(hours=1)).isoformat()},
-                    {"step": "Text Extraction", "status": "Completed", "timestamp": (datetime.now() - timedelta(minutes=45)).isoformat()},
-                    {"step": "AI Processing", "status": "In Progress", "timestamp": (datetime.now() - timedelta(minutes=30)).isoformat()},
-                    {"step": "Validation", "status": "Pending", "timestamp": None}
-                ],
-                "extractionMethod": "ai_rag"
+                "ragStatus": "Processing"
             },
             {
                 "id": "SMPL-RAG-003",
@@ -245,14 +227,7 @@ async def get_samples(request: Request):
                 "location": "Intake Bay",
                 "extractedMetadata": {},
                 "confidenceScore": 0.0,
-                "ragStatus": "Pending",
-                "processingSteps": [
-                    {"step": "Document Upload", "status": "Pending", "timestamp": None},
-                    {"step": "Text Extraction", "status": "Pending", "timestamp": None},
-                    {"step": "AI Processing", "status": "Pending", "timestamp": None},
-                    {"step": "Validation", "status": "Pending", "timestamp": None}
-                ],
-                "extractionMethod": "ai_rag"
+                "ragStatus": "Pending"
             }
         ]
 
@@ -1058,6 +1033,151 @@ async def proxy_notification(path: str, request: Request):
             return response.json()
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Notification service unavailable: {e!s}")
+
+# Enhanced services proxy routes
+@app.api_route("/api/notifications/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_notifications(path: str, request: Request):
+    """Proxy requests to Notifications service (plural)"""
+    notification_url = "http://lims-notification:8000"
+    try:
+        async with httpx.AsyncClient() as client:
+            # For health checks, use the direct health endpoint
+            if path == "health":
+                url = f"{notification_url}/health"
+            else:
+                url = f"{notification_url}/api/v1/{path}"
+            
+            body = None
+            if request.method in ["POST", "PUT", "PATCH"]:
+                body = await request.body()
+
+            response = await client.request(
+                method=request.method,
+                url=url,
+                headers=dict(request.headers),
+                params=request.query_params,
+                content=body,
+                timeout=30.0
+            )
+            
+            # Return the response content and status
+            return Response(
+                content=response.content,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="Notifications service unavailable")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Notifications service error: {e!s}")
+
+@app.api_route("/api/events/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_events(path: str, request: Request):
+    """Proxy requests to Events service"""
+    events_url = "http://lims-events:8087"
+    try:
+        async with httpx.AsyncClient() as client:
+            # For health checks, use the direct health endpoint
+            if path == "health":
+                url = f"{events_url}/health"
+            else:
+                url = f"{events_url}/api/v1/{path}"
+            
+            body = None
+            if request.method in ["POST", "PUT", "PATCH"]:
+                body = await request.body()
+
+            response = await client.request(
+                method=request.method,
+                url=url,
+                headers=dict(request.headers),
+                params=request.query_params,
+                content=body,
+                timeout=30.0
+            )
+            
+            # Return the response content and status
+            return Response(
+                content=response.content,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="Events service unavailable")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Events service error: {e!s}")
+
+@app.api_route("/api/transactions/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_transactions(path: str, request: Request):
+    """Proxy requests to Transactions service"""
+    transactions_url = "http://lims-transactions:8000"
+    try:
+        async with httpx.AsyncClient() as client:
+            # For health checks, use the direct health endpoint
+            if path == "health":
+                url = f"{transactions_url}/health"
+            else:
+                url = f"{transactions_url}/api/v1/{path}"
+            
+            body = None
+            if request.method in ["POST", "PUT", "PATCH"]:
+                body = await request.body()
+
+            response = await client.request(
+                method=request.method,
+                url=url,
+                headers=dict(request.headers),
+                params=request.query_params,
+                content=body,
+                timeout=30.0
+            )
+            
+            # Return the response content and status
+            return Response(
+                content=response.content,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="Transactions service unavailable")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Transactions service error: {e!s}")
+
+@app.api_route("/api/qaqc/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_qaqc(path: str, request: Request):
+    """Proxy requests to QA/QC service"""
+    qaqc_url = "http://lims-qaqc:8089"
+    try:
+        async with httpx.AsyncClient() as client:
+            # For health checks, use the direct health endpoint
+            if path == "health":
+                url = f"{qaqc_url}/health"
+            else:
+                url = f"{qaqc_url}/api/v1/{path}"
+            
+            body = None
+            if request.method in ["POST", "PUT", "PATCH"]:
+                body = await request.body()
+
+            response = await client.request(
+                method=request.method,
+                url=url,
+                headers=dict(request.headers),
+                params=request.query_params,
+                content=body,
+                timeout=30.0
+            )
+            
+            # Return the response content and status
+            return Response(
+                content=response.content,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="QA/QC service unavailable")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"QA/QC service error: {e!s}")
 
 # NOTE: Removed proxy endpoints - using direct endpoints below
 # Project endpoints

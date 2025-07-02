@@ -251,11 +251,11 @@ class TracSeqAPIGatewayConfig(BaseSettings):
                 path_prefix="/library-prep",
                 health_check_path="/health"
             ),
-            "qc": ServiceEndpoint(
+            "qaqc": ServiceEndpoint(
                 name="QA/QC Service",
                 host="lims-qaqc",
                 port=8089,
-                path_prefix="/qc",
+                path_prefix="/qaqc",
                 health_check_path="/health"
             ),
             "flow-cells": ServiceEndpoint(

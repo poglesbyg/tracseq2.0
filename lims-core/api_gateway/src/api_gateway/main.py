@@ -159,7 +159,11 @@ def create_app() -> FastAPI:
 
         # Build upstream URL
         upstream_path = full_path[len(service_endpoint.path_prefix):]
-        upstream_url = f"{service_endpoint.base_url}/api/v1{upstream_path}"
+        # For health checks, use the configured health check path directly
+        if upstream_path == "/health" or upstream_path.startswith("/health"):
+            upstream_url = service_endpoint.health_url
+        else:
+            upstream_url = f"{service_endpoint.base_url}/api/v1{upstream_path}"
 
         # Get request data
         body = await request.body()
