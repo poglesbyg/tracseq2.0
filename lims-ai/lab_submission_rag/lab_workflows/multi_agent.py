@@ -14,7 +14,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from llama_index.workflows import (
+from llama_index.core.workflow import (
     Context,
     Event,
     StartEvent,

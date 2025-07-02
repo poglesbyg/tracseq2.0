@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from llama_index.workflows import (
+from llama_index.core.workflow import (
     Context,
     Event,
     StartEvent,

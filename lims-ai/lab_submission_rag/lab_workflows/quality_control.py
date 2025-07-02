@@ -15,7 +15,7 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from llama_index.workflows import (
+from llama_index.core.workflow import (
     Context,
     Event,
     StartEvent,

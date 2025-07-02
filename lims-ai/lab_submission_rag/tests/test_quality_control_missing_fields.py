@@ -15,7 +15,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 
-from ..workflows.quality_control import (
+from ..lab_workflows.quality_control import (
     QualityControlWorkflow,
     CONFIDENCE_THRESHOLD_HIGH,
     CONFIDENCE_THRESHOLD_MEDIUM,
