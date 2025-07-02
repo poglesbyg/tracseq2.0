@@ -92,7 +92,7 @@ services:
 
   # Service Discovery (Consul)
   consul:
-    image: consul:1.17
+    image: hashicorp/consul:latest
     container_name: consul
     hostname: consul
     ports:

@@ -2,7 +2,7 @@
 
 # Core async functionality
 websockets==12.0
-asyncio==3.4.3
+# asyncio is built-in to Python 3.11, no need to install
 aiohttp==3.9.1
 
 # JSON Schema validation
@@ -16,7 +16,7 @@ prometheus-client==0.19.0
 python-consul==1.1.0
 
 # Circuit breaker
-py-breaker==0.8.0
+pybreaker==0.8.0
 
 # Utilities
 python-dateutil==2.8.2
