@@ -70,6 +70,7 @@ class DatabaseSavedEvent(Event):
     submission_id: str
     document_id: str
     success: bool
+    extraction_result: Optional[ExtractionResult] = None
 
 
 class ValidationErrorEvent(Event):
@@ -102,7 +103,7 @@ class DocumentProcessingWorkflow(Workflow):
         """Validate the input document"""
         start_time = time.time()
         
-        file_path = Path(ev.get("file_path"))
+        file_path = Path(getattr(ev, "file_path", ""))
         ctx.data["file_path"] = file_path
         ctx.data["start_time"] = start_time
         
@@ -218,6 +219,9 @@ class DocumentProcessingWorkflow(Workflow):
             ev.source_document
         )
         
+        # Store extraction result in context for later use
+        ctx.data["extraction_result"] = extraction_result
+        
         logger.info(
             f"Extraction completed. Success: {extraction_result.success}, "
             f"Confidence: {extraction_result.confidence_score:.2f}"
@@ -284,7 +288,8 @@ class DocumentProcessingWorkflow(Workflow):
                 return DatabaseSavedEvent(
                     submission_id=submission.submission_id,
                     document_id=document_id,
-                    success=True
+                    success=True,
+                    extraction_result=ev.extraction_result
                 )
                 
         except Exception as e:
@@ -300,17 +305,21 @@ class DocumentProcessingWorkflow(Workflow):
         self, ctx: Context, ev: DatabaseSavedEvent
     ) -> StopEvent:
         """Finalize the workflow and return results"""
-        # Get the extraction result from context
-        extraction_result = ctx.data.get("extraction_result")
+        # Get the extraction result from event first, then fallback to context
+        extraction_result = ev.extraction_result or ctx.data.get("extraction_result")
         
         # Update processing time
         if extraction_result:
-            extraction_result.processing_time = time.time() - ctx.data["start_time"]
-        
-        logger.info(
-            f"Document processing completed for submission {ev.submission_id}. "
-            f"Total time: {extraction_result.processing_time:.2f}s"
-        )
+            extraction_result.processing_time = time.time() - ctx.data.get("start_time", 0)
+            
+            logger.info(
+                f"Document processing completed for submission {ev.submission_id}. "
+                f"Total time: {extraction_result.processing_time:.2f}s"
+            )
+        else:
+            logger.warning(
+                f"No extraction result found for submission {ev.submission_id}"
+            )
         
         return StopEvent(result=extraction_result)
     

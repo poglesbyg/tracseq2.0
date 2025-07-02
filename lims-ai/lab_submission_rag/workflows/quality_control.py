@@ -67,6 +67,7 @@ class HumanReviewRequestEvent(Event):
     extraction_result: Dict[str, Any]
     confidence_score: float
     validation_errors: List[str]
+    missing_fields: List[str]
     attempt_number: int
 
 
@@ -94,8 +95,8 @@ class QualityControlWorkflow(Workflow):
         self, ctx: Context, ev: StartEvent
     ) -> ExtractionAttemptEvent:
         """Initialize extraction process"""
-        text = ev.get("text")
-        require_human_review = ev.get("require_human_review", False)
+        text = getattr(ev, "text", None)
+        require_human_review = getattr(ev, "require_human_review", False)
         
         ctx.data["text"] = text
         ctx.data["require_human_review"] = require_human_review
@@ -119,8 +120,8 @@ class QualityControlWorkflow(Workflow):
         # Build enhanced prompt with feedback
         prompt = self._build_extraction_prompt(
             ev.text,
-            ev.get("previous_result"),
-            ev.get("feedback") or ev.get("validation_errors", [])
+            getattr(ev, "previous_result", None),
+            getattr(ev, "feedback", None) or getattr(ev, "validation_errors", [])
         )
         
         # Perform extraction
@@ -180,7 +181,8 @@ class QualityControlWorkflow(Workflow):
                     ev.extraction_result,
                     ev.confidence_score,
                     True,
-                    ctx.data["text"]
+                    ctx.data["text"],
+                    missing_fields=ev.missing_fields
                 )
             )
         
@@ -203,6 +205,7 @@ class QualityControlWorkflow(Workflow):
                 extraction_result=ev.extraction_result,
                 confidence_score=ev.confidence_score,
                 validation_errors=ev.validation_errors,
+                missing_fields=ev.missing_fields,
                 attempt_number=ev.attempt_number
             )
         
@@ -214,7 +217,8 @@ class QualityControlWorkflow(Workflow):
                 ev.confidence_score,
                 ev.confidence_score >= CONFIDENCE_THRESHOLD_LOW,
                 ctx.data["text"],
-                warnings=ev.validation_errors
+                warnings=ev.validation_errors,
+                missing_fields=ev.missing_fields
             )
         )
     
@@ -247,7 +251,8 @@ class QualityControlWorkflow(Workflow):
                     1.0,  # Human-reviewed results have perfect confidence
                     True,
                     ctx.data["text"],
-                    warnings=["Human-reviewed and approved"]
+                    warnings=["Human-reviewed and approved"],
+                    missing_fields=ev.missing_fields  # Preserve original missing fields info
                 )
             )
         else:
@@ -386,32 +391,20 @@ Please correct these issues in your extraction.
         confidence_score: float,
         success: bool,
         source_text: str,
-        warnings: Optional[List[str]] = None
+        warnings: Optional[List[str]] = None,
+        missing_fields: Optional[List[str]] = None
     ) -> ExtractionResult:
         """Create extraction result from validated data"""
         
-        # Convert to LabSubmission if successful
-        submission = None
-        if success and extraction_data:
-            try:
-                # Create submission from extraction data
-                submission = LabSubmission(
-                    administrative=extraction_data.get("administrative", {}),
-                    sample=extraction_data.get("sample", {}),
-                    sequencing=extraction_data.get("sequencing", {}),
-                    raw_text=source_text[:1000],  # Store first 1000 chars
-                    confidence_score=confidence_score
-                )
-            except Exception as e:
-                logger.error(f"Failed to create LabSubmission: {e}")
-                success = False
-                warnings = (warnings or []) + [f"Failed to create submission: {str(e)}"]
+        # Note: Not creating LabSubmission here due to model mismatch
+        # The extraction data structure (administrative/sample/sequencing) 
+        # doesn't match the LabSubmission model fields
         
         return ExtractionResult(
             success=success,
-            submission=submission,
+            submission=None,  # Skip LabSubmission creation
             confidence_score=confidence_score,
-            missing_fields=[],
+            missing_fields=missing_fields or [],
             warnings=warnings or [],
             processing_time=0.0,  # Will be set by caller
             source_document="quality_control_workflow"

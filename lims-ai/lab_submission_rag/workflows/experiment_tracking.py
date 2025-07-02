@@ -95,10 +95,10 @@ class ExperimentTrackingWorkflow(Workflow):
     ) -> List[ModelEvaluationEvent]:
         """Initialize experiment and create evaluation events for each model"""
         
-        experiment_name = ev.get("experiment_name")
-        model_configs = ev.get("model_configs")
-        test_data = ev.get("test_data")
-        metrics_to_track = ev.get("metrics_to_track", ["accuracy", "f1_score", "processing_time"])
+        experiment_name = getattr(ev, "experiment_name", None)
+        model_configs = getattr(ev, "model_configs", [])
+        test_data = getattr(ev, "test_data", [])
+        metrics_to_track = getattr(ev, "metrics_to_track", ["accuracy", "f1_score", "processing_time"])
         
         # Create experiment
         experiment_id = await self.experiment_tracker.create_experiment(
@@ -112,6 +112,7 @@ class ExperimentTrackingWorkflow(Workflow):
         ctx.data["metrics_to_track"] = metrics_to_track
         ctx.data["model_results"] = {}
         ctx.data["start_time"] = time.time()
+        ctx.data["model_configs"] = model_configs
         
         logger.info(f"Started experiment {experiment_id} with {len(model_configs)} models")
         

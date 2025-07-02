@@ -69,15 +69,18 @@ class LLMInterface:
             self.client_type = "mock"
 
     async def extract_submission_info(
-        self, document_chunks: list[tuple[str, float]], source_document: str
+        self, document_chunks: list[tuple[str, float]], source_document: str, custom_prompt: str | None = None
     ) -> ExtractionResult:
         """Extract laboratory submission information from document chunks"""
         try:
-            # Combine relevant chunks into context
-            context = self._prepare_context(document_chunks)
-
-            # Create extraction prompt
-            prompt = self._create_extraction_prompt(context)
+            if custom_prompt:
+                # Use custom prompt directly
+                prompt = custom_prompt
+            else:
+                # Combine relevant chunks into context
+                context = self._prepare_context(document_chunks)
+                # Create extraction prompt
+                prompt = self._create_extraction_prompt(context)
 
             # Get LLM response
             response = await self._get_llm_response(prompt)
@@ -370,3 +373,16 @@ Please provide a detailed, accurate answer based on the context. If the informat
         except Exception as e:
             logger.error(f"Error in query processing: {str(e)}")
             return f"I apologize, but I encountered an error while processing your query: {str(e)}"
+
+    async def extract_submission_info_with_prompt(self, prompt: str) -> dict:
+        """Extract submission information using a custom prompt"""
+        try:
+            response = await self._get_llm_response(prompt)
+            # Try to parse as JSON, otherwise return as dict with content
+            try:
+                return json.loads(response)
+            except json.JSONDecodeError:
+                return {"content": response, "error": "Failed to parse JSON"}
+        except Exception as e:
+            logger.error(f"Error in extraction with prompt: {str(e)}")
+            return {"error": str(e)}

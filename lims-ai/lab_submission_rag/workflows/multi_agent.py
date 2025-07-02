@@ -104,7 +104,7 @@ class WorkflowCompleteEvent(Event):
 class DocumentProcessorAgent:
     """Agent responsible for document processing and extraction"""
     
-    async def process_document(self, document_path: str) -> Dict[str, Any]:
+    async def process_document(self, document_path: str) -> tuple[Dict[str, Any], float]:
         """Process document and extract information"""
         logger.info(f"DocumentProcessorAgent: Processing {document_path}")
         
@@ -149,6 +149,9 @@ class QualityControlAgent:
         # Check for missing critical fields
         if not validated_data.get("sample", {}).get("sample_id"):
             issues_found.append("Missing sample ID")
+            # Ensure the "sample" key exists before setting sample_id
+            if "sample" not in validated_data:
+                validated_data["sample"] = {}
             validated_data["sample"]["sample_id"] = f"AUTO-{datetime.now().strftime('%Y%m%d%H%M%S')}"
             corrections_made.append("Generated automatic sample ID")
         
@@ -244,9 +247,9 @@ class MultiAgentLabWorkflow(Workflow):
     ) -> DocumentReceivedEvent:
         """Receive and prepare document for processing"""
         
-        document_path = ev.get("document_path")
-        submission_type = ev.get("submission_type", "standard")
-        priority = ev.get("priority", "normal")
+        document_path = getattr(ev, "document_path", None)
+        submission_type = getattr(ev, "submission_type", "standard")
+        priority = getattr(ev, "priority", "normal")
         
         # Initialize workflow context
         ctx.data["submission_id"] = f"SUB-{datetime.now().strftime('%Y%m%d%H%M%S')}"
