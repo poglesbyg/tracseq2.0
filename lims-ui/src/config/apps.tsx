@@ -520,6 +520,15 @@ const FinderApp = ({ windowContext }: { windowContext?: any }) => {
               )}
               {item.metadata?.status === 'completed' && item.metadata?.filePath && (
                 <button
+                  onClick={() => {
+                    // Create a download link
+                    const link = document.createElement('a');
+                    link.href = `/api/reports/download/${item.metadata?.id}`;
+                    link.download = item.name + '.' + (item.metadata?.format || 'pdf');
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
                   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
                   Download Report

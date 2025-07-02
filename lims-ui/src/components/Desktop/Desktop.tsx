@@ -41,6 +41,7 @@ const DesktopContent: React.FC<DesktopProps> = ({ apps }) => {
   const [showSpotlight, setShowSpotlight] = useState(false);
   const [showMissionControl, setShowMissionControl] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [desktopBackground, setDesktopBackground] = useState('gradient-to-br from-blue-100 via-purple-50 to-pink-100');
   const { showContextMenu } = useContextMenu();
 
   const handleAppLaunch = useCallback((appId: string) => {
@@ -104,33 +105,158 @@ const DesktopContent: React.FC<DesktopProps> = ({ apps }) => {
       {
         label: 'New Folder',
         icon: <FolderOpenIcon className="w-4 h-4" />,
-        action: () => console.log('New folder')
+        action: () => {
+          // Open Finder and create a new folder
+          const finderId = `finder-${Date.now()}`;
+          const finderApp = apps.find(a => a.id === 'finder');
+          if (finderApp) {
+            openWindow({
+              id: finderId,
+              appId: 'finder',
+              title: 'Finder',
+              icon: finderApp.icon,
+              component: finderApp.component,
+              position: { x: 200, y: 100 },
+              size: finderApp.defaultSize || { width: 900, height: 600 },
+              isMinimized: false,
+              isMaximized: false,
+              zIndex: 1000 + windows.length,
+            });
+            addWindowToSpace(finderId);
+          }
+        }
       },
       { divider: true },
       {
         label: 'Change Desktop Background',
-        action: () => console.log('Change background')
+        submenu: [
+          { 
+            label: 'Blue Gradient', 
+            action: () => setDesktopBackground('gradient-to-br from-blue-100 via-blue-50 to-blue-200')
+          },
+          { 
+            label: 'Purple Gradient', 
+            action: () => setDesktopBackground('gradient-to-br from-purple-100 via-purple-50 to-purple-200')
+          },
+          { 
+            label: 'Green Gradient', 
+            action: () => setDesktopBackground('gradient-to-br from-green-100 via-green-50 to-green-200')
+          },
+          { 
+            label: 'Sunset Gradient', 
+            action: () => setDesktopBackground('gradient-to-br from-orange-100 via-pink-50 to-purple-100')
+          },
+          { 
+            label: 'Ocean Gradient', 
+            action: () => setDesktopBackground('gradient-to-br from-cyan-100 via-blue-50 to-indigo-100')
+          },
+          { 
+            label: 'Default', 
+            action: () => setDesktopBackground('gradient-to-br from-blue-100 via-purple-50 to-pink-100')
+          }
+        ]
       },
       { divider: true },
       {
         label: 'Clean Up',
-        action: () => console.log('Clean up')
+        action: () => {
+          // Arrange windows in a grid
+          const visibleWindows = windows.filter(w => {
+            const space = spaces.find(s => s.id === currentSpaceId);
+            return space && space.windowIds.includes(w.id) && !w.isMinimized;
+          });
+          
+          const cols = Math.ceil(Math.sqrt(visibleWindows.length));
+          const windowWidth = 600;
+          const windowHeight = 400;
+          const padding = 20;
+          const startX = 50;
+          const startY = 50;
+          
+          visibleWindows.forEach((window, index) => {
+            const row = Math.floor(index / cols);
+            const col = index % cols;
+            
+            updateWindow(window.id, {
+              position: {
+                x: startX + col * (windowWidth + padding),
+                y: startY + row * (windowHeight + padding)
+              },
+              size: { width: windowWidth, height: windowHeight },
+              isMaximized: false
+            });
+          });
+        }
       },
       {
         label: 'Clean Up By',
         submenu: [
-          { label: 'Name' },
-          { label: 'Kind' },
-          { label: 'Date Modified' },
-          { label: 'Size' }
+          { 
+            label: 'Name',
+            action: () => {
+              const sortedWindows = [...windows].sort((a, b) => a.title.localeCompare(b.title));
+              arrangeWindows(sortedWindows);
+            }
+          },
+          { 
+            label: 'Kind',
+            action: () => {
+              const sortedWindows = [...windows].sort((a, b) => a.appId.localeCompare(b.appId));
+              arrangeWindows(sortedWindows);
+            }
+          },
+          { 
+            label: 'Date Modified',
+            action: () => {
+              const sortedWindows = [...windows].sort((a, b) => b.zIndex - a.zIndex);
+              arrangeWindows(sortedWindows);
+            }
+          },
+          { 
+            label: 'Size',
+            action: () => {
+              const sortedWindows = [...windows].sort((a, b) => 
+                (b.size.width * b.size.height) - (a.size.width * a.size.height)
+              );
+              arrangeWindows(sortedWindows);
+            }
+          }
         ]
       }
     ]);
   };
 
+  const arrangeWindows = (windowsToArrange: typeof windows) => {
+    const visibleWindows = windowsToArrange.filter(w => {
+      const space = spaces.find(s => s.id === currentSpaceId);
+      return space && space.windowIds.includes(w.id) && !w.isMinimized;
+    });
+    
+    const cols = Math.ceil(Math.sqrt(visibleWindows.length));
+    const windowWidth = 600;
+    const windowHeight = 400;
+    const padding = 20;
+    const startX = 50;
+    const startY = 50;
+    
+    visibleWindows.forEach((window, index) => {
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+      
+      updateWindow(window.id, {
+        position: {
+          x: startX + col * (windowWidth + padding),
+          y: startY + row * (windowHeight + padding)
+        },
+        size: { width: windowWidth, height: windowHeight },
+        isMaximized: false
+      });
+    });
+  };
+
   return (
     <div 
-      className="fixed inset-0 bg-gradient-to-br from-blue-100 via-purple-50 to-pink-100 overflow-hidden"
+      className={`fixed inset-0 bg-${desktopBackground} overflow-hidden`}
       onContextMenu={handleDesktopContextMenu}
     >
       {/* Desktop wallpaper with subtle animation */}

@@ -39,6 +39,9 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [columnPath, setColumnPath] = useState<string[]>([]);
+  const [navigationHistory, setNavigationHistory] = useState<(string | null)[]>([null]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const [showRecent, setShowRecent] = useState(false);
 
   const getItemById = (id: string) => items.find(item => item.id === id);
   
@@ -47,6 +50,14 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
   };
 
   const getFilteredItems = () => {
+    if (showRecent) {
+      // Show items sorted by modified date (most recent first)
+      return [...items]
+        .filter(item => item.type !== 'folder')
+        .sort((a, b) => b.modified.getTime() - a.modified.getTime())
+        .slice(0, 20); // Show last 20 items
+    }
+    
     if (!searchQuery) return getChildren(currentFolderId);
     
     return items.filter(item => 
@@ -89,10 +100,41 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
     }
   };
 
+  const navigateTo = (folderId: string | null) => {
+    if (folderId !== currentFolderId) {
+      setCurrentFolderId(folderId);
+      setShowRecent(false);
+      
+      // Update navigation history
+      const newHistory = navigationHistory.slice(0, historyIndex + 1);
+      newHistory.push(folderId);
+      setNavigationHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+    }
+  };
+
+  const handleBack = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setCurrentFolderId(navigationHistory[newIndex]);
+      setShowRecent(false);
+    }
+  };
+
+  const handleForward = () => {
+    if (historyIndex < navigationHistory.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setCurrentFolderId(navigationHistory[newIndex]);
+      setShowRecent(false);
+    }
+  };
+
   const handleItemClick = (item: FileSystemItem) => {
     onItemSelect(item);
     if (item.type === 'folder') {
-      setCurrentFolderId(item.id);
+      navigateTo(item.id);
       if (viewMode === 'column') {
         const currentIndex = columnPath.indexOf(item.parent || '');
         setColumnPath([...columnPath.slice(0, currentIndex + 1), item.id]);
@@ -102,7 +144,7 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
 
   const handleItemDoubleClick = (item: FileSystemItem) => {
     if (item.type === 'folder') {
-      setCurrentFolderId(item.id);
+      navigateTo(item.id);
     } else {
       onItemOpen(item);
     }
@@ -112,18 +154,29 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
     <div className="w-48 bg-gray-50 border-r border-gray-200 p-3">
       <div className="space-y-1">
         <button 
-          onClick={() => setCurrentFolderId(null)}
+          onClick={() => {
+            navigateTo(null);
+            setShowRecent(false);
+          }}
           className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
-            currentFolderId === null ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+            currentFolderId === null && !showRecent ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
           }`}
         >
           All Files
         </button>
-        <button className="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-gray-100">
+        <button 
+          onClick={() => {
+            setShowRecent(true);
+            setCurrentFolderId(null);
+          }}
+          className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
+            showRecent ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+          }`}
+        >
           Recent
         </button>
         <button 
-          onClick={() => setCurrentFolderId('samples-folder')}
+          onClick={() => navigateTo('samples-folder')}
           className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
             currentFolderId === 'samples-folder' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
           }`}
@@ -131,7 +184,7 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
           Samples
         </button>
         <button 
-          onClick={() => setCurrentFolderId('templates-folder')}
+          onClick={() => navigateTo('templates-folder')}
           className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
             currentFolderId === 'templates-folder' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
           }`}
@@ -139,7 +192,7 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
           Templates
         </button>
         <button 
-          onClick={() => setCurrentFolderId('projects-folder')}
+          onClick={() => navigateTo('projects-folder')}
           className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
             currentFolderId === 'projects-folder' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
           }`}
@@ -147,7 +200,7 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
           Projects
         </button>
         <button 
-          onClick={() => setCurrentFolderId('reports-folder')}
+          onClick={() => navigateTo('reports-folder')}
           className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
             currentFolderId === 'reports-folder' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
           }`}
@@ -258,11 +311,27 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
       <div className="h-12 border-b border-gray-200 flex items-center px-4 gap-4">
         {/* Navigation */}
         <div className="flex items-center gap-2">
-          <button className="p-1 hover:bg-gray-100 rounded">
-            <ChevronLeftIcon className="w-5 h-5 text-gray-600" />
+          <button 
+            onClick={handleBack}
+            disabled={historyIndex === 0}
+            className={`p-1 rounded ${
+              historyIndex === 0 
+                ? 'text-gray-300 cursor-not-allowed' 
+                : 'hover:bg-gray-100 text-gray-600'
+            }`}
+          >
+            <ChevronLeftIcon className="w-5 h-5" />
           </button>
-          <button className="p-1 hover:bg-gray-100 rounded">
-            <ChevronRightIcon className="w-5 h-5 text-gray-600" />
+          <button 
+            onClick={handleForward}
+            disabled={historyIndex === navigationHistory.length - 1}
+            className={`p-1 rounded ${
+              historyIndex === navigationHistory.length - 1 
+                ? 'text-gray-300 cursor-not-allowed' 
+                : 'hover:bg-gray-100 text-gray-600'
+            }`}
+          >
+            <ChevronRightIcon className="w-5 h-5" />
           </button>
         </div>
 
@@ -270,7 +339,13 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
         <div className="flex-1 flex items-center gap-1 text-sm text-gray-600">
           <FolderIcon className="w-4 h-4" />
           <span>Laboratory Files</span>
-          {currentFolderId && (
+          {showRecent && (
+            <>
+              <ChevronRightIcon className="w-3 h-3" />
+              <span>Recent</span>
+            </>
+          )}
+          {currentFolderId && !showRecent && (
             <>
               <ChevronRightIcon className="w-3 h-3" />
               <span>{getItemById(currentFolderId)?.name}</span>
