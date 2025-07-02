@@ -21,6 +21,9 @@ use database::create_pool;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Debug: Print to stderr to ensure we see the output
+    eprintln!("QAQC SERVICE DEBUG: main() function started");
+    
     // Initialize tracing first so we can see logs
     tracing_subscriber::registry()
         .with(

@@ -2,6 +2,29 @@
 
 A standalone microservice for laboratory barcode generation, validation, and management.
 
+## Setup
+
+### Database URL for SQLx
+
+This service uses SQLx with compile-time query verification. You need to set the `DATABASE_URL` environment variable before building:
+
+```bash
+# Option 1: Use the setup script
+source setup-env.sh
+
+# Option 2: Export directly
+export DATABASE_URL="postgres://postgres:postgres@localhost:5432/barcode_service"
+
+# Option 3: Add to your shell profile (~/.bashrc or ~/.zshrc)
+echo 'export DATABASE_URL="postgres://postgres:postgres@localhost:5432/barcode_service"' >> ~/.zshrc
+```
+
+After setting the DATABASE_URL, you can build the service:
+
+```bash
+cargo build
+```
+
 ## Features
 
 - **Barcode Generation**: Generate unique barcodes with configurable patterns

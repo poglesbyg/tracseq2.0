@@ -42,6 +42,7 @@ pub enum BarcodeError {
 
 impl IntoResponse for BarcodeError {
     fn into_response(self) -> Response {
+        let error_type = self.error_type();
         let (status, error_message) = match self {
             BarcodeError::ValidationError(msg) => (StatusCode::BAD_REQUEST, msg),
             BarcodeError::BarcodeNotFound(msg) => (StatusCode::NOT_FOUND, msg),
@@ -60,7 +61,7 @@ impl IntoResponse for BarcodeError {
         let body = Json(json!({
             "error": {
                 "message": error_message,
-                "type": self.error_type(),
+                "type": error_type,
                 "timestamp": chrono::Utc::now(),
             }
         }));

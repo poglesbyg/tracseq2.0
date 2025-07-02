@@ -1,0 +1,21 @@
+# Development configuration for Barcode Service
+
+[database]
+# Database URL for development
+# Note: For SQLx compile-time verification, you also need to set DATABASE_URL environment variable
+url = "postgres://postgres:postgres@localhost:5432/barcode_service"
+
+[service]
+host = "0.0.0.0"
+port = 8005
+
+[barcode]
+prefix = "LAB"
+separator = "-"
+min_length = 12
+include_date = true
+include_sequence = true
+validation_pattern = "^[A-Z0-9-]+$"
+
+[logging]
+level = "debug" 

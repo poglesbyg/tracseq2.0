@@ -33,31 +33,43 @@ pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateE
 
 async fn create_custom_types(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
     let type_definitions = vec![
-        "CREATE TYPE qc_workflow_status AS ENUM ('draft', 'active', 'executing', 'completed', 'failed', 'cancelled', 'suspended')",
-        "CREATE TYPE qc_workflow_type AS ENUM ('samplevalidation', 'sequencingqc', 'dataquality', 'compliancecheck', 'performanceanalysis', 'libraryqc', 'spreadsheetvalidation', 'custom')",
-        "CREATE TYPE qc_step_type AS ENUM ('validation', 'measurement', 'analysis', 'comparison', 'approval', 'documentation', 'notification', 'integration', 'customscript')",
-        "CREATE TYPE qc_trigger_type AS ENUM ('scheduled', 'eventbased', 'thresholdbased', 'statuschange', 'dataavailable', 'manual')",
-        "CREATE TYPE threshold_severity AS ENUM ('critical', 'warning', 'info', 'advisory')",
-        "CREATE TYPE quality_check_type AS ENUM ('numericrange', 'stringmatch', 'regexmatch', 'fileexists', 'databasequery', 'servicecall', 'statistical', 'visual', 'custom')",
-        "CREATE TYPE comparison_operator AS ENUM ('equal', 'notequal', 'greaterthan', 'lessthan', 'greaterthanorequal', 'lessthanorequal', 'contains', 'startswith', 'endswith', 'regex', 'in', 'notin')",
-        "CREATE TYPE logic_operator AS ENUM ('and', 'or', 'not')",
-        "CREATE TYPE quality_metric_type AS ENUM ('concentration', 'purity', 'integrity', 'yield', 'coverage', 'quality', 'error', 'performance', 'compliance', 'custom')",
-        "CREATE TYPE metric_status AS ENUM ('pass', 'fail', 'warning', 'pending', 'notapplicable')",
-        "CREATE TYPE compliance_rule_type AS ENUM ('validation', 'documentation', 'approval', 'retention', 'access', 'audit', 'reporting', 'custom')",
-        "CREATE TYPE compliance_severity AS ENUM ('critical', 'high', 'medium', 'low', 'info')",
-        "CREATE TYPE trigger_action_type AS ENUM ('startworkflow', 'sendnotification', 'updatestatus', 'createtask', 'logevent', 'callservice', 'custom')",
-        "CREATE TYPE compliance_action_type AS ENUM ('require', 'validate', 'document', 'approve', 'archive', 'notify', 'audit', 'custom')",
-        "CREATE TYPE report_type AS ENUM ('quality', 'compliance', 'performance', 'trend', 'summary', 'custom')",
-        "CREATE TYPE period_type AS ENUM ('hour', 'day', 'week', 'month', 'quarter', 'year', 'custom')",
-        "CREATE TYPE trend_direction AS ENUM ('increasing', 'decreasing', 'stable', 'volatile', 'unknown')",
-        "CREATE TYPE execution_priority AS ENUM ('critical', 'high', 'normal', 'low')",
+        ("qc_workflow_status", "('draft', 'active', 'executing', 'completed', 'failed', 'cancelled', 'suspended')"),
+        ("qc_workflow_type", "('samplevalidation', 'sequencingqc', 'dataquality', 'compliancecheck', 'performanceanalysis', 'libraryqc', 'spreadsheetvalidation', 'custom')"),
+        ("qc_step_type", "('validation', 'measurement', 'analysis', 'comparison', 'approval', 'documentation', 'notification', 'integration', 'customscript')"),
+        ("qc_trigger_type", "('scheduled', 'eventbased', 'thresholdbased', 'statuschange', 'dataavailable', 'manual')"),
+        ("threshold_severity", "('critical', 'warning', 'info', 'advisory')"),
+        ("quality_check_type", "('numericrange', 'stringmatch', 'regexmatch', 'fileexists', 'databasequery', 'servicecall', 'statistical', 'visual', 'custom')"),
+        ("comparison_operator", "('equal', 'notequal', 'greaterthan', 'lessthan', 'greaterthanorequal', 'lessthanorequal', 'contains', 'startswith', 'endswith', 'regex', 'in', 'notin')"),
+        ("logic_operator", "('and', 'or', 'not')"),
+        ("quality_metric_type", "('concentration', 'purity', 'integrity', 'yield', 'coverage', 'quality', 'error', 'performance', 'compliance', 'custom')"),
+        ("metric_status", "('pass', 'fail', 'warning', 'pending', 'notapplicable')"),
+        ("compliance_rule_type", "('validation', 'documentation', 'approval', 'retention', 'access', 'audit', 'reporting', 'custom')"),
+        ("compliance_severity", "('critical', 'high', 'medium', 'low', 'info')"),
+        ("trigger_action_type", "('startworkflow', 'sendnotification', 'updatestatus', 'createtask', 'logevent', 'callservice', 'custom')"),
+        ("compliance_action_type", "('require', 'validate', 'document', 'approve', 'archive', 'notify', 'audit', 'custom')"),
+        ("report_type", "('quality', 'compliance', 'performance', 'trend', 'summary', 'custom')"),
+        ("period_type", "('hour', 'day', 'week', 'month', 'quarter', 'year', 'custom')"),
+        ("trend_direction", "('increasing', 'decreasing', 'stable', 'volatile', 'unknown')"),
+        ("execution_priority", "('critical', 'high', 'normal', 'low')"),
     ];
 
-    for type_def in type_definitions {
-        sqlx::query(&format!("{} IF NOT EXISTS", type_def))
-            .execute(pool)
-            .await
-            .map_err(|e| sqlx::migrate::MigrateError::Source(Box::new(e)))?;
+    for (type_name, type_values) in type_definitions {
+        // Check if type already exists
+        let type_exists: (bool,) = sqlx::query_as(
+            "SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = $1)"
+        )
+        .bind(type_name)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| sqlx::migrate::MigrateError::Source(Box::new(e)))?;
+
+        if !type_exists.0 {
+            let query = format!("CREATE TYPE {} AS ENUM {}", type_name, type_values);
+            sqlx::query(&query)
+                .execute(pool)
+                .await
+                .map_err(|e| sqlx::migrate::MigrateError::Source(Box::new(e)))?;
+        }
     }
 
     Ok(())

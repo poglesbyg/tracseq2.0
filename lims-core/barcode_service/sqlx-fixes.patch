@@ -1,0 +1,165 @@
+# SQLx Macro Replacements for barcode_service/src/service.rs
+
+# 1. Fix get_barcode_status() - around line 339
+REPLACE:
+```rust
+let stored_barcode = sqlx::query_as!(
+    StoredBarcode,
+    "SELECT * FROM barcodes WHERE barcode = $1",
+    barcode
+)
+.fetch_optional(&self.db_pool)
+.await
+.map_err(BarcodeError::DatabaseError)?;
+```
+
+WITH:
+```rust
+let stored_barcode = sqlx::query_as::<_, StoredBarcode>(
+    "SELECT * FROM barcodes WHERE barcode = $1"
+)
+.bind(barcode)
+.fetch_optional(&self.db_pool)
+.await
+.map_err(BarcodeError::DatabaseError)?;
+```
+
+# 2. Fix get_stats() - around line 353
+REPLACE:
+```rust
+let total_generated = sqlx::query_scalar!(
+    "SELECT COUNT(*) FROM barcodes"
+)
+.fetch_one(&self.db_pool)
+.await
+.map_err(BarcodeError::DatabaseError)?
+.unwrap_or(0);
+```
+
+WITH:
+```rust
+let total_generated: Option<i64> = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM barcodes"
+)
+.fetch_one(&self.db_pool)
+.await
+.map_err(BarcodeError::DatabaseError)?;
+
+let total_generated = total_generated.unwrap_or(0);
+```
+
+# 3. Fix total_reserved - around line 361
+REPLACE:
+```rust
+let total_reserved = sqlx::query_scalar!(
+    "SELECT COUNT(*) FROM barcodes WHERE is_reserved = true"
+)
+.fetch_one(&self.db_pool)
+.await
+.map_err(BarcodeError::DatabaseError)?
+.unwrap_or(0);
+```
+
+WITH:
+```rust
+let total_reserved: Option<i64> = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM barcodes WHERE is_reserved = true"
+)
+.fetch_one(&self.db_pool)
+.await
+.map_err(BarcodeError::DatabaseError)?;
+
+let total_reserved = total_reserved.unwrap_or(0);
+```
+
+# 4. Fix total_unique_prefixes - around line 369
+REPLACE:
+```rust
+let total_unique_prefixes = sqlx::query_scalar!(
+    "SELECT COUNT(DISTINCT prefix) FROM barcodes WHERE prefix IS NOT NULL"
+)
+.fetch_one(&self.db_pool)
+.await
+.map_err(BarcodeError::DatabaseError)?
+.unwrap_or(0);
+```
+
+WITH:
+```rust
+let total_unique_prefixes: Option<i64> = sqlx::query_scalar(
+    "SELECT COUNT(DISTINCT prefix) FROM barcodes WHERE prefix IS NOT NULL"
+)
+.fetch_one(&self.db_pool)
+.await
+.map_err(BarcodeError::DatabaseError)?;
+
+let total_unique_prefixes = total_unique_prefixes.unwrap_or(0);
+```
+
+# 5. Fix most_recent_barcode - around line 377
+REPLACE:
+```rust
+let most_recent_barcode = sqlx::query_scalar!(
+    "SELECT barcode FROM barcodes ORDER BY created_at DESC LIMIT 1"
+)
+.fetch_optional(&self.db_pool)
+.await
+.map_err(BarcodeError::DatabaseError)?;
+```
+
+WITH:
+```rust
+let most_recent_barcode: Option<String> = sqlx::query_scalar(
+    "SELECT barcode FROM barcodes ORDER BY created_at DESC LIMIT 1"
+)
+.fetch_optional(&self.db_pool)
+.await
+.map_err(BarcodeError::DatabaseError)?;
+```
+
+# 6. Fix recent_count - around line 386
+REPLACE:
+```rust
+let recent_count = sqlx::query_scalar!(
+    "SELECT COUNT(*) FROM barcodes WHERE created_at >= $1",
+    thirty_days_ago
+)
+.fetch_one(&self.db_pool)
+.await
+.map_err(BarcodeError::DatabaseError)?
+.unwrap_or(0);
+```
+
+WITH:
+```rust
+let recent_count: Option<i64> = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM barcodes WHERE created_at >= $1"
+)
+.bind(thirty_days_ago)
+.fetch_one(&self.db_pool)
+.await
+.map_err(BarcodeError::DatabaseError)?;
+
+let recent_count = recent_count.unwrap_or(0);
+```
+
+# 7. Fix health_check() - around line 414
+REPLACE:
+```rust
+let count = sqlx::query_scalar!("SELECT COUNT(*) FROM barcodes")
+    .fetch_one(&self.db_pool)
+    .await
+    .map_err(BarcodeError::DatabaseError)?;
+
+Ok(count.unwrap_or(0))
+```
+
+WITH:
+```rust
+let count: Option<i64> = sqlx::query_scalar("SELECT COUNT(*) FROM barcodes")
+    .fetch_one(&self.db_pool)
+    .await
+    .map_err(BarcodeError::DatabaseError)?;
+
+Ok(count.unwrap_or(0))
+``` 

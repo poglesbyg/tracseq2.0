@@ -188,10 +188,10 @@ impl BarcodeService {
 
     /// Check if a barcode is unique in the database
     pub async fn check_barcode_unique(&self, barcode: &str) -> Result<bool> {
-        let count = sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM barcodes WHERE barcode = $1",
-            barcode
+        let count: Option<i64> = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM barcodes WHERE barcode = $1"
         )
+        .bind(barcode)
         .fetch_one(&self.db_pool)
         .await
         .map_err(BarcodeError::DatabaseError)?;
@@ -208,22 +208,22 @@ impl BarcodeService {
     ) -> Result<()> {
         let info = self.parse_barcode(barcode);
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO barcodes (id, barcode, prefix, sample_type, location_id, is_reserved, created_at, metadata)
             VALUES ($1, $2, $3, $4, $5, false, $6, $7)
-            "#,
-            uuid::Uuid::new_v4(),
-            barcode,
-            info.prefix,
-            sample_type,
-            location_id,
-            Utc::now(),
-            serde_json::json!({
-                "generated_by": "barcode_service",
-                "validation_passed": true
-            })
+            "#
         )
+        .bind(uuid::Uuid::new_v4())
+        .bind(barcode)
+        .bind(&info.prefix)
+        .bind(sample_type)
+        .bind(location_id)
+        .bind(Utc::now())
+        .bind(serde_json::json!({
+            "generated_by": "barcode_service",
+            "validation_passed": true
+        }))
         .execute(&self.db_pool)
         .await
         .map_err(BarcodeError::DatabaseError)?;
@@ -270,10 +270,10 @@ impl BarcodeService {
     /// Reserve a barcode
     pub async fn reserve_barcode(&self, barcode: &str, reserved_by: &str, purpose: Option<&str>) -> Result<()> {
         // Check if barcode exists
-        let exists = sqlx::query_scalar!(
-            "SELECT EXISTS(SELECT 1 FROM barcodes WHERE barcode = $1)",
-            barcode
+        let exists: Option<bool> = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM barcodes WHERE barcode = $1)"
         )
+        .bind(barcode)
         .fetch_one(&self.db_pool)
         .await
         .map_err(BarcodeError::DatabaseError)?;
@@ -283,19 +283,19 @@ impl BarcodeService {
         }
 
         // Reserve the barcode
-        let rows_affected = sqlx::query!(
+        let rows_affected = sqlx::query(
             r#"
             UPDATE barcodes 
             SET is_reserved = true, reserved_by = $1, reserved_at = $2, metadata = metadata || $3
             WHERE barcode = $4 AND NOT is_reserved
-            "#,
-            reserved_by,
-            Utc::now(),
-            serde_json::json!({
-                "reservation_purpose": purpose
-            }),
-            barcode
+            "#
         )
+        .bind(reserved_by)
+        .bind(Utc::now())
+        .bind(serde_json::json!({
+            "reservation_purpose": purpose
+        }))
+        .bind(barcode)
         .execute(&self.db_pool)
         .await
         .map_err(BarcodeError::DatabaseError)?
@@ -310,18 +310,18 @@ impl BarcodeService {
 
     /// Release a barcode
     pub async fn release_barcode(&self, barcode: &str, released_by: &str) -> Result<()> {
-        let rows_affected = sqlx::query!(
+        let rows_affected = sqlx::query(
             r#"
             UPDATE barcodes 
             SET is_reserved = false, reserved_by = NULL, reserved_at = NULL, metadata = metadata || $1
             WHERE barcode = $2 AND is_reserved
-            "#,
-            serde_json::json!({
-                "released_by": released_by,
-                "released_at": Utc::now()
-            }),
-            barcode
+            "#
         )
+        .bind(serde_json::json!({
+            "released_by": released_by,
+            "released_at": Utc::now()
+        }))
+        .bind(barcode)
         .execute(&self.db_pool)
         .await
         .map_err(BarcodeError::DatabaseError)?
