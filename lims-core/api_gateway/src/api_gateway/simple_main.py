@@ -16,6 +16,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from fastapi.responses import JSONResponse
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -36,14 +37,18 @@ app.add_middleware(
 # Service URLs from environment
 RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service:8000")
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8080")
-SEQUENCING_SERVICE_URL = os.getenv("SEQUENCING_SERVICE_URL", "http://sequencing-service:8084")
-NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://notification-service:8085")
+SEQUENCING_SERVICE_URL = os.getenv("SEQUENCING_SERVICE_URL", "http://lims-sequencing:8084")
+NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://lims-notification:8000")
 # Use lab_manager for new features (temporary fix)
 LAB_MANAGER_URL = os.getenv("LAB_MANAGER_URL", "http://host.docker.internal:3001")
 PROJECT_SERVICE_URL = os.getenv("PROJECT_SERVICE_URL", LAB_MANAGER_URL)
 LIBRARY_PREP_SERVICE_URL = os.getenv("LIBRARY_PREP_SERVICE_URL", LAB_MANAGER_URL)
-QAQC_SERVICE_URL = os.getenv("QAQC_SERVICE_URL", LAB_MANAGER_URL)
+QAQC_SERVICE_URL = os.getenv("QAQC_SERVICE_URL", "http://lims-qaqc:8089")
 FLOW_CELL_SERVICE_URL = os.getenv("FLOW_CELL_SERVICE_URL", LAB_MANAGER_URL)
+# Enhanced services
+EVENT_SERVICE_URL = os.getenv("EVENT_SERVICE_URL", "http://lims-events:8087")
+TRANSACTION_SERVICE_URL = os.getenv("TRANSACTION_SERVICE_URL", "http://lims-transactions:8088")
+TEMPLATE_SERVICE_URL = os.getenv("TEMPLATE_SERVICE_URL", "http://lims-templates:8000")
 
 # Pydantic models for API requests
 class LoginRequest(BaseModel):
@@ -995,7 +1000,11 @@ async def proxy_sequencing(path: str, request: Request):
     """Proxy requests to Sequencing service"""
     try:
         async with httpx.AsyncClient() as client:
-            url = f"{SEQUENCING_SERVICE_URL}/api/v1/{path}"
+            # For health checks, use the direct health endpoint
+            if path == "health":
+                url = f"{SEQUENCING_SERVICE_URL}/health"
+            else:
+                url = f"{SEQUENCING_SERVICE_URL}/api/v1/{path}"
             body = None
             if request.method in ["POST", "PUT", "PATCH"]:
                 body = await request.body()
@@ -1110,14 +1119,13 @@ async def proxy_events(path: str, request: Request):
 @app.api_route("/api/transactions/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy_transactions(path: str, request: Request):
     """Proxy requests to Transactions service"""
-    transactions_url = "http://lims-transactions:8000"
     try:
         async with httpx.AsyncClient() as client:
             # For health checks, use the direct health endpoint
             if path == "health":
-                url = f"{transactions_url}/health"
+                url = f"{TRANSACTION_SERVICE_URL}/health"
             else:
-                url = f"{transactions_url}/api/v1/{path}"
+                url = f"{TRANSACTION_SERVICE_URL}/api/v1/{path}"
             
             body = None
             if request.method in ["POST", "PUT", "PATCH"]:
@@ -1146,15 +1154,22 @@ async def proxy_transactions(path: str, request: Request):
 @app.api_route("/api/qaqc/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy_qaqc(path: str, request: Request):
     """Proxy requests to QA/QC service"""
-    qaqc_url = "http://lims-qaqc:8089"
+    # Mock health check for QA/QC while the service is being fixed
+    if path == "health" and request.method == "GET":
+        return JSONResponse({
+            "service": "qaqc-service",
+            "status": "unavailable",
+            "message": "Service binary issue - being fixed",
+            "timestamp": datetime.now().isoformat()
+        }, status_code=503)
+    
     try:
         async with httpx.AsyncClient() as client:
             # For health checks, use the direct health endpoint
             if path == "health":
-                url = f"{qaqc_url}/health"
+                url = f"{QAQC_SERVICE_URL}/health"
             else:
-                url = f"{qaqc_url}/api/v1/{path}"
-            
+                url = f"{QAQC_SERVICE_URL}/api/v1/{path}"
             body = None
             if request.method in ["POST", "PUT", "PATCH"]:
                 body = await request.body()
@@ -1167,17 +1182,47 @@ async def proxy_qaqc(path: str, request: Request):
                 content=body,
                 timeout=30.0
             )
-            
-            # Return the response content and status
             return Response(
                 content=response.content,
                 status_code=response.status_code,
-                headers=dict(response.headers)
+                headers=dict(response.headers),
+                media_type=response.headers.get("content-type", "application/json")
             )
-    except httpx.ConnectError:
-        raise HTTPException(status_code=503, detail="QA/QC service unavailable")
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"QA/QC service error: {e!s}")
+        print(f"Error proxying to QA/QC service: {e}")
+        return JSONResponse({"error": "Service unavailable"}, status_code=503)
+
+@app.api_route("/api/templates/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_templates(path: str, request: Request):
+    """Proxy requests to Templates service"""
+    try:
+        async with httpx.AsyncClient() as client:
+            # For health checks, use the direct health endpoint
+            if path == "health":
+                url = f"{TEMPLATE_SERVICE_URL}/health"
+            else:
+                url = f"{TEMPLATE_SERVICE_URL}/api/v1/{path}"
+            body = None
+            if request.method in ["POST", "PUT", "PATCH"]:
+                body = await request.body()
+
+            response = await client.request(
+                method=request.method,
+                url=url,
+                headers=dict(request.headers),
+                params=request.query_params,
+                content=body,
+                timeout=30.0
+            )
+            return Response(
+                content=response.content,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                media_type=response.headers.get("content-type", "application/json")
+            )
+    except Exception as e:
+        print(f"Error proxying to Templates service: {e}")
+        return JSONResponse({"error": "Service unavailable"}, status_code=503)
 
 # NOTE: Removed proxy endpoints - using direct endpoints below
 # Project endpoints
