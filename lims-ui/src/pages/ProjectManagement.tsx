@@ -413,7 +413,7 @@ export default function ProjectManagement() {
                             {template.name} v{template.version}
                           </p>
                           <p className="text-sm text-gray-500">
-                            {template.category} • {template.file_type.toUpperCase()}
+                            {template.category} • {template.file_type?.toUpperCase() || 'UNKNOWN'}
                           </p>
                           {template.description && (
                             <p className="text-sm text-gray-500">{template.description}</p>
