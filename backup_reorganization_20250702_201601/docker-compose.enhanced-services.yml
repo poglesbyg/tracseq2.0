@@ -2,7 +2,7 @@ services:
   # Enhanced Services that extend the base deployment
   notification-service:
     build:
-      context: ../lims-enhanced/notification_service
+      context: ../lims-core/notification_service
       dockerfile: Dockerfile
     image: tracseq-notification_service:latest
     container_name: lims-notification
@@ -78,7 +78,7 @@ services:
 
   sequencing-service:
     build:
-      context: ../lims-laboratory/sequencing_service
+      context: ../lims-core/sequencing_service
       dockerfile: Dockerfile
     image: tracseq-sequencing_service:latest
     container_name: lims-sequencing

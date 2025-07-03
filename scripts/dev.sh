@@ -81,7 +81,7 @@ start_service() {
             ;;
         4)
             print_status "Starting storage service..."
-            cd lims-core/enhanced_storage_service
+            cd lims-enhanced/enhanced_storage_service
             cargo run
             ;;
         5)

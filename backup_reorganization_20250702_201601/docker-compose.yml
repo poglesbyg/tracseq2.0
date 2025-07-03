@@ -62,7 +62,7 @@ services:
 
   storage-service:
     build:
-      context: ../lims-enhanced/enhanced_storage_service
+      context: ../lims-core/enhanced_storage_service
       dockerfile: Dockerfile.simple  # Use simplified version
     container_name: lims-storage
     environment:
@@ -156,7 +156,7 @@ services:
   # API Gateway
   api-gateway:
     build:
-      context: ../lims-gateway/api_gateway
+      context: ../lims-core/api_gateway
       dockerfile: Dockerfile
     container_name: lims-gateway
     environment:

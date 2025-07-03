@@ -1,3 +1,16 @@
+#!/bin/bash
+
+# Update Cargo.toml workspace members after reorganization
+
+set -e
+
+echo "📝 Updating Cargo.toml workspace members..."
+
+# Create a backup
+cp Cargo.toml Cargo.toml.bak
+
+# Create the new Cargo.toml with updated paths
+cat > Cargo.toml << 'EOF'
 [workspace]
 resolver = "2"
 members = [
@@ -10,6 +23,8 @@ members = [
     "lims-core/template_service",
     "lims-core/transaction_service",
     "lims-core/dashboard_service",
+    "lims-core/config-service",
+    "lims-core/circuit-breaker-lib",
     "lims-core/mcp-bridge",
     
     # Enhanced services
@@ -18,6 +33,8 @@ members = [
     "lims-enhanced/event_service",
     "lims-enhanced/notification_service",
     "lims-enhanced/spreadsheet_versioning_service",
+    "lims-enhanced/saga_orchestrator",
+    "lims-enhanced/saga_orchestrator/orchestrator",
     
     # Laboratory services
     "lims-laboratory/lab_manager",
@@ -29,11 +46,7 @@ members = [
     
     # Test helpers
     "test-helpers",
-    "temp_auth_test"
-]
-exclude = [
-    "lims-core/circuit-breaker-lib",
-    "lims-core/config-service",
+    "temp_auth_test",
     "kafka"
 ]
 
@@ -42,8 +55,6 @@ version = "0.1.0"
 authors = ["TracSeq Team"]
 edition = "2021"
 rust-version = "1.90"
-license = "MIT"
-repository = "https://github.com/poglesbyg/tracseq2.0"
 
 [workspace.dependencies]
 # Async runtime
@@ -52,29 +63,24 @@ async-trait = "0.1"
 
 # Web frameworks
 axum = { version = "0.7", features = ["multipart", "ws", "macros"] }
-axum-test = "14.0"
 actix-web = "4.4"
 actix-cors = "0.6"
-tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace"] }
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "time", "json", "macros", "chrono", "migrate"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "time", "json", "macros"] }
 sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros"] }
-postgres = { version = "0.19", features = ["with-uuid-1", "with-chrono-0_4"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-# Testing
-rstest = "0.18"
 
 # Other common dependencies
 uuid = { version = "1.11", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tower = { version = "0.5", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
 thiserror = "2.0"
 anyhow = "1.0"
 dotenv = "0.15"
@@ -86,42 +92,15 @@ lapin = "2.3"
 deadpool-lapin = "0.12"
 kafka = { version = "0.10", features = [] }
 
-# Authentication and SSO
-saml2 = "0.3"
-quick-xml = "0.31"
-bcrypt = "0.15"
-
-# Configuration
-config = "0.14"
-
-# Validation
-validator = { version = "0.18", features = ["derive"] }
-
-# Async utilities
-futures = "0.3"
-
-# Version constraints for problematic dependencies
-base64ct = "1.6"
-
-# Metrics
-metrics = "0.21"
-metrics-exporter-prometheus = "0.12"
-
-[workspace.lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(docsrs)'] }
-
 [profile.dev]
 opt-level = 1
 
 [profile.release]
-opt-level = "s"          # Optimize for size
-lto = true               # Enable link-time optimization
-codegen-units = 1        # Reduce parallel code generation for smaller binaries
-panic = "abort"          # Reduce binary size by removing unwinding code
-strip = true             # Strip debug symbols
+lto = true
+codegen-units = 1
+EOF
 
-# Additional optimization profile for ultra-small builds
-[profile.release-small]
-inherits = "release"
-opt-level = "z"          # Optimize aggressively for size
-lto = "fat"              # Full LTO for maximum size reduction
+echo "✅ Cargo.toml updated successfully!"
+echo ""
+echo "🔍 Verifying workspace configuration..."
+cargo metadata --no-deps > /dev/null 2>&1 && echo "✅ Workspace configuration is valid!" || echo "❌ Workspace configuration has errors!" 

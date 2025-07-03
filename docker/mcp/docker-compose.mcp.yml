@@ -148,7 +148,7 @@ services:
 
   # notification-service-mcp:
   #   build:
-  #     context: ../../lims-core/notification_service
+  #     context: ../../lims-enhanced/notification_service
   #     dockerfile: Dockerfile.mcp
   #   container_name: notification-service-mcp
   #   hostname: notification-service-mcp

@@ -24,13 +24,28 @@ Build an intelligent LIMS platform that empowers lab technicians and researchers
 ## 📁 Project Structure
 
 ```
-lims-microservices/
-├── lims-core/              # Rust microservices
+tracseq2.0/
+├── lims-core/              # Core Rust microservices
 │   ├── auth_service/       # Authentication & authorization
 │   ├── sample_service/     # Sample management
-│   ├── storage_service/    # Storage tracking & IoT
-│   ├── lab_manager/        # Core laboratory workflows
-│   └── ...                 # Other services
+│   ├── barcode_service/    # Barcode generation
+│   ├── project_service/    # Project management
+│   └── ...                 # Other core services
+│
+├── lims-enhanced/          # Advanced Rust services
+│   ├── enhanced_storage_service/    # AI-powered storage
+│   ├── cognitive_assistant_service/ # AI assistant
+│   ├── event_service/              # Event architecture
+│   └── ...                         # Other enhanced services
+│
+├── lims-laboratory/        # Laboratory-specific services
+│   ├── lab_manager/        # Core lab workflows
+│   ├── sequencing_service/ # Sequencing workflows
+│   ├── qaqc_service/       # Quality control
+│   └── ...                 # Other lab services
+│
+├── lims-gateway/           # API Gateway
+│   └── api_gateway/        # Request routing & auth
 │
 ├── lims-ai/                # Python AI services
 │   ├── enhanced_rag_service/   # Document processing

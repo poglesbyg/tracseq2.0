@@ -4,7 +4,7 @@ services:
   # Cognitive Assistant Service
   cognitive-assistant:
     build:
-      context: ../lims-enhanced/cognitive_assistant_service
+      context: ../lims-core/cognitive_assistant_service
       dockerfile: Dockerfile
     container_name: lims-cognitive
     environment:

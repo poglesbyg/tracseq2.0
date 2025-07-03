@@ -1,0 +1,37 @@
+# Alternative port configuration to avoid conflicts
+# Use this with: docker-compose -f docker-compose.yml -f docker-compose-ports.yml up -d
+
+services:
+  postgres:
+    ports:
+      - "5433:5432"  # Alternative PostgreSQL port
+
+  redis:
+    ports:
+      - "6380:6379"  # Alternative Redis port
+
+  auth-service:
+    ports:
+      - "8011:8000"  # Alternative auth service port (8011 instead of 8001)
+
+  sample-service:
+    ports:
+      - "8012:8000"  # Alternative sample service port (8012 instead of 8002)
+
+  storage-service:
+    ports:
+      - "8013:8000"  # Alternative storage service port (8013 instead of 8003)
+
+  rag-service:
+    ports:
+      - "8110:8000"  # Alternative RAG service port (8110 instead of 8100)
+
+  frontend:
+    ports:
+      - "3001:80"    # Alternative frontend port (3001 instead of 3000)
+    environment:
+      VITE_API_URL: http://localhost:8089  # Updated to use new API Gateway port
+
+  api-gateway:
+    ports:
+      - "8089:8080"  # Alternative API Gateway port (8089 instead of 8080) 

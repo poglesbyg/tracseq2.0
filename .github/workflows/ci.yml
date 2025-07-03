@@ -60,7 +60,7 @@ jobs:
               - 'test-helpers/**'
             python:
               - 'lims-ai/**'
-              - 'lims-core/api_gateway/**'
+              - 'lims-gateway/api_gateway/**'
               - '**/*.py'
             docker:
               - 'docker/**'
@@ -263,7 +263,7 @@ jobs:
       matrix:
         include:
           - service: api_gateway
-            path: lims-core/api_gateway
+            path: lims-gateway/api_gateway
           - service: lab_submission_rag
             path: lims-ai/lab_submission_rag
           - service: enhanced_rag_service

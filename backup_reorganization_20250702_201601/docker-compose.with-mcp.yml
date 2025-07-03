@@ -31,7 +31,7 @@ services:
     container_name: cognitive-assistant-service
     hostname: cognitive-assistant-service
     build:
-      context: ../lims-enhanced/cognitive_assistant_service
+      context: ../lims-core/cognitive_assistant_service
       dockerfile: Dockerfile
     ports:
       - "8015:8015"
@@ -56,7 +56,7 @@ services:
     container_name: enhanced-storage-service
     hostname: enhanced-storage-service
     build:
-      context: ../lims-enhanced/enhanced_storage_service
+      context: ../lims-core/enhanced_storage_service
       dockerfile: Dockerfile
     ports:
       - "8005:8005"
@@ -167,7 +167,7 @@ services:
     container_name: lab-manager
     hostname: lab-manager
     build:
-      context: ../lims-laboratory/lab_manager
+      context: ../lims-core/lab_manager
       dockerfile: Dockerfile
     ports:
       - "8080:8080"

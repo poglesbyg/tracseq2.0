@@ -27,7 +27,7 @@ services:
   library-prep-service:
     image: docker:library-prep-service
     build:
-      context: ../lims-laboratory/library_prep_service
+      context: ../lims-core/library_prep_service
       dockerfile: Dockerfile
     container_name: lims-library-prep-service
     environment:
@@ -49,7 +49,7 @@ services:
   qaqc-service:
     image: docker:qaqc-service
     build:
-      context: ../lims-laboratory/qaqc_service
+      context: ../lims-core/qaqc_service
       dockerfile: Dockerfile
     container_name: lims-qaqc-service
     environment:
@@ -72,7 +72,7 @@ services:
   flow-cell-service:
     image: docker:flow-cell-service
     build:
-      context: ../lims-laboratory/flow_cell_service
+      context: ../lims-core/flow_cell_service
       dockerfile: Dockerfile
     container_name: lims-flow-cell-service
     environment:
