@@ -17,6 +17,22 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
+import asyncpg
+
+# Database connection pool
+DATABASE_URL = os.getenv("DATABASE_URL", "postgres://postgres:postgres@lims-postgres:5432/lims_db")
+db_pool = None
+
+# Initialize database pool on startup
+async def init_db():
+    global db_pool
+    db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
+
+# Close database pool on shutdown
+async def close_db():
+    global db_pool
+    if db_pool:
+        await db_pool.close()
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -24,6 +40,15 @@ app = FastAPI(
     description="Central routing hub for TracSeq microservices",
     version="2.0.0"
 )
+
+# Startup and shutdown events
+@app.on_event("startup")
+async def startup_event():
+    await init_db()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await close_db()
 
 # CORS middleware
 app.add_middleware(
@@ -311,42 +336,73 @@ async def get_samples(request: Request):
         }
 
     else:
-        # Return regular samples for normal requests
-        samples_data = [
-            {
-                "id": "SMPL-001",
-                "name": "Sample 001",
-                "type": "DNA",
-                "status": "Processing",
-                "submittedBy": "Dr. Smith",
-                "submittedDate": (datetime.now() - timedelta(days=1)).isoformat(),
-                "location": "Freezer A1-B2"
-            },
-            {
-                "id": "SMPL-002",
-                "name": "Sample 002",
-                "type": "RNA",
-                "status": "Completed",
-                "submittedBy": "Dr. Johnson",
-                "submittedDate": (datetime.now() - timedelta(days=3)).isoformat(),
-                "location": "Freezer A2-C1"
-            },
-            {
-                "id": "SMPL-003",
-                "name": "Sample 003",
-                "type": "Protein",
-                "status": "Pending",
-                "submittedBy": "Dr. Williams",
-                "submittedDate": datetime.now().isoformat(),
-                "location": "Intake Bay"
-            }
-        ]
-
+        # Return samples from database for normal requests
+        if not db_pool:
+            # Fallback to mock data if DB not connected
+            samples_data = [
+                {
+                    "id": "SMPL-001",
+                    "name": "Sample 001",
+                    "type": "DNA",
+                    "status": "Processing",
+                    "submittedBy": "Dr. Smith",
+                    "submittedDate": (datetime.now() - timedelta(days=1)).isoformat(),
+                    "location": "Freezer A1-B2"
+                }
+            ]
+        else:
+            try:
+                async with db_pool.acquire() as conn:
+                    # Query samples from database
+                    rows = await conn.fetch("""
+                        SELECT 
+                            id, name, barcode, location, status, 
+                            created_at, updated_at, metadata
+                        FROM samples
+                        ORDER BY created_at DESC
+                    """)
+                    
+                    # Convert rows to list of dicts with expected format
+                    samples_data = []
+                    for row in rows:
+                        # Extract type from metadata if available
+                        metadata = row['metadata'] or {}
+                        # Parse JSON if metadata is a string
+                        if isinstance(metadata, str):
+                            try:
+                                metadata = json.loads(metadata)
+                            except:
+                                metadata = {}
+                        
+                        sample_type = metadata.get('type', 'Unknown')
+                        submitted_by = metadata.get('submitted_by', 'Unknown')
+                        
+                        samples_data.append({
+                            "id": str(row['id']),
+                            "name": row['name'],
+                            "type": sample_type,
+                            "status": row['status'],
+                            "submittedBy": submitted_by,
+                            "submittedDate": row['created_at'].isoformat() if row['created_at'] else datetime.now().isoformat(),
+                            "location": row['location'],
+                            "barcode": row['barcode']
+                        })
+                        
+                    # Get total count
+                    count_row = await conn.fetchrow("SELECT COUNT(*) as count FROM samples")
+                    total_count = count_row['count'] if count_row else len(samples_data)
+                    
+            except Exception as e:
+                print(f"Error fetching samples: {e}")
+                # Fallback to minimal mock data
+                samples_data = []
+                total_count = 0
+        
         # Return both formats for compatibility
         return {
             "data": samples_data,  # For frontend expecting .data.filter()
             "samples": samples_data,  # For other consumers
-            "totalCount": 1247,
+            "totalCount": total_count,
             "page": 1,
             "pageSize": 10
         }
@@ -364,37 +420,61 @@ async def create_sample(request: Request):
 # Templates endpoints
 @app.get("/api/templates")
 async def get_templates():
-    """Get all templates"""
-    templates_data = [
-        {
-            "id": "TPL-001",
-            "name": "DNA Extraction Template",
-            "description": "Standard DNA extraction workflow",
-            "category": "Extraction",
-            "version": "1.2",
-            "isActive": True,
-            "createdDate": (datetime.now() - timedelta(days=30)).isoformat()
-        },
-        {
-            "id": "TPL-002",
-            "name": "RNA Sequencing Template",
-            "description": "RNA-seq analysis pipeline",
-            "category": "Sequencing",
-            "version": "2.1",
-            "isActive": True,
-            "createdDate": (datetime.now() - timedelta(days=15)).isoformat()
-        },
-        {
-            "id": "TPL-003",
-            "name": "Protein Analysis Template",
-            "description": "Protein characterization workflow",
-            "category": "Analysis",
-            "version": "1.0",
-            "isActive": False,
-            "createdDate": (datetime.now() - timedelta(days=60)).isoformat()
-        }
-    ]
-
+    """Get all templates from database"""
+    if not db_pool:
+        # Fallback to mock data if DB not connected
+        templates_data = [
+            {
+                "id": "TPL-001",
+                "name": "DNA Extraction Template",
+                "description": "Standard DNA extraction workflow",
+                "category": "Extraction",
+                "version": "1.2",
+                "isActive": True,
+                "createdDate": (datetime.now() - timedelta(days=30)).isoformat()
+            }
+        ]
+    else:
+        try:
+            async with db_pool.acquire() as conn:
+                # Query templates from database
+                rows = await conn.fetch("""
+                    SELECT 
+                        id, name, description, file_path, file_type,
+                        created_at, updated_at, metadata
+                    FROM templates
+                    ORDER BY created_at DESC
+                """)
+                
+                # Convert rows to list of dicts with expected format
+                templates_data = []
+                for row in rows:
+                    # Extract additional info from metadata if available
+                    metadata = row['metadata'] or {}
+                    if isinstance(metadata, str):
+                        try:
+                            metadata = json.loads(metadata)
+                        except:
+                            metadata = {}
+                    
+                    templates_data.append({
+                        "id": str(row['id']),
+                        "name": row['name'],
+                        "description": row['description'],
+                        "category": row['file_type'] or "General",
+                        "version": metadata.get('version', '1.0'),
+                        "isActive": metadata.get('is_active', True),
+                        "createdDate": row['created_at'].isoformat() if row['created_at'] else datetime.now().isoformat(),
+                        "updatedDate": row['updated_at'].isoformat() if row['updated_at'] else None,
+                        "file_path": row['file_path'],
+                        "file_type": row['file_type']
+                    })
+                    
+        except Exception as e:
+            print(f"Error fetching templates: {e}")
+            # Fallback to minimal mock data
+            templates_data = []
+    
     # Return array directly for the templates tab in ProjectManagement
     return templates_data
 
@@ -506,6 +586,49 @@ async def storage_status():
         return {"operational": False, "error": str(e)}, 503
 
 # Reports endpoints
+@app.get("/api/reports")
+async def get_reports():
+    """Get all generated reports from database"""
+    if not db_pool:
+        # Fallback to empty array if DB not connected
+        return []
+    
+    try:
+        async with db_pool.acquire() as conn:
+            # Query all reports from the database
+            rows = await conn.fetch("""
+                SELECT 
+                    id, definition_id, name, description, status, 
+                    format, parameters, file_path, file_size, 
+                    generated_by, started_at, completed_at, created_at
+                FROM generated_reports
+                ORDER BY created_at DESC
+            """)
+            
+            # Convert rows to list of dicts
+            reports = []
+            for row in rows:
+                report = dict(row)
+                # Convert UUID to string for JSON serialization
+                report['id'] = str(report['id'])
+                if report['definition_id']:
+                    report['definition_id'] = str(report['definition_id'])
+                if report['generated_by']:
+                    report['generated_by'] = str(report['generated_by'])
+                # Convert dates to ISO format
+                if report['started_at']:
+                    report['started_at'] = report['started_at'].isoformat()
+                if report['completed_at']:
+                    report['completed_at'] = report['completed_at'].isoformat()
+                if report['created_at']:
+                    report['created_at'] = report['created_at'].isoformat()
+                reports.append(report)
+                
+            return reports
+    except Exception as e:
+        print(f"Error fetching reports: {e}")
+        return []
+
 @app.get("/api/reports/templates")
 async def get_report_templates():
     """Get available report templates."""
@@ -1286,9 +1409,50 @@ async def proxy_templates(path: str, request: Request):
 # Project endpoints
 @app.get("/api/projects")
 async def get_projects():
-    """Get all projects"""
-    # Return empty list for now - in production, this would query the database
-    return []
+    """Get all projects from database"""
+    if not db_pool:
+        # Fallback to empty array if DB not connected
+        return []
+    
+    try:
+        async with db_pool.acquire() as conn:
+            # Query all projects from the database
+            rows = await conn.fetch("""
+                SELECT 
+                    id, project_code, name, description, project_type, 
+                    status, priority, start_date, target_end_date, 
+                    principal_investigator_id, project_manager_id, 
+                    department, budget_approved, budget_used, metadata,
+                    created_at, updated_at
+                FROM projects
+                ORDER BY created_at DESC
+            """)
+            
+            # Convert rows to list of dicts
+            projects = []
+            for row in rows:
+                project = dict(row)
+                # Convert UUID to string for JSON serialization
+                project['id'] = str(project['id'])
+                if project['principal_investigator_id']:
+                    project['principal_investigator_id'] = str(project['principal_investigator_id'])
+                if project['project_manager_id']:
+                    project['project_manager_id'] = str(project['project_manager_id'])
+                # Convert dates to ISO format
+                if project['start_date']:
+                    project['start_date'] = project['start_date'].isoformat()
+                if project['target_end_date']:
+                    project['target_end_date'] = project['target_end_date'].isoformat()
+                if project['created_at']:
+                    project['created_at'] = project['created_at'].isoformat()
+                if project['updated_at']:
+                    project['updated_at'] = project['updated_at'].isoformat()
+                projects.append(project)
+                
+            return projects
+    except Exception as e:
+        print(f"Error fetching projects: {e}")
+        return []
 
 @app.get("/api/projects/batches")
 async def get_batches():
