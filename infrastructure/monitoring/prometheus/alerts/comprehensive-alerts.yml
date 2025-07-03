@@ -1,0 +1,308 @@
+groups:
+  - name: service_alerts
+    interval: 30s
+    rules:
+      # Service Down Alert
+      - alert: ServiceDown
+        expr: up{job=~".*-service|api-gateway"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.job }} has been down for more than 2 minutes on instance {{ $labels.instance }}"
+          runbook_url: "https://wiki.tracseq.com/runbooks/service-down"
+      
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: service:error_rate > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High error rate in {{ $labels.service }}"
+          description: "Service {{ $labels.service }} has error rate of {{ $value | humanizePercentage }}"
+      
+      # High Response Time
+      - alert: HighResponseTime
+        expr: service:http_request_duration:p95 > 1
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High response time in {{ $labels.service }}"
+          description: "95th percentile response time for {{ $labels.service }} is {{ $value }}s"
+      
+      # Service Memory Pressure
+      - alert: ServiceMemoryPressure
+        expr: service:memory_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High memory usage in {{ $labels.service }}"
+          description: "Memory usage for {{ $labels.service }} pod {{ $labels.pod }} is at {{ $value }}%"
+      
+      # Service CPU Throttling
+      - alert: ServiceCPUThrottling
+        expr: |
+          rate(container_cpu_throttled_periods_total{container!=""}[5m]) / 
+          rate(container_cpu_periods_total{container!=""}[5m]) > 0.25
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "CPU throttling in {{ $labels.service }}"
+          description: "{{ $labels.service }} pod {{ $labels.pod }} is experiencing {{ $value | humanizePercentage }} CPU throttling"
+
+  - name: database_alerts
+    interval: 60s
+    rules:
+      # Database Connection Pool Exhaustion
+      - alert: DatabaseConnectionPoolExhaustion
+        expr: database:connection_pool_usage > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          team: database
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "Database {{ $labels.database }} connection pool is {{ $value | humanizePercentage }} full"
+      
+      # Database High Query Time
+      - alert: DatabaseSlowQueries
+        expr: |
+          histogram_quantile(0.95, 
+            rate(pg_stat_statements_total_time_seconds_bucket[5m])
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+          team: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile query time is {{ $value }}s for database {{ $labels.database }}"
+      
+      # Database Replication Lag
+      - alert: DatabaseReplicationLag
+        expr: pg_replication_lag_seconds > 10
+        for: 5m
+        labels:
+          severity: critical
+          team: database
+        annotations:
+          summary: "High database replication lag"
+          description: "Replication lag is {{ $value }}s for replica {{ $labels.replica }}"
+      
+      # Low Cache Hit Ratio
+      - alert: DatabaseLowCacheHitRatio
+        expr: database:cache_hit_ratio < 0.9
+        for: 15m
+        labels:
+          severity: warning
+          team: database
+        annotations:
+          summary: "Low database cache hit ratio"
+          description: "Cache hit ratio for {{ $labels.database }} is {{ $value | humanizePercentage }}"
+
+  - name: laboratory_alerts
+    interval: 60s
+    rules:
+      # Sample Processing Backlog
+      - alert: SampleProcessingBacklog
+        expr: lab:sample_queue_depth > 1000
+        for: 15m
+        labels:
+          severity: warning
+          team: laboratory
+        annotations:
+          summary: "High sample processing backlog"
+          description: "{{ $value }} samples in queue for {{ $labels.service }} with priority {{ $labels.priority }}"
+      
+      # Storage Capacity Warning
+      - alert: StorageCapacityWarning
+        expr: lab:storage_utilization_by_zone > 85
+        for: 30m
+        labels:
+          severity: warning
+          team: laboratory
+        annotations:
+          summary: "Storage zone nearing capacity"
+          description: "Storage zone {{ $labels.zone }} ({{ $labels.temperature }}) is {{ $value }}% full"
+      
+      # Storage Capacity Critical
+      - alert: StorageCapacityCritical
+        expr: lab:storage_utilization_by_zone > 95
+        for: 10m
+        labels:
+          severity: critical
+          team: laboratory
+        annotations:
+          summary: "Storage zone critically full"
+          description: "Storage zone {{ $labels.zone }} ({{ $labels.temperature }}) is {{ $value }}% full"
+      
+      # Sequencing Failure Rate
+      - alert: HighSequencingFailureRate
+        expr: lab:sequencing_success_rate < 0.9
+        for: 1h
+        labels:
+          severity: warning
+          team: laboratory
+        annotations:
+          summary: "High sequencing failure rate"
+          description: "Sequencing success rate for {{ $labels.instrument }} is {{ $value | humanizePercentage }}"
+      
+      # Sample Turnaround Time SLA
+      - alert: SampleTurnaroundTimeSLA
+        expr: business:avg_turnaround_time_hours > 72
+        for: 30m
+        labels:
+          severity: warning
+          team: laboratory
+        annotations:
+          summary: "Sample turnaround time exceeding SLA"
+          description: "Average turnaround time for {{ $labels.sample_type }} is {{ $value }} hours"
+
+  - name: infrastructure_alerts
+    interval: 30s
+    rules:
+      # Node Down
+      - alert: NodeDown
+        expr: up{job="node-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Node {{ $labels.instance }} is down"
+          description: "Node exporter on {{ $labels.instance }} has been down for more than 2 minutes"
+      
+      # High Node CPU Usage
+      - alert: HighNodeCPUUsage
+        expr: |
+          100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "High CPU usage on node {{ $labels.instance }}"
+          description: "CPU usage on {{ $labels.instance }} is {{ $value }}%"
+      
+      # High Node Memory Usage
+      - alert: HighNodeMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "High memory usage on node {{ $labels.instance }}"
+          description: "Memory usage on {{ $labels.instance }} is {{ $value }}%"
+      
+      # Disk Space Warning
+      - alert: DiskSpaceWarning
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs"} / 
+           node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs"}) * 100 < 15
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Disk {{ $labels.device }} on {{ $labels.instance }} has {{ $value }}% free space"
+      
+      # High Network Error Rate
+      - alert: HighNetworkErrorRate
+        expr: |
+          rate(node_network_receive_errs_total[5m]) + 
+          rate(node_network_transmit_errs_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "High network error rate on {{ $labels.instance }}"
+          description: "Network interface {{ $labels.device }} on {{ $labels.instance }} has {{ $value }} errors/sec"
+
+  - name: ai_service_alerts
+    interval: 30s
+    rules:
+      # High LLM Token Usage
+      - alert: HighLLMTokenUsage
+        expr: rate(ai:token_usage_rate[1h]) > 100000
+        for: 10m
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "High LLM token usage"
+          description: "{{ $labels.service }} is using {{ $value }} tokens/hour for model {{ $labels.model }}"
+      
+      # LLM Service Latency
+      - alert: HighLLMLatency
+        expr: ai:model_inference_latency > 5
+        for: 10m
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "High LLM inference latency"
+          description: "Model {{ $labels.model }} has 95th percentile latency of {{ $value }}s"
+      
+      # RAG Retrieval Performance
+      - alert: SlowRAGRetrieval
+        expr: ai:rag_retrieval_duration > 2
+        for: 10m
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "Slow RAG retrieval performance"
+          description: "RAG index {{ $labels.index }} has 95th percentile retrieval time of {{ $value }}s"
+
+  - name: business_alerts
+    interval: 5m
+    rules:
+      # System Availability SLA
+      - alert: SystemAvailabilitySLA
+        expr: business:system_availability < 99.5
+        for: 30m
+        labels:
+          severity: critical
+          team: platform
+          sla: true
+        annotations:
+          summary: "System availability below SLA"
+          description: "System availability is {{ $value }}% over the last 24 hours"
+      
+      # Low Daily Active Users
+      - alert: LowDailyActiveUsers
+        expr: |
+          (business:daily_active_users / 
+           avg_over_time(business:daily_active_users[7d])) < 0.7
+        for: 1h
+        labels:
+          severity: warning
+          team: product
+        annotations:
+          summary: "Significant drop in daily active users"
+          description: "Daily active users dropped by {{ $value | humanizePercentage }} compared to 7-day average"
+      
+      # Certificate Expiry Warning
+      - alert: CertificateExpiryWarning
+        expr: probe_ssl_earliest_cert_expiry - time() < 30 * 24 * 3600
+        for: 1h
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "Certificate for {{ $labels.instance }} expires in {{ $value | humanizeDuration }}"

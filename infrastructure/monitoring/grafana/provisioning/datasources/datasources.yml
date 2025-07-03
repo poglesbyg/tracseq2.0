@@ -9,61 +9,140 @@ deleteDatasources:
     orgId: 1
 
 datasources:
+  # Prometheus - Primary metrics datasource
   - name: Prometheus
     type: prometheus
     access: proxy
-    orgId: 1
     url: http://prometheus:9090
-    basicAuth: false
     isDefault: true
-    version: 1
-    editable: true
     jsonData:
       httpMethod: POST
-      queryTimeout: 60s
       timeInterval: 15s
-      exemplarTraceIdDestinations:
-        - name: trace_id
-          datasourceUid: jaeger-uid
-          urlDisplayLabel: "View Trace"
+      queryTimeout: 60s
+      manageAlerts: true
+      prometheusType: Prometheus
+      prometheusVersion: 2.45.0
+      cacheLevel: 'High'
+      disableMetricsLookup: false
+      incrementalQuerying: true
+      incrementalQueryOverlapWindow: 10m
+    editable: true
+    uid: prometheus-uid
 
+  # Loki - Logs datasource
   - name: Loki
     type: loki
     access: proxy
-    orgId: 1
     url: http://loki:3100
-    basicAuth: false
-    isDefault: false
-    version: 1
-    editable: true
-    uid: loki-uid
     jsonData:
-      httpMethod: GET
+      maxLines: 5000
       derivedFields:
         - datasourceUid: jaeger-uid
-          matcherRegex: '(?:trace_id|traceID)=(\w+)'
-          name: trace_id
+          matcherRegex: '"trace_id":"(\w+)"'
+          name: TraceID
           url: '$${__value.raw}'
           urlDisplayLabel: 'View Trace'
+        - datasourceUid: jaeger-uid
+          matcherRegex: '"span_id":"(\w+)"'
+          name: SpanID
+    editable: true
+    uid: loki-uid
 
+  # Jaeger - Distributed tracing
   - name: Jaeger
     type: jaeger
     access: proxy
-    orgId: 1
     url: http://jaeger:16686
-    basicAuth: false
-    isDefault: false
-    version: 1
-    editable: true
-    uid: jaeger-uid
     jsonData:
-      httpMethod: GET
       tracesToLogs:
         datasourceUid: loki-uid
         filterByTraceID: true
         filterBySpanID: true
-        tags:
-          - key: service_name
+        mapTagNamesEnabled: true
+        mappedTags:
+          - key: service.name
             value: service
-        spanStartTimeShift: '-1h'
-        spanEndTimeShift: '1h'
+          - key: pod
+            value: pod
+      tracesToMetrics:
+        datasourceUid: prometheus-uid
+        queries:
+          - name: 'Request Rate'
+            query: 'sum(rate(http_requests_total{service="$${__span.tags.service.name}"}[5m]))'
+          - name: 'Error Rate'
+            query: 'sum(rate(http_requests_total{service="$${__span.tags.service.name}",status=~"5.."}[5m]))'
+    editable: true
+    uid: jaeger-uid
+
+  # PostgreSQL - Direct database queries
+  - name: PostgreSQL
+    type: postgres
+    url: enhanced_storage_service-postgres-1:5432
+    database: lab_manager
+    user: postgres
+    secureJsonData:
+      password: postgres
+    jsonData:
+      sslmode: 'disable'
+      maxOpenConns: 0
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+      postgresVersion: 1500
+      timescaledb: false
+    editable: true
+    uid: postgres-uid
+
+  # Alertmanager - Alert visualization
+  - name: Alertmanager
+    type: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    jsonData:
+      implementation: prometheus
+    editable: true
+    uid: alertmanager-uid
+
+  # Redis - For real-time metrics
+  - name: Redis
+    type: redis-datasource
+    access: proxy
+    url: redis://enhanced_storage_service-redis-1:6379
+    jsonData:
+      poolSize: 10
+      timeout: 10
+      pingInterval: 0
+      pipelineWindow: 0
+    editable: true
+    uid: redis-uid
+
+  # Elasticsearch - For logs (if using ELK stack)
+  - name: Elasticsearch
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    database: "[logs-]YYYY.MM.DD"
+    jsonData:
+      interval: Daily
+      timeField: "@timestamp"
+      esVersion: "8.0.0"
+      includeFrozen: false
+      logMessageField: message
+      logLevelField: level
+      maxConcurrentShardRequests: 5
+    editable: true
+    uid: elasticsearch-uid
+
+  # InfluxDB - For time-series data (optional)
+  - name: InfluxDB
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: tracseq
+      defaultBucket: metrics
+      tlsSkipVerify: true
+    secureJsonData:
+      token: your-influxdb-token
+    editable: true
+    uid: influxdb-uid

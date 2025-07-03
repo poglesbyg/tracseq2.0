@@ -1,32 +1,69 @@
 apiVersion: 1
 
 providers:
-  - name: 'TracSeq Microservices'
+  - name: 'TracSeq Dashboards'
     orgId: 1
     folder: 'TracSeq'
+    folderUid: 'tracseq'
     type: file
     disableDeletion: false
-    updateIntervalSeconds: 30
+    updateIntervalSeconds: 10
     allowUiUpdates: true
     options:
       path: /var/lib/grafana/dashboards/tracseq
+      foldersFromFilesStructure: true
 
-  - name: 'Infrastructure'
+  - name: 'Infrastructure Dashboards'
     orgId: 1
     folder: 'Infrastructure'
+    folderUid: 'infrastructure'
     type: file
     disableDeletion: false
-    updateIntervalSeconds: 30
+    updateIntervalSeconds: 10
     allowUiUpdates: true
     options:
       path: /var/lib/grafana/dashboards/infrastructure
 
-  - name: 'Application Performance'
+  - name: 'Laboratory Dashboards'
     orgId: 1
-    folder: 'APM'
+    folder: 'Laboratory'
+    folderUid: 'laboratory'
     type: file
     disableDeletion: false
-    updateIntervalSeconds: 30
+    updateIntervalSeconds: 10
     allowUiUpdates: true
     options:
-      path: /var/lib/grafana/dashboards/apm
+      path: /var/lib/grafana/dashboards/laboratory
+
+  - name: 'AI Services Dashboards'
+    orgId: 1
+    folder: 'AI Services'
+    folderUid: 'ai-services'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/ai-services
+
+  - name: 'Business Metrics'
+    orgId: 1
+    folder: 'Business'
+    folderUid: 'business'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/business
+
+  - name: 'Alerts Dashboard'
+    orgId: 1
+    folder: 'Alerts'
+    folderUid: 'alerts'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/alerts
