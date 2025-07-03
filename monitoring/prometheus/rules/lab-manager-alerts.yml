@@ -1,0 +1,83 @@
+groups:
+  - name: lab_manager_alerts
+    interval: 30s
+    rules:
+      # Service availability alerts
+      - alert: LabManagerDown
+        expr: up{job="lab-manager"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: lab-manager
+        annotations:
+          summary: "Lab Manager service is down"
+          description: "Lab Manager has been down for more than 5 minutes."
+
+      - alert: RAGServiceDown
+        expr: up{job="rag-service"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: rag-service
+        annotations:
+          summary: "RAG Service is down"
+          description: "RAG Service has been down for more than 5 minutes."
+
+      - alert: PostgresDown
+        expr: up{job="postgres"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL has been down for more than 5 minutes."
+
+      # Performance alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80% for more than 10 minutes on {{ $labels.instance }}"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 85% for more than 10 minutes on {{ $labels.instance }}"
+
+      - alert: DiskSpaceRunningOut
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk space running out"
+          description: "Less than 15% disk space remaining on {{ $labels.instance }}"
+
+      # Application-specific alerts
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1.0
+        for: 10m
+        labels:
+          severity: warning
+          service: lab-manager
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is above 1 second for more than 10 minutes"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: lab-manager
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is above 5% for more than 5 minutes"
