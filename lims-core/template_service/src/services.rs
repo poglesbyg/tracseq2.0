@@ -47,14 +47,11 @@ impl TemplateServiceImpl {
         let metadata = request.metadata.clone().unwrap_or(serde_json::json!({}));
         let category = request.category.clone().unwrap_or_else(|| "general".to_string());
 
-        // Generate a UUID for created_by (temporary solution)
-        let created_by_uuid = Uuid::new_v4(); // TODO: Should come from user authentication
-
         let query = r#"
             INSERT INTO templates (
                 id, name, description, category, status, version, 
-                template_data, field_definitions, validation_rules, metadata, 
-                is_active, created_by, created_at, updated_at
+                form_config, tags, is_public, metadata, 
+                isActive, created_by, created_at, updated_at
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
             )
@@ -65,14 +62,14 @@ impl TemplateServiceImpl {
             .bind(&request.name)
             .bind(&request.description)
             .bind(&category)
-            .bind(TemplateStatus::Draft)
-            .bind(1)
+            .bind("draft")
+            .bind("1.0.0")
             .bind(&form_config)
-            .bind(serde_json::json!([]))
-            .bind(serde_json::json!({}))
+            .bind(&tags)
+            .bind(is_public)
             .bind(&metadata)
             .bind(true)
-            .bind(created_by_uuid)
+            .bind(created_by)
             .bind(now)
             .bind(now)
             .execute(self.db_pool.get_pool())
@@ -105,10 +102,11 @@ impl TemplateServiceImpl {
 
         let query = r#"
             SELECT 
-                id, name, description, category, status, version,
-                template_data, metadata, is_active, created_by, created_at, updated_at
+                id, name, description, category, status, version, template_type,
+                form_config, tags, is_public, is_system, metadata, isActive, 
+                created_by, created_at, updated_at, createdDate, updatedDate
             FROM templates 
-            WHERE is_active = true
+            WHERE isActive = true
             ORDER BY created_at DESC
             LIMIT $1 OFFSET $2
         "#;
@@ -125,26 +123,25 @@ impl TemplateServiceImpl {
                 id: row.get("id"),
                 name: row.get("name"),
                 description: row.get("description"),
-                template_type: "laboratory".to_string(), // Default type
-                status: TemplateStatus::Draft, // Parse from DB status string if needed
-                version: row.get::<i32, _>("version").to_string(),
+                template_type: row.get::<Option<String>, _>("template_type")
+                    .unwrap_or_else(|| "form".to_string()),
+                status: row.get("status"),
+                version: row.get("version"),
                 category: row.get("category"),
-                tags: vec![], // TODO: Extract from template_data if needed
-                is_public: false, // TODO: Add to database schema
-                is_system: false,
+                tags: row.get("tags"),
+                is_public: row.get("is_public"),
+                is_system: row.get("is_system"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
-                created_by: row.get::<Option<uuid::Uuid>, _>("created_by")
-                    .map(|uuid| uuid.to_string())
-                    .unwrap_or_else(|| "system".to_string()),
-                updated_by: None, // TODO: Add to database schema
-                field_count: Some(0), // TODO: Count from template_fields
-                usage_count: Some(0), // TODO: Count from template_instances
+                created_by: row.get("created_by"),
+                updated_by: None,
+                field_count: Some(0),
+                usage_count: Some(0),
             })
             .collect();
 
         // Get total count
-        let count_query = "SELECT COUNT(*) FROM templates WHERE is_active = true";
+        let count_query = "SELECT COUNT(*) FROM templates WHERE isActive = true";
         let total_count: i64 = sqlx::query_scalar(count_query)
             .fetch_one(self.db_pool.get_pool())
             .await?;
@@ -164,10 +161,11 @@ impl TemplateServiceImpl {
     pub async fn get_template(&self, template_id: Uuid) -> Result<Option<TemplateResponse>> {
         let query = r#"
             SELECT 
-                id, name, description, category, status, version,
-                template_data, metadata, is_active, created_by, created_at, updated_at
+                id, name, description, category, status, version, template_type,
+                form_config, tags, is_public, is_system, metadata, isActive, 
+                created_by, created_at, updated_at, createdDate, updatedDate
             FROM templates 
-            WHERE id = $1 AND is_active = true
+            WHERE id = $1 AND isActive = true
         "#;
 
         let row = sqlx::query(query)
@@ -180,18 +178,16 @@ impl TemplateServiceImpl {
                 id: row.get("id"),
                 name: row.get("name"),
                 description: row.get("description"),
-                template_type: "laboratory".to_string(),
-                status: TemplateStatus::Draft,
-                version: row.get::<i32, _>("version").to_string(),
+                template_type: row.get("template_type"),
+                status: row.get("status"),
+                version: row.get("version"),
                 category: row.get("category"),
-                tags: vec![],
-                is_public: false,
-                is_system: false,
+                tags: row.get("tags"),
+                is_public: row.get("is_public"),
+                is_system: row.get("is_system"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
-                created_by: row.get::<Option<uuid::Uuid>, _>("created_by")
-                    .map(|uuid| uuid.to_string())
-                    .unwrap_or_else(|| "system".to_string()),
+                created_by: row.get("created_by"),
                 updated_by: None,
                 field_count: Some(0),
                 usage_count: Some(0),
@@ -212,9 +208,10 @@ impl TemplateServiceImpl {
                 category = COALESCE($4, category),
                 metadata = COALESCE($5, metadata),
                 updated_at = $6
-            WHERE id = $1 AND is_active = true
-            RETURNING id, name, description, category, status, version,
-                     template_data, metadata, created_by, created_at, updated_at
+            WHERE id = $1 AND isActive = true
+            RETURNING id, name, description, category, status, version, template_type,
+                     form_config, tags, is_public, is_system, metadata, 
+                     created_by, created_at, updated_at
         "#;
 
         let row = sqlx::query(query)
@@ -232,18 +229,16 @@ impl TemplateServiceImpl {
                 id: row.get("id"),
                 name: row.get("name"),
                 description: row.get("description"),
-                template_type: request.template_type.unwrap_or_else(|| "laboratory".to_string()),
-                status: request.status.unwrap_or(TemplateStatus::Draft),
-                version: row.get::<i32, _>("version").to_string(),
+                template_type: row.get("template_type"),
+                status: row.get("status"),
+                version: row.get("version"),
                 category: row.get("category"),
-                tags: request.tags.unwrap_or_default(),
-                is_public: request.is_public.unwrap_or(false),
-                is_system: false,
+                tags: row.get("tags"),
+                is_public: row.get("is_public"),
+                is_system: row.get("is_system"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
-                created_by: row.get::<Option<uuid::Uuid>, _>("created_by")
-                    .map(|uuid| uuid.to_string())
-                    .unwrap_or_else(|| "system".to_string()),
+                created_by: row.get("created_by"),
                 updated_by: Some(updated_by.to_string()),
                 field_count: Some(0),
                 usage_count: Some(0),
@@ -255,7 +250,7 @@ impl TemplateServiceImpl {
 
     /// Delete a template (soft delete)
     pub async fn delete_template(&self, template_id: Uuid) -> Result<bool> {
-        let query = "UPDATE templates SET is_active = false WHERE id = $1 AND is_active = true";
+        let query = "UPDATE templates SET isActive = false WHERE id = $1 AND isActive = true";
         
         let result = sqlx::query(query)
             .bind(template_id)

@@ -9,14 +9,14 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
       REDIS_URL: redis://lims-redis:6379
-      PORT: "8000"
+      PORT: "8085"
       JWT_SECRET: "your-jwt-secret"
       SMTP_HOST: "smtp.gmail.com"
       SMTP_PORT: "587"
       SMTP_USER: "noreply@tracseq.com"
       SMTP_PASSWORD: ""
     ports:
-      - "8015:8000"
+      - "8015:8085"
     networks:
       - lims-network
     external_links:
@@ -47,10 +47,10 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
       REDIS_URL: redis://lims-redis:6379
-      TRANSACTION_PORT: "8000"
+      PORT: "8088"
       JWT_SECRET: "your-jwt-secret"
     ports:
-      - "8017:8000"
+      - "8017:8088"
     networks:
       - lims-network
     external_links:
@@ -66,10 +66,10 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
       REDIS_URL: redis://lims-redis:6379
-      PORT: "8000"
+      TEMPLATE_PORT: "8083"
       JWT_SECRET: "your-jwt-secret"
     ports:
-      - "8018:8000"
+      - "8018:8083"
     networks:
       - lims-network
     external_links:

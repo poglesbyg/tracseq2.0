@@ -219,7 +219,8 @@ pub async fn proxy_template_request(
     headers: HeaderMap,
     body: Option<Bytes>,
 ) -> Result<Response, StatusCode> {
-    let path_str = format!("/api/templates/{}", path.0);
+    // Template service expects paths without /api prefix
+    let path_str = format!("/templates/{}", path.0);
     
     SERVICE_PROXY
         .proxy_request("template", method, &path_str, headers, body)

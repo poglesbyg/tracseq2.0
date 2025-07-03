@@ -3,8 +3,6 @@ apiVersion: 1
 providers:
   - name: 'TracSeq Dashboards'
     orgId: 1
-    folder: 'TracSeq'
-    folderUid: 'tracseq'
     type: file
     disableDeletion: false
     updateIntervalSeconds: 10
@@ -12,6 +10,17 @@ providers:
     options:
       path: /var/lib/grafana/dashboards/tracseq
       foldersFromFilesStructure: true
+  
+  - name: 'LIMS Dashboards'
+    orgId: 1
+    folder: 'LIMS Services'
+    folderUid: 'lims-services'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/tracseq
 
   - name: 'Infrastructure Dashboards'
     orgId: 1

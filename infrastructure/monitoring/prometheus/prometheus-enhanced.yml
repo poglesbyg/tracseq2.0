@@ -195,9 +195,9 @@ scrape_configs:
     metrics_path: '/metrics'
     scrape_interval: 30s
 
-  - job_name: 'api-gateway'
+  - job_name: 'lims-gateway'
     static_configs:
-      - targets: ['api-gateway:8089']
+      - targets: ['lims-gateway:8000']
         labels:
           service: 'gateway'
           tier: 'frontend'
@@ -244,9 +244,19 @@ scrape_configs:
       module: [http_2xx]
     static_configs:
       - targets:
-          - http://api-gateway:8089/health
-          - http://auth-service:8080/health
-          - http://sample-service:8081/health
+          # Working LIMS service endpoints
+          - http://lims-gateway:8000/api/health
+          - http://lims-gateway:8000/health
+          - http://lims-samples:8000/health
+          - http://lims-sequencing:8000/health
+          - http://lims-reports:8000/health
+          - http://lims-events:8087/health
+          - http://lims-notification:8085/health
+          - http://lims-templates:8083/health
+          - http://lims-transactions:8088/health
+          # Try storage and RAG with their specific ports
+          - http://lims-storage:8082/health
+          - http://lims-rag:8086/health
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

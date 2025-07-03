@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
     info!("🌐 Server: {}:{}", config.server.host, config.server.port);
     
     // Initialize database
-    let db_pool = DatabasePool::new(&config.database_url).await?;
+    let db_pool = database::new(&config.database_url).await?;
     
     // Run database migrations
     database::run_migrations(&db_pool).await?;

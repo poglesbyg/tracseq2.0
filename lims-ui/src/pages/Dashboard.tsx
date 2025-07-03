@@ -107,7 +107,11 @@ export default function Dashboard() {
     queryKey: ['recentTemplates'],
     queryFn: async () => {
       const response = await axios.get('/api/templates');
-      return response.data.slice(0, 3); // Get latest 3
+      // Handle API response format { data: [...], pagination: {...}, success: true }
+      const templates = response.data && typeof response.data === 'object' && Array.isArray(response.data.data)
+        ? response.data.data
+        : Array.isArray(response.data) ? response.data : [];
+      return templates.slice(0, 3); // Get latest 3
     }
   });
 
@@ -116,7 +120,11 @@ export default function Dashboard() {
     queryKey: ['recentSamples'],
     queryFn: async () => {
       const response = await axios.get('/api/samples');
-      return response.data.slice(0, 5); // Get latest 5
+      // Handle API response format { data: [...], pagination: {...}, success: true }
+      const samples = response.data && typeof response.data === 'object' && Array.isArray(response.data.data)
+        ? response.data.data
+        : Array.isArray(response.data) ? response.data : (response.data?.samples || []);
+      return samples.slice(0, 5); // Get latest 5
     }
   });
 

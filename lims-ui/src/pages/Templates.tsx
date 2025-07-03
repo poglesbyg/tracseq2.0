@@ -55,22 +55,36 @@ export default function Templates() {
       const response = await axios.get('/api/templates');
       console.log('📊 Templates response:', response.data);
       
-      // Handle API response structure - API returns {data: [...], templates: [...]}
-      const apiData = response.data || {};
-      const rawTemplates = apiData.data || apiData.templates || [];
+      // Handle API response - API returns { data: [...], pagination: {...}, success: true }
+      let rawTemplates: unknown[] = [];
       
-      // Ensure we always return an array and transform to match Template interface
-      const templatesArray = Array.isArray(rawTemplates) ? rawTemplates : [];
+      if (response.data && typeof response.data === 'object') {
+        const apiData = response.data as Record<string, unknown>;
+        
+        // Check for 'data' property first (standard API response)
+        if (Array.isArray(apiData.data)) {
+          rawTemplates = apiData.data;
+        } else if (Array.isArray(apiData.templates)) {
+          // Fallback to 'templates' property
+          rawTemplates = apiData.templates;
+        } else if (Array.isArray(response.data)) {
+          // If the response itself is an array
+          rawTemplates = response.data;
+        }
+      }
       
       // Transform API data to match Template interface
-      const transformedTemplates = templatesArray.map((apiTemplate: Record<string, unknown>) => ({
-        id: String(apiTemplate.id || ''),
-        name: String(apiTemplate.name || ''),
-        description: apiTemplate.description ? String(apiTemplate.description) : undefined,
-        created_at: String(apiTemplate.created_at || new Date().toISOString()),
-        fields: Array.isArray(apiTemplate.fields) ? apiTemplate.fields as TemplateField[] : [],
-        metadata: (apiTemplate.metadata || {}) as Record<string, unknown>
-      }));
+      const transformedTemplates = rawTemplates.map((apiTemplate) => {
+        const template = apiTemplate as Record<string, unknown>;
+        return {
+          id: String(template.id || ''),
+          name: String(template.name || ''),
+          description: template.description ? String(template.description) : undefined,
+          created_at: String(template.created_at || template.createdDate || new Date().toISOString()),
+          fields: Array.isArray(template.fields) ? template.fields as TemplateField[] : [],
+          metadata: (template.metadata || {}) as Record<string, unknown>
+        };
+      });
       
       console.log(`✅ Final templates count: ${transformedTemplates.length}`);
       return transformedTemplates;

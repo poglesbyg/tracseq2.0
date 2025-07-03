@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, State, Multipart},
     http::StatusCode,
     response::Json,
 };
@@ -283,9 +283,142 @@ pub mod template_fields {
 
 pub mod files {
     use super::*;
+    use std::path::PathBuf;
+    use tokio::fs;
+    use tokio::io::AsyncWriteExt;
 
-    pub async fn upload_template(Json(_payload): Json<Value>) -> Result<Json<Value>, StatusCode> {
-        Ok(Json(json!({"message": "Template uploaded"})))
+    pub async fn upload_template(
+        State(state): State<AppState>,
+        mut multipart: Multipart
+    ) -> Result<Json<Value>, StatusCode> {
+        let mut file_data: Option<Vec<u8>> = None;
+        let mut file_name: Option<String> = None;
+        let mut template_data: Option<CreateTemplateRequest> = None;
+
+        // Process multipart form data
+        while let Some(field) = multipart.next_field().await.map_err(|e| {
+            eprintln!("Error reading multipart field: {}", e);
+            StatusCode::BAD_REQUEST
+        })? {
+            let name = field.name().unwrap_or("").to_string();
+            
+            match name.as_str() {
+                "file" => {
+                    // Get the file name
+                    file_name = field.file_name().map(|s| s.to_string());
+                    
+                    // Read file data
+                    file_data = Some(field.bytes().await.map_err(|e| {
+                        eprintln!("Error reading file data: {}", e);
+                        StatusCode::BAD_REQUEST
+                    })?.to_vec());
+                }
+                "template" => {
+                    // Parse template metadata
+                    let data = field.text().await.map_err(|e| {
+                        eprintln!("Error reading template data: {}", e);
+                        StatusCode::BAD_REQUEST
+                    })?;
+                    
+                    template_data = serde_json::from_str(&data).ok();
+                }
+                _ => {
+                    // Ignore other fields
+                }
+            }
+        }
+
+        // Validate required data
+        let file_data = file_data.ok_or_else(|| {
+            eprintln!("No file data received");
+            StatusCode::BAD_REQUEST
+        })?;
+        
+        let file_name = file_name.ok_or_else(|| {
+            eprintln!("No file name received");
+            StatusCode::BAD_REQUEST
+        })?;
+
+        // Create uploads directory if it doesn't exist
+        let upload_dir = PathBuf::from("uploads/templates");
+        fs::create_dir_all(&upload_dir).await.map_err(|e| {
+            eprintln!("Error creating upload directory: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        // Generate unique file name
+        let file_id = Uuid::new_v4();
+        let path_buf = PathBuf::from(&file_name);
+        let file_extension = path_buf
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("xlsx");
+        let stored_file_name = format!("{}.{}", file_id, file_extension);
+        let file_path = upload_dir.join(&stored_file_name);
+
+        // Save file to disk
+        let mut file = fs::File::create(&file_path).await.map_err(|e| {
+            eprintln!("Error creating file: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+        
+        file.write_all(&file_data).await.map_err(|e| {
+            eprintln!("Error writing file: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        // Determine file type based on extension
+        let file_type = match file_extension {
+            "xlsx" | "xls" => "spreadsheet",
+            "csv" => "csv",
+            "docx" | "doc" => "document",
+            "pdf" => "pdf",
+            _ => "other",
+        };
+
+        // Convert file path to string for reuse
+        let file_path_str = file_path.to_string_lossy().to_string();
+
+        // Create template request
+        let mut create_request = template_data.unwrap_or_else(|| CreateTemplateRequest {
+            name: file_name.clone(),
+            description: Some(format!("Uploaded file: {}", file_name)),
+            template_type: file_type.to_string(),
+            category: Some("uploaded".to_string()),
+            tags: Some(vec![file_type.to_string()]),
+            is_public: Some(false),
+            form_config: None,
+            metadata: Some(serde_json::json!({
+                "original_filename": file_name.clone(),
+                "file_path": file_path_str.clone(),
+                "file_type": file_type,
+                "file_size": file_data.len(),
+                "uploaded_at": chrono::Utc::now()
+            })),
+        });
+
+        // Ensure metadata includes file path and type
+        if let Some(ref mut metadata) = create_request.metadata {
+            metadata["file_path"] = serde_json::json!(file_path.to_string_lossy().to_string());
+            metadata["file_type"] = serde_json::json!(file_type);
+        }
+
+        // Create template record
+        let created_by = "system"; // TODO: Get from auth context
+        
+        match state.template_service.create_template(create_request, created_by).await {
+            Ok(template) => Ok(Json(json!({
+                "success": true,
+                "template": template,
+                "message": "Template uploaded successfully"
+            }))),
+            Err(e) => {
+                // Clean up uploaded file on error
+                let _ = fs::remove_file(&file_path).await;
+                eprintln!("Error creating template: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
     }
 
     pub async fn download_template(Path(_template_id): Path<String>) -> Result<Json<Value>, StatusCode> {

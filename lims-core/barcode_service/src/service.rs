@@ -336,11 +336,10 @@ impl BarcodeService {
 
     /// Get barcode reservation status
     pub async fn get_barcode_status(&self, barcode: &str) -> Result<Option<StoredBarcode>> {
-        let stored_barcode = sqlx::query_as!(
-            StoredBarcode,
-            "SELECT * FROM barcodes WHERE barcode = $1",
-            barcode
+        let stored_barcode = sqlx::query_as::<_, StoredBarcode>(
+            "SELECT * FROM barcodes WHERE barcode = $1"
         )
+        .bind(barcode)
         .fetch_optional(&self.db_pool)
         .await
         .map_err(BarcodeError::DatabaseError)?;
@@ -350,31 +349,28 @@ impl BarcodeService {
 
     /// Get barcode generation statistics
     pub async fn get_stats(&self) -> Result<BarcodeStats> {
-        let total_generated = sqlx::query_scalar!(
+        let total_generated = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM barcodes"
         )
         .fetch_one(&self.db_pool)
         .await
-        .map_err(BarcodeError::DatabaseError)?
-        .unwrap_or(0);
+        .map_err(BarcodeError::DatabaseError)?;
 
-        let total_reserved = sqlx::query_scalar!(
+        let total_reserved = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM barcodes WHERE is_reserved = true"
         )
         .fetch_one(&self.db_pool)
         .await
-        .map_err(BarcodeError::DatabaseError)?
-        .unwrap_or(0);
+        .map_err(BarcodeError::DatabaseError)?;
 
-        let total_unique_prefixes = sqlx::query_scalar!(
+        let total_unique_prefixes = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(DISTINCT prefix) FROM barcodes WHERE prefix IS NOT NULL"
         )
         .fetch_one(&self.db_pool)
         .await
-        .map_err(BarcodeError::DatabaseError)?
-        .unwrap_or(0);
+        .map_err(BarcodeError::DatabaseError)?;
 
-        let most_recent_barcode = sqlx::query_scalar!(
+        let most_recent_barcode = sqlx::query_scalar::<_, String>(
             "SELECT barcode FROM barcodes ORDER BY created_at DESC LIMIT 1"
         )
         .fetch_optional(&self.db_pool)
@@ -383,14 +379,13 @@ impl BarcodeService {
 
         // Calculate generation rate per day (last 30 days)
         let thirty_days_ago = Utc::now() - chrono::Duration::days(30);
-        let recent_count = sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM barcodes WHERE created_at >= $1",
-            thirty_days_ago
+        let recent_count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM barcodes WHERE created_at >= $1"
         )
+        .bind(thirty_days_ago)
         .fetch_one(&self.db_pool)
         .await
-        .map_err(BarcodeError::DatabaseError)?
-        .unwrap_or(0);
+        .map_err(BarcodeError::DatabaseError)?;
 
         let generation_rate_per_day = recent_count as f64 / 30.0;
 
@@ -411,11 +406,11 @@ impl BarcodeService {
 
     /// Check database connectivity
     pub async fn health_check(&self) -> Result<i64> {
-        let count = sqlx::query_scalar!("SELECT COUNT(*) FROM barcodes")
+        let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM barcodes")
             .fetch_one(&self.db_pool)
             .await
             .map_err(BarcodeError::DatabaseError)?;
 
-        Ok(count.unwrap_or(0))
+        Ok(count)
     }
 } 

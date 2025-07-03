@@ -79,7 +79,7 @@ FLOW_CELL_SERVICE_URL = os.getenv("FLOW_CELL_SERVICE_URL", LAB_MANAGER_URL)
 # Enhanced services
 EVENT_SERVICE_URL = os.getenv("EVENT_SERVICE_URL", "http://lims-events:8087")
 TRANSACTION_SERVICE_URL = os.getenv("TRANSACTION_SERVICE_URL", "http://lims-transactions:8088")
-TEMPLATE_SERVICE_URL = os.getenv("TEMPLATE_SERVICE_URL", "http://lims-templates:8000")
+TEMPLATE_SERVICE_URL = os.getenv("TEMPLATE_SERVICE_URL", "http://lims-templates:8083")
 
 # Pydantic models for API requests
 class LoginRequest(BaseModel):
@@ -121,6 +121,15 @@ async def root():
 @app.get("/health")
 async def health():
     """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "service": "api-gateway",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/api/health")
+async def api_health():
+    """API health check endpoint for frontend"""
     return {
         "status": "healthy",
         "service": "api-gateway",
@@ -214,12 +223,14 @@ async def login(request: Request):
         })
 
         return {
-            "token": token,
-            "user": {
-                "id": user["id"],
-                "email": user["email"],
-                "name": user["name"],
-                "role": user["role"]
+            "data": {
+                "token": token,
+                "user": {
+                    "id": user["id"],
+                    "email": user["email"],
+                    "name": user["name"],
+                    "role": user["role"]
+                }
             }
         }
 
@@ -1662,9 +1673,10 @@ async def test_query(request: Request):
 @app.get("/api/debug/routes")
 async def debug_routes():
     """Debug endpoint to see all registered routes"""
+    from fastapi.routing import APIRoute
     routes = []
     for route in app.routes:
-        if hasattr(route, "path") and hasattr(route, "methods"):
+        if isinstance(route, APIRoute):
             routes.append({
                 "path": route.path,
                 "methods": list(route.methods) if route.methods else ["GET"]
@@ -1953,7 +1965,8 @@ async def proxy_templates(path: str, request: Request):
             if path == "health":
                 url = f"{TEMPLATE_SERVICE_URL}/health"
             else:
-                url = f"{TEMPLATE_SERVICE_URL}/api/v1/{path}"
+                # Template service expects routes without /api/v1 prefix
+                url = f"{TEMPLATE_SERVICE_URL}/templates/{path}"
             body = None
             if request.method in ["POST", "PUT", "PATCH"]:
                 body = await request.body()
@@ -2403,11 +2416,15 @@ async def debug_problematic_endpoints():
         try:
             # Simulate a request to test data format
             if endpoint == "/api/samples":
-                # Create a mock request for testing
-                from fastapi import Request
-                from starlette.datastructures import QueryParams
-                mock_request = type("MockRequest", (), {"query_params": QueryParams("")})()
-                response = await get_samples(mock_request)
+                # Create a proper request object for testing
+                from starlette.requests import Request
+                from starlette.datastructures import QueryParams, Headers
+                scope = {
+                    "type": "http",
+                    "query_string": b"",
+                    "headers": [],
+                }
+                response = await get_samples(Request(scope))
             elif endpoint == "/api/templates":
                 response = await get_templates()
             elif endpoint == "/api/sequencing/jobs":
@@ -2421,14 +2438,25 @@ async def debug_problematic_endpoints():
             elif endpoint == "/api/spreadsheets/datasets":
                 response = await get_spreadsheet_datasets()
 
-            test_results[name] = {
-                "endpoint": endpoint,
-                "has_data_field": "data" in response,
-                "data_is_array": isinstance(response.get("data"), list) if "data" in response else False,
-                "data_length": len(response.get("data", [])) if isinstance(response.get("data"), list) else 0,
-                "data_type": str(type(response.get("data", None))),
-                "status": "✅ OK" if (isinstance(response.get("data"), list) and len(response.get("data", [])) > 0) else "❌ ISSUE"
-            }
+            # Handle both list and dict responses
+            if isinstance(response, list):
+                test_results[name] = {
+                    "endpoint": endpoint,
+                    "has_data_field": False,
+                    "data_is_array": True,
+                    "data_length": len(response),
+                    "data_type": "list (direct)",
+                    "status": "❌ ISSUE - Returns list directly, should return {data: [...]}"
+                }
+            else:
+                test_results[name] = {
+                    "endpoint": endpoint,
+                    "has_data_field": "data" in response,
+                    "data_is_array": isinstance(response.get("data"), list) if "data" in response else False,
+                    "data_length": len(response.get("data", [])) if isinstance(response.get("data"), list) else 0,
+                    "data_type": str(type(response.get("data", None))),
+                    "status": "✅ OK" if (isinstance(response.get("data"), list) and len(response.get("data", [])) > 0) else "❌ ISSUE"
+                }
         except Exception as e:
             test_results[name] = {
                 "endpoint": endpoint,

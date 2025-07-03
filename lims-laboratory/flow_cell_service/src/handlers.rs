@@ -727,13 +727,13 @@ pub async fn optimize_flow_cell(
     };
     
     // Convert request to optimization format
-    let libraries: Vec<LibraryInfo> = request.libraries.into_iter().map(|lib| LibraryInfo {
-        id: lib.id,
-        concentration: lib.concentration,
-        fragment_size: lib.fragment_size,
-        index_type: lib.index_type,
-        project_id: lib.project_id,
-        priority: lib.priority.unwrap_or(1),
+    let libraries: Vec<LibraryInfo> = request.library_preparations.into_iter().map(|lib| LibraryInfo {
+        id: lib.library_prep_id,
+        concentration: lib.concentration_nm,
+        fragment_size: 300, // Default fragment size
+        index_type: lib.index_sequence.clone(),
+        project_id: None, // Not provided in request
+        priority: 1, // Default priority
     }).collect();
     
     let optimization_request = OptimizationRequest {
@@ -748,23 +748,33 @@ pub async fn optimize_flow_cell(
     // Run optimization
     let result = FlowCellOptimizer::optimize(optimization_request, flow_cell_type.lane_count);
     
-    // Convert HashMap to Vec<LaneAssignment>
-    let lane_assignments: Vec<LaneAssignment> = result.lane_assignments
+    // Convert to response format
+    let suggested_assignments: Vec<LaneAssignmentRequest> = result.lane_assignments
         .into_iter()
-        .map(|(lane_number, library_ids)| LaneAssignment {
+        .map(|(lane_number, library_ids)| LaneAssignmentRequest {
             lane_number,
             library_prep_ids: library_ids,
-            target_reads: flow_cell_type.reads_per_lane / flow_cell_type.lane_count as i64,
-            loading_concentration: 1.5, // Default concentration
+            target_reads: flow_cell_type.reads_per_lane.map(|r| r / flow_cell_type.lane_count as i64),
+            index_type: Some("dual".to_string()),
+            index_sequences: None,
+            loading_concentration_pm: Some(200.0),
         })
         .collect();
     
+    let total_reads = flow_cell_type.reads_per_lane.unwrap_or(0);
+    
     Ok(Json(OptimizeFlowCellResponse {
-        lane_assignments,
         optimization_score: result.score,
-        balance_score: result.balance_score,
-        index_diversity_score: result.index_diversity_score,
-        suggestions: result.suggestions,
+        suggested_assignments,
+        expected_metrics: FlowCellMetrics {
+            total_reads,
+            reads_per_sample: vec![],
+            lane_balance_score: result.balance_score,
+            index_balance_score: result.index_diversity_score,
+            estimated_cost: Some((total_reads as f64 / 1_000_000_000.0) * 0.25),
+        },
+        warnings: result.suggestions,
+        alternative_designs: None,
     }))
 }
 

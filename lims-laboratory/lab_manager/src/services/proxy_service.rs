@@ -156,7 +156,7 @@ impl ServiceProxy {
             ServiceConfig {
                 name: "template_service".to_string(),
                 url: std::env::var("TEMPLATE_SERVICE_URL")
-                    .unwrap_or_else(|_| "http://lims-templates:8000".to_string()),
+                    .unwrap_or_else(|_| "http://lims-templates:8083".to_string()),
                 health_check_path: "/health".to_string(),
                 timeout_seconds: 30,
                 retry_attempts: 3,

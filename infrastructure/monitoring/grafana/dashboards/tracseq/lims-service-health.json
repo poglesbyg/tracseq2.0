@@ -19,6 +19,8 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
+  "title": "LIMS Service Health Dashboard",
+  "uid": "lims-health",
   "links": [],
   "liveNow": false,
   "panels": [
@@ -38,7 +40,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus-uid"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -51,12 +53,12 @@
                 "0": {
                   "color": "red",
                   "index": 1,
-                  "text": "Down"
+                  "text": "DOWN"
                 },
                 "1": {
                   "color": "green",
                   "index": 0,
-                  "text": "Up"
+                  "text": "UP"
                 }
               },
               "type": "value"
@@ -81,7 +83,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 1
       },
@@ -89,7 +91,7 @@
       "options": {
         "colorMode": "background",
         "graphMode": "none",
-        "justifyMode": "auto",
+        "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -101,111 +103,24 @@
         "textMode": "auto"
       },
       "pluginVersion": "10.0.0",
+      "repeat": "service",
+      "repeatDirection": "h",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus-uid"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "probe_success{job=\"blackbox-http\", instance=~\".*lims-.*\"}",
-          "legendFormat": "{{instance}}",
-          "range": true,
+          "expr": "probe_success{job=\"blackbox-http\", instance=~\".*lims-${service}.*\"} OR on() vector(0)",
+          "legendFormat": "${service}",
+          "range": false,
+          "instant": true,
           "refId": "A"
         }
       ],
-      "title": "Service Status",
+      "title": "${service} Service",
       "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus-uid"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 1
-      },
-      "id": 2,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus-uid"
-          },
-          "editorMode": "code",
-          "expr": "sum by (instance) (rate(probe_duration_seconds{job=\"blackbox-http\", instance=~\".*lims-.*\"}[5m])) > 0",
-          "legendFormat": "{{instance}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Request Rate by Service",
-      "type": "timeseries"
     },
     {
       "collapsed": false,
@@ -217,13 +132,126 @@
       },
       "id": 21,
       "panels": [],
-      "title": "Performance Metrics",
+      "title": "Service Details",
       "type": "row"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus-uid"
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "color": "red",
+                        "index": 1,
+                        "text": "DOWN"
+                      },
+                      "1": {
+                        "color": "green",
+                        "index": 0,
+                        "text": "UP"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "id": 2,
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Service"
+          }
+        ]
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "expr": "probe_success{job=\"blackbox-http\", instance=~\".*lims-.*\"}",
+          "range": false,
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Service Health Table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "job": true,
+              "__name__": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "instance": "Endpoint",
+              "Value": "Status"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -276,16 +304,16 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 10,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 10
       },
       "id": 3,
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
@@ -298,7 +326,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus-uid"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "probe_duration_seconds{job=\"blackbox-http\", instance=~\".*lims-.*\"}",
@@ -307,78 +335,8 @@
           "refId": "A"
         }
       ],
-      "title": "Response Time (95th percentile)",
+      "title": "Response Time",
       "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus-uid"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 10
-      },
-      "id": 4,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus-uid"
-          },
-          "editorMode": "code",
-          "expr": "(1 - probe_success{job=\"blackbox-http\", instance=~\".*lims-.*\"}) * 100",
-          "legendFormat": "{{instance}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Error Rate by Service",
-      "type": "gauge"
     },
     {
       "collapsed": false,
@@ -386,17 +344,17 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 20
       },
       "id": 22,
       "panels": [],
-      "title": "Resource Utilization",
+      "title": "Container Metrics",
       "type": "row"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus-uid"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -435,22 +393,12 @@
             }
           },
           "mappings": [],
-          "max": 100,
-          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 70
-              },
-              {
-                "color": "red",
-                "value": 85
               }
             ]
           },
@@ -462,7 +410,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 19
+        "y": 21
       },
       "id": 5,
       "options": {
@@ -481,7 +429,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus-uid"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "rate(container_cpu_usage_seconds_total{name=~\"lims-.*\"}[5m]) * 100",
@@ -490,13 +438,13 @@
           "refId": "A"
         }
       ],
-      "title": "CPU Usage by Service",
+      "title": "CPU Usage by Container",
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus-uid"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -541,18 +489,10 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 70
-              },
-              {
-                "color": "red",
-                "value": 85
               }
             ]
           },
-          "unit": "percent"
+          "unit": "bytes"
         },
         "overrides": []
       },
@@ -560,7 +500,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 19
+        "y": 21
       },
       "id": 6,
       "options": {
@@ -579,29 +519,75 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus-uid"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(container_memory_usage_bytes{name=~\"lims-.*\"} / container_spec_memory_limit_bytes{name=~\"lims-.*\"}) * 100",
+          "expr": "container_memory_usage_bytes{name=~\"lims-.*\"}",
           "legendFormat": "{{name}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Memory Usage by Service",
+      "title": "Memory Usage by Container",
       "type": "timeseries"
     }
   ],
   "refresh": "10s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": [
-    "tracseq",
-    "services",
-    "overview"
-  ],
+  "tags": ["lims", "health"],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "Prometheus",
+          "value": "prometheus-uid"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Data Source",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": ["gateway", "frontend", "rag", "storage", "samples", "postgres", "redis"],
+          "value": ["gateway", "frontend", "rag", "storage", "samples", "postgres", "redis"]
+        },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Service",
+        "multi": true,
+        "name": "service",
+        "options": [
+          {"text": "gateway", "value": "gateway"},
+          {"text": "frontend", "value": "frontend"},
+          {"text": "rag", "value": "rag"},
+          {"text": "storage", "value": "storage"},
+          {"text": "samples", "value": "samples"},
+          {"text": "reports", "value": "reports"},
+          {"text": "sequencing", "value": "sequencing"},
+          {"text": "events", "value": "events"},
+          {"text": "transactions", "value": "transactions"},
+          {"text": "templates", "value": "templates"},
+          {"text": "notification", "value": "notification"},
+          {"text": "postgres", "value": "postgres"},
+          {"text": "redis", "value": "redis"}
+        ],
+        "query": "",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
   },
   "time": {
     "from": "now-1h",
@@ -609,8 +595,6 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "TracSeq Service Overview",
-  "uid": "tracseq-service-overview",
-  "version": 0,
+  "version": 1,
   "weekStart": ""
 }

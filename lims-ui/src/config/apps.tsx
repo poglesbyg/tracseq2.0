@@ -61,8 +61,9 @@ const FinderApp = ({ windowContext }: { windowContext?: any }) => {
         ];
 
         // Add samples to the samples folder
-        if (samplesRes.data && Array.isArray(samplesRes.data)) {
-          samplesRes.data.forEach((sample: any) => {
+        const samplesData = samplesRes.data?.data || samplesRes.data || [];
+        if (Array.isArray(samplesData)) {
+          samplesData.forEach((sample: any) => {
             fileItems.push({
               id: `sample-${sample.id}`,
               name: sample.name || sample.barcode,
@@ -85,8 +86,9 @@ const FinderApp = ({ windowContext }: { windowContext?: any }) => {
         }
 
         // Add templates to the templates folder
-        if (templatesRes.data && Array.isArray(templatesRes.data)) {
-          templatesRes.data.forEach((template: any) => {
+        const templatesData = templatesRes.data?.data || templatesRes.data || [];
+        if (Array.isArray(templatesData)) {
+          templatesData.forEach((template: any) => {
             fileItems.push({
               id: `template-${template.id}`,
               name: template.name,
@@ -105,8 +107,9 @@ const FinderApp = ({ windowContext }: { windowContext?: any }) => {
         }
 
         // Add projects to the projects folder
-        if (projectsRes.data && Array.isArray(projectsRes.data)) {
-          projectsRes.data.forEach((project: any) => {
+        const projectsData = projectsRes.data?.data || projectsRes.data || [];
+        if (Array.isArray(projectsData)) {
+          projectsData.forEach((project: any) => {
             fileItems.push({
               id: `project-${project.id}`,
               name: `${project.project_code} - ${project.name}`,
@@ -130,8 +133,9 @@ const FinderApp = ({ windowContext }: { windowContext?: any }) => {
         }
 
         // Add reports to the reports folder
-        if (reportsRes.data && Array.isArray(reportsRes.data)) {
-          reportsRes.data.forEach((report: any) => {
+        const reportsData = reportsRes.data?.data || reportsRes.data || [];
+        if (Array.isArray(reportsData)) {
+          reportsData.forEach((report: any) => {
             fileItems.push({
               id: `report-${report.id}`,
               name: report.name,

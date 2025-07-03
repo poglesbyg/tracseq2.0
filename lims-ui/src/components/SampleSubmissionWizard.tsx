@@ -59,7 +59,12 @@ export default function SampleSubmissionWizard({ onSuccess, onClose }: SampleSub
     queryKey: ['templates'],
     queryFn: async () => {
       const response = await axios.get('/api/templates');
-      return response.data;
+      // Handle API response format { data: [...], pagination: {...}, success: true }
+      if (response.data && typeof response.data === 'object' && Array.isArray(response.data.data)) {
+        return response.data.data;
+      }
+      // Fallback to direct array or templates property
+      return Array.isArray(response.data) ? response.data : (response.data.templates || []);
     },
   });
 

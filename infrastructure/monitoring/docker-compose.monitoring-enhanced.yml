@@ -365,10 +365,7 @@ volumes:
 # ================================
 networks:
   monitoring-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
+    external: true
   microservices-network:
     external: true
     name: enhanced_storage_service_enhanced_storage_network

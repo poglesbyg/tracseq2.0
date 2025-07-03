@@ -71,12 +71,20 @@ export default function Samples() {
     queryKey: ['samples'],
     queryFn: async () => {
       const response = await axios.get('/api/samples');
-      // Handle both API response formats
-      if (response.data.data && response.data.data.samples) {
-        return response.data.data;
+      // Handle API response format { data: [...], pagination: {...}, success: true }
+      if (response.data && typeof response.data === 'object' && Array.isArray(response.data.data)) {
+        return { samples: response.data.data, total: response.data.pagination?.total || response.data.data.length };
       }
       // Fallback to direct array response
-      return { samples: response.data, total: response.data.length };
+      if (Array.isArray(response.data)) {
+        return { samples: response.data, total: response.data.length };
+      }
+      // Another fallback if data is wrapped differently
+      if (response.data.samples && Array.isArray(response.data.samples)) {
+        return { samples: response.data.samples, total: response.data.total || response.data.samples.length };
+      }
+      // Default empty response
+      return { samples: [], total: 0 };
     },
   });
 

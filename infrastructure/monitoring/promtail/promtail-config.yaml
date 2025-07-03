@@ -153,7 +153,9 @@ scrape_configs:
       
       # Limit log line length
       - limit:
-          max_line_size: 100KB
+          rate: 20
+          burst: 30
+          drop: false
 
   # System logs
   - job_name: system
