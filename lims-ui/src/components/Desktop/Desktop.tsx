@@ -13,6 +13,8 @@ import { AppDefinition } from '../../types/apps';
 import { 
   FolderOpenIcon
 } from '@heroicons/react/24/outline';
+import { ChatBotWrapper } from '../ChatBotWrapper';
+import { ChatBotFloat } from '../ChatBotFloat';
 
 interface DesktopProps {
   apps: AppDefinition[];
@@ -43,6 +45,7 @@ const DesktopContent: React.FC<DesktopProps> = ({ apps }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [desktopBackground, setDesktopBackground] = useState('gradient-to-br from-blue-100 via-purple-50 to-pink-100');
   const { showContextMenu } = useContextMenu();
+  const [showChatBot, setShowChatBot] = useState(false);
 
   const handleAppLaunch = useCallback((appId: string) => {
     const app = apps.find(a => a.id === appId);
@@ -355,6 +358,20 @@ const DesktopContent: React.FC<DesktopProps> = ({ apps }) => {
         onNotificationDismiss={dismissNotification}
         onClearAll={clearAll}
       />
+
+      {/* ChatBot */}
+      <ChatBotWrapper 
+        isOpen={showChatBot} 
+        onToggle={() => setShowChatBot(false)} 
+      />
+      
+      {/* ChatBot Float Button - Always visible */}
+      {!showChatBot && (
+        <ChatBotFloat 
+          onClick={() => setShowChatBot(true)} 
+          hasUnread={false}
+        />
+      )}
     </div>
   );
 };

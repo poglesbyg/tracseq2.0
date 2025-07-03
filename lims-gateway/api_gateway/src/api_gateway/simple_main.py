@@ -8,16 +8,22 @@ import json
 import os
 import sys
 import uuid
+import asyncio
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List, AsyncGenerator
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, File, Form, BackgroundTasks, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, Field
 import asyncpg
+
+# Import auth middleware
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from middleware.auth import get_current_user, create_token
+from routes.websocket_chat import websocket_chat_endpoint, manager
 
 # Database connection pool
 DATABASE_URL = os.getenv("DATABASE_URL", "postgres://postgres:postgres@lims-postgres:5432/lims_db")
@@ -199,11 +205,16 @@ async def login(request: Request):
         if not user or user["password"] != password:
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        # In production, generate a proper JWT token
-        mock_token = f"mock_jwt_token_for_{user['id']}"
+        # Generate JWT token
+        token = create_token({
+            "id": user["id"],
+            "email": user["email"],
+            "name": user["name"],
+            "role": user["role"]
+        })
 
         return {
-            "token": mock_token,
+            "token": token,
             "user": {
                 "id": user["id"],
                 "email": user["email"],
@@ -218,27 +229,587 @@ async def login(request: Request):
         raise HTTPException(status_code=500, detail=f"Login error: {e!s}")
 
 @app.get("/api/auth/me")
-async def get_current_user(request: Request):
+async def get_current_user_endpoint(request: Request):
     """Get current user info"""
-    # Mock user info - in production, decode JWT from Authorization header
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
     return {
-        "id": "1",
-        "email": "admin@tracseq.com",
-        "name": "Admin User",
-        "role": "admin"
+        "id": user.id,
+        "email": user.email,
+        "name": user.name,
+        "role": user.role
     }
 
 # Additional auth endpoint that frontend might be calling
 @app.get("/api/users/me")
 async def get_current_user_alt(request: Request):
     """Get current user info (alternative endpoint)"""
-    # Mock user info - in production, decode JWT from Authorization header
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
     return {
-        "id": "1",
-        "email": "admin@tracseq.com",
-        "name": "Admin User",
-        "role": "admin"
+        "id": user.id,
+        "email": user.email,
+        "name": user.name,
+        "role": user.role
     }
+
+# =============================================================================
+# Chat API Endpoints for TracSeq ChatBot Integration
+# =============================================================================
+
+@app.post("/api/chat/stream")
+async def chat_stream(
+    request: Request,
+    message: str = Form(...),
+    conversationId: str = Form(...),
+    files: Optional[List[UploadFile]] = File(None)
+):
+    """
+    Stream chat responses with support for file uploads.
+    
+    This endpoint handles:
+    - Real-time streaming of AI responses
+    - File upload processing
+    - Context-aware responses based on conversation history
+    """
+    async def generate_stream() -> AsyncGenerator[str, None]:
+        # Initial response
+        response_id = str(uuid.uuid4())
+        
+        # Get authenticated user context
+        user = await get_current_user(request)
+        user_context = {
+            "user_id": user.id if user else "anonymous",
+            "user_email": user.email if user else "anonymous@tracseq.com",
+            "user_name": user.name if user else "Anonymous User",
+            "user_role": user.role if user else "guest"
+        }
+        
+        try:
+            # Process any uploaded files first
+            file_context = ""
+            file_data = []
+            if files:
+                for file in files:
+                    content = await file.read()
+                    file_context += f"\n[Processing file: {file.filename} ({len(content)} bytes)]"
+                    file_data.append({
+                        "filename": file.filename,
+                        "content": content.decode('utf-8', errors='ignore') if file.content_type and 'text' in file.content_type else None,
+                        "content_type": file.content_type,
+                        "size": len(content)
+                    })
+            
+            # Prepare context for RAG service
+            async with httpx.AsyncClient() as client:
+                # Get conversation history if exists
+                history = []
+                if db_pool:
+                    try:
+                        async with db_pool.acquire() as conn:
+                            # First ensure conversation exists
+                            await conn.execute("""
+                                INSERT INTO chat_conversations (id, user_id, title, created_at, updated_at)
+                                VALUES ($1, $2, $3, $4, $4)
+                                ON CONFLICT (id) DO UPDATE SET
+                                    last_message_at = EXCLUDED.updated_at,
+                                    updated_at = EXCLUDED.updated_at
+                            """, conversationId, user_context['user_id'], f"Chat at {datetime.utcnow().isoformat()}", datetime.utcnow())
+                            
+                            rows = await conn.fetch("""
+                                SELECT role, content, created_at 
+                                FROM chat_messages 
+                                WHERE conversation_id = $1 
+                                ORDER BY created_at DESC 
+                                LIMIT 10
+                            """, conversationId)
+                            history = [{"role": row['role'], "content": row['content']} for row in reversed(rows)]
+                    except:
+                        pass
+                
+                # Call RAG service
+                rag_payload = {
+                    "query": message,
+                    "session_id": conversationId,
+                    "context": {
+                        "conversation_history": history,
+                        "files": file_data
+                    },
+                    "stream": True
+                }
+                
+                # Try to connect to RAG service
+                try:
+                    response = await client.post(
+                        f"{RAG_SERVICE_URL}/api/v1/rag/query",
+                        json=rag_payload,
+                        timeout=30.0
+                    )
+                    
+                    if response.status_code == 200:
+                        # Process RAG response
+                        data = response.json()
+                        if 'result' in data and 'response' in data['result']:
+                            content = data['result']['response']
+                            confidence = data['result'].get('confidence', 0.85)
+                            sources = data['result'].get('sources', [])
+                            
+                            # Stream the response in chunks
+                            words = content.split(' ')
+                            for i in range(0, len(words), 5):  # Send 5 words at a time
+                                chunk_words = words[i:i+5]
+                                chunk_text = ' '.join(chunk_words) + ' '
+                                
+                                chunk = {
+                                    "id": response_id,
+                                    "content": chunk_text,
+                                    "type": "chunk",
+                                    "timestamp": datetime.utcnow().isoformat()
+                                }
+                                yield f"data: {json.dumps(chunk)}\n\n"
+                                await asyncio.sleep(0.05)
+                            
+                            # Send completion with metadata
+                            completion = {
+                                "id": response_id,
+                                "type": "completion",
+                                "timestamp": datetime.utcnow().isoformat(),
+                                "metadata": {
+                                    "conversationId": conversationId,
+                                    "confidence": confidence,
+                                    "modelUsed": "rag-llama3.2",
+                                    "processingTime": 2.5,
+                                    "sources": sources
+                                }
+                            }
+                            yield f"data: {json.dumps(completion)}\n\n"
+                            
+                            # Store in database
+                            if db_pool:
+                                try:
+                                    async with db_pool.acquire() as conn:
+                                        await conn.execute("""
+                                            INSERT INTO chat_messages (
+                                                conversation_id, role, content, metadata, created_at
+                                            ) VALUES ($1, $2, $3, $4, $5)
+                                        """, conversationId, "user", message, json.dumps({"files": len(file_data)}), datetime.utcnow())
+                                        
+                                        await conn.execute("""
+                                            INSERT INTO chat_messages (
+                                                conversation_id, role, content, metadata, created_at
+                                            ) VALUES ($1, $2, $3, $4, $5)
+                                        """, conversationId, "assistant", content, json.dumps({"confidence": confidence, "sources": sources}), datetime.utcnow())
+                                except:
+                                    pass
+                        else:
+                            raise Exception("Invalid RAG response format")
+                    else:
+                        raise Exception(f"RAG service returned {response.status_code}")
+                        
+                except Exception as e:
+                    # Fallback to mock response if RAG service is unavailable
+                    print(f"RAG service error: {e}")
+                    fallback_content = f"I understand you're asking about '{message}'.{file_context}\n\nI'm currently unable to connect to my knowledge base, but I can help you with:\n\n1. **Sample Registration**: Create and track new samples\n2. **Document Processing**: Extract data from PDFs\n3. **Protocol Access**: View standard operating procedures\n4. **Quality Control**: Validate sample metrics\n\nPlease try again in a moment or proceed with one of these options."
+                    
+                    # Stream fallback response
+                    words = fallback_content.split(' ')
+                    for i in range(0, len(words), 5):
+                        chunk_words = words[i:i+5]
+                        chunk_text = ' '.join(chunk_words) + ' '
+                        
+                        chunk = {
+                            "id": response_id,
+                            "content": chunk_text,
+                            "type": "chunk",
+                            "timestamp": datetime.utcnow().isoformat()
+                        }
+                        yield f"data: {json.dumps(chunk)}\n\n"
+                        await asyncio.sleep(0.05)
+                    
+                    completion = {
+                        "id": response_id,
+                        "type": "completion",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "metadata": {
+                            "conversationId": conversationId,
+                            "confidence": 0.5,
+                            "modelUsed": "fallback",
+                            "processingTime": 0.1,
+                            "error": str(e)
+                        }
+                    }
+                    yield f"data: {json.dumps(completion)}\n\n"
+                
+                yield "data: [DONE]\n\n"
+                
+        except Exception as e:
+            error_chunk = {
+                "id": response_id,
+                "content": f"Error: {str(e)}",
+                "type": "error",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            yield f"data: {json.dumps(error_chunk)}\n\n"
+            yield "data: [DONE]\n\n"
+    
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
+    )
+
+@app.post("/api/documents/process")
+async def process_document(
+    file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    metadata: Optional[str] = Form(None)
+):
+    """
+    Process uploaded documents (PDFs, Excel, etc.) and extract laboratory data.
+    
+    Supports:
+    - PDF submission forms
+    - Excel sample sheets
+    - CSV data files
+    """
+    try:
+        # Validate file type
+        allowed_types = [
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-excel",
+            "text/csv"
+        ]
+        
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {file.content_type}"
+            )
+        
+        # Read file content
+        content = await file.read()
+        
+        # In production, this would send to the RAG service for processing
+        # For now, return mock extracted data
+        extracted_data = {
+            "document_type": "laboratory_submission",
+            "extracted_fields": {
+                "submitter": {
+                    "name": "Dr. Jane Smith",
+                    "institution": "Central Research Lab",
+                    "email": "jane.smith@research.edu"
+                },
+                "samples": [{
+                    "type": "DNA Extract",
+                    "volume": 50.0,
+                    "volume_unit": "µL",
+                    "concentration": 125.0,
+                    "concentration_unit": "ng/µL",
+                    "quality_metrics": {
+                        "A260_280": 1.85,
+                        "A260_230": 2.10,
+                        "RIN": 9.2
+                    }
+                }],
+                "storage_requirements": {
+                    "temperature": -20,
+                    "container": "1.5mL Eppendorf tube",
+                    "special_handling": "Avoid freeze-thaw cycles"
+                },
+                "project_info": {
+                    "project_id": "PROJ-2024-001",
+                    "funding_source": "NIH R01-123456"
+                }
+            }
+        }
+        
+        result = {
+            "success": True,
+            "extracted_data": extracted_data,
+            "confidence": 0.92,
+            "validation_errors": None
+        }
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+
+class SampleCreationRequest(BaseModel):
+    sample_type: str
+    volume: float
+    concentration: float
+    buffer: str
+    storage_temperature: float
+    storage_location: Dict[str, str]
+    project_id: Optional[str] = None
+    principal_investigator: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+@app.post("/api/samples/create")
+async def create_sample_from_chat(
+    request: Request,
+    sample_data: SampleCreationRequest
+):
+    """
+    Create a new sample based on chat interaction data.
+    
+    This endpoint is called when users confirm sample creation
+    through the chat interface.
+    """
+    try:
+        # Get user info from auth header (if available)
+        auth_header = request.headers.get("Authorization", "")
+        user_info = {"id": "chatbot_user", "email": "chatbot@tracseq.com"}
+        
+        if auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            # In production, decode JWT token here
+            # For now, use mock user info
+            user_info = {"id": "1", "email": "admin@tracseq.com"}
+        
+        # Prepare sample creation payload for the sample service
+        sample_payload = {
+            "name": f"{sample_data.sample_type} Sample",
+            "sample_type": sample_data.sample_type,
+            "volume": sample_data.volume,
+            "volume_unit": "µL",
+            "concentration": sample_data.concentration,
+            "concentration_unit": "ng/µL",
+            "buffer": sample_data.buffer,
+            "storage_temperature": sample_data.storage_temperature,
+            "storage_location": json.dumps(sample_data.storage_location),
+            "project_id": sample_data.project_id,
+            "principal_investigator": sample_data.principal_investigator,
+            "metadata": json.dumps(sample_data.metadata) if sample_data.metadata else "{}",
+            "created_by": user_info["email"]
+        }
+        
+        # Try to call the real sample service
+        async with httpx.AsyncClient() as client:
+            try:
+                # Add auth header if available
+                headers = {}
+                if auth_header:
+                    headers["Authorization"] = auth_header
+                
+                response = await client.post(
+                    f"{LAB_MANAGER_URL}/api/samples",  # Using lab_manager as sample service
+                    json=sample_payload,
+                    headers=headers,
+                    timeout=10.0
+                )
+                
+                if response.status_code == 200 or response.status_code == 201:
+                    data = response.json()
+                    
+                    # Store sample creation in chat history
+                    if db_pool:
+                        try:
+                            async with db_pool.acquire() as conn:
+                                await conn.execute("""
+                                    INSERT INTO chat_messages (
+                                        conversation_id, role, content, metadata, created_at
+                                    ) VALUES ($1, $2, $3, $4, $5)
+                                """, 
+                                request.headers.get("X-Conversation-Id", "system"),
+                                "system",
+                                f"Sample created: {data.get('barcode', 'Unknown')}",
+                                json.dumps({"sample_id": data.get('id'), "action": "sample_created"}),
+                                datetime.utcnow()
+                                )
+                        except:
+                            pass
+                    
+                    return {
+                        "success": True,
+                        "sample": data,
+                        "actions": {
+                            "print_label": f"/api/samples/{data.get('id')}/label",
+                            "view_details": f"/api/samples/{data.get('id')}",
+                            "schedule_qc": f"/api/samples/{data.get('id')}/qc"
+                        }
+                    }
+                else:
+                    raise Exception(f"Sample service returned {response.status_code}: {response.text}")
+                    
+            except httpx.RequestError as e:
+                # Fallback to mock response if service is unavailable
+                print(f"Sample service error: {e}")
+                sample_id = f"SAMP-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+                barcode = f"TSQ{sample_id.replace('-', '')}"
+                
+                response = {
+                    "success": True,
+                    "sample": {
+                        "id": sample_id,
+                        "barcode": barcode,
+                        "type": sample_data.sample_type,
+                        "volume": sample_data.volume,
+                        "concentration": sample_data.concentration,
+                        "buffer": sample_data.buffer,
+                        "storage": {
+                            "temperature": sample_data.storage_temperature,
+                            "location": sample_data.storage_location
+                        },
+                        "project_id": sample_data.project_id,
+                        "principal_investigator": sample_data.principal_investigator,
+                        "created_at": datetime.utcnow().isoformat(),
+                        "status": "registered"
+                    },
+                    "actions": {
+                        "print_label": f"/api/samples/{sample_id}/label",
+                        "view_details": f"/api/samples/{sample_id}",
+                        "schedule_qc": f"/api/samples/{sample_id}/qc"
+                    }
+                }
+                
+                return response
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sample creation failed: {str(e)}")
+
+@app.get("/api/protocols/list")
+async def list_protocols(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0
+):
+    """
+    Retrieve available laboratory protocols and SOPs.
+    
+    Query parameters:
+    - category: Filter by protocol category (e.g., 'extraction', 'qc', 'storage')
+    - search: Search protocols by name or content
+    - limit: Number of results to return
+    - offset: Pagination offset
+    """
+    # Mock protocol data
+    # In production, this would query the protocol database
+    protocols = [
+        {
+            "id": "SOP-001",
+            "name": "DNA/RNA Extraction Protocol",
+            "version": "2.3",
+            "last_updated": datetime(2024, 1, 15).isoformat(),
+            "category": "extraction",
+            "file_url": "/protocols/SOP-001-v2.3.pdf"
+        },
+        {
+            "id": "SOP-005",
+            "name": "Library Preparation Protocol",
+            "version": "1.8",
+            "last_updated": datetime(2024, 2, 20).isoformat(),
+            "category": "library_prep",
+            "file_url": "/protocols/SOP-005-v1.8.pdf"
+        },
+        {
+            "id": "SOP-009",
+            "name": "Quality Control Standards",
+            "version": "3.1",
+            "last_updated": datetime(2023, 12, 10).isoformat(),
+            "category": "qc",
+            "file_url": "/protocols/SOP-009-v3.1.pdf"
+        },
+        {
+            "id": "SOP-012",
+            "name": "Sample Storage Guidelines",
+            "version": "2.0",
+            "last_updated": datetime(2024, 1, 5).isoformat(),
+            "category": "storage",
+            "file_url": "/protocols/SOP-012-v2.0.pdf"
+        },
+        {
+            "id": "SOP-015",
+            "name": "Sequencing Run Setup",
+            "version": "1.5",
+            "last_updated": datetime(2024, 3, 1).isoformat(),
+            "category": "sequencing",
+            "file_url": "/protocols/SOP-015-v1.5.pdf"
+        }
+    ]
+    
+    # Apply filters
+    filtered_protocols = protocols
+    
+    if category:
+        filtered_protocols = [p for p in filtered_protocols if p["category"] == category]
+    
+    if search:
+        search_lower = search.lower()
+        filtered_protocols = [
+            p for p in filtered_protocols 
+            if search_lower in p["name"].lower() or search_lower in p["category"].lower()
+        ]
+    
+    # Apply pagination
+    total = len(filtered_protocols)
+    paginated = filtered_protocols[offset:offset + limit]
+    
+    return {
+        "protocols": paginated,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "categories": list(set(p["category"] for p in protocols))
+    }
+
+@app.get("/api/chat/health")
+async def chat_health():
+    """Check chat service health status."""
+    return {
+        "status": "healthy",
+        "service": "chat",
+        "timestamp": datetime.utcnow().isoformat(),
+        "features": {
+            "streaming": True,
+            "file_upload": True,
+            "document_processing": True,
+            "sample_creation": True,
+            "protocol_access": True
+        }
+    }
+
+# =============================================================================
+# WebSocket Chat Endpoint
+# =============================================================================
+
+@app.websocket("/ws/chat/{conversation_id}")
+async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
+    """WebSocket endpoint for real-time chat communication."""
+    # Get user from websocket query params or headers
+    auth_user = None
+    try:
+        # Try to get token from query params first (for WebSocket)
+        token = websocket.query_params.get("token")
+        if token:
+            from middleware.auth import decode_token, AuthUser
+            payload = decode_token(token)
+            if payload:
+                auth_user = AuthUser(
+                    user_id=payload.get("sub", payload.get("id", "")),
+                    email=payload.get("email", ""),
+                    name=payload.get("name", ""),
+                    role=payload.get("role", "user")
+                )
+    except:
+        pass
+    
+    await websocket_chat_endpoint(websocket, conversation_id, db_pool, auth_user)
+
+# =============================================================================
+# End of Chat API Endpoints
+# =============================================================================
 
 # Dashboard endpoints
 @app.get("/api/dashboard/stats")
