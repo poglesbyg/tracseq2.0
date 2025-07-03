@@ -1,0 +1,225 @@
+groups:
+  - name: service_performance
+    interval: 30s
+    rules:
+      # HTTP Request rates by service
+      - record: service:http_request_rate
+        expr: |
+          sum by (service, method, status_class) (
+            rate(http_requests_total[5m])
+          )
+      
+      # HTTP Request duration percentiles
+      - record: service:http_request_duration:p50
+        expr: |
+          histogram_quantile(0.5, 
+            sum by (service, method, le) (
+              rate(http_request_duration_seconds_bucket[5m])
+            )
+          )
+      
+      - record: service:http_request_duration:p95
+        expr: |
+          histogram_quantile(0.95, 
+            sum by (service, method, le) (
+              rate(http_request_duration_seconds_bucket[5m])
+            )
+          )
+      
+      - record: service:http_request_duration:p99
+        expr: |
+          histogram_quantile(0.99, 
+            sum by (service, method, le) (
+              rate(http_request_duration_seconds_bucket[5m])
+            )
+          )
+      
+      # Error rates
+      - record: service:error_rate
+        expr: |
+          sum by (service) (
+            rate(http_requests_total{status=~"5.."}[5m])
+          ) / sum by (service) (
+            rate(http_requests_total[5m])
+          )
+
+  - name: database_performance
+    interval: 60s
+    rules:
+      # Database connection pool usage
+      - record: database:connection_pool_usage
+        expr: |
+          sum by (service, database) (
+            pg_stat_database_numbackends
+          ) / sum by (service, database) (
+            pg_settings_max_connections
+          )
+      
+      # Database query rates
+      - record: database:query_rate
+        expr: |
+          sum by (service, database, query_type) (
+            rate(database_queries_total[5m])
+          )
+      
+      # Database transaction rates
+      - record: database:transaction_rate
+        expr: |
+          sum by (database) (
+            rate(pg_stat_database_xact_commit[5m]) + 
+            rate(pg_stat_database_xact_rollback[5m])
+          )
+      
+      # Cache hit ratio
+      - record: database:cache_hit_ratio
+        expr: |
+          sum by (database) (
+            pg_stat_database_blks_hit
+          ) / (
+            sum by (database) (pg_stat_database_blks_hit) + 
+            sum by (database) (pg_stat_database_blks_read)
+          )
+
+  - name: resource_utilization
+    interval: 30s
+    rules:
+      # CPU utilization by service
+      - record: service:cpu_usage
+        expr: |
+          sum by (service, pod) (
+            rate(container_cpu_usage_seconds_total{container!=""}[5m])
+          ) * 100
+      
+      # Memory utilization by service
+      - record: service:memory_usage_bytes
+        expr: |
+          sum by (service, pod) (
+            container_memory_working_set_bytes{container!=""}
+          )
+      
+      # Memory utilization percentage
+      - record: service:memory_usage_percent
+        expr: |
+          sum by (service, pod) (
+            container_memory_working_set_bytes{container!=""}
+          ) / sum by (service, pod) (
+            container_spec_memory_limit_bytes{container!=""}
+          ) * 100
+      
+      # Disk I/O rates
+      - record: service:disk_io_rate
+        expr: |
+          sum by (service, pod, device) (
+            rate(container_fs_reads_bytes_total[5m]) + 
+            rate(container_fs_writes_bytes_total[5m])
+          )
+
+  - name: laboratory_metrics
+    interval: 60s
+    rules:
+      # Sample processing rate
+      - record: lab:sample_processing_rate
+        expr: |
+          sum by (service, status) (
+            rate(sample_processed_total[5m])
+          )
+      
+      # Sample queue depth
+      - record: lab:sample_queue_depth
+        expr: |
+          sum by (service, priority) (
+            sample_queue_size
+          )
+      
+      # Storage utilization by temperature zone
+      - record: lab:storage_utilization_by_zone
+        expr: |
+          sum by (zone, temperature) (
+            storage_used_slots
+          ) / sum by (zone, temperature) (
+            storage_total_slots
+          ) * 100
+      
+      # Sequencing run success rate
+      - record: lab:sequencing_success_rate
+        expr: |
+          sum by (instrument, run_type) (
+            rate(sequencing_runs_completed{status="success"}[24h])
+          ) / sum by (instrument, run_type) (
+            rate(sequencing_runs_completed[24h])
+          )
+      
+      # Document processing performance
+      - record: lab:document_processing_duration
+        expr: |
+          histogram_quantile(0.95,
+            sum by (document_type, le) (
+              rate(document_processing_duration_seconds_bucket[5m])
+            )
+          )
+
+  - name: ai_service_metrics
+    interval: 30s
+    rules:
+      # LLM request rate
+      - record: ai:llm_request_rate
+        expr: |
+          sum by (model, service) (
+            rate(llm_requests_total[5m])
+          )
+      
+      # LLM token usage rate
+      - record: ai:token_usage_rate
+        expr: |
+          sum by (model, service) (
+            rate(llm_tokens_used_total[5m])
+          )
+      
+      # RAG retrieval performance
+      - record: ai:rag_retrieval_duration
+        expr: |
+          histogram_quantile(0.95,
+            sum by (index, le) (
+              rate(rag_retrieval_duration_seconds_bucket[5m])
+            )
+          )
+      
+      # Model inference latency
+      - record: ai:model_inference_latency
+        expr: |
+          histogram_quantile(0.95,
+            sum by (model, le) (
+              rate(model_inference_duration_seconds_bucket[5m])
+            )
+          )
+
+  - name: business_kpis
+    interval: 5m
+    rules:
+      # Daily active users
+      - record: business:daily_active_users
+        expr: |
+          count by () (
+            count_over_time(
+              auth_user_login_total[24h]
+            )
+          )
+      
+      # Samples processed per day
+      - record: business:daily_samples_processed
+        expr: |
+          sum by (sample_type) (
+            increase(sample_processed_total[24h])
+          )
+      
+      # Average turnaround time
+      - record: business:avg_turnaround_time_hours
+        expr: |
+          avg by (sample_type) (
+            sample_turnaround_time_seconds
+          ) / 3600
+      
+      # System availability
+      - record: business:system_availability
+        expr: |
+          avg_over_time(up{job="api-gateway"}[24h]) * 100

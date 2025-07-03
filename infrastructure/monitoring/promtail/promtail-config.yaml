@@ -1,0 +1,197 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: tracseq
+    batchwait: 1s
+    batchsize: 1048576
+    timeout: 10s
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+
+scrape_configs:
+  # Docker container logs
+  - job_name: containers
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: containerlogs
+          __path__: /var/lib/docker/containers/*/*log
+    
+    pipeline_stages:
+      # Extract container metadata
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            attrs:
+            tag:
+      
+      # Extract container name from file path
+      - regex:
+          source: filename
+          expression: '/var/lib/docker/containers/(?P<container_id>[^/]+)/(?P<container_name>[^/]+)-json.log'
+      
+      # Parse Docker compose labels
+      - labels:
+          container_id:
+          container_name:
+      
+      # Parse log line
+      - json:
+          expressions:
+            log: log
+            stream: stream
+            time: time
+          source: output
+      
+      # Parse nested JSON logs
+      - json:
+          expressions:
+            level: level
+            msg: msg
+            service: service
+            trace_id: trace_id
+            span_id: span_id
+            user_id: user_id
+            method: method
+            path: path
+            status: status
+            duration: duration
+            error: error
+          source: log
+      
+      # Set severity level
+      - match:
+          selector: '{level=~"error|ERROR|Error"}'
+          stages:
+            - labels:
+                severity: error
+      
+      - match:
+          selector: '{level=~"warn|WARN|Warn|warning|WARNING|Warning"}'
+          stages:
+            - labels:
+                severity: warning
+      
+      - match:
+          selector: '{level=~"info|INFO|Info"}'
+          stages:
+            - labels:
+                severity: info
+      
+      - match:
+          selector: '{level=~"debug|DEBUG|Debug"}'
+          stages:
+            - labels:
+                severity: debug
+      
+      # Extract service name from container name
+      - regex:
+          source: container_name
+          expression: '^(?P<service_name>[^-]+)'
+      
+      - labels:
+          service_name:
+          level:
+          trace_id:
+          span_id:
+          user_id:
+          method:
+          path:
+          status:
+      
+      # Parse specific service logs
+      - match:
+          selector: '{service_name=~"auth-service|sample-service|template-service"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\S+) (?P<level>\S+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+      
+      # Parse Python/AI service logs
+      - match:
+          selector: '{service_name=~"enhanced-rag-service|cognitive-assistant"}'
+          stages:
+            - regex:
+                expression: '^\[(?P<timestamp>[^\]]+)\] (?P<level>\S+) (?P<logger>\S+) - (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: '2006-01-02 15:04:05,000'
+            - labels:
+                level:
+                logger:
+      
+      # Parse Nginx/API Gateway logs
+      - match:
+          selector: '{service_name="api-gateway"}'
+          stages:
+            - regex:
+                expression: '^(?P<remote_addr>\S+) - (?P<remote_user>\S+) \[(?P<time_local>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) (?P<protocol>\S+)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)"'
+            - labels:
+                method:
+                path:
+                status:
+                remote_addr:
+      
+      # Drop debug logs in production
+      - match:
+          selector: '{severity="debug",environment="production"}'
+          action: drop
+      
+      # Limit log line length
+      - limit:
+          max_line_size: 100KB
+
+  # System logs
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          __path__: /var/log/{syslog,messages,*.log}
+    
+    pipeline_stages:
+      - match:
+          selector: '{filename="/var/log/auth.log"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\S+ \S+ \S+) (?P<host>\S+) (?P<process>[^:]+): (?P<message>.*)$'
+            - labels:
+                host:
+                process:
+      
+      - match:
+          selector: '{filename="/var/log/nginx/access.log"}'
+          stages:
+            - regex:
+                expression: '^(?P<remote_addr>\S+) - (?P<remote_user>\S+) \[(?P<time_local>[^\]]+)\] "(?P<request>[^"]+)" (?P<status>\d+) (?P<body_bytes_sent>\d+)'
+            - labels:
+                status:
+                
+  # Journal logs
+  - job_name: journal
+    journal:
+      max_age: 12h
+      labels:
+        job: systemd-journal
+    relabel_configs:
+      - source_labels: ['__journal__systemd_unit']
+        target_label: 'unit'
+      - source_labels: ['__journal__hostname']
+        target_label: 'hostname'
+      - source_labels: ['__journal_priority_keyword']
+        target_label: 'level'

@@ -1,0 +1,274 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'tracseq-production'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - /etc/prometheus/rules/*.yml
+  - /etc/prometheus/alerts/*.yml
+
+# Remote write configuration for long-term storage
+remote_write:
+  - url: http://cortex:9009/api/v1/push
+    queue_config:
+      max_samples_per_send: 10000
+      batch_send_deadline: 5s
+    write_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(up|scrape_.*)'
+        action: drop
+
+scrape_configs:
+  # ===============================
+  # Self-monitoring
+  # ===============================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+)(?::\d+)?'
+        replacement: '$1'
+
+  # ===============================
+  # Service Discovery for Kubernetes
+  # ===============================
+  - job_name: 'kubernetes-apiservers'
+    kubernetes_sd_configs:
+      - role: endpoints
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+
+  - job_name: 'kubernetes-nodes'
+    kubernetes_sd_configs:
+      - role: node
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: kubernetes_pod_name
+
+  # ===============================
+  # TracSeq Microservices (Enhanced)
+  # ===============================
+  - job_name: 'tracseq-services'
+    dns_sd_configs:
+      - names:
+          - '_metrics._tcp.tracseq.local'
+    relabel_configs:
+      - source_labels: [__meta_dns_name]
+        target_label: service
+        regex: '([^.]+)\..*'
+        replacement: '$1'
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+)(?::\d+)?'
+        replacement: '$1'
+
+  # Static configs for services
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:8080']
+        labels:
+          service: 'auth'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'go_memstats_.*'
+        action: drop
+
+  - job_name: 'sample-service'
+    static_configs:
+      - targets: ['sample-service:8081']
+        labels:
+          service: 'sample'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'enhanced-storage-service'
+    static_configs:
+      - targets: ['enhanced-storage-service:8082']
+        labels:
+          service: 'storage'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'template-service'
+    static_configs:
+      - targets: ['template-service:8083']
+        labels:
+          service: 'template'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'sequencing-service'
+    static_configs:
+      - targets: ['sequencing-service:8084']
+        labels:
+          service: 'sequencing'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['notification-service:8085']
+        labels:
+          service: 'notification'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'enhanced-rag-service'
+    static_configs:
+      - targets: ['enhanced-rag-service:8086']
+        labels:
+          service: 'rag'
+          tier: 'ai'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'event-service'
+    static_configs:
+      - targets: ['event-service:8087']
+        labels:
+          service: 'event'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'transaction-service'
+    static_configs:
+      - targets: ['transaction-service:8088']
+        labels:
+          service: 'transaction'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8089']
+        labels:
+          service: 'gateway'
+          tier: 'frontend'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # ===============================
+  # Infrastructure Components
+  # ===============================
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          type: 'infrastructure'
+          component: 'node'
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          type: 'infrastructure'
+          component: 'container'
+
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          type: 'database'
+          component: 'postgres'
+
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          type: 'database'
+          component: 'redis'
+
+  # ===============================
+  # Blackbox Monitoring (HTTP/TCP checks)
+  # ===============================
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://api-gateway:8089/health
+          - http://auth-service:8080/health
+          - http://sample-service:8081/health
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # ===============================
+  # Push Gateway for batch jobs
+  # ===============================
+  - job_name: 'pushgateway'
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']
+
+  # ===============================
+  # JVM Monitoring (for Java services)
+  # ===============================
+  - job_name: 'jmx-exporter'
+    static_configs:
+      - targets: []
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
