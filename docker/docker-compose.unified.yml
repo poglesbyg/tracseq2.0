@@ -4,21 +4,21 @@
 services:
   # Infrastructure Services
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: tracseq-postgres
     ports:
-      - "${DB_EXTERNAL_PORT:-5433}:5432"
+      - "5433:5432"
     environment:
-      POSTGRES_DB: lims_db
+      POSTGRES_DB: lab_manager
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ../db/000_init_database.sql:/docker-entrypoint-initdb.d/000_init_database.sql:ro
-      - ../db/001_consolidated_migrations.sql:/docker-entrypoint-initdb.d/001_consolidated_migrations.sql:ro
+      - ../db/000_init_database.sql:/docker-entrypoint-initdb.d/000_init_database.sql
+      - ../db/001_consolidated_migrations.sql:/docker-entrypoint-initdb.d/001_consolidated_migrations.sql
       - ../db/migrations/999_fix_all_schemas.sql:/docker-entrypoint-initdb.d/999_fix_all_schemas.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d lims_db"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,15 +30,15 @@ services:
     image: redis:7-alpine
     container_name: tracseq-redis
     ports:
-      - "${REDIS_EXTERNAL_PORT:-6380}:6379"
+      - "6379:6379"
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 3s
-      retries: 3
+      timeout: 5s
+      retries: 5
     networks:
       - tracseq-network
     restart: unless-stopped
@@ -53,7 +53,7 @@ services:
     ports:
       - "${GATEWAY_PORT:-8089}:8000"
     environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       # Service URLs - all internal to the network
       AUTH_SERVICE_URL: http://auth-service:8001
@@ -86,7 +86,7 @@ services:
       - "${AUTH_PORT:-8011}:8001"
     environment:
       PORT: 8001
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
@@ -109,7 +109,7 @@ services:
       - "${SAMPLE_PORT:-8012}:8081"
     environment:
       PORT: 8081
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       AUTH_SERVICE_URL: http://auth-service:8001
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
@@ -133,7 +133,7 @@ services:
       - "${TEMPLATE_PORT:-8018}:8083"
     environment:
       TEMPLATE_PORT: 8083
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
@@ -156,8 +156,8 @@ services:
       - "${STORAGE_PORT:-8013}:8082"
     environment:
       PORT: 8082
-      STORAGE_DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      STORAGE_DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
@@ -182,7 +182,7 @@ services:
       - "${NOTIFICATION_PORT:-8015}:8085"
     environment:
       PORT: 8085
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
       SMTP_HOST: "smtp.gmail.com"
@@ -210,7 +210,7 @@ services:
     environment:
       PORT: 8087
       HOST: "0.0.0.0"
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
       RUST_LOG: info
@@ -234,7 +234,7 @@ services:
       - "${TRANSACTION_PORT:-8017}:8088"
     environment:
       PORT: 8088
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
@@ -257,7 +257,7 @@ services:
       - "${SEQUENCING_PORT:-8019}:8084"
     environment:
       PORT: 8084
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
@@ -280,7 +280,7 @@ services:
       - "${REPORTS_PORT:-8014}:8000"
     environment:
       PORT: 8000
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
@@ -302,7 +302,7 @@ services:
     ports:
       - "${RAG_PORT:-8100}:8000"
     environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       USE_OLLAMA: "true"
       OLLAMA_BASE_URL: http://ollama:11434
@@ -339,7 +339,7 @@ services:
   frontend:
     build:
       context: ../lims-ui
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     image: tracseq-frontend:latest
     container_name: tracseq-frontend
     ports:
