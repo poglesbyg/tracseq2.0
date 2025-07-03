@@ -7,8 +7,8 @@ services:
     image: tracseq-notification_service:latest
     container_name: lims-notification
     environment:
-      DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
-      REDIS_URL: redis://lims-redis:6379
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
       PORT: "8085"
       JWT_SECRET: "your-jwt-secret"
       SMTP_HOST: "smtp.gmail.com"
@@ -27,8 +27,8 @@ services:
     image: tracseq-event_service:latest
     container_name: lims-events
     environment:
-      DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
-      REDIS_URL: redis://lims-redis:6379
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
       PORT: "8087"
       HOST: "0.0.0.0"
       JWT_SECRET: "your-jwt-secret"
@@ -45,8 +45,8 @@ services:
     image: tracseq-transaction_service:latest
     container_name: lims-transactions
     environment:
-      DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
-      REDIS_URL: redis://lims-redis:6379
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
       PORT: "8088"
       JWT_SECRET: "your-jwt-secret"
     ports:
@@ -64,8 +64,8 @@ services:
     image: tracseq-template_service:latest
     container_name: lims-templates
     environment:
-      DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
-      REDIS_URL: redis://lims-redis:6379
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
       TEMPLATE_PORT: "8083"
       JWT_SECRET: "your-jwt-secret"
     ports:
@@ -83,8 +83,8 @@ services:
     image: tracseq-sequencing_service:latest
     container_name: lims-sequencing
     environment:
-      DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
-      REDIS_URL: redis://lims-redis:6379
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
       PORT: "8000"
       JWT_SECRET: "your-jwt-secret"
     ports:
@@ -99,8 +99,8 @@ services:
     image: tracseq-qaqc_service:latest
     container_name: lims-qaqc
     environment:
-      DATABASE_URL: postgres://postgres:postgres@lims-postgres:5432/lims_db
-      REDIS_URL: redis://lims-redis:6379
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
       QAQC_HOST: "0.0.0.0"
       QAQC_PORT: "8089"
       JWT_SECRET: "your-jwt-secret"

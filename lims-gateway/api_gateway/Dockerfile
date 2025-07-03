@@ -28,6 +28,9 @@ RUN pip install -e .
 COPY src/ ./src/
 COPY config/ ./config/
 
+# Set PYTHONPATH
+ENV PYTHONPATH=/app/src:$PYTHONPATH
+
 # Create necessary directories
 RUN mkdir -p /app/logs
 
@@ -44,4 +47,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Command to run the application
-CMD ["python", "src/api_gateway/simple_main.py"] 
+CMD ["python", "-m", "api_gateway.simple_main"] 

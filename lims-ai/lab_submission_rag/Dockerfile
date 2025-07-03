@@ -11,17 +11,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY requirements.txt .
-
-# Install Python dependencies with memory optimizations
-# Update pip first to avoid hash verification issues
+# Copy requirements and install dependencies
+COPY requirements.simple.txt ./requirements.txt
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir --compile \
-    --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org \
-    -r requirements.txt && \
-    python -m compileall /usr/local/lib/python3.11/site-packages/ && \
-    pip uninstall -y pip setuptools wheel
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .

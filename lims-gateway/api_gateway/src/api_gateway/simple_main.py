@@ -1002,63 +1002,29 @@ async def create_sample(request: Request):
 # Templates endpoints
 @app.get("/api/templates")
 async def get_templates():
-    """Get all templates from database"""
-    if not db_pool:
-        # Fallback to mock data if DB not connected
-        templates_data = [
-            {
-                "id": "TPL-001",
-                "name": "DNA Extraction Template",
-                "description": "Standard DNA extraction workflow",
-                "category": "Extraction",
-                "version": "1.2",
-                "isActive": True,
-                "createdDate": (datetime.now() - timedelta(days=30)).isoformat()
-            }
-        ]
-    else:
-        try:
-            async with db_pool.acquire() as conn:
-                # Query templates from database
-                rows = await conn.fetch("""
-                    SELECT 
-                        id, name, description, file_path, file_type,
-                        created_at, updated_at, metadata
-                    FROM templates
-                    ORDER BY created_at DESC
-                """)
+    """Get all templates by proxying to template service"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{TEMPLATE_SERVICE_URL}/templates",
+                timeout=10.0
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                # Template service returns {data: [...], pagination: {...}}
+                # Frontend expects just the array
+                if isinstance(data, dict) and 'data' in data:
+                    return data['data']
+                return data
+            else:
+                print(f"Template service returned {response.status_code}")
+                return []
                 
-                # Convert rows to list of dicts with expected format
-                templates_data = []
-                for row in rows:
-                    # Extract additional info from metadata if available
-                    metadata = row['metadata'] or {}
-                    if isinstance(metadata, str):
-                        try:
-                            metadata = json.loads(metadata)
-                        except:
-                            metadata = {}
-                    
-                    templates_data.append({
-                        "id": str(row['id']),
-                        "name": row['name'],
-                        "description": row['description'],
-                        "category": row['file_type'] or "General",
-                        "version": metadata.get('version', '1.0'),
-                        "isActive": metadata.get('is_active', True),
-                        "createdDate": row['created_at'].isoformat() if row['created_at'] else datetime.now().isoformat(),
-                        "updatedDate": row['updated_at'].isoformat() if row['updated_at'] else None,
-                        "file_path": row['file_path'],
-                        "file_type": row['file_type']
-                    })
-                    
-        except Exception as e:
-            print(f"Error fetching templates: {e}")
-            # Fallback to minimal mock data
-            templates_data = []
-    
-    # Return array directly for the templates tab in ProjectManagement
-    return templates_data
+    except Exception as e:
+        print(f"Error fetching templates: {e}")
+        # Fallback to empty array
+        return []
 
 # Sequencing endpoints
 @app.get("/api/sequencing/jobs")

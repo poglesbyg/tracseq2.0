@@ -18,12 +18,14 @@ RUN mkdir src && \
     cargo build --release && \
     rm -rf src
 
-# Copy source code
-COPY . .
+# Copy source code (exclude files that might conflict)
+COPY src ./src
+RUN rm -f src/lib.rs  # Remove lib.rs as it references non-existent modules
+COPY migrations ./migrations
+COPY templates ./templates
 
 # Build application
-RUN touch src/main.rs && \
-    cargo build --release
+RUN cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim

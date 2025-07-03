@@ -1,0 +1,363 @@
+# Unified Docker Compose Configuration for TracSeq 2.0
+# This file consolidates all services with consistent naming and configuration
+
+services:
+  # Infrastructure Services
+  postgres:
+    image: postgres:15-alpine
+    container_name: tracseq-postgres
+    ports:
+      - "${DB_EXTERNAL_PORT:-5433}:5432"
+    environment:
+      POSTGRES_DB: lims_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../db/000_init_database.sql:/docker-entrypoint-initdb.d/000_init_database.sql:ro
+      - ../db/001_consolidated_migrations.sql:/docker-entrypoint-initdb.d/001_consolidated_migrations.sql:ro
+      - ../db/migrations/999_fix_all_schemas.sql:/docker-entrypoint-initdb.d/999_fix_all_schemas.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lims_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: tracseq-redis
+    ports:
+      - "${REDIS_EXTERNAL_PORT:-6380}:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ../lims-gateway/api_gateway
+      dockerfile: Dockerfile
+    image: tracseq-api-gateway:latest
+    container_name: tracseq-gateway
+    ports:
+      - "${GATEWAY_PORT:-8089}:8000"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
+      # Service URLs - all internal to the network
+      AUTH_SERVICE_URL: http://auth-service:8001
+      SAMPLE_SERVICE_URL: http://sample-service:8081
+      STORAGE_SERVICE_URL: http://storage-service:8082
+      TEMPLATE_SERVICE_URL: http://template-service:8083
+      SEQUENCING_SERVICE_URL: http://sequencing-service:8084
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
+      EVENT_SERVICE_URL: http://event-service:8087
+      TRANSACTION_SERVICE_URL: http://transaction-service:8088
+      REPORTS_SERVICE_URL: http://reports-service:8014
+      RAG_SERVICE_URL: http://rag-service:8100
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Authentication Service
+  auth-service:
+    build:
+      context: ../lims-core/auth_service
+      dockerfile: Dockerfile
+    image: tracseq-auth-service:latest
+    container_name: tracseq-auth
+    ports:
+      - "${AUTH_PORT:-8011}:8001"
+    environment:
+      PORT: 8001
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Sample Management Service
+  sample-service:
+    build:
+      context: ../lims-core/sample_service
+      dockerfile: Dockerfile
+    image: tracseq-sample-service:latest
+    container_name: tracseq-samples
+    ports:
+      - "${SAMPLE_PORT:-8012}:8081"
+    environment:
+      PORT: 8081
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://auth-service:8001
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Template Service
+  template-service:
+    build:
+      context: ../lims-core/template_service
+      dockerfile: Dockerfile
+    image: tracseq-template-service:latest
+    container_name: tracseq-templates
+    ports:
+      - "${TEMPLATE_PORT:-8018}:8083"
+    environment:
+      TEMPLATE_PORT: 8083
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Storage Service
+  storage-service:
+    build:
+      context: ../lims-enhanced/enhanced_storage_service
+      dockerfile: Dockerfile
+    image: tracseq-storage-service:latest
+    container_name: tracseq-storage
+    ports:
+      - "${STORAGE_PORT:-8013}:8082"
+    environment:
+      PORT: 8082
+      STORAGE_DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - storage_data:/app/storage
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ../lims-enhanced/notification_service
+      dockerfile: Dockerfile
+    image: tracseq-notification-service:latest
+    container_name: tracseq-notification
+    ports:
+      - "${NOTIFICATION_PORT:-8015}:8085"
+    environment:
+      PORT: 8085
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+      SMTP_HOST: "smtp.gmail.com"
+      SMTP_PORT: "587"
+      SMTP_USER: "noreply@tracseq.com"
+      SMTP_PASSWORD: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Event Service
+  event-service:
+    build:
+      context: ../lims-enhanced/event_service
+      dockerfile: Dockerfile
+    image: tracseq-event-service:latest
+    container_name: tracseq-events
+    ports:
+      - "${EVENT_PORT:-8016}:8087"
+    environment:
+      PORT: 8087
+      HOST: "0.0.0.0"
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Transaction Service
+  transaction-service:
+    build:
+      context: ../lims-core/transaction_service
+      dockerfile: Dockerfile
+    image: tracseq-transaction-service:latest
+    container_name: tracseq-transactions
+    ports:
+      - "${TRANSACTION_PORT:-8017}:8088"
+    environment:
+      PORT: 8088
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Sequencing Service
+  sequencing-service:
+    build:
+      context: ../lims-laboratory/sequencing_service
+      dockerfile: Dockerfile
+    image: tracseq-sequencing-service:latest
+    container_name: tracseq-sequencing
+    ports:
+      - "${SEQUENCING_PORT:-8019}:8084"
+    environment:
+      PORT: 8084
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Reports Service
+  reports-service:
+    build:
+      context: ../lims-core/reports_service
+      dockerfile: Dockerfile
+    image: tracseq-reports-service:latest
+    container_name: tracseq-reports
+    ports:
+      - "${REPORTS_PORT:-8014}:8000"
+    environment:
+      PORT: 8000
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # RAG Service (AI Document Processing)
+  rag-service:
+    build:
+      context: ../lims-ai/lab_submission_rag
+      dockerfile: Dockerfile
+    image: tracseq-rag-service:latest
+    container_name: tracseq-rag
+    ports:
+      - "${RAG_PORT:-8100}:8000"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      REDIS_URL: redis://redis:6379
+      USE_OLLAMA: "true"
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: llama3.2:3b
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    volumes:
+      - rag_storage:/app/uploads
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Ollama (Local AI Models)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: tracseq-ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ../lims-ui
+      dockerfile: Dockerfile
+    image: tracseq-frontend:latest
+    container_name: tracseq-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  storage_data:
+  rag_storage:
+  ollama_data:
+
+networks:
+  tracseq-network:
+    driver: bridge
+    name: tracseq-network 
