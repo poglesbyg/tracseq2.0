@@ -5,9 +5,9 @@ edition = "2021"
 authors = ["Lab Management Team"]
 description = "Enhanced storage management service with IoT integration, predictive analytics, and digital twin technology"
 
-[lib]
+[[bin]]
 name = "enhanced_storage_service"
-path = "src/lib.rs"
+path = "src/main.rs"
 
 [dependencies]
 # Web framework
@@ -147,8 +147,4 @@ mockito = "1.4"
 
 # Async testing utilities
 futures = "0.3"
-tokio = { version = "1.36", features = ["test-util", "rt-multi-thread", "macros"] }
-
-[[bin]]
-name = "enhanced_storage_service"
-path = "src/main.rs" 
+tokio = { version = "1.36", features = ["test-util", "rt-multi-thread", "macros"] } 

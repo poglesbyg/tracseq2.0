@@ -3,6 +3,10 @@ name = "reports-service"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "reports-service"
+path = "src/main.rs"
+
 [dependencies]
 # Web framework
 axum = "0.7"
@@ -13,8 +17,8 @@ hyper = "1.0"
 # Async runtime
 tokio = { version = "1", features = ["full"] }
 
-# Database
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
+# Database - Updated to match code expectations
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "migrate", "macros"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -37,8 +41,8 @@ anyhow = "1.0"
 # HTTP client for fetching data from other services
 reqwest = { version = "0.11", features = ["json"] }
 
-# Configuration
-config = "0.13"
+# Configuration - Updated version
+config = "0.14"
 
 # PDF generation
 printpdf = "0.6"

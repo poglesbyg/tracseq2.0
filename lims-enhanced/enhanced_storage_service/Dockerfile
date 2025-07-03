@@ -26,6 +26,9 @@ RUN rm src/main.rs src/lib.rs
 # Copy actual source code
 COPY src ./src
 
+# Use the standalone main.rs for binary-only build
+COPY src/main_standalone.rs ./src/main.rs
+
 # Build the application
 RUN cargo build --release
 

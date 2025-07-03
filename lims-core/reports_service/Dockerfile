@@ -21,6 +21,10 @@ RUN mkdir src && \
 # Copy source code (exclude files that might conflict)
 COPY src ./src
 RUN rm -f src/lib.rs  # Remove lib.rs as it references non-existent modules
+
+# Use the standalone main.rs for binary-only build
+COPY src/main_standalone.rs ./src/main.rs
+
 COPY migrations ./migrations
 COPY templates ./templates
 
@@ -66,4 +70,4 @@ ENV RUST_LOG=info
 ENV REPORTS_PORT=3026
 
 # Run the binary
-CMD ["./reports-service"]
+CMD ["/app/reports-service"]

@@ -170,6 +170,16 @@ CREATE TABLE IF NOT EXISTS notifications (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Add missing columns to notifications table
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS max_retries INTEGER DEFAULT 3;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS template_id UUID;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS template_data JSONB;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS priority VARCHAR(20) DEFAULT 'normal';
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS source_service VARCHAR(100);
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS source_event_id UUID;
+
 -- Add indexes
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_timestamp ON sessions(timestamp);
