@@ -343,7 +343,7 @@ services:
     image: tracseq-frontend:latest
     container_name: tracseq-frontend
     ports:
-      - "${FRONTEND_PORT:-3000}:80"
+      - "${FRONTEND_PORT:-3000}:5173"
     depends_on:
       - api-gateway
     networks:
