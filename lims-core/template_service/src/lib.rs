@@ -78,6 +78,10 @@ pub fn create_app(state: AppState) -> axum::Router {
             get(handlers::templates::get_template),
         )
         .route(
+            "/templates/:template_id/data",
+            get(handlers::templates::get_template_data),
+        )
+        .route(
             "/templates/:template_id",
             put(handlers::templates::update_template),
         )

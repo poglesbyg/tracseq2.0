@@ -143,6 +143,45 @@ pub mod templates {
         }
     }
 
+    pub async fn get_template_data(
+        State(state): State<AppState>,
+        Path(template_id): Path<String>
+    ) -> Result<Json<Value>, StatusCode> {
+        let template_uuid = match Uuid::parse_str(&template_id) {
+            Ok(uuid) => uuid,
+            Err(_) => return Err(StatusCode::BAD_REQUEST),
+        };
+
+        match state.template_service.get_template(template_uuid).await {
+            Ok(Some(template)) => {
+                Ok(Json(json!({
+                    "id": template.id,
+                    "name": template.name,
+                    "description": template.description,
+                    "template_type": template.template_type,
+                    "status": template.status,
+                    "version": template.version,
+                    "category": template.category,
+                    "tags": template.tags,
+                    "is_public": template.is_public,
+                    "is_system": template.is_system,
+                    "created_at": template.created_at,
+                    "updated_at": template.updated_at,
+                    "created_by": template.created_by,
+                    "updated_by": template.updated_by,
+                    "field_count": template.field_count,
+                    "usage_count": template.usage_count,
+                    "content": "Template data available"
+                })))
+            }
+            Ok(None) => Err(StatusCode::NOT_FOUND),
+            Err(e) => {
+                eprintln!("Error getting template data: {}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    }
+
     pub async fn clone_template(Path(_template_id): Path<String>) -> Result<Json<Value>, StatusCode> {
         // TODO: Implement template cloning
         Ok(Json(json!({"message": "Template cloning not yet implemented"})))
