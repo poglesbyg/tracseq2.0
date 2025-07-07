@@ -2644,6 +2644,62 @@ async def create_qc_review(review: dict):
     """Create a new QC review"""
     return {"id": str(uuid.uuid4()), **review}
 
+@app.get("/api/qc/dashboard/stats")
+async def get_qc_dashboard_stats():
+    """Get QC dashboard statistics"""
+    return {
+        "totalSamples": 1247,
+        "passedQC": 1156,
+        "failedQC": 91,
+        "pendingQC": 0,
+        "passRate": 92.7,
+        "recentActivity": [
+            {
+                "id": "QC-001",
+                "sampleId": "SMPL-001",
+                "status": "passed",
+                "timestamp": (datetime.now() - timedelta(hours=1)).isoformat(),
+                "reviewer": "Dr. Smith"
+            },
+            {
+                "id": "QC-002", 
+                "sampleId": "SMPL-002",
+                "status": "failed",
+                "timestamp": (datetime.now() - timedelta(hours=2)).isoformat(),
+                "reviewer": "Lab Tech Johnson"
+            }
+        ]
+    }
+
+@app.get("/api/qc/metrics/recent")
+async def get_qc_metrics_recent():
+    """Get recent QC metrics"""
+    return {
+        "metrics": [
+            {
+                "id": "QCM-001",
+                "sampleId": "SMPL-001",
+                "concentration": 50.2,
+                "purity": 1.85,
+                "qualityScore": 95,
+                "timestamp": (datetime.now() - timedelta(hours=1)).isoformat()
+            },
+            {
+                "id": "QCM-002",
+                "sampleId": "SMPL-002", 
+                "concentration": 32.1,
+                "purity": 1.72,
+                "qualityScore": 78,
+                "timestamp": (datetime.now() - timedelta(hours=3)).isoformat()
+            }
+        ],
+        "summary": {
+            "avgConcentration": 41.15,
+            "avgPurity": 1.785,
+            "avgQualityScore": 86.5
+        }
+    }
+
 # Flow Cell endpoints
 @app.get("/api/flow-cells/types")
 async def get_flow_cell_types():
@@ -2915,6 +2971,46 @@ async def preview_spreadsheet_sheets():
         "fileSize": 2048576,  # 2MB
         "lastModified": datetime.now().isoformat()
     }
+
+@app.post("/api/spreadsheets/preview-sheets")
+async def preview_spreadsheet_sheets_upload(file: UploadFile = File(...)):
+    """Get sheet names from an uploaded spreadsheet file for preview"""
+    try:
+        # Read the uploaded file
+        file_content = await file.read()
+        file_size = len(file_content)
+        
+        # For now, return mock sheet names based on file type
+        # In production, this would parse the actual spreadsheet
+        file_extension = file.filename.split('.')[-1].lower() if file.filename else 'unknown'
+        
+        if file_extension in ['xlsx', 'xls']:
+            sheets = [
+                {"name": "Sheet1", "index": 0, "rowCount": 100, "columnCount": 10},
+                {"name": "Data", "index": 1, "rowCount": 250, "columnCount": 8},
+                {"name": "Summary", "index": 2, "rowCount": 10, "columnCount": 5}
+            ]
+        elif file_extension == 'csv':
+            sheets = [
+                {"name": "CSV_Data", "index": 0, "rowCount": 500, "columnCount": 12}
+            ]
+        else:
+            sheets = [
+                {"name": "Unknown", "index": 0, "rowCount": 0, "columnCount": 0}
+            ]
+        
+        return {
+            "sheets": sheets,
+            "fileName": file.filename or "uploaded_file",
+            "fileSize": file_size,
+            "fileType": file_extension,
+            "lastModified": datetime.now().isoformat(),
+            "success": True
+        }
+        
+    except Exception as e:
+        print(f"Error processing uploaded file: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to process file: {str(e)}")
 
 # Redirect handlers for double /api URLs (frontend routing issue)
 @app.get("/api/api/storage/locations")
