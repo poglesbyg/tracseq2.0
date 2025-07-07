@@ -5,6 +5,9 @@ use axum::{
 };
 use serde_json::{json, Value};
 use uuid::Uuid;
+use calamine::{Reader, open_workbook, Xlsx};
+use std::path::PathBuf;
+use sqlx::Row;
 use crate::{
     AppState,
     models::{CreateTemplateRequest, UpdateTemplateRequest, TemplateSearchFilters, CreateFieldRequest, UpdateFieldRequest}
@@ -152,34 +155,90 @@ pub mod templates {
             Err(_) => return Err(StatusCode::BAD_REQUEST),
         };
 
-        match state.template_service.get_template(template_uuid).await {
-            Ok(Some(template)) => {
-                Ok(Json(json!({
-                    "id": template.id,
-                    "name": template.name,
-                    "description": template.description,
-                    "template_type": template.template_type,
-                    "status": template.status,
-                    "version": template.version,
-                    "category": template.category,
-                    "tags": template.tags,
-                    "is_public": template.is_public,
-                    "is_system": template.is_system,
-                    "created_at": template.created_at,
-                    "updated_at": template.updated_at,
-                    "created_by": template.created_by,
-                    "updated_by": template.updated_by,
-                    "field_count": template.field_count,
-                    "usage_count": template.usage_count,
-                    "content": "Template data available"
-                })))
-            }
-            Ok(None) => Err(StatusCode::NOT_FOUND),
+        // Query database directly to get metadata
+        let query = r#"
+            SELECT 
+                id, name, description, category, status, version,
+                template_data, metadata, is_active, 
+                created_by, created_at, updated_at
+            FROM templates 
+            WHERE id = $1 AND is_active = true
+        "#;
+
+        let row = match sqlx::query(query)
+            .bind(template_uuid)
+            .fetch_optional(state.db_pool.get_pool())
+            .await
+        {
+            Ok(Some(row)) => row,
+            Ok(None) => return Err(StatusCode::NOT_FOUND),
             Err(e) => {
-                eprintln!("Error getting template data: {}", e);
-                Err(StatusCode::INTERNAL_SERVER_ERROR)
+                eprintln!("Error querying template: {}", e);
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
             }
-        }
+        };
+
+        // Extract metadata from database row
+        let metadata: serde_json::Value = row.get::<Option<serde_json::Value>, _>("metadata")
+            .unwrap_or(serde_json::json!({}));
+
+        // Try to parse spreadsheet data if file path exists in metadata
+        let parsed_data = if let Some(file_path_value) = metadata.get("file_path") {
+            if let Some(file_path_str) = file_path_value.as_str() {
+                parse_spreadsheet_file(file_path_str).await.unwrap_or_else(|e| {
+                    eprintln!("Error parsing spreadsheet: {}", e);
+                    json!({
+                        "sheet_names": [],
+                        "sheets": []
+                    })
+                })
+            } else {
+                json!({
+                    "sheet_names": [],
+                    "sheets": []
+                })
+            }
+        } else {
+            json!({
+                "sheet_names": [],
+                "sheets": []
+            })
+        };
+
+        // Build template response manually from database row
+        let template_response = json!({
+            "id": row.get::<Uuid, _>("id"),
+            "name": row.get::<String, _>("name"),
+            "description": row.get::<Option<String>, _>("description"),
+            "template_type": metadata.get("template_type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("form"),
+            "status": row.get::<crate::models::TemplateStatus, _>("status"),
+            "version": row.get::<i32, _>("version").to_string(),
+            "category": row.get::<Option<String>, _>("category"),
+            "tags": metadata.get("tags")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<&str>>())
+                .unwrap_or_default(),
+            "is_public": metadata.get("is_public")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            "is_system": metadata.get("is_system")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
+            "updated_at": row.get::<chrono::DateTime<chrono::Utc>, _>("updated_at"),
+            "created_by": row.get::<Option<String>, _>("created_by").unwrap_or_else(|| "system".to_string()),
+            "updated_by": Option::<String>::None,
+            "field_count": 0,
+            "usage_count": 0,
+            "metadata": metadata
+        });
+
+        Ok(Json(json!({
+            "template": template_response,
+            "data": parsed_data
+        })))
     }
 
     pub async fn clone_template(Path(_template_id): Path<String>) -> Result<Json<Value>, StatusCode> {
@@ -621,10 +680,129 @@ pub mod admin {
     }
 
     pub async fn get_usage_statistics() -> Result<Json<Value>, StatusCode> {
-        Ok(Json(json!({"usage": {}})))
+        Ok(Json(json!({"statistics": {}})))
     }
 
     pub async fn test_validation_rules() -> Result<Json<Value>, StatusCode> {
-        Ok(Json(json!({"test_result": "passed"})))
+        Ok(Json(json!({"message": "Validation rules tested"})))
     }
+}
+
+// Spreadsheet parsing functionality
+async fn parse_spreadsheet_file(file_path: &str) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
+    let path = PathBuf::from(file_path);
+    
+    if !path.exists() {
+        return Ok(json!({
+            "sheet_names": [],
+            "sheets": []
+        }));
+    }
+
+    let extension = path.extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    match extension.as_str() {
+        "xlsx" => parse_excel_file(&path).await,
+        "xls" => parse_excel_file(&path).await,
+        "csv" => parse_csv_file(&path).await,
+        _ => Ok(json!({
+            "sheet_names": [],
+            "sheets": [{
+                "name": "Content",
+                "headers": ["Content"],
+                "rows": [["File type not supported for preview"]],
+                "total_rows": 1,
+                "total_columns": 1
+            }]
+        }))
+    }
+}
+
+async fn parse_excel_file(path: &PathBuf) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
+    let mut workbook: Xlsx<_> = open_workbook(path)?;
+    let sheet_names = workbook.sheet_names().to_owned();
+    let mut sheets = Vec::new();
+
+    for sheet_name in &sheet_names {
+        if let Ok(range) = workbook.worksheet_range(sheet_name) {
+            let mut headers = Vec::new();
+            let mut rows = Vec::new();
+            
+            let mut row_iter = range.rows();
+            
+            // Get headers from first row
+            if let Some(header_row) = row_iter.next() {
+                headers = header_row.iter()
+                    .map(|cell| cell.to_string())
+                    .collect();
+            }
+            
+            // Get data rows (limit to first 100 rows for performance)
+            for (_i, row) in row_iter.take(100).enumerate() {
+                let row_data: Vec<String> = row.iter()
+                    .map(|cell| cell.to_string())
+                    .collect();
+                rows.push(row_data);
+            }
+            
+            sheets.push(json!({
+                "name": sheet_name,
+                "headers": headers,
+                "rows": rows,
+                "total_rows": range.height(),
+                "total_columns": range.width()
+            }));
+        }
+    }
+
+    Ok(json!({
+        "sheet_names": sheet_names,
+        "sheets": sheets
+    }))
+}
+
+async fn parse_csv_file(path: &PathBuf) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
+    use std::fs::File;
+    use csv::ReaderBuilder;
+
+    let file = File::open(path)?;
+    let mut reader = ReaderBuilder::new()
+        .has_headers(true)
+        .from_reader(file);
+
+    let headers: Vec<String> = reader.headers()?
+        .iter()
+        .map(|h| h.to_string())
+        .collect();
+
+    let mut rows = Vec::new();
+    let mut total_rows = 0;
+
+    // Read data rows (limit to first 100 rows for performance)
+    for (i, result) in reader.records().take(100).enumerate() {
+        total_rows = i + 1;
+        let record = result?;
+        let row_data: Vec<String> = record.iter()
+            .map(|field| field.to_string())
+            .collect();
+        rows.push(row_data);
+    }
+
+    let sheet_name = path.file_stem()
+        .and_then(|name| name.to_str())
+        .unwrap_or("Sheet1");
+
+    Ok(json!({
+        "sheet_names": [sheet_name],
+        "sheets": [{
+            "name": sheet_name,
+            "headers": headers,
+            "rows": rows,
+            "total_rows": total_rows,
+            "total_columns": headers.len()
+        }]
+    }))
 }
