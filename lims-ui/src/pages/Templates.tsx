@@ -112,6 +112,12 @@ export default function Templates() {
       
       formData.append('template', JSON.stringify(templateData));
       
+      // Debug logging
+      console.log('📤 Upload mutation - FormData created:', formData);
+      console.log('📤 Upload mutation - FormData is instanceof FormData:', formData instanceof FormData);
+      console.log('📤 Upload mutation - File:', file);
+      console.log('📤 Upload mutation - Template data:', templateData);
+      
       const response = await axios.post('/api/templates/upload', formData);
       return response.data;
     },

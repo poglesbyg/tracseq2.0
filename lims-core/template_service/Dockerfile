@@ -40,6 +40,9 @@ RUN useradd -r -s /bin/false -m -d /app appuser
 # Set working directory
 WORKDIR /app
 
+# Create uploads directory
+RUN mkdir -p /app/uploads/templates
+
 # Copy binary from builder
 COPY --from=builder /app/target/release/template_service /app/template_service
 

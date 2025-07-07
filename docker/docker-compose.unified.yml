@@ -66,6 +66,7 @@ services:
       TRANSACTION_SERVICE_URL: http://tracseq-transactions:8088
       REPORTS_SERVICE_URL: http://tracseq-reports:8000
       RAG_SERVICE_URL: http://tracseq-rag:8000
+      LAB_MANAGER_URL: http://tracseq-lab-manager:3001
     depends_on:
       postgres:
         condition: service_healthy
@@ -136,11 +137,14 @@ services:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+      RUST_LOG: debug
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - template_uploads:/app/uploads
     networks:
       - tracseq-network
     restart: unless-stopped
@@ -269,6 +273,30 @@ services:
       - tracseq-network
     restart: unless-stopped
 
+  # Lab Manager Service (Full functionality including samples/batch)
+  lab-manager:
+    build:
+      context: ../lims-laboratory/lab_manager
+      dockerfile: Dockerfile.simple
+    image: tracseq-lab-manager:latest
+    container_name: tracseq-lab-manager
+    ports:
+      - "${LAB_MANAGER_PORT:-3001}:3001"
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
   # Reports Service
   reports-service:
     build:
@@ -344,6 +372,13 @@ services:
     container_name: tracseq-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:5173"
+    volumes:
+      - ../lims-ui/src:/app/src:ro
+      - ../lims-ui/public:/app/public:ro
+      - ../lims-ui/index.html:/app/index.html:ro
+      - ../lims-ui/vite.config.ts:/app/vite.config.ts:ro
+      - ../lims-ui/tsconfig.json:/app/tsconfig.json:ro
+      - ../lims-ui/eslint.config.js:/app/eslint.config.js:ro
     depends_on:
       - api-gateway
     networks:
@@ -356,6 +391,7 @@ volumes:
   storage_data:
   rag_storage:
   ollama_data:
+  template_uploads:
 
 networks:
   tracseq-network:

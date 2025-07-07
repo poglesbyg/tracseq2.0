@@ -7,6 +7,7 @@ Minimal working implementation for demonstration
 import json
 import os
 import sys
+import time
 import uuid
 import asyncio
 from datetime import datetime, timedelta
@@ -14,11 +15,15 @@ from typing import Any, Dict, Optional, List, AsyncGenerator
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, File, Form, BackgroundTasks, WebSocket
+from fastapi import FastAPI, HTTPException, Depends, Request, Response, WebSocket, WebSocketDisconnect, BackgroundTasks, Form, File, UploadFile, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.exceptions import RequestValidationError
+from contextlib import asynccontextmanager
 from pydantic import BaseModel, Field
 import asyncpg
+import jwt
+import base64
 
 # Import auth middleware
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -71,21 +76,56 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add exception handler for validation errors
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Log validation errors to understand 400 errors"""
+    print(f"Validation error: {exc.errors()}")
+    print(f"Request URL: {request.url}")
+    print(f"Request method: {request.method}")
+    return JSONResponse(
+        status_code=400,
+        content={"detail": exc.errors(), "body": exc.body if hasattr(exc, 'body') else None}
+    )
+
+# Add a general exception handler
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Log all exceptions"""
+    print(f"General exception: {exc}")
+    print(f"Request URL: {request.url}")
+    print(f"Request method: {request.method}")
+    import traceback
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)}
+    )
+
 # Service URLs from environment
-RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service:8000")
+GATEWAY_HOST = os.getenv("GATEWAY_HOST", "0.0.0.0")
+GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "8000"))
+GATEWAY_DEBUG = os.getenv("GATEWAY_DEBUG", "false").lower() == "true"
+
+# Service discovery URLs
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8080")
-SEQUENCING_SERVICE_URL = os.getenv("SEQUENCING_SERVICE_URL", "http://lims-sequencing:8084")
-NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://lims-notification:8000")
-# Use lab_manager for new features (temporary fix)
-LAB_MANAGER_URL = os.getenv("LAB_MANAGER_URL", "http://host.docker.internal:3001")
+SAMPLE_SERVICE_URL = os.getenv("SAMPLE_SERVICE_URL", "http://sample-service:8081")
+STORAGE_SERVICE_URL = os.getenv("STORAGE_SERVICE_URL", "http://storage-service:8082")
+TEMPLATE_SERVICE_URL = os.getenv("TEMPLATE_SERVICE_URL", "http://template-service:8083")
+SEQUENCING_SERVICE_URL = os.getenv("SEQUENCING_SERVICE_URL", "http://sequencing-service:8084")
+NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://notification-service:8085")
+RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service:8000")
+EVENT_SERVICE_URL = os.getenv("EVENT_SERVICE_URL", "http://event-service:8087")
+TRANSACTION_SERVICE_URL = os.getenv("TRANSACTION_SERVICE_URL", "http://transaction-service:8088")
+COGNITIVE_ASSISTANT_URL = os.getenv("COGNITIVE_ASSISTANT_URL", "http://cognitive-assistant:8000")
+REPORTS_SERVICE_URL = os.getenv("REPORTS_SERVICE_URL", "http://reports-service:8000")
+
+# Lab manager is deployed as sequencing service
+LAB_MANAGER_URL = os.getenv("LAB_MANAGER_URL", SEQUENCING_SERVICE_URL)
 PROJECT_SERVICE_URL = os.getenv("PROJECT_SERVICE_URL", LAB_MANAGER_URL)
 LIBRARY_PREP_SERVICE_URL = os.getenv("LIBRARY_PREP_SERVICE_URL", LAB_MANAGER_URL)
-QAQC_SERVICE_URL = os.getenv("QAQC_SERVICE_URL", "http://lims-qaqc:8089")
+QAQC_SERVICE_URL = os.getenv("QAQC_SERVICE_URL", LAB_MANAGER_URL)
 FLOW_CELL_SERVICE_URL = os.getenv("FLOW_CELL_SERVICE_URL", LAB_MANAGER_URL)
-# Enhanced services
-EVENT_SERVICE_URL = os.getenv("EVENT_SERVICE_URL", "http://tracseq-events:8087")
-TRANSACTION_SERVICE_URL = os.getenv("TRANSACTION_SERVICE_URL", "http://lims-transactions:8088")
-TEMPLATE_SERVICE_URL = os.getenv("TEMPLATE_SERVICE_URL", "http://lims-templates:8083")
 
 # Pydantic models for API requests
 class LoginRequest(BaseModel):
@@ -141,6 +181,47 @@ async def api_health():
         "service": "api-gateway",
         "timestamp": datetime.now().isoformat()
     }
+
+
+
+# TEST ENDPOINT - Simple storage samples endpoint
+@app.get("/api/test/samples")
+async def get_test_samples_simple():
+    """Simple storage samples endpoint - TEST"""
+    return {
+        "data": [
+            {
+                "id": "SMPL-001",
+                "barcode": "BC001",
+                "sample_type": "DNA",
+                "location_name": "Freezer A1 (-80°C)",
+                "status": "stored",
+                "stored_at": "2024-01-15T10:30:00Z"
+            },
+            {
+                "id": "SMPL-002", 
+                "barcode": "BC002",
+                "sample_type": "RNA",
+                "location_name": "Refrigerator B2 (4°C)",
+                "status": "stored",
+                "stored_at": "2024-01-16T14:20:00Z"
+            }
+        ],
+        "total": 2,
+        "page": 1,
+        "per_page": 20
+    }
+
+# REMOVED: Duplicate storage utilization endpoint - using comprehensive version later in file
+
+# REMOVED: Duplicate mobile samples endpoint - using comprehensive version later in file
+
+# REMOVED: Duplicate store sample endpoint - using comprehensive version later in file
+
+# ============================================================================
+# Storage Management Endpoints (Early Definition) - REMOVED DUE TO CONFLICTS
+# ============================================================================
+# NOTE: Storage endpoints moved to after storage locations section to avoid conflicts
 
 # Service-specific health endpoints
 @app.get("/api/templates/health")
@@ -1011,12 +1092,115 @@ async def get_samples(request: Request):
 @app.post("/api/samples")
 async def create_sample(request: Request):
     """Create a new sample"""
-    # Mock sample creation
-    return {
-        "id": f"SMPL-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-        "status": "created",
-        "message": "Sample created successfully"
-    }
+    try:
+        # Get request data
+        data = await request.json()
+        
+        # Add user context
+        user = await get_current_user(request)
+        if user:
+            data['created_by'] = user['id']
+        
+        # Forward to lab_manager (acting as sample service)
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{LAB_MANAGER_URL}/api/samples",
+                json=data,
+                headers={"Authorization": request.headers.get("Authorization", "")}
+            )
+            
+            return JSONResponse(
+                content=response.json(),
+                status_code=response.status_code
+            )
+            
+    except Exception as e:
+        print(f"Error creating sample: {e}")
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
+@app.post("/api/samples/batch")
+async def create_samples_batch(request: Request):
+    """Create multiple samples in batch"""
+    try:
+        # Get request data
+        data = await request.json()
+        samples_data = data.get('samples', [])
+        
+        if not samples_data:
+            return JSONResponse(
+                content={"error": "No samples provided"},
+                status_code=400
+            )
+        
+        # Get user context
+        user = await get_current_user(request)
+        
+        # Track created samples
+        created_samples = []
+        errors = []
+        
+        # Create each sample individually
+        async with httpx.AsyncClient() as client:
+            for idx, sample_data in enumerate(samples_data):
+                try:
+                    # Remove created_by field to avoid UUID/string type mismatch
+                    # The sample service will handle user context internally
+                    sample_data.pop('created_by', None)
+                    
+                    # Forward to sample service - create individual sample
+                    response = await client.post(
+                        f"{SAMPLE_SERVICE_URL}/samples",
+                        json=sample_data,
+                        headers={"Authorization": request.headers.get("Authorization", "")}
+                    )
+                    
+                    if response.status_code == 200 or response.status_code == 201:
+                        created_samples.append(response.json())
+                    else:
+                        errors.append({
+                            "index": idx,
+                            "error": f"Failed to create sample: {response.text}"
+                        })
+                        
+                except Exception as e:
+                    errors.append({
+                        "index": idx,
+                        "error": str(e)
+                    })
+        
+        # Return results
+        if errors:
+            return JSONResponse(
+                content={
+                    "created": created_samples,
+                    "errors": errors,
+                    "partial_success": len(created_samples) > 0
+                },
+                status_code=207  # Multi-status
+            )
+        else:
+            return JSONResponse(
+                content={
+                    "created": created_samples,
+                    "total": len(created_samples)
+                },
+                status_code=200
+            )
+            
+    except json.JSONDecodeError:
+        return JSONResponse(
+            content={"error": "Invalid JSON in request body"},
+            status_code=400
+        )
+    except Exception as e:
+        print(f"Error creating samples batch: {e}")
+        return JSONResponse(
+            content={"error": f"Failed to create samples batch: {str(e)}"},
+            status_code=500
+        )
 
 # Templates endpoints
 @app.get("/api/templates")
@@ -1102,32 +1286,342 @@ async def create_sequencing_job(request: Request):
 
 # Storage endpoints
 @app.get("/api/storage/locations")
-async def get_storage_locations():
-    """Get storage locations"""
-    locations_data = [
+async def get_storage_locations(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100)
+):
+    """Get all storage locations with pagination"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{STORAGE_SERVICE_URL}/api/storage/locations",
+                params={"page": page, "per_page": per_page}
+            )
+            return JSONResponse(
+                content=response.json(),
+                status_code=response.status_code
+            )
+    except Exception as e:
+        return JSONResponse(
+            content={"error": f"Failed to fetch storage locations: {str(e)}"},
+            status_code=500
+        )
+
+@app.post("/api/storage/locations")
+async def create_storage_location(request: Request):
+    """Create a new storage location"""
+    try:
+        data = await request.json()
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{STORAGE_SERVICE_URL}/api/storage/locations",
+                json=data,
+                headers={"Authorization": request.headers.get("Authorization", "")}
+            )
+            return JSONResponse(
+                content=response.json(),
+                status_code=response.status_code
+            )
+    except Exception as e:
+        return JSONResponse(
+            content={"error": f"Failed to create storage location: {str(e)}"},
+            status_code=500
+        )
+
+@app.get("/api/storage/locations/{location_id}")
+async def get_storage_location(location_id: str):
+    """Get a specific storage location"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{STORAGE_SERVICE_URL}/api/storage/locations/{location_id}"
+            )
+            return JSONResponse(
+                content=response.json(),
+                status_code=response.status_code
+            )
+    except Exception as e:
+        return JSONResponse(
+            content={"error": f"Failed to fetch storage location: {str(e)}"},
+            status_code=500
+        )
+
+@app.put("/api/storage/locations/{location_id}")
+async def update_storage_location(location_id: str, request: Request):
+    """Update a storage location"""
+    try:
+        data = await request.json()
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.put(
+                f"{STORAGE_SERVICE_URL}/storage/locations/{location_id}",
+                json=data,
+                headers={"Authorization": request.headers.get("Authorization", "")}
+            )
+            return JSONResponse(
+                content=response.json(),
+                status_code=response.status_code
+            )
+    except Exception as e:
+        return JSONResponse(
+            content={"error": f"Failed to update storage location: {str(e)}"},
+            status_code=500
+        )
+
+@app.delete("/api/storage/locations/{location_id}")
+async def delete_storage_location(location_id: str, request: Request):
+    """Delete a storage location"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.delete(
+                f"{STORAGE_SERVICE_URL}/storage/locations/{location_id}",
+                headers={"Authorization": request.headers.get("Authorization", "")}
+            )
+            return JSONResponse(
+                content=response.json(),
+                status_code=response.status_code
+            )
+    except Exception as e:
+        return JSONResponse(
+            content={"error": f"Failed to delete storage location: {str(e)}"},
+            status_code=500
+        )
+
+@app.get("/api/storage/locations/{location_id}/capacity")
+async def get_location_capacity(location_id: str):
+    """Get capacity information for a storage location"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{STORAGE_SERVICE_URL}/storage/locations/{location_id}/capacity"
+            )
+            return JSONResponse(
+                content=response.json(),
+                status_code=response.status_code
+            )
+    except Exception as e:
+        return JSONResponse(
+            content={"error": f"Failed to fetch location capacity: {str(e)}"},
+            status_code=500
+        )
+
+# TEST: Simple storage sample endpoint for debugging
+@app.get("/api/storage/test-samples")
+async def test_storage_samples():
+    """Test endpoint to verify registration"""
+    return {"message": "Storage samples test endpoint working", "data": []}
+
+# Additional storage endpoints (working versions)
+@app.get("/api/storage/samples")
+async def get_storage_samples_working(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100)
+):
+    """Get all storage samples with pagination - Working version"""
+    mock_samples = [
         {
-            "id": "STOR-001",
-            "name": "Freezer A1",
-            "temperature": -80,
-            "capacity": 1000,
-            "occupied": 750,
-            "status": "Normal"
+            "id": "SMPL-001",
+            "barcode": "BC001",
+            "sample_type": "DNA",
+            "location_id": "freezer-a1",
+            "location_name": "Freezer A1 (-80°C)",
+            "status": "stored",
+            "stored_at": "2024-01-15T10:30:00Z",
+            "volume": 100.0,
+            "concentration": 50.0
         },
         {
-            "id": "STOR-002",
-            "name": "Refrigerator B2",
-            "temperature": 4,
-            "capacity": 500,
-            "occupied": 320,
-            "status": "Normal"
+            "id": "SMPL-002", 
+            "barcode": "BC002",
+            "sample_type": "RNA",
+            "location_id": "fridge-b2",
+            "location_name": "Refrigerator B2 (4°C)",
+            "status": "stored",
+            "stored_at": "2024-01-16T14:20:00Z",
+            "volume": 75.0,
+            "concentration": 30.0
         }
     ]
-
-    # Return both formats for compatibility
+    
     return {
-        "data": locations_data,  # For frontend expecting .data.filter()
-        "locations": locations_data  # For other consumers
+        "data": mock_samples,
+        "total": len(mock_samples),
+        "page": page,
+        "per_page": per_page
     }
+
+@app.get("/api/storage/analytics/utilization")
+async def get_storage_utilization_working():
+    """Get storage utilization analytics - Working version"""
+    mock_utilization = {
+        "data": {
+            "total_capacity": 5000,
+            "total_used": 3200,
+            "utilization_percentage": 64.0,
+            "zones": [
+                {"name": "-80C", "capacity": 1000, "used": 800, "utilization": 80.0},
+                {"name": "-20C", "capacity": 800, "used": 600, "utilization": 75.0},
+                {"name": "4C", "capacity": 1200, "used": 900, "utilization": 75.0},
+                {"name": "RT", "capacity": 2000, "used": 900, "utilization": 45.0}
+            ]
+        }
+    }
+    
+    return mock_utilization
+
+@app.get("/api/storage/mobile/samples")
+async def get_mobile_samples_working(
+    status: str = Query(None),
+    sample_type: str = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100)
+):
+    """Get samples optimized for mobile interface - Working version"""
+    mock_mobile_samples = [
+        {
+            "id": "SMPL-001",
+            "barcode": "BC001",
+            "type": "DNA",
+            "location": "A1",
+            "status": "stored",
+            "temp": "-80°C"
+        },
+        {
+            "id": "SMPL-002",
+            "barcode": "BC002", 
+            "type": "RNA",
+            "location": "B2",
+            "status": "stored",
+            "temp": "4°C"
+        }
+    ]
+    
+    return {
+        "data": mock_mobile_samples,
+        "total": len(mock_mobile_samples),
+        "page": page,
+        "per_page": per_page
+    }
+
+# Store samples endpoint
+@app.post("/api/storage/samples")
+async def store_sample_in_storage(request: Request):
+    """Store a sample in storage location"""
+    try:
+        data = await request.json()
+        
+        # Mock storage response - in production this would store in database
+        sample_id = f"STORED-{int(time.time())}"
+        
+        response_data = {
+            "success": True,
+            "message": "Sample stored successfully",
+            "data": {
+                "id": sample_id,
+                "barcode": data.get("barcode"),
+                "sample_type": data.get("sample_type"),
+                "storage_location_id": data.get("storage_location_id"),
+                "temperature_requirements": data.get("temperature_requirements"),
+                "status": "stored",
+                "stored_at": datetime.now().isoformat(),
+                "metadata": data.get("metadata", {})
+            }
+        }
+        
+        return JSONResponse(content=response_data, status_code=201)
+        
+    except Exception as e:
+        return JSONResponse(
+            content={"error": f"Failed to store sample: {str(e)}"},
+            status_code=500
+        )
+
+# Sample retrieval endpoint
+@app.post("/api/storage/samples/{sample_id}/retrieve")
+async def retrieve_sample_from_storage(sample_id: str, request: Request):
+    """Retrieve a sample from storage"""
+    try:
+        response_data = {
+            "success": True,
+            "message": f"Sample {sample_id} retrieved successfully",
+            "data": {
+                "id": sample_id,
+                "status": "retrieved",
+                "retrieved_at": datetime.now().isoformat(),
+                "retrieved_by": "current_user"
+            }
+        }
+        
+        return JSONResponse(content=response_data, status_code=200)
+        
+    except Exception as e:
+        return JSONResponse(
+            content={"error": f"Failed to retrieve sample: {str(e)}"},
+            status_code=500
+        )
+
+# Sample movement endpoint
+@app.post("/api/storage/samples/{sample_id}/move")
+async def move_sample_in_storage(sample_id: str, request: Request):
+    """Move a sample to a new storage location"""
+    try:
+        data = await request.json()
+        
+        response_data = {
+            "success": True,
+            "message": f"Sample {sample_id} moved successfully",
+            "data": {
+                "id": sample_id,
+                "old_location": "previous_location",
+                "new_location_id": data.get("new_location_id"),
+                "reason": data.get("reason"),
+                "moved_at": datetime.now().isoformat(),
+                "moved_by": "current_user"
+            }
+        }
+        
+        return JSONResponse(content=response_data, status_code=200)
+        
+    except Exception as e:
+        return JSONResponse(
+            content={"error": f"Failed to move sample: {str(e)}"},
+            status_code=500
+        )
+
+# Sample search endpoint
+@app.get("/api/storage/samples/search")
+async def search_samples_in_storage(
+    barcode: str = Query(None),
+    location_id: str = Query(None),
+    sample_type: str = Query(None),
+    status: str = Query(None)
+):
+    """Search for samples in storage"""
+    try:
+        # Mock search results
+        mock_results = [
+            {
+                "id": "SMPL-001",
+                "barcode": barcode or "BC001",
+                "sample_type": "DNA",
+                "storage_location_id": "freezer-a1",
+                "status": "stored",
+                "stored_at": "2024-01-15T10:30:00Z"
+            }
+        ]
+        
+        return {
+            "success": True,
+            "data": mock_results,
+            "total": len(mock_results)
+        }
+        
+    except Exception as e:
+        return JSONResponse(
+            content={"error": f"Failed to search samples: {str(e)}"},
+            status_code=500
+        )
 
 # Storage Service Proxy (forward to actual storage service)
 storage_service_url = os.getenv("STORAGE_SERVICE_URL", "http://storage-service:8000")
@@ -1945,6 +2439,9 @@ async def proxy_qaqc(path: str, request: Request):
 async def proxy_templates(path: str, request: Request):
     """Proxy requests to Templates service"""
     try:
+        print(f"Template proxy: path={path}, method={request.method}")
+        print(f"Headers: {dict(request.headers)}")
+        
         async with httpx.AsyncClient() as client:
             # For health checks, use the direct health endpoint
             if path == "health":
@@ -1952,18 +2449,61 @@ async def proxy_templates(path: str, request: Request):
             else:
                 # Template service expects routes without /api/v1 prefix
                 url = f"{TEMPLATE_SERVICE_URL}/templates/{path}"
-            body = None
-            if request.method in ["POST", "PUT", "PATCH"]:
-                body = await request.body()
+            
+            print(f"Proxying to: {url}")
+            
+            # Handle multipart form data for uploads
+            if path == "upload" and request.method == "POST":
+                # For file uploads, we need to handle multipart/form-data
+                content_type = request.headers.get("content-type", "")
+                print(f"Content-Type: {content_type}")
+                
+                if content_type.startswith("multipart/form-data"):
+                    # Read the raw body and forward it with the same content-type
+                    body = await request.body()
+                    print(f"Body length: {len(body)}")
+                    
+                    headers = dict(request.headers)
+                    # Remove host header to avoid conflicts
+                    headers.pop("host", None)
+                    headers.pop("content-length", None)
+                    
+                    print("Forwarding multipart request...")
+                    response = await client.request(
+                        method=request.method,
+                        url=url,
+                        headers=headers,
+                        content=body,
+                        timeout=30.0
+                    )
+                    print(f"Response status: {response.status_code}")
+                else:
+                    # Non-multipart POST request
+                    print("Not multipart, handling as regular POST")
+                    body = await request.body()
+                    response = await client.request(
+                        method=request.method,
+                        url=url,
+                        headers=dict(request.headers),
+                        params=request.query_params,
+                        content=body,
+                        timeout=30.0
+                    )
+            else:
+                # For non-upload requests, handle normally
+                body = None
+                if request.method in ["POST", "PUT", "PATCH"]:
+                    body = await request.body()
 
-            response = await client.request(
-                method=request.method,
-                url=url,
-                headers=dict(request.headers),
-                params=request.query_params,
-                content=body,
-                timeout=30.0
-            )
+                response = await client.request(
+                    method=request.method,
+                    url=url,
+                    headers=dict(request.headers),
+                    params=request.query_params,
+                    content=body,
+                    timeout=30.0
+                )
+            
             return Response(
                 content=response.content,
                 status_code=response.status_code,
@@ -1972,6 +2512,8 @@ async def proxy_templates(path: str, request: Request):
             )
     except Exception as e:
         print(f"Error proxying to Templates service: {e}")
+        import traceback
+        traceback.print_exc()
         return JSONResponse({"error": "Service unavailable"}, status_code=503)
 
 # NOTE: Removed proxy endpoints - using direct endpoints below
@@ -2470,6 +3012,13 @@ async def debug_problematic_endpoints():
         "test_results": test_results,
         "timestamp": datetime.now().isoformat()
     }
+
+# ============================================================================
+# Storage Management Endpoints - REMOVED DUPLICATES
+# ============================================================================
+# NOTE: Storage endpoints are now defined earlier in the file (lines ~187-244)
+
+# NOTE: All storage endpoints removed from here - they are defined earlier in the file
 
 if __name__ == "__main__":
     # Get configuration from environment

@@ -1,0 +1,70 @@
+FROM rustlang/rust:nightly-bookworm as builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace Cargo.toml first
+COPY ../../../Cargo.toml ./workspace-Cargo.toml
+COPY ../../../Cargo.lock ./workspace-Cargo.lock || true
+
+# Create workspace structure
+RUN mkdir -p lims-laboratory/lab_manager
+
+# Copy the lab_manager Cargo.toml
+COPY Cargo.toml ./lims-laboratory/lab_manager/
+
+# Copy source code
+COPY src ./lims-laboratory/lab_manager/src
+COPY migrations ./lims-laboratory/lab_manager/migrations
+
+# Create a workspace Cargo.toml that includes lab_manager
+RUN echo '[workspace]' > Cargo.toml && \
+    echo 'members = ["lims-laboratory/lab_manager"]' >> Cargo.toml && \
+    echo '' >> Cargo.toml && \
+    cat workspace-Cargo.toml | grep -A 100 '\[workspace.dependencies\]' >> Cargo.toml || true
+
+# Set SQLX offline mode
+ENV SQLX_OFFLINE=false
+ENV DATABASE_URL=postgres://postgres:postgres@localhost:5432/lab_manager
+
+# Build the application
+RUN cd lims-laboratory/lab_manager && cargo build --release --bin lab_manager
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the binary from builder
+COPY --from=builder /app/lims-laboratory/lab_manager/target/release/lab_manager ./
+
+# Copy migrations
+COPY --from=builder /app/lims-laboratory/lab_manager/migrations ./migrations
+
+# Create storage directory
+RUN mkdir -p /app/storage
+
+# Set environment
+ENV RUST_LOG=info
+ENV STORAGE_PATH=/app/storage
+
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:3001/health || exit 1
+
+CMD ["./lab_manager"] 

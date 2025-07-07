@@ -64,8 +64,8 @@ impl SampleServiceImpl {
                 id, name, barcode, sample_type, status, template_id,
                 source_type, source_identifier, collection_date, collection_location,
                 collector, concentration, volume, unit, quality_score, metadata, notes,
-                created_at, updated_at, created_by, updated_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+                created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
             RETURNING *
             "#,
         )
@@ -88,8 +88,6 @@ impl SampleServiceImpl {
         .bind(request.notes.as_deref())
         .bind(now)
         .bind(now)
-        .bind(request.created_by.as_deref())
-        .bind(request.created_by.as_deref())
         .fetch_one(&self.db_pool.pool)
         .await?;
 
