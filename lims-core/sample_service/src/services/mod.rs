@@ -1,6 +1,7 @@
 use uuid::Uuid;
 use chrono::Utc;
 use sqlx::Row;
+use rust_decimal::Decimal;
 
 use crate::{
     config::Config,

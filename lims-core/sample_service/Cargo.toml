@@ -46,7 +46,7 @@ regex = "1.10"
 once_cell = "1.19"
 
 # Decimal numbers
-rust_decimal = { version = "1.33", features = ["serde"] }
+rust_decimal = { version = "1.33", features = ["serde", "db-postgres"] }
 
 # Async trait support
 async-trait = "0.1"

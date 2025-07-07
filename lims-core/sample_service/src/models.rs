@@ -4,6 +4,7 @@ use sqlx::FromRow;
 use std::fmt;
 use uuid::Uuid;
 use validator::Validate;
+use rust_decimal::Decimal;
 
 /// Sample status enumeration
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq)]
@@ -148,19 +149,12 @@ pub struct CreateSampleRequest {
     pub collection_location: Option<String>,
     pub collector: Option<String>,
 
-    #[validate(range(min = 0.0, message = "Concentration must be positive"))]
     pub concentration: Option<f64>,
 
-    #[validate(range(min = 0.0, message = "Volume must be positive"))]
     pub volume: Option<f64>,
 
     pub unit: Option<String>,
 
-    #[validate(range(
-        min = 0.0,
-        max = 1.0,
-        message = "Quality score must be between 0 and 1"
-    ))]
     pub quality_score: Option<f64>,
 
     pub metadata: Option<serde_json::Value>,
@@ -192,19 +186,12 @@ pub struct UpdateSampleRequest {
     pub collection_location: Option<String>,
     pub collector: Option<String>,
 
-    #[validate(range(min = 0.0, message = "Concentration must be positive"))]
     pub concentration: Option<f64>,
 
-    #[validate(range(min = 0.0, message = "Volume must be positive"))]
     pub volume: Option<f64>,
 
     pub unit: Option<String>,
 
-    #[validate(range(
-        min = 0.0,
-        max = 1.0,
-        message = "Quality score must be between 0 and 1"
-    ))]
     pub quality_score: Option<f64>,
 
     pub metadata: Option<serde_json::Value>,
