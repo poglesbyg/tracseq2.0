@@ -55,7 +55,7 @@ export const QAQCWorkflowInterface: React.FC = () => {
   const [controlSamples, setControlSamples] = useState<ControlSample[]>([]);
   const [selectedTab, setSelectedTab] = useState<'reviews' | 'metrics' | 'controls' | 'trends'>('reviews');
   const [loading, setLoading] = useState(true);
-  const [selectedReview, setSelectedReview] = useState<QCReview | null>(null);
+  const [_selectedReview, setSelectedReview] = useState<QCReview | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -79,7 +79,7 @@ export const QAQCWorkflowInterface: React.FC = () => {
     }
   };
 
-  const startQCReview = async (sampleId: string, reviewType: string) => {
+  const _startQCReview = async (sampleId: string, reviewType: string) => {
     try {
       const response = await axios.post('/api/qc/reviews', {
         sample_id: sampleId,
@@ -92,7 +92,7 @@ export const QAQCWorkflowInterface: React.FC = () => {
     }
   };
 
-  const completeQCReview = async (reviewId: string, results: QCResults) => {
+  const _completeQCReview = async (reviewId: string, results: QCResults) => {
     try {
       await axios.post(`/api/qc/reviews/${reviewId}/complete`, { results });
       

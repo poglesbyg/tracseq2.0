@@ -16,6 +16,7 @@ pub mod validation;
 
 use std::net::SocketAddr;
 use std::process;
+use std::sync::Arc;
 
 use assembly::assemble_production_components;
 use middleware::validation::initialize_validation_regexes;
@@ -42,7 +43,7 @@ async fn main() {
 
     // Assemble all components using the new modular system
     let components = match assemble_production_components().await {
-        Ok(components) => components,
+        Ok(components) => Arc::new(components),
         Err(e) => {
             tracing::error!("Failed to assemble application components: {}", e);
             eprintln!("❌ Error: Failed to initialize application components");

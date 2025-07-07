@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
-  ChartBarIcon,
-  CircleStackIcon,
-  BoltIcon,
-  ExclamationCircleIcon,
-  ArrowTrendingUpIcon,
-  ClockIcon
+  ServerIcon,
+  ExclamationTriangleIcon,
+  ArrowPathIcon,
+  ClockIcon,
+  AdjustmentsHorizontalIcon
 } from '@heroicons/react/24/outline';
 import axios from '../../utils/axios';
 
@@ -159,7 +158,7 @@ export const EventMonitorDashboard: React.FC = () => {
                   <p className="text-2xl font-semibold text-gray-900">{formatNumber(stats.events_published)}</p>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-full">
-                  <ArrowTrendingUpIcon className="h-6 w-6 text-blue-600" />
+                  <ArrowPathIcon className="h-6 w-6 text-blue-600" />
                 </div>
               </div>
             </div>
@@ -171,7 +170,7 @@ export const EventMonitorDashboard: React.FC = () => {
                   <p className="text-2xl font-semibold text-gray-900">{formatNumber(stats.events_consumed)}</p>
                 </div>
                 <div className="p-3 bg-green-100 rounded-full">
-                  <CircleStackIcon className="h-6 w-6 text-green-600" />
+                  <ServerIcon className="h-6 w-6 text-green-600" />
                 </div>
               </div>
             </div>
@@ -183,7 +182,7 @@ export const EventMonitorDashboard: React.FC = () => {
                   <p className="text-2xl font-semibold text-gray-900">{formatNumber(stats.events_failed)}</p>
                 </div>
                 <div className="p-3 bg-red-100 rounded-full">
-                  <ExclamationCircleIcon className="h-6 w-6 text-red-600" />
+                  <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
                 </div>
               </div>
             </div>
@@ -195,7 +194,7 @@ export const EventMonitorDashboard: React.FC = () => {
                   <p className="text-2xl font-semibold text-gray-900">{stats.handlers_registered}</p>
                 </div>
                 <div className="p-3 bg-purple-100 rounded-full">
-                  <BoltIcon className="h-6 w-6 text-purple-600" />
+                  <AdjustmentsHorizontalIcon className="h-6 w-6 text-purple-600" />
                 </div>
               </div>
             </div>
@@ -363,4 +362,4 @@ export const EventMonitorDashboard: React.FC = () => {
       )}
     </div>
   );
-}; 
+};

@@ -263,16 +263,12 @@ impl FlowCellManager {
         let design = self.get_flow_cell_design(design_id).await?;
         
         if let Some(design) = design {
-            let flow_cell_type = if let Some(type_id) = design.flow_cell_type_id {
-                sqlx::query_as::<_, FlowCellType>(
-                    "SELECT * FROM flow_cell_types WHERE id = $1"
-                )
-                .bind(type_id)
-                .fetch_optional(&self.pool)
-                .await?
-            } else {
-                None
-            };
+            let flow_cell_type = sqlx::query_as::<_, FlowCellType>(
+                "SELECT * FROM flow_cell_types WHERE id = $1"
+            )
+            .bind(design.flow_cell_type_id)
+            .fetch_optional(&self.pool)
+            .await?;
 
             let lanes = self.get_design_lanes(design_id).await?;
             let lane_count = lanes.len() as i32;

@@ -3,7 +3,6 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useSpeechRecognition } from 'react-speech-kit';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { 
   PaperAirplaneIcon, 
   ChatBubbleLeftRightIcon, 
@@ -16,12 +15,7 @@ import {
   DocumentTextIcon,
   ClipboardDocumentListIcon,
   ArrowPathIcon,
-  PaperClipIcon,
   MicrophoneIcon,
-  ChevronDownIcon,
-  CheckCircleIcon,
-  ArrowDownTrayIcon,
-  CommandLineIcon,
   DocumentMagnifyingGlassIcon,
   ChartBarIcon
 } from '@heroicons/react/24/outline';
