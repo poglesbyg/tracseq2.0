@@ -2,12 +2,23 @@ import React, { useRef } from 'react';
 import { useDraggable } from '../../hooks/useDraggable';
 import { useResizable } from '../../hooks/useResizable';
 
+export interface WindowContext {
+  windowId: string;
+  openApp?: (appId: string, context?: Record<string, unknown>) => void;
+  closeWindow: () => void;
+  updateWindow: (updates: Partial<WindowState>) => void;
+}
+
+export interface WindowComponentProps {
+  windowContext: WindowContext;
+}
+
 export interface WindowState {
   id: string;
   appId: string;
   title: string;
   icon?: React.ReactNode;
-  component: React.ComponentType<any>;
+  component: React.ComponentType<WindowComponentProps>;
   position: { x: number; y: number };
   size: { width: number; height: number };
   isMinimized: boolean;
@@ -21,7 +32,7 @@ interface WindowProps {
   onClose: () => void;
   onFocus: () => void;
   onUpdate: (updates: Partial<WindowState>) => void;
-  onOpenApp?: (appId: string, context?: any) => void;
+  onOpenApp?: (appId: string, context?: Record<string, unknown>) => void;
 }
 
 export const Window: React.FC<WindowProps> = ({ window, onClose, onFocus, onUpdate, onOpenApp }) => {

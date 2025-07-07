@@ -22,7 +22,7 @@ interface Notification {
   created_at: string;
   sent_at?: string;
   read_at?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 interface NotificationTemplate {

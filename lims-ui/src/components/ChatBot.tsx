@@ -36,7 +36,7 @@ interface Message {
     sourceContext?: string[];
     action?: {
       type: string;
-      payload: any;
+      payload: Record<string, unknown>;
     };
   };
   attachments?: Array<{
@@ -48,7 +48,7 @@ interface Message {
     label: string;
     action: string;
     variant: 'primary' | 'secondary' | 'danger';
-    data?: any;
+    data?: Record<string, unknown>;
   }>;
   isStreaming?: boolean;
 }
@@ -60,7 +60,7 @@ interface ChatBotProps {
 
 interface QuickAction {
   label: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ className?: string }>;
   prompt: string;
   description: string;
 }
@@ -93,7 +93,7 @@ const quickActions: QuickAction[] = [
 ];
 
 export const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
-  const [sessionId] = useState(() => `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const [_sessionId] = useState(() => `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -304,7 +304,7 @@ How can I assist you today?`,
   }, []);
 
   // Send message mutation with streaming support
-  const sendMessageMutation = useMutation({
+  const _sendMessageMutation = useMutation({
     mutationFn: async ({ message, attachments }: { message: string, attachments?: File[] }) => {
       const formData = new FormData();
       formData.append('message', message);
@@ -329,13 +329,13 @@ How can I assist you today?`,
 
       return response;
     },
-    onSuccess: (data) => {
+    onSuccess: (_data) => {
       queryClient.invalidateQueries({ queryKey: ['chatHistory'] });
     }
   });
 
   // Simulate streaming response
-  const simulateStreamingResponse = (content: string, messageId: string) => {
+  const _simulateStreamingResponse = (content: string, messageId: string) => {
     const words = content.split(' ');
     let currentContent = '';
     let wordIndex = 0;
@@ -494,7 +494,7 @@ How can I assist you today?`,
     uploadedFiles.current = [];
   };
 
-  const generateMockResponse = (userInput: string, files: File[]) => {
+  const _generateMockResponse = (userInput: string, files: File[]) => {
     const input = userInput.toLowerCase();
     
     if (files.length > 0 && files.some(f => f.type === 'application/pdf')) {
@@ -643,7 +643,7 @@ Please provide more specific details about what you'd like to accomplish, or try
     };
   };
 
-  const handleActionClick = async (action: any) => {
+  const _handleActionClick = async (action: { label: string; action: string; type?: string; data?: Record<string, unknown> }) => {
     console.log('Action clicked:', action);
     
     const actionMessage: Message = {
@@ -661,7 +661,7 @@ Please provide more specific details about what you'd like to accomplish, or try
           window.location.href = '/samples/new';
           break;
           
-        case 'generate_labels':
+        case 'generate_labels': {
           // Trigger label generation
           const labelResponse = await fetch('/api/samples/labels', {
             method: 'POST',
@@ -678,6 +678,7 @@ Please provide more specific details about what you'd like to accomplish, or try
             }]);
           }
           break;
+        }
           
         case 'schedule_qc':
           // Navigate to QC scheduling

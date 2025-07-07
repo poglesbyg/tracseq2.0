@@ -14,6 +14,7 @@ import {
   UsersIcon
 } from '@heroicons/react/24/outline';
 import { Finder, FileSystemItem } from '../components/Desktop/Finder';
+import { WindowContext } from '../components/Desktop/Window';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
@@ -36,10 +37,10 @@ import FlowCellDesign from '../pages/FlowCellDesign';
 import ServicesStatus from '../pages/ServicesStatus';
 
 // Create a wrapper component for Finder
-const FinderApp = ({ windowContext }: { windowContext?: any }) => {
+const FinderApp = ({ windowContext }: { windowContext?: WindowContext }) => {
   const [selectedItem, setSelectedItem] = useState<FileSystemItem | null>(null);
   const [items, setItems] = useState<FileSystemItem[]>([]);
-  const [detailView, setDetailView] = useState<any>(null);
+  const [detailView, setDetailView] = useState<React.ReactNode>(null);
 
   useEffect(() => {
     // Fetch real data from the API
@@ -63,7 +64,21 @@ const FinderApp = ({ windowContext }: { windowContext?: any }) => {
         // Add samples to the samples folder
         const samplesData = samplesRes.data?.data || samplesRes.data || [];
         if (Array.isArray(samplesData)) {
-          samplesData.forEach((sample: any) => {
+          samplesData.forEach((sample: {
+            id: string;
+            name?: string;
+            barcode: string;
+            created_at: string;
+            updated_at?: string;
+            status: string;
+            location: string;
+            metadata?: {
+              volume_ul?: number;
+              sample_type?: string;
+              concentration_ng_ul?: number;
+              project?: string;
+            };
+          }) => {
             fileItems.push({
               id: `sample-${sample.id}`,
               name: sample.name || sample.barcode,
@@ -198,7 +213,7 @@ const FinderApp = ({ windowContext }: { windowContext?: any }) => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-500">Barcode</label>
-                <p className="text-lg font-mono">{item.metadata?.barcode}</p>
+                <p className="text-lg font-mono">{String(item.metadata?.barcode || '')}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">Status</label>
@@ -209,7 +224,7 @@ const FinderApp = ({ windowContext }: { windowContext?: any }) => {
                     item.metadata?.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                     'bg-gray-100 text-gray-800'
                   }`}>
-                    {item.metadata?.status?.replace('_', ' ').toUpperCase()}
+                    {String(item.metadata?.status || '').replace('_', ' ').toUpperCase()}
                   </span>
                 </p>
               </div>

@@ -24,7 +24,7 @@ interface QCReview {
 
 interface QCResults {
   passed: boolean;
-  metrics: Record<string, any>;
+  metrics: Record<string, string | number | boolean>;
   issues: string[];
   recommendations: string[];
 }
@@ -44,7 +44,7 @@ interface ControlSample {
   id: string;
   name: string;
   type: 'positive' | 'negative' | 'standard';
-  expected_values: Record<string, any>;
+  expected_values: Record<string, string | number | boolean>;
   last_run?: string;
   status?: 'pass' | 'fail' | 'warning';
 }

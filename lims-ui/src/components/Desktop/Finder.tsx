@@ -21,7 +21,7 @@ export interface FileSystemItem {
   created: Date;
   modified: Date;
   size?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   children?: string[];
 }
 

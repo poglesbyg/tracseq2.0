@@ -19,7 +19,7 @@ export interface Notification {
   read: boolean;
   actionLabel?: string;
   onAction?: () => void;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 interface NotificationCenterProps {

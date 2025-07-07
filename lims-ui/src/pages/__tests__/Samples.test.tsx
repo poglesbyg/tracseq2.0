@@ -94,8 +94,8 @@ describe('Samples', () => {
       if (url.includes('/api/samples')) {
         return Promise.resolve({ 
           data: { 
-            data: {
-              samples: mockSamples,
+            data: mockSamples,
+            pagination: {
               total: mockSamples.length,
               page: 1,
               per_page: 50,
@@ -284,8 +284,8 @@ describe('Samples', () => {
         if (url.includes('/api/samples')) {
           return Promise.resolve({ 
             data: { 
-              data: {
-                samples: [],
+              data: [],
+              pagination: {
                 total: 0,
                 page: 1,
                 per_page: 50,

@@ -1,10 +1,11 @@
 import { ComponentType } from 'react';
+import { WindowState } from '../components/Desktop/Window';
 
 export interface WindowContext {
   windowId: string;
-  openApp?: (appId: string, context?: any) => void;
+  openApp?: (appId: string, context?: Record<string, unknown>) => void;
   closeWindow: () => void;
-  updateWindow: (updates: any) => void;
+  updateWindow: (updates: Partial<WindowState>) => void;
 }
 
 export interface AppDefinition {
