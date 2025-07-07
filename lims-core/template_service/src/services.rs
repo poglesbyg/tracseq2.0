@@ -43,17 +43,23 @@ impl TemplateServiceImpl {
         
         let tags = request.tags.clone().unwrap_or_default();
         let is_public = request.is_public.unwrap_or(false);
-        let form_config = request.form_config.clone().unwrap_or(serde_json::json!({}));
-        let metadata = request.metadata.clone().unwrap_or(serde_json::json!({}));
+        let template_data = request.form_config.clone().unwrap_or(serde_json::json!({}));
+        let mut metadata = request.metadata.clone().unwrap_or(serde_json::json!({}));
         let category = request.category.clone().unwrap_or_else(|| "general".to_string());
+
+        // Store additional fields in metadata since they don't exist in the DB schema
+        metadata["template_type"] = serde_json::json!(request.template_type);
+        metadata["tags"] = serde_json::json!(tags);
+        metadata["is_public"] = serde_json::json!(is_public);
+        metadata["is_system"] = serde_json::json!(false);
 
         let query = r#"
             INSERT INTO templates (
                 id, name, description, category, status, version, 
-                form_config, tags, is_public, metadata, 
-                isActive, created_by, created_at, updated_at
+                template_data, metadata, 
+                is_active, created_by, created_at, updated_at
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
             )
         "#;
 
@@ -63,13 +69,11 @@ impl TemplateServiceImpl {
             .bind(&request.description)
             .bind(&category)
             .bind("draft")
-            .bind("1.0.0")
-            .bind(&form_config)
-            .bind(&tags)
-            .bind(is_public)
+            .bind(1i32)
+            .bind(&template_data)
             .bind(&metadata)
             .bind(true)
-            .bind(created_by)
+            .bind(Uuid::parse_str(created_by).ok())
             .bind(now)
             .bind(now)
             .execute(self.db_pool.get_pool())
@@ -102,11 +106,11 @@ impl TemplateServiceImpl {
 
         let query = r#"
             SELECT 
-                id, name, description, category, status, version, template_type,
-                form_config, tags, is_public, is_system, metadata, isActive, 
-                created_by, created_at, updated_at, createdDate, updatedDate
+                id, name, description, category, status, version,
+                template_data, metadata, is_active, 
+                created_by, created_at, updated_at
             FROM templates 
-            WHERE isActive = true
+            WHERE is_active = true
             ORDER BY created_at DESC
             LIMIT $1 OFFSET $2
         "#;
@@ -119,29 +123,42 @@ impl TemplateServiceImpl {
 
         let templates: Vec<TemplateResponse> = rows
             .into_iter()
-            .map(|row| TemplateResponse {
-                id: row.get("id"),
-                name: row.get("name"),
-                description: row.get("description"),
-                template_type: row.get::<Option<String>, _>("template_type")
-                    .unwrap_or_else(|| "form".to_string()),
-                status: row.get("status"),
-                version: row.get("version"),
-                category: row.get("category"),
-                tags: row.get("tags"),
-                is_public: row.get("is_public"),
-                is_system: row.get("is_system"),
-                created_at: row.get("created_at"),
-                updated_at: row.get("updated_at"),
-                created_by: row.get("created_by"),
-                updated_by: None,
-                field_count: Some(0),
-                usage_count: Some(0),
+            .map(|row| {
+                let metadata: serde_json::Value = row.get::<Option<serde_json::Value>, _>("metadata").unwrap_or(serde_json::json!({}));
+                
+                TemplateResponse {
+                    id: row.get("id"),
+                    name: row.get("name"),
+                    description: row.get("description"),
+                    template_type: metadata.get("template_type")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("form")
+                        .to_string(),
+                    status: row.get("status"),
+                    version: row.get::<i32, _>("version").to_string(),
+                    category: row.get("category"),
+                    tags: metadata.get("tags")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                        .unwrap_or_default(),
+                    is_public: metadata.get("is_public")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false),
+                    is_system: metadata.get("is_system")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false),
+                    created_at: row.get("created_at"),
+                    updated_at: row.get("updated_at"),
+                    created_by: row.get::<Option<String>, _>("created_by").unwrap_or_else(|| "system".to_string()),
+                    updated_by: None,
+                    field_count: Some(0),
+                    usage_count: Some(0),
+                }
             })
             .collect();
 
         // Get total count
-        let count_query = "SELECT COUNT(*) FROM templates WHERE isActive = true";
+        let count_query = "SELECT COUNT(*) FROM templates WHERE is_active = true";
         let total_count: i64 = sqlx::query_scalar(count_query)
             .fetch_one(self.db_pool.get_pool())
             .await?;
@@ -161,11 +178,11 @@ impl TemplateServiceImpl {
     pub async fn get_template(&self, template_id: Uuid) -> Result<Option<TemplateResponse>> {
         let query = r#"
             SELECT 
-                id, name, description, category, status, version, template_type,
-                form_config, tags, is_public, is_system, metadata, isActive, 
-                created_by, created_at, updated_at, createdDate, updatedDate
+                id, name, description, category, status, version,
+                template_data, metadata, is_active, 
+                created_by, created_at, updated_at
             FROM templates 
-            WHERE id = $1 AND isActive = true
+            WHERE id = $1 AND is_active = true
         "#;
 
         let row = sqlx::query(query)
@@ -174,20 +191,32 @@ impl TemplateServiceImpl {
             .await?;
 
         if let Some(row) = row {
+            let metadata: serde_json::Value = row.get::<Option<serde_json::Value>, _>("metadata").unwrap_or(serde_json::json!({}));
+            
             Ok(Some(TemplateResponse {
                 id: row.get("id"),
                 name: row.get("name"),
                 description: row.get("description"),
-                template_type: row.get("template_type"),
+                template_type: metadata.get("template_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("form")
+                    .to_string(),
                 status: row.get("status"),
-                version: row.get("version"),
+                version: row.get::<i32, _>("version").to_string(),
                 category: row.get("category"),
-                tags: row.get("tags"),
-                is_public: row.get("is_public"),
-                is_system: row.get("is_system"),
+                tags: metadata.get("tags")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                    .unwrap_or_default(),
+                is_public: metadata.get("is_public")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
+                is_system: metadata.get("is_system")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
-                created_by: row.get("created_by"),
+                created_by: row.get::<Option<String>, _>("created_by").unwrap_or_else(|| "system".to_string()),
                 updated_by: None,
                 field_count: Some(0),
                 usage_count: Some(0),
@@ -208,9 +237,9 @@ impl TemplateServiceImpl {
                 category = COALESCE($4, category),
                 metadata = COALESCE($5, metadata),
                 updated_at = $6
-            WHERE id = $1 AND isActive = true
-            RETURNING id, name, description, category, status, version, template_type,
-                     form_config, tags, is_public, is_system, metadata, 
+            WHERE id = $1 AND is_active = true
+            RETURNING id, name, description, category, status, version,
+                     template_data, metadata, 
                      created_by, created_at, updated_at
         "#;
 
@@ -225,20 +254,32 @@ impl TemplateServiceImpl {
             .await?;
 
         if let Some(row) = row {
+            let metadata: serde_json::Value = row.get::<Option<serde_json::Value>, _>("metadata").unwrap_or(serde_json::json!({}));
+            
             Ok(Some(TemplateResponse {
                 id: row.get("id"),
                 name: row.get("name"),
                 description: row.get("description"),
-                template_type: row.get("template_type"),
+                template_type: metadata.get("template_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("form")
+                    .to_string(),
                 status: row.get("status"),
-                version: row.get("version"),
+                version: row.get::<i32, _>("version").to_string(),
                 category: row.get("category"),
-                tags: row.get("tags"),
-                is_public: row.get("is_public"),
-                is_system: row.get("is_system"),
+                tags: metadata.get("tags")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                    .unwrap_or_default(),
+                is_public: metadata.get("is_public")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
+                is_system: metadata.get("is_system")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
-                created_by: row.get("created_by"),
+                created_by: row.get::<Option<String>, _>("created_by").unwrap_or_else(|| "system".to_string()),
                 updated_by: Some(updated_by.to_string()),
                 field_count: Some(0),
                 usage_count: Some(0),
@@ -250,7 +291,7 @@ impl TemplateServiceImpl {
 
     /// Delete a template (soft delete)
     pub async fn delete_template(&self, template_id: Uuid) -> Result<bool> {
-        let query = "UPDATE templates SET isActive = false WHERE id = $1 AND isActive = true";
+        let query = "UPDATE templates SET is_active = false WHERE id = $1 AND is_active = true";
         
         let result = sqlx::query(query)
             .bind(template_id)
