@@ -91,50 +91,50 @@ class MonolithRouterConfig(BaseSettings):
         default={
             "auth": ServiceEndpoint(
                 name="Auth Service",
-                host="auth-service",
+                host="tracseq-auth",
                 port=8080,
                 path_prefix="/api/auth",
                 health_check_path="/health"
             ),
             "samples": ServiceEndpoint(
                 name="Sample Service",
-                host="sample-service",
+                host="tracseq-samples",
                 port=8081,
                 path_prefix="/api/samples",
                 health_check_path="/health"
             ),
             "templates": ServiceEndpoint(
                 name="Template Service",
-                host="template-service",
+                host="tracseq-templates",
                 port=8083,
                 path_prefix="/api/templates",
                 health_check_path="/health"
             ),
             "storage": ServiceEndpoint(
                 name="Storage Service",
-                host="enhanced-storage-service",
+                host="tracseq-storage",
                 port=8082,
                 path_prefix="/api/storage",
                 health_check_path="/health"
             ),
             "sequencing": ServiceEndpoint(
                 name="Sequencing Service",
-                host="sequencing-service",
+                host="tracseq-sequencing",
                 port=8084,
                 path_prefix="/api/sequencing",
                 health_check_path="/health"
             ),
             "notifications": ServiceEndpoint(
                 name="Notification Service",
-                host="notification-service",
+                host="tracseq-notification",
                 port=8085,
                 path_prefix="/api/notifications",
                 health_check_path="/health"
             ),
             "rag": ServiceEndpoint(
                 name="RAG Service",
-                host="enhanced-rag-service",
-                port=8086,
+                host="tracseq-rag",
+                port=8000,
                 path_prefix="/api/rag",
                 health_check_path="/health"
             ),
@@ -162,22 +162,22 @@ class MonolithRouterConfig(BaseSettings):
             ),
             "event": ServiceEndpoint(
                 name="Event Service",
-                host="event-service",
-                port=3017,
+                host="tracseq-events",
+                port=8087,
                 path_prefix="/api/events",
                 health_check_path="/health"
             ),
             "transaction": ServiceEndpoint(
                 name="Transaction Service",
-                host="transaction-service",
+                host="tracseq-transactions",
                 port=8088,
                 path_prefix="/api/transactions",
                 health_check_path="/health"
             ),
             "spreadsheet": ServiceEndpoint(
                 name="Spreadsheet Service",
-                host="spreadsheet-versioning-service",
-                port=3015,
+                host="tracseq-spreadsheet",
+                port=8088,
                 path_prefix="/api/spreadsheets",
                 health_check_path="/health"
             ),

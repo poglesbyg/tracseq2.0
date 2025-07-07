@@ -53,27 +53,38 @@ services:
     ports:
       - "${GATEWAY_PORT:-8089}:8000"
     environment:
+      # Gateway Configuration
+      ENVIRONMENT: development
+      HOST: 0.0.0.0
+      PORT: 8000
+      
+      # Database and Cache
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
-      # Service URLs - all internal to the network
-      AUTH_SERVICE_URL: http://tracseq-auth:8080
-      SAMPLE_SERVICE_URL: http://tracseq-samples:8081
-      STORAGE_SERVICE_URL: http://tracseq-storage:8082
-      TEMPLATE_SERVICE_URL: http://tracseq-templates:8083
-      SEQUENCING_SERVICE_URL: http://tracseq-sequencing:8084
-      NOTIFICATION_SERVICE_URL: http://tracseq-notification:8085
-      EVENT_SERVICE_URL: http://tracseq-events:8087
-      TRANSACTION_SERVICE_URL: http://tracseq-transactions:8088
-      REPORTS_SERVICE_URL: http://tracseq-reports:8000
-      RAG_SERVICE_URL: http://tracseq-rag:8000
-      SPREADSHEET_SERVICE_URL: http://tracseq-spreadsheet:8088
-      LAB_MANAGER_URL: http://tracseq-lab-manager:3001
-      # Feature flags for microservice routing
-      USE_SPREADSHEET_SERVICE: true
+      
+      # Monolith Configuration (fallback)
+      MONOLITH__HOST: tracseq-lab-manager
+      MONOLITH__PORT: 3001
+      
+      # Use hardcoded microservice configuration from monolith_config.py
+      
+      # Feature flags - Enable microservices
+      USE_AUTH_SERVICE: true
+      USE_SAMPLE_SERVICE: true
       USE_TEMPLATE_SERVICE: true
       USE_STORAGE_SERVICE: true
+      USE_SEQUENCING_SERVICE: true
       USE_NOTIFICATION_SERVICE: true
       USE_RAG_SERVICE: true
+      USE_EVENT_SERVICE: true
+      USE_TRANSACTION_SERVICE: true
+      USE_SPREADSHEET_SERVICE: true
+      
+      # Gateway Settings
+      REQUEST_TIMEOUT: 30
+      MAX_CONCURRENT_REQUESTS: 1000
+      MONITORING__LOG_REQUESTS: true
+      MONITORING__LOG_RESPONSES: true
     depends_on:
       postgres:
         condition: service_healthy

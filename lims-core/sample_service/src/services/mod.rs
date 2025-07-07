@@ -51,7 +51,7 @@ impl SampleServiceImpl {
         // Validate template if provided
         if let Some(template_id) = request.template_id {
             if let Some(ref metadata) = request.metadata {
-                self.validate_template_compatibility(template_id, metadata).await?;
+                self.validate_template_compatibility(template_id, &request.metadata).await?;
             }
         }
 
@@ -592,13 +592,13 @@ impl SampleServiceImpl {
     async fn validate_template_compatibility(
         &self,
         template_id: Uuid,
-        metadata: &serde_json::Value,
+        metadata: &Option<serde_json::Value>,
     ) -> SampleResult<()> {
         // This would integrate with the template service to validate
         // that the sample metadata matches the template requirements
         // For now, we'll do basic validation
         
-        if metadata.is_null() {
+        if metadata.is_none() || metadata.as_ref().unwrap().is_null() {
             return Err(SampleServiceError::TemplateValidation(
                 "Template requires metadata but none provided".to_string(),
             ));

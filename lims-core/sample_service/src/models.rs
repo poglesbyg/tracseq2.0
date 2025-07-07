@@ -115,7 +115,7 @@ pub struct Sample {
     pub volume: Option<f64>,
     pub unit: Option<String>,
     pub quality_score: Option<f64>,
-    pub metadata: serde_json::Value,
+    pub metadata: Option<serde_json::Value>,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
