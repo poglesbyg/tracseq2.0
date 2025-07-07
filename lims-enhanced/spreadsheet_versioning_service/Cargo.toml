@@ -41,7 +41,7 @@ config = "0.14"
 dotenvy = "0.15"
 
 # Spreadsheet processing
-calamine = "0.22"
+calamine = "0.21"
 csv = "1.2"
 
 # Difference algorithms

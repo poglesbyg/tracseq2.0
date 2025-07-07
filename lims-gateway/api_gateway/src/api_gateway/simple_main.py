@@ -941,150 +941,51 @@ async def get_dashboard_stats():
 # Samples endpoints
 @app.get("/api/samples")
 async def get_samples(request: Request):
-    """Get all samples - with support for filtering by extraction method"""
-    # Check for extraction_method query parameter
-    extraction_method = request.query_params.get("extraction_method")
-
-    if extraction_method == "ai_rag":
-        # Return RAG-processed samples when specifically requested
-        rag_samples_data = [
-            {
-                "id": "SMPL-RAG-001",
-                "originalId": "SMPL-001",
-                "name": "Sample 001 (RAG Processed)",
-                "type": "DNA",
-                "status": "RAG_Analyzed",
-                "submittedBy": "Dr. Smith",
-                "submittedDate": (datetime.now() - timedelta(days=1)).isoformat(),
-                "location": "Freezer A1-B2",
-                "ragProcessingDate": (datetime.now() - timedelta(hours=2)).isoformat(),
-                "extractedMetadata": {
-                    "concentration": "50 ng/μL",
-                    "volume": "100 μL",
-                    "quality": "High",
-                    "extractionMethod": "Qiagen DNeasy"
-                },
-                "confidenceScore": 0.94,
-                "ragStatus": "Completed"
-            },
-            {
-                "id": "SMPL-RAG-002",
-                "originalId": "SMPL-002",
-                "name": "Sample 002 (RAG Processed)",
-                "type": "RNA",
-                "status": "RAG_Processing",
-                "submittedBy": "Dr. Johnson",
-                "submittedDate": (datetime.now() - timedelta(days=3)).isoformat(),
-                "location": "Freezer A2-C1",
-                "ragProcessingDate": (datetime.now() - timedelta(minutes=30)).isoformat(),
-                "extractedMetadata": {
-                    "concentration": "75 ng/μL",
-                    "volume": "50 μL",
-                    "quality": "Medium",
-                    "extractionMethod": "TRIzol"
-                },
-                "confidenceScore": 0.87,
-                "ragStatus": "Processing"
-            },
-            {
-                "id": "SMPL-RAG-003",
-                "originalId": "SMPL-003",
-                "name": "Sample 003 (RAG Pending)",
-                "type": "Protein",
-                "status": "RAG_Pending",
-                "submittedBy": "Dr. Williams",
-                "submittedDate": datetime.now().isoformat(),
-                "location": "Intake Bay",
-                "extractedMetadata": {},
-                "confidenceScore": 0.0,
-                "ragStatus": "Pending"
-            }
-        ]
-
-        # Return RAG samples with enhanced metadata
-        return {
-            "data": rag_samples_data,  # For frontend expecting .data.filter()
-            "samples": rag_samples_data,  # For other consumers
-            "totalCount": len(rag_samples_data),
-            "page": 1,
-            "pageSize": 10,
-            "extractionMethod": "ai_rag",
-            "processingStats": {
-                "completed": 1,
-                "processing": 1,
-                "pending": 1,
-                "failed": 0
-            }
-        }
-
-    else:
-        # Return samples from database for normal requests
-        if not db_pool:
-            # Fallback to mock data if DB not connected
-            samples_data = [
-                {
-                    "id": "SMPL-001",
-                    "name": "Sample 001",
-                    "type": "DNA",
-                    "status": "Processing",
-                    "submittedBy": "Dr. Smith",
-                    "submittedDate": (datetime.now() - timedelta(days=1)).isoformat(),
-                    "location": "Freezer A1-B2"
+    """Get all samples - proxy to sample service"""
+    try:
+        # Forward request to sample service
+        async with httpx.AsyncClient() as client:
+            # Build query parameters
+            query_params = dict(request.query_params)
+            
+            response = await client.get(
+                f"{SAMPLE_SERVICE_URL}/samples",
+                params=query_params,
+                headers={"Authorization": request.headers.get("Authorization", "")},
+                timeout=30.0
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                # Sample service returns {data: [...], ...}
+                # Transform to match frontend expectations
+                samples_data = data.get('data', [])
+                
+                return {
+                    "data": samples_data,
+                    "samples": samples_data,
+                    "totalCount": len(samples_data),
+                    "page": 1,
+                    "pageSize": len(samples_data)
                 }
-            ]
-        else:
-            try:
-                async with db_pool.acquire() as conn:
-                    # Query samples from database
-                    rows = await conn.fetch("""
-                        SELECT 
-                            id, name, barcode, location, status, 
-                            created_at, updated_at, metadata
-                        FROM samples
-                        ORDER BY created_at DESC
-                    """)
-                    
-                    # Convert rows to list of dicts with expected format
-                    samples_data = []
-                    for row in rows:
-                        # Extract type from metadata if available
-                        metadata = row['metadata'] or {}
-                        # Parse JSON if metadata is a string
-                        if isinstance(metadata, str):
-                            try:
-                                metadata = json.loads(metadata)
-                            except:
-                                metadata = {}
-                        
-                        sample_type = metadata.get('type', 'Unknown')
-                        submitted_by = metadata.get('submitted_by', 'Unknown')
-                        
-                        samples_data.append({
-                            "id": str(row['id']),
-                            "name": row['name'],
-                            "type": sample_type,
-                            "status": row['status'],
-                            "submittedBy": submitted_by,
-                            "submittedDate": row['created_at'].isoformat() if row['created_at'] else datetime.now().isoformat(),
-                            "location": row['location'],
-                            "barcode": row['barcode']
-                        })
-                        
-                    # Get total count
-                    count_row = await conn.fetchrow("SELECT COUNT(*) as count FROM samples")
-                    total_count = count_row['count'] if count_row else len(samples_data)
-                    
-            except Exception as e:
-                print(f"Error fetching samples: {e}")
-                # Fallback to minimal mock data
-                samples_data = []
-                total_count = 0
-        
-        # Return both formats for compatibility
+            else:
+                print(f"Sample service returned {response.status_code}: {response.text}")
+                # Return empty response on error
+                return {
+                    "data": [],
+                    "samples": [],
+                    "totalCount": 0,
+                    "page": 1,
+                    "pageSize": 10
+                }
+                
+    except Exception as e:
+        print(f"Error fetching samples from service: {e}")
+        # Return empty response on error
         return {
-            "data": samples_data,  # For frontend expecting .data.filter()
-            "samples": samples_data,  # For other consumers
-            "totalCount": total_count,
+            "data": [],
+            "samples": [],
+            "totalCount": 0,
             "page": 1,
             "pageSize": 10
         }
@@ -1115,9 +1016,8 @@ async def create_sample(request: Request):
             )
             
     except Exception as e:
-        print(f"Error creating sample: {e}")
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": f"Failed to create sample: {str(e)}"},
             status_code=500
         )
 
@@ -1127,74 +1027,21 @@ async def create_samples_batch(request: Request):
     try:
         # Get request data
         data = await request.json()
-        samples_data = data.get('samples', [])
         
-        if not samples_data:
-            return JSONResponse(
-                content={"error": "No samples provided"},
-                status_code=400
-            )
-        
-        # Get user context
-        user = await get_current_user(request)
-        
-        # Track created samples
-        created_samples = []
-        errors = []
-        
-        # Create each sample individually
+        # Forward to sample service
         async with httpx.AsyncClient() as client:
-            for idx, sample_data in enumerate(samples_data):
-                try:
-                    # Remove created_by field to avoid UUID/string type mismatch
-                    # The sample service will handle user context internally
-                    sample_data.pop('created_by', None)
-                    
-                    # Forward to sample service - create individual sample
-                    response = await client.post(
-                        f"{SAMPLE_SERVICE_URL}/samples",
-                        json=sample_data,
-                        headers={"Authorization": request.headers.get("Authorization", "")}
-                    )
-                    
-                    if response.status_code == 200 or response.status_code == 201:
-                        created_samples.append(response.json())
-                    else:
-                        errors.append({
-                            "index": idx,
-                            "error": f"Failed to create sample: {response.text}"
-                        })
-                        
-                except Exception as e:
-                    errors.append({
-                        "index": idx,
-                        "error": str(e)
-                    })
-        
-        # Return results
-        if errors:
-            return JSONResponse(
-                content={
-                    "created": created_samples,
-                    "errors": errors,
-                    "partial_success": len(created_samples) > 0
-                },
-                status_code=207  # Multi-status
-            )
-        else:
-            return JSONResponse(
-                content={
-                    "created": created_samples,
-                    "total": len(created_samples)
-                },
-                status_code=200
+            response = await client.post(
+                f"{SAMPLE_SERVICE_URL}/samples/batch",
+                json=data,
+                headers={"Authorization": request.headers.get("Authorization", "")},
+                timeout=30.0
             )
             
-    except json.JSONDecodeError:
-        return JSONResponse(
-            content={"error": "Invalid JSON in request body"},
-            status_code=400
-        )
+            return JSONResponse(
+                content=response.json(),
+                status_code=response.status_code
+            )
+            
     except Exception as e:
         print(f"Error creating samples batch: {e}")
         return JSONResponse(

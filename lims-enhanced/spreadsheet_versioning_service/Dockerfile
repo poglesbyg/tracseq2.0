@@ -1,5 +1,5 @@
-# Build stage
-FROM rust:1.80-alpine as builder
+# Build stage  
+FROM rustlang/rust:nightly-alpine as builder
 
 # Install build dependencies
 RUN apk add --no-cache \
