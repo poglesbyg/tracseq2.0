@@ -146,7 +146,7 @@ export const FinderAppWrapper: React.FC<FinderAppWrapperProps> = ({ windowContex
         // Process projects
         const projectsData = projectsRes.data?.data || projectsRes.data || [];
         if (Array.isArray(projectsData)) {
-          projectsData.forEach((project: any) => {
+          projectsData.forEach((project: ProjectApiResponse) => {
             const metadata: ProjectMetadata = {
               id: project.id,
               name: project.name,
@@ -176,7 +176,7 @@ export const FinderAppWrapper: React.FC<FinderAppWrapperProps> = ({ windowContex
         // Process reports
         const reportsData = reportsRes.data?.data || reportsRes.data || [];
         if (Array.isArray(reportsData)) {
-          reportsData.forEach((report: any) => {
+          reportsData.forEach((report: ReportApiResponse) => {
             const metadata: ReportMetadata = {
               id: report.id,
               format: report.format,
@@ -216,7 +216,7 @@ export const FinderAppWrapper: React.FC<FinderAppWrapperProps> = ({ windowContex
   const handleItemOpen = (item: FileSystemItem) => {
     if (!item.metadata || typeof item.metadata !== 'object') return;
     
-    const metadata = item.metadata as any;
+    const metadata = item.metadata as SampleMetadata | TemplateMetadata | ProjectMetadata | ReportMetadata;
     const appId = item.type === 'sample' ? 'samples' :
                   item.type === 'template' ? 'templates' :
                   item.type === 'project' ? 'projects' :

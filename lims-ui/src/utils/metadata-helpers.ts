@@ -65,16 +65,16 @@ export function getMetadataProperty<T extends ItemMetadata, K extends keyof T>(
   if (!metadata || !(property in metadata)) {
     return defaultValue;
   }
-  const value = (metadata as any)[property];
+  const value = (metadata as Record<string, unknown>)[property as string];
   return value != null ? String(value) : defaultValue;
 }
 
 export function getMetadataId(metadata: ItemMetadata | undefined): string | undefined {
   if (!metadata || !('id' in metadata)) return undefined;
-  return (metadata as any).id;
+  return (metadata as Record<string, unknown>).id as string | undefined;
 }
 
 export function getMetadataDescription(metadata: ItemMetadata | undefined): string {
   if (!metadata || !('description' in metadata)) return '';
-  return String((metadata as any).description || '');
+  return String((metadata as Record<string, unknown>).description || '');
 } 
