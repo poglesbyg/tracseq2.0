@@ -2,7 +2,7 @@
 
 use barcode_service::{
     service::BarcodeService,
-    error::{BarcodeError, Result},
+    error::BarcodeError,
 };
 use crate::test_utils::*;
 use std::collections::HashSet;
@@ -138,8 +138,8 @@ test_with_barcode_db!(
         let stats = service.get_stats().await.expect("Should get stats");
         
         // Verify counts
-        assert_eq!(stats.total_generated, initial_count + count + reserved_count);
-        assert!(stats.total_reserved >= reserved_count);
+        assert_eq!(stats.total_generated, initial_count + count as i64 + reserved_count as i64);
+        assert!(stats.total_reserved >= reserved_count as i64);
         assert!(stats.total_unique_prefixes > 0);
         assert!(stats.most_recent_barcode.is_some());
         assert!(stats.generation_rate_per_day >= 0.0);
