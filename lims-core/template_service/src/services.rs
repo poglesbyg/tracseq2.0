@@ -68,7 +68,7 @@ impl TemplateServiceImpl {
             .bind(&request.name)
             .bind(&request.description)
             .bind(&category)
-            .bind("draft")
+            .bind(TemplateStatus::Draft)
             .bind(1i32)
             .bind(&template_data)
             .bind(&metadata)
