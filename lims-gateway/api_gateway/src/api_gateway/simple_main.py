@@ -22,8 +22,14 @@ import asyncpg
 
 # Import auth middleware
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from middleware.auth import get_current_user, create_token
-from routes.websocket_chat import websocket_chat_endpoint, manager
+try:
+    # Try relative import first (when running as module)
+    from .middleware.auth import get_current_user, create_token
+    from .routes.websocket_chat import websocket_chat_endpoint, manager
+except ImportError:
+    # Fall back to absolute import (when running directly)
+    from middleware.auth import get_current_user, create_token
+    from routes.websocket_chat import websocket_chat_endpoint, manager
 
 # Database connection pool
 DATABASE_URL = os.getenv("DATABASE_URL", "postgres://postgres:postgres@lims-postgres:5432/lims_db")
@@ -77,7 +83,7 @@ LIBRARY_PREP_SERVICE_URL = os.getenv("LIBRARY_PREP_SERVICE_URL", LAB_MANAGER_URL
 QAQC_SERVICE_URL = os.getenv("QAQC_SERVICE_URL", "http://lims-qaqc:8089")
 FLOW_CELL_SERVICE_URL = os.getenv("FLOW_CELL_SERVICE_URL", LAB_MANAGER_URL)
 # Enhanced services
-EVENT_SERVICE_URL = os.getenv("EVENT_SERVICE_URL", "http://lims-events:8087")
+EVENT_SERVICE_URL = os.getenv("EVENT_SERVICE_URL", "http://tracseq-events:8087")
 TRANSACTION_SERVICE_URL = os.getenv("TRANSACTION_SERVICE_URL", "http://lims-transactions:8088")
 TEMPLATE_SERVICE_URL = os.getenv("TEMPLATE_SERVICE_URL", "http://lims-templates:8083")
 
@@ -193,6 +199,16 @@ async def transactions_health():
             return response.json()
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Transaction service unavailable: {str(e)}")
+
+@app.get("/api/events/health")
+async def events_health():
+    """Event service health check"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{EVENT_SERVICE_URL}/health", timeout=5.0)
+            return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Event service unavailable: {str(e)}")
 
 # Authentication endpoints
 @app.post("/api/auth/login")
@@ -1813,7 +1829,7 @@ async def proxy_notifications(path: str, request: Request):
 @app.api_route("/api/events/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy_events(path: str, request: Request):
     """Proxy requests to Events service"""
-    events_url = "http://lims-events:8087"
+    events_url = EVENT_SERVICE_URL
     try:
         async with httpx.AsyncClient() as client:
             # For health checks, use the direct health endpoint
@@ -2336,6 +2352,22 @@ async def get_spreadsheet_dataset(dataset_id: str):
             ]
         },
         "totalRecords": 2,
+        "lastModified": datetime.now().isoformat()
+    }
+
+@app.get("/api/spreadsheets/preview-sheets")
+async def preview_spreadsheet_sheets():
+    """Get sheet names from a spreadsheet for preview"""
+    # Mock sheet names for now
+    return {
+        "sheets": [
+            {"name": "Samples", "index": 0, "rowCount": 1247, "columnCount": 15},
+            {"name": "QC_Results", "index": 1, "rowCount": 456, "columnCount": 12},
+            {"name": "Storage_Inventory", "index": 2, "rowCount": 2500, "columnCount": 8},
+            {"name": "Metadata", "index": 3, "rowCount": 50, "columnCount": 4}
+        ],
+        "fileName": "current_dataset.xlsx",
+        "fileSize": 2048576,  # 2MB
         "lastModified": datetime.now().isoformat()
     }
 

@@ -62,7 +62,7 @@ services:
       TEMPLATE_SERVICE_URL: http://template-service:8083
       SEQUENCING_SERVICE_URL: http://sequencing-service:8084
       NOTIFICATION_SERVICE_URL: http://notification-service:8085
-      EVENT_SERVICE_URL: http://event-service:8087
+      EVENT_SERVICE_URL: http://tracseq-events:8087
       TRANSACTION_SERVICE_URL: http://transaction-service:8088
       REPORTS_SERVICE_URL: http://reports-service:8014
       RAG_SERVICE_URL: http://rag-service:8100

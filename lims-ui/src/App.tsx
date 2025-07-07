@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { Desktop } from './components/Desktop/Desktop';
-import { apps } from './config/apps';
+import { apps } from './config/apps-fixed';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 

@@ -13,6 +13,45 @@ import {
 } from '@heroicons/react/24/outline';
 import { FolderIcon as FolderSolidIcon } from '@heroicons/react/24/solid';
 
+export interface SampleMetadata {
+  id: string;
+  barcode: string;
+  status: string;
+  location: string;
+  sampleType?: string;
+  concentration?: number;
+  project?: string;
+  description?: string;
+}
+
+export interface TemplateMetadata {
+  id: string;
+  version: string;
+  isActive: boolean;
+  description?: string;
+}
+
+export interface ProjectMetadata {
+  id: string;
+  name: string;
+  projectCode: string;
+  projectType: string;
+  status: string;
+  priority: string;
+  department: string;
+  budgetApproved?: number;
+  budgetUsed?: number;
+  description?: string;
+}
+
+export interface ReportMetadata {
+  id: string;
+  format: string;
+  status: string;
+  filePath: string;
+  description?: string;
+}
+
 export interface FileSystemItem {
   id: string;
   name: string;
@@ -21,7 +60,7 @@ export interface FileSystemItem {
   created: Date;
   modified: Date;
   size?: number;
-  metadata?: Record<string, unknown>;
+  metadata?: SampleMetadata | TemplateMetadata | ProjectMetadata | ReportMetadata | Record<string, unknown>;
   children?: string[];
 }
 

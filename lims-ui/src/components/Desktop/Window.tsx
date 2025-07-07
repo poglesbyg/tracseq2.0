@@ -10,7 +10,7 @@ export interface WindowContext {
 }
 
 export interface WindowComponentProps {
-  windowContext: WindowContext;
+  windowContext?: WindowContext;
 }
 
 export interface WindowState {

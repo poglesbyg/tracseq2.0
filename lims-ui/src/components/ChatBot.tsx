@@ -279,7 +279,7 @@ How can I assist you today?`,
         }
       };
     }
-  }, [isOpen, conversationId.current]);
+  }, [isOpen]); // conversationId is a ref and doesn't trigger re-renders
 
   // File upload handler
   const handleFileUpload = useCallback((files: FileList) => {
