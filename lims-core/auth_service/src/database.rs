@@ -152,13 +152,13 @@ impl DatabasePool {
             r#"
             CREATE TABLE IF NOT EXISTS rate_limits (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                identifier VARCHAR(255) NOT NULL,
+                key_identifier VARCHAR(255) NOT NULL,
                 request_count INTEGER NOT NULL DEFAULT 1,
                 window_start TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 
-                UNIQUE(identifier, window_start)
+                UNIQUE(key_identifier, window_start)
             )
             "#,
         )
@@ -238,7 +238,7 @@ impl DatabasePool {
             .await?;
 
         sqlx::query(
-            "CREATE INDEX IF NOT EXISTS idx_rate_limits_identifier ON rate_limits(identifier)",
+            "CREATE INDEX IF NOT EXISTS idx_rate_limits_key_identifier ON rate_limits(key_identifier)",
         )
         .execute(&self.pool)
         .await?;

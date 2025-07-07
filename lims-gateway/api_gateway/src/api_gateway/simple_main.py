@@ -269,20 +269,23 @@ async def get_current_user_endpoint(request: Request):
         "role": user.role
     }
 
-# Additional auth endpoint that frontend might be calling
+# Proxy route for /api/users/me to auth service  
 @app.get("/api/users/me")
-async def get_current_user_alt(request: Request):
-    """Get current user info (alternative endpoint)"""
-    user = await get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    return {
-        "id": user.id,
-        "email": user.email,
-        "name": user.name,
-        "role": user.role
-    }
+async def proxy_users_me(request: Request):
+    """Proxy /api/users/me to auth service /auth/me"""
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{AUTH_SERVICE_URL}/auth/me"
+            
+            response = await client.request(
+                method="GET",
+                url=url,
+                headers=dict(request.headers),
+                timeout=30.0
+            )
+            return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Auth service unavailable: {e!s}")
 
 # =============================================================================
 # Chat API Endpoints for TracSeq ChatBot Integration
@@ -1724,7 +1727,7 @@ async def proxy_auth(path: str, request: Request):
     """Proxy requests to Auth service"""
     try:
         async with httpx.AsyncClient() as client:
-            url = f"{AUTH_SERVICE_URL}/api/v1/{path}"
+            url = f"{AUTH_SERVICE_URL}/auth/{path}"
             body = None
             if request.method in ["POST", "PUT", "PATCH"]:
                 body = await request.body()

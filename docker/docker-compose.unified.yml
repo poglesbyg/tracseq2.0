@@ -56,7 +56,7 @@ services:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       # Service URLs - all internal to the network
-      AUTH_SERVICE_URL: http://tracseq-auth:8001
+      AUTH_SERVICE_URL: http://tracseq-auth:8080
       SAMPLE_SERVICE_URL: http://tracseq-samples:8081
       STORAGE_SERVICE_URL: http://tracseq-storage:8082
       TEMPLATE_SERVICE_URL: http://tracseq-templates:8083
@@ -83,9 +83,9 @@ services:
     image: tracseq-auth-service:latest
     container_name: tracseq-auth
     ports:
-      - "${AUTH_PORT:-8011}:8001"
+      - "${AUTH_PORT:-8011}:8080"
     environment:
-      PORT: 8001
+      AUTH_PORT: 8080
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
@@ -111,7 +111,7 @@ services:
       PORT: 8081
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
       REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://tracseq-auth:8001
+      AUTH_SERVICE_URL: http://tracseq-auth:8080
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
       postgres:
