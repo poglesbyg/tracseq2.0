@@ -8,7 +8,7 @@ use serde_json::json;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::info;
+use tracing::{info, error};
 
 mod config;
 mod database;
@@ -31,24 +31,73 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing
+    // Initialize comprehensive tracing with debug info
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("spreadsheet_versioning_service=debug".parse()?)
+        )
+        .with_file(true)
+        .with_line_number(true)
+        .with_target(true)
         .init();
 
     info!("🚀 Starting Spreadsheet Versioning Service");
+    info!("Environment variables:");
+    info!("  DATABASE_URL: {}", std::env::var("DATABASE_URL").unwrap_or_else(|_| "NOT SET".to_string()));
+    info!("  PORT: {}", std::env::var("PORT").unwrap_or_else(|_| "NOT SET".to_string()));
+    info!("  RUST_LOG: {}", std::env::var("RUST_LOG").unwrap_or_else(|_| "NOT SET".to_string()));
 
-    // Load configuration
-    let config = Arc::new(Config::load()?);
+    // Load configuration with detailed error handling
+    info!("📋 Loading configuration...");
+    let config = match Config::load() {
+        Ok(config) => {
+            info!("✅ Configuration loaded successfully");
+            info!("  Port: {}", config.port);
+            info!("  Database URL: {}", config.database_url);
+            info!("  Max file size: {} MB", config.max_file_size_mb);
+            Arc::new(config)
+        }
+        Err(e) => {
+            error!("❌ Failed to load configuration: {}", e);
+            return Err(e.into());
+        }
+    };
     
-    // Initialize database
-    let database = Arc::new(Database::new(&config.database_url).await?);
+    // Initialize database with detailed error handling
+    info!("🗄️ Initializing database connection...");
+    let database = match Database::new(&config.database_url).await {
+        Ok(db) => {
+            info!("✅ Database connection established");
+            Arc::new(db)
+        }
+        Err(e) => {
+            error!("❌ Failed to connect to database: {}", e);
+            error!("Database URL: {}", config.database_url);
+            return Err(e.into());
+        }
+    };
     
-    // Run migrations
-    database.migrate().await?;
+    // Run migrations with detailed error handling
+    info!("🔄 Running database migrations...");
+    if let Err(e) = database.migrate().await {
+        error!("❌ Failed to run migrations: {}", e);
+        return Err(e.into());
+    }
+    info!("✅ Database migrations completed");
+    
+    // Test database connection
+    info!("🔍 Testing database connection...");
+    if let Err(e) = database.health_check().await {
+        error!("❌ Database health check failed: {}", e);
+        return Err(e.into());
+    }
+    info!("✅ Database health check passed");
     
     // Initialize services
+    info!("⚙️ Initializing versioning service...");
     let versioning_service = Arc::new(VersioningService::new(database.clone()));
+    info!("✅ Versioning service initialized");
     
     let app_state = AppState {
         config: config.clone(),
@@ -57,14 +106,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Create router
+    info!("🛣️ Creating application router...");
     let app = create_router().with_state(app_state);
+    info!("✅ Router created");
 
     // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
-    info!("✅ Spreadsheet Versioning Service listening on {}", addr);
+    info!("🌐 Binding to address: {}", addr);
     
-    let listener = TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    let listener = match TcpListener::bind(addr).await {
+        Ok(listener) => {
+            info!("✅ Successfully bound to {}", addr);
+            listener
+        }
+        Err(e) => {
+            error!("❌ Failed to bind to {}: {}", addr, e);
+            return Err(e.into());
+        }
+    };
+    
+    info!("🎉 Spreadsheet Versioning Service is ready and listening on {}", addr);
+    
+    // Start serving with error handling
+    if let Err(e) = axum::serve(listener, app).await {
+        error!("❌ Server error: {}", e);
+        return Err(e.into());
+    }
 
     Ok(())
 }
@@ -101,13 +168,27 @@ fn create_router() -> Router<AppState> {
         .layer(TraceLayer::new_for_http())
 }
 
-async fn health_check() -> Json<serde_json::Value> {
-    Json(json!({
-        "status": "healthy",
-        "service": "Spreadsheet Versioning Service",
-        "version": "1.0.0",
-        "timestamp": chrono::Utc::now()
-    }))
+async fn health_check(State(state): State<AppState>) -> Result<Json<serde_json::Value>, ServiceError> {
+    info!("Health check requested");
+    
+    // Test database connection
+    match state.database.health_check().await {
+        Ok(_) => {
+            info!("Health check passed");
+            Ok(Json(json!({
+                "service": "Spreadsheet Versioning Service",
+                "status": "healthy",
+                "timestamp": chrono::Utc::now(),
+                "version": "1.0.0",
+                "database": "connected",
+                "port": state.config.port
+            })))
+        }
+        Err(e) => {
+            error!("Health check failed: {}", e);
+            Err(ServiceError::DatabaseConnection(format!("Health check failed: {}", e)))
+        }
+    }
 }
 
 async fn readiness_check(State(state): State<AppState>) -> Result<Json<serde_json::Value>, ServiceError> {

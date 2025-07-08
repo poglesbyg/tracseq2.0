@@ -1,6 +1,6 @@
 use anyhow::Result;
 use sqlx::{postgres::PgPoolOptions, PgPool};
-use tracing::info;
+use tracing::{info, error};
 
 #[derive(Debug, Clone)]
 pub struct Database {
@@ -11,13 +11,31 @@ impl Database {
     pub async fn new(database_url: &str) -> Result<Self> {
         info!("Connecting to database: {}", database_url);
 
+        // Validate database URL format
+        if database_url.is_empty() {
+            return Err(anyhow::anyhow!("Database URL is empty"));
+        }
+        
+        if !database_url.starts_with("postgres://") && !database_url.starts_with("postgresql://") {
+            return Err(anyhow::anyhow!("Invalid database URL format. Must start with postgres:// or postgresql://"));
+        }
+
         let pool = PgPoolOptions::new()
             .max_connections(20)
             .min_connections(5)
+            .acquire_timeout(std::time::Duration::from_secs(30))
+            .idle_timeout(std::time::Duration::from_secs(600))
+            .max_lifetime(std::time::Duration::from_secs(1800))
             .connect(database_url)
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to connect to database: {}", e);
+                anyhow::anyhow!("Database connection failed: {}", e)
+            })?;
 
-        info!("✅ Database connection established");
+        info!("✅ Database connection pool established");
+        info!("  Max connections: 20");
+        info!("  Min connections: 5");
 
         Ok(Self { pool })
     }

@@ -78,7 +78,7 @@ services:
       USE_RAG_SERVICE: true
       USE_EVENT_SERVICE: true
       USE_TRANSACTION_SERVICE: true
-      USE_SPREADSHEET_SERVICE: false
+      USE_SPREADSHEET_SERVICE: true
       
       # Gateway Settings
       REQUEST_TIMEOUT: 30
