@@ -5,11 +5,11 @@ services:
   # Infrastructure Services
   postgres:
     image: postgres:16-alpine
-    container_name: tracseq-postgres
+    container_name: lims-postgres
     ports:
-      - "5433:5432"
+      - "5432:5432"
     environment:
-      POSTGRES_DB: lab_manager
+      POSTGRES_DB: lims_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
@@ -28,7 +28,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: tracseq-redis
+    container_name: lims-redis
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes
@@ -49,9 +49,9 @@ services:
       context: ../lims-gateway/api_gateway
       dockerfile: Dockerfile
     image: tracseq-api-gateway:latest
-    container_name: tracseq-gateway
+    container_name: lims-gateway
     ports:
-      - "${GATEWAY_PORT:-8089}:8000"
+      - "${GATEWAY_PORT:-8000}:8000"
     environment:
       # Gateway Configuration
       ENVIRONMENT: development
@@ -59,9 +59,19 @@ services:
       PORT: 8000
       VERSION: "2.0.0"
       
-      # Database and Cache
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379/0
+      # Database Configuration - Standardized
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 10
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration
+      REDIS_URL: redis://lims-redis:6379/0
       
       # Authentication
       JWT_SECRET_KEY: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
@@ -70,12 +80,12 @@ services:
       
       # CORS Configuration
       CORS__ENABLED: true
-      CORS__ALLOW_ORIGINS: '["http://localhost:3000", "http://localhost:5173", "http://localhost:8089"]'
+      CORS__ALLOW_ORIGINS: '["http://localhost:3000", "http://localhost:5173", "http://localhost:8000"]'
       CORS__ALLOW_CREDENTIALS: true
       
       # Rate Limiting
       RATE_LIMITING__ENABLED: true
-      RATE_LIMITING__REDIS_URL: redis://redis:6379/1
+      RATE_LIMITING__REDIS_URL: redis://lims-redis:6379/1
       
       # Monitoring
       MONITORING__METRICS_ENABLED: true
@@ -86,61 +96,140 @@ services:
       # Gateway Settings
       REQUEST_TIMEOUT: 30
       MAX_CONCURRENT_REQUESTS: 1000
+      
+      # Service Discovery - FIXED URLs
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      SAMPLE_SERVICE_URL: http://lims-samples:8081
+      STORAGE_SERVICE_URL: http://lims-storage:8082
+      TEMPLATE_SERVICE_URL: http://lims-templates:8083
+      SEQUENCING_SERVICE_URL: http://lims-sequencing:8084
+      NOTIFICATION_SERVICE_URL: http://lims-notification:8085
+      RAG_SERVICE_URL: http://lims-rag:8086
+      EVENT_SERVICE_URL: http://lims-events:8087
+      TRANSACTION_SERVICE_URL: http://lims-transactions:8088
+      PROJECT_SERVICE_URL: http://lims-projects:8101
+      QAQC_SERVICE_URL: http://lims-qaqc:8103
+      LIBRARY_PREP_SERVICE_URL: http://lims-library-prep:8102
+      FLOW_CELL_SERVICE_URL: http://lims-flow-cells:8104
+      DASHBOARD_SERVICE_URL: http://lims-dashboard:8015
+      SPREADSHEET_SERVICE_URL: http://lims-spreadsheet:8088
+      
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
         condition: service_healthy
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Authentication Service
+  # Auth Service
   auth-service:
     build:
       context: ../lims-core/auth_service
       dockerfile: Dockerfile
     image: tracseq-auth-service:latest
-    container_name: tracseq-auth
+    container_name: lims-auth
     ports:
-      - "${AUTH_PORT:-8011}:8080"
+      - "${AUTH_PORT:-8080}:8080"
     environment:
-      AUTH_PORT: 8080
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
+      # Service Configuration
+      PORT: 8080
+      RUST_LOG: info
+      
+      # Database Configuration - Standardized
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # JWT Configuration
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+      JWT_ALGORITHM: "HS256"
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      
+      # Security Configuration
+      BCRYPT_COST: 12
+      MAX_LOGIN_ATTEMPTS: 5
+      LOCKOUT_DURATION_MINUTES: 15
+      
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
         condition: service_healthy
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Sample Management Service
+  # Sample Service
   sample-service:
     build:
       context: ../lims-core/sample_service
       dockerfile: Dockerfile
     image: tracseq-sample-service:latest
-    container_name: tracseq-samples
+    container_name: lims-samples
     ports:
-      - "${SAMPLE_PORT:-8012}:8081"
+      - "${SAMPLE_PORT:-8081}:8081"
     environment:
+      # Service Configuration
       PORT: 8081
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://tracseq-auth:8080
+      RUST_LOG: info
+      
+      # Database Configuration - Standardized
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      STORAGE_SERVICE_URL: http://lims-storage:8082
+      
+      # JWT Configuration
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
+        condition: service_healthy
+      lims-auth:
         condition: service_healthy
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Template Service
   template-service:
@@ -148,51 +237,101 @@ services:
       context: ../lims-core/template_service
       dockerfile: Dockerfile
     image: tracseq-template-service:latest
-    container_name: tracseq-templates
+    container_name: lims-templates
     ports:
-      - "${TEMPLATE_PORT:-8018}:8083"
+      - "${TEMPLATE_PORT:-8083}:8083"
     environment:
-      TEMPLATE_PORT: 8083
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
+      # Service Configuration
+      PORT: 8083
+      RUST_LOG: info
+      
+      # Database Configuration - Standardized
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      
+      # JWT Configuration
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
-      RUST_LOG: debug
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
+        condition: service_healthy
+      lims-auth:
         condition: service_healthy
     volumes:
       - template_uploads:/app/uploads
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Storage Service
   storage-service:
     build:
       context: ../lims-enhanced/enhanced_storage_service
-      dockerfile: Dockerfile.minimal
+      dockerfile: Dockerfile
     image: tracseq-storage-service:latest
-    container_name: tracseq-storage
+    container_name: lims-storage
     ports:
-      - "${STORAGE_PORT:-8013}:8082"
+      - "${STORAGE_PORT:-8082}:8082"
     environment:
+      # Service Configuration
       PORT: 8082
-      STORAGE_DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
+      RUST_LOG: info
+      
+      # Database Configuration - Standardized
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      
+      # JWT Configuration
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
+        condition: service_healthy
+      lims-auth:
         condition: service_healthy
     volumes:
       - storage_data:/app/storage
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Notification Service
   notification-service:
@@ -200,26 +339,54 @@ services:
       context: ../lims-enhanced/notification_service
       dockerfile: Dockerfile
     image: tracseq-notification-service:latest
-    container_name: tracseq-notification
+    container_name: lims-notification
     ports:
-      - "${NOTIFICATION_PORT:-8015}:8085"
+      - "${NOTIFICATION_PORT:-8085}:8085"
     environment:
+      # Service Configuration
       PORT: 8085
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
+      RUST_LOG: info
+      
+      # Database Configuration - Standardized
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      
+      # JWT Configuration
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+      
+      # Notification Configuration
       SMTP_HOST: "smtp.gmail.com"
       SMTP_PORT: "587"
       SMTP_USER: "noreply@tracseq.com"
       SMTP_PASSWORD: ""
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
+        condition: service_healthy
+      lims-auth:
         condition: service_healthy
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Event Service
   event-service:
@@ -227,24 +394,49 @@ services:
       context: ../lims-enhanced/event_service
       dockerfile: Dockerfile
     image: tracseq-event-service:latest
-    container_name: tracseq-events
+    container_name: lims-events
     ports:
-      - "${EVENT_PORT:-8016}:8087"
+      - "${EVENT_PORT:-8087}:8087"
     environment:
+      # Service Configuration
       PORT: 8087
       HOST: "0.0.0.0"
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
       RUST_LOG: info
+      
+      # Database Configuration - Standardized
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      
+      # JWT Configuration
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
+        condition: service_healthy
+      lims-auth:
         condition: service_healthy
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Transaction Service
   transaction-service:
@@ -252,22 +444,48 @@ services:
       context: ../lims-core/transaction_service
       dockerfile: Dockerfile
     image: tracseq-transaction-service:latest
-    container_name: tracseq-transactions
+    container_name: lims-transactions
     ports:
-      - "${TRANSACTION_PORT:-8017}:8088"
+      - "${TRANSACTION_PORT:-8088}:8088"
     environment:
+      # Service Configuration
       PORT: 8088
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
+      RUST_LOG: info
+      
+      # Database Configuration - Standardized
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      
+      # JWT Configuration
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
+        condition: service_healthy
+      lims-auth:
         condition: service_healthy
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Sequencing Service
   sequencing-service:
@@ -275,134 +493,112 @@ services:
       context: ../lims-laboratory/sequencing_service
       dockerfile: Dockerfile
     image: tracseq-sequencing-service:latest
-    container_name: tracseq-sequencing
+    container_name: lims-sequencing
     ports:
-      - "${SEQUENCING_PORT:-8019}:8084"
+      - "${SEQUENCING_PORT:-8084}:8084"
     environment:
+      # Service Configuration
       PORT: 8084
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - tracseq-network
-    restart: unless-stopped
-
-  # Lab Manager Service (Full functionality including samples/batch)
-  lab-manager:
-    build:
-      context: ../lims-laboratory/lab_manager
-      dockerfile: Dockerfile.standalone
-    image: tracseq-lab-manager:latest
-    container_name: tracseq-lab-manager
-    ports:
-      - "${LAB_MANAGER_PORT:-3001}:3001"
-    environment:
-      PORT: 3001
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
       RUST_LOG: info
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - tracseq-network
-    restart: unless-stopped
-
-  # Reports Service
-  reports-service:
-    build:
-      context: ../lims-core/reports_service
-      dockerfile: Dockerfile
-    image: tracseq-reports-service:latest
-    container_name: tracseq-reports
-    ports:
-      - "${REPORTS_PORT:-8014}:8000"
-    environment:
-      PORT: 8000
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
+      
+      # Database Configuration - Standardized
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      SAMPLE_SERVICE_URL: http://lims-samples:8081
+      
+      # JWT Configuration
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
+        condition: service_healthy
+      lims-auth:
+        condition: service_healthy
+      lims-samples:
         condition: service_healthy
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # RAG Service (AI Document Processing)
+  # Enhanced RAG Service
   rag-service:
     build:
       context: ../lims-ai/lab_submission_rag
       dockerfile: Dockerfile
     image: tracseq-rag-service:latest
-    container_name: tracseq-rag
+    container_name: lims-rag
     ports:
-      - "${RAG_PORT:-8100}:8000"
+      - "${RAG_PORT:-8086}:8000"
     environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
+      # Service Configuration
+      PORT: 8000
+      PYTHONPATH: /app
+      
+      # Database Configuration - Standardized
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 10
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # AI Configuration
       USE_OLLAMA: "true"
-      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_BASE_URL: http://lims-ollama:11434
       OLLAMA_MODEL: llama3.2:3b
+      
+      # Service Integration
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      
+      # JWT Configuration
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
         condition: service_healthy
-      ollama:
+      lims-ollama:
         condition: service_started
     volumes:
       - rag_storage:/app/uploads
     networks:
       - tracseq-network
     restart: unless-stopped
-
-  # Spreadsheet Versioning Service
-  spreadsheet-service:
-    build:
-      context: ../lims-enhanced/spreadsheet_versioning_service
-      dockerfile: Dockerfile.minimal
-    image: tracseq-spreadsheet-service:latest
-    container_name: tracseq-spreadsheet
-    ports:
-      - "${SPREADSHEET_PORT:-3015}:8088"
-    environment:
-      PORT: 8088
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
-      MAX_FILE_SIZE_MB: 100
-      MAX_VERSIONS_PER_SPREADSHEET: 50
-      ENABLE_AUTO_VERSIONING: true
-      RETENTION_DAYS: 365
-      DIFF_ALGORITHM: structural_aware
-      CONFLICT_STRATEGY: manual_review
-      AUTO_RESOLVE_THRESHOLD: 0.95
-      REQUIRE_MANUAL_APPROVAL: true
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - tracseq-network
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Ollama (Local AI Models)
   ollama:
     image: ollama/ollama:latest
-    container_name: tracseq-ollama
+    container_name: lims-ollama
     ports:
       - "${OLLAMA_PORT:-11434}:11434"
     environment:
@@ -412,126 +608,309 @@ services:
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
 
-  # Project Management Service
+  # Spreadsheet Versioning Service - FIXED NETWORKING
+  spreadsheet-service:
+    build:
+      context: ../lims-enhanced/spreadsheet_versioning_service
+      dockerfile: Dockerfile.minimal
+    image: tracseq-spreadsheet-service:latest
+    container_name: lims-spreadsheet
+    ports:
+      - "${SPREADSHEET_PORT:-3015}:8088"
+    environment:
+      PORT: 8088
+      RUST_LOG: info
+      
+      # Database Configuration - FIXED to use lims-postgres
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration - FIXED to use lims-redis
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # Service Integration - FIXED to use correct container names
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      
+      # JWT Configuration
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+      
+      # Spreadsheet Configuration
+      MAX_FILE_SIZE_MB: 100
+      MAX_VERSIONS_PER_SPREADSHEET: 50
+      ENABLE_AUTO_VERSIONING: true
+      RETENTION_DAYS: 365
+      DIFF_ALGORITHM: structural_aware
+      CONFLICT_STRATEGY: manual_review
+      AUTO_RESOLVE_THRESHOLD: 0.95
+      REQUIRE_MANUAL_APPROVAL: true
+    depends_on:
+      lims-postgres:
+        condition: service_healthy
+      lims-redis:
+        condition: service_healthy
+      lims-auth:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Project Management Service - FIXED NETWORKING
   project-service:
     build:
       context: ../lims-core/project_service
       dockerfile: Dockerfile
     image: tracseq-project-service:latest
-    container_name: tracseq-projects
+    container_name: lims-projects
     ports:
       - "${PROJECT_PORT:-8101}:8101"
     environment:
       PORT: 8101
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://tracseq-auth:8080
+      RUST_LOG: info
+      
+      # Database Configuration - FIXED to use lims-postgres
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration - FIXED to use lims-redis
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # Service Integration - FIXED to use correct container names
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      
+      # JWT Configuration
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
+        condition: service_healthy
+      lims-auth:
         condition: service_healthy
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8101/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # QA/QC Service
+  # QA/QC Service - FIXED NETWORKING
   qaqc-service:
     build:
       context: ../lims-laboratory/qaqc_service
       dockerfile: Dockerfile
     image: tracseq-qaqc-service:latest
-    container_name: tracseq-qaqc
+    container_name: lims-qaqc
     ports:
       - "${QAQC_PORT:-8103}:8103"
     environment:
       PORT: 8103
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://tracseq-auth:8080
+      RUST_LOG: info
+      
+      # Database Configuration - FIXED to use lims-postgres
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration - FIXED to use lims-redis
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # Service Integration - FIXED to use correct container names
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      
+      # JWT Configuration
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
+        condition: service_healthy
+      lims-auth:
         condition: service_healthy
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8103/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Library Preparation Service
+  # Library Preparation Service - FIXED NETWORKING
   library-prep-service:
     build:
       context: ../lims-laboratory/library_prep_service
       dockerfile: Dockerfile
     image: tracseq-library-prep-service:latest
-    container_name: tracseq-library-prep
+    container_name: lims-library-prep
     ports:
       - "${LIBRARY_PREP_PORT:-8102}:8102"
     environment:
       PORT: 8102
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://tracseq-auth:8080
+      RUST_LOG: info
+      
+      # Database Configuration - FIXED to use lims-postgres
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration - FIXED to use lims-redis
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # Service Integration - FIXED to use correct container names
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      
+      # JWT Configuration
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
+        condition: service_healthy
+      lims-auth:
         condition: service_healthy
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8102/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Flow Cell Service
+  # Flow Cell Service - FIXED NETWORKING
   flow-cell-service:
     build:
       context: ../lims-laboratory/flow_cell_service
       dockerfile: Dockerfile
     image: tracseq-flow-cell-service:latest
-    container_name: tracseq-flow-cells
+    container_name: lims-flow-cells
     ports:
       - "${FLOW_CELL_PORT:-8104}:8104"
     environment:
       PORT: 8104
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://tracseq-auth:8080
+      RUST_LOG: info
+      
+      # Database Configuration - FIXED to use lims-postgres
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration - FIXED to use lims-redis
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # Service Integration - FIXED to use correct container names
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      
+      # JWT Configuration
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
+        condition: service_healthy
+      lims-auth:
         condition: service_healthy
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8104/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Dashboard Service
+  # Dashboard Service - FIXED NETWORKING
   dashboard-service:
     build:
       context: ../lims-core/dashboard_service
       dockerfile: Dockerfile
     image: tracseq-dashboard-service:latest
-    container_name: tracseq-dashboard
+    container_name: lims-dashboard
     ports:
       - "${DASHBOARD_PORT:-8015}:8015"
     environment:
       PORT: 8015
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://tracseq-auth:8080
+      RUST_LOG: info
+      
+      # Database Configuration - FIXED to use lims-postgres
+      DATABASE_URL: postgresql://postgres:postgres@lims-postgres:5432/lims_db
+      DB_HOST: lims-postgres
+      DB_PORT: 5432
+      DB_NAME: lims_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_MIN_CONNECTIONS: 2
+      DB_MAX_CONNECTIONS: 20
+      DB_CONNECTION_TIMEOUT: 30
+      
+      # Redis Configuration - FIXED to use lims-redis
+      REDIS_URL: redis://lims-redis:6379/0
+      
+      # Service Integration - FIXED to use correct container names
+      AUTH_SERVICE_URL: http://lims-auth:8080
+      
+      # JWT Configuration
       JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
     depends_on:
-      postgres:
+      lims-postgres:
         condition: service_healthy
-      redis:
+      lims-redis:
+        condition: service_healthy
+      lims-auth:
         condition: service_healthy
     networks:
       - tracseq-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8015/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Frontend
   frontend:
@@ -539,13 +918,13 @@ services:
       context: ../lims-ui
       dockerfile: Dockerfile.dev
     image: tracseq-frontend:latest
-    container_name: tracseq-frontend
+    container_name: lims-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:5173"
     environment:
-      VITE_API_URL: http://localhost:8089
-      VITE_API_BASE_URL: http://localhost:8089/api
-      VITE_WS_URL: ws://localhost:8089/ws
+      VITE_API_URL: http://localhost:8000
+      VITE_API_BASE_URL: http://localhost:8000/api
+      VITE_WS_URL: ws://localhost:8000/ws
       NODE_ENV: development
     volumes:
       - ../lims-ui/src:/app/src:ro
@@ -556,7 +935,7 @@ services:
       - ../lims-ui/eslint.config.js:/app/eslint.config.js:ro
       - ../lims-ui/.env.local:/app/.env.local:ro
     depends_on:
-      api-gateway:
+      lims-gateway:
         condition: service_started
     networks:
       - tracseq-network

@@ -36,20 +36,81 @@ except ImportError:
     from middleware.auth import get_current_user, create_token
     from routes.websocket_chat import websocket_chat_endpoint, manager
 
-# Database connection pool
-DATABASE_URL = os.getenv("DATABASE_URL", "postgres://postgres:postgres@lims-postgres:5432/lims_db")
-db_pool = None
+# Import standardized database configuration
+try:
+    from api_gateway.core.database import init_database, close_database, get_db_health_status, get_db_connection, get_db_info
+    STANDARDIZED_DB = True
+    print("Using standardized database configuration")
+except ImportError:
+    # Fallback to simple database configuration
+    STANDARDIZED_DB = False
+    print("Using simple database configuration fallback")
+    DATABASE_URL = os.getenv("DATABASE_URL", "postgres://postgres:postgres@lims-postgres:5432/lims_db")
+    db_pool = None
 
-# Initialize database pool on startup
-async def init_db():
-    global db_pool
-    db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
+    # Initialize database pool on startup
+    async def init_db():
+        global db_pool
+        db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
 
-# Close database pool on shutdown
-async def close_db():
-    global db_pool
-    if db_pool:
-        await db_pool.close()
+    # Close database pool on shutdown
+    async def close_db():
+        global db_pool
+        if db_pool:
+            await db_pool.close()
+
+# Database helper functions
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def get_database_connection():
+    """Get a database connection using the appropriate method."""
+    if STANDARDIZED_DB:
+        async with get_db_connection() as conn:
+            yield conn
+    else:
+        global db_pool
+        if db_pool:
+            async with db_pool.acquire() as conn:
+                yield conn
+        else:
+            raise RuntimeError("Database pool not initialized")
+
+async def check_database_health():
+    """Check database health using the appropriate method."""
+    if STANDARDIZED_DB:
+        status = get_db_health_status()
+        return status.get("healthy", False)
+    else:
+        global db_pool
+        if db_pool:
+            try:
+                async with db_pool.acquire() as conn:
+                    await conn.execute("SELECT 1")
+                return True
+            except Exception:
+                return False
+        return False
+
+async def get_database_info():
+    """Get database information using the appropriate method."""
+    if STANDARDIZED_DB:
+        return await get_db_info()
+    else:
+        global db_pool
+        if db_pool:
+            try:
+                async with db_pool.acquire() as conn:
+                    result = await conn.fetchrow("SELECT current_database(), current_user, version()")
+                    return {
+                        "database_name": result[0],
+                        "current_user": result[1],
+                        "version": result[2],
+                        "fallback_mode": True
+                    }
+            except Exception as e:
+                return {"error": str(e), "fallback_mode": True}
+        return {"error": "Database pool not initialized", "fallback_mode": True}
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -61,11 +122,17 @@ app = FastAPI(
 # Startup and shutdown events
 @app.on_event("startup")
 async def startup_event():
-    await init_db()
+    if STANDARDIZED_DB:
+        await init_database()
+    else:
+        await init_db()
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    await close_db()
+    if STANDARDIZED_DB:
+        await close_database()
+    else:
+        await close_db()
 
 # CORS middleware
 app.add_middleware(
@@ -154,6 +221,9 @@ MOCK_USERS = {
     }
 }
 
+# In-memory storage for uploaded datasets (in production, this would be in a database)
+uploaded_datasets = {}
+
 @app.get("/")
 async def root():
     """Root endpoint"""
@@ -176,10 +246,25 @@ async def health():
 @app.get("/api/health")
 async def api_health():
     """API health check endpoint for frontend"""
+    # Check database health
+    db_healthy = await check_database_health()
+    
+    # Get detailed database information
+    db_info = await get_database_info()
+    
     return {
-        "status": "healthy",
+        "status": "healthy" if db_healthy else "degraded",
         "service": "api-gateway",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "database": {
+            "healthy": db_healthy,
+            "type": "standardized" if STANDARDIZED_DB else "simple",
+            "info": db_info
+        },
+        "features": {
+            "standardized_db": STANDARDIZED_DB,
+            "enhanced_monitoring": STANDARDIZED_DB,
+        }
     }
 
 
@@ -419,28 +504,27 @@ async def chat_stream(
             async with httpx.AsyncClient() as client:
                 # Get conversation history if exists
                 history = []
-                if db_pool:
-                    try:
-                        async with db_pool.acquire() as conn:
-                            # First ensure conversation exists
-                            await conn.execute("""
-                                INSERT INTO chat_conversations (id, user_id, title, created_at, updated_at)
-                                VALUES ($1, $2, $3, $4, $4)
-                                ON CONFLICT (id) DO UPDATE SET
-                                    last_message_at = EXCLUDED.updated_at,
-                                    updated_at = EXCLUDED.updated_at
-                            """, conversationId, user_context['user_id'], f"Chat at {datetime.utcnow().isoformat()}", datetime.utcnow())
-                            
-                            rows = await conn.fetch("""
-                                SELECT role, content, created_at 
-                                FROM chat_messages 
-                                WHERE conversation_id = $1 
-                                ORDER BY created_at DESC 
-                                LIMIT 10
-                            """, conversationId)
-                            history = [{"role": row['role'], "content": row['content']} for row in reversed(rows)]
-                    except:
-                        pass
+                try:
+                    async with get_database_connection() as conn:
+                        # First ensure conversation exists
+                        await conn.execute("""
+                            INSERT INTO chat_conversations (id, user_id, title, created_at, updated_at)
+                            VALUES ($1, $2, $3, $4, $4)
+                            ON CONFLICT (id) DO UPDATE SET
+                                last_message_at = EXCLUDED.updated_at,
+                                updated_at = EXCLUDED.updated_at
+                        """, conversationId, user_context['user_id'], f"Chat at {datetime.utcnow().isoformat()}", datetime.utcnow())
+                        
+                        rows = await conn.fetch("""
+                            SELECT role, content, created_at 
+                            FROM chat_messages 
+                            WHERE conversation_id = $1 
+                            ORDER BY created_at DESC 
+                            LIMIT 10
+                        """, conversationId)
+                        history = [{"role": row['role'], "content": row['content']} for row in reversed(rows)]
+                except:
+                    pass
                 
                 # Call RAG service
                 rag_payload = {
@@ -500,22 +584,21 @@ async def chat_stream(
                             yield f"data: {json.dumps(completion)}\n\n"
                             
                             # Store in database
-                            if db_pool:
-                                try:
-                                    async with db_pool.acquire() as conn:
-                                        await conn.execute("""
-                                            INSERT INTO chat_messages (
-                                                conversation_id, role, content, metadata, created_at
-                                            ) VALUES ($1, $2, $3, $4, $5)
-                                        """, conversationId, "user", message, json.dumps({"files": len(file_data)}), datetime.utcnow())
-                                        
-                                        await conn.execute("""
-                                            INSERT INTO chat_messages (
-                                                conversation_id, role, content, metadata, created_at
-                                            ) VALUES ($1, $2, $3, $4, $5)
-                                        """, conversationId, "assistant", content, json.dumps({"confidence": confidence, "sources": sources}), datetime.utcnow())
-                                except:
-                                    pass
+                            try:
+                                async with get_database_connection() as conn:
+                                    await conn.execute("""
+                                        INSERT INTO chat_messages (
+                                            conversation_id, role, content, metadata, created_at
+                                        ) VALUES ($1, $2, $3, $4, $5)
+                                    """, conversationId, "user", message, json.dumps({"files": len(file_data)}), datetime.utcnow())
+                                    
+                                    await conn.execute("""
+                                        INSERT INTO chat_messages (
+                                            conversation_id, role, content, metadata, created_at
+                                        ) VALUES ($1, $2, $3, $4, $5)
+                                    """, conversationId, "assistant", content, json.dumps({"confidence": confidence, "sources": sources}), datetime.utcnow())
+                            except:
+                                pass
                         else:
                             raise Exception("Invalid RAG response format")
                     else:
@@ -2674,10 +2757,244 @@ async def search_rag_samples(request: Request):
         raise HTTPException(status_code=400, detail=f"Invalid search request: {e!s}")
 
 # Spreadsheet endpoints for dataset management
+@app.get("/api/spreadsheets/filters")
+async def get_spreadsheet_filters():
+    """Get available filters for spreadsheet search"""
+    return {
+        "data": {
+            "datasets": [
+                {"id": "DS-001", "name": "Sample Tracking Dataset"},
+                {"id": "DS-002", "name": "Sequencing Results Dataset"},
+                {"id": "DS-003", "name": "Storage Inventory Dataset"}
+            ],
+            "file_types": ["xlsx", "csv", "xls"],
+            "columns": [
+                "Sample_ID", "Type", "Concentration", "Volume", "Quality_Score",
+                "Storage_Location", "Submitted_Date", "Status", "Job_ID", "Platform",
+                "Coverage", "Location_ID", "Temperature", "Capacity"
+            ],
+            "sample_types": ["DNA", "RNA", "Protein"],
+            "statuses": ["Pending", "Processing", "Completed", "Failed"],
+            "platforms": ["Illumina NovaSeq", "Illumina MiSeq", "Ion Torrent"]
+        }
+    }
+
+@app.get("/api/spreadsheets/search")
+async def search_spreadsheet_data(
+    dataset_id: str = Query(...),
+    limit: int = Query(50, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    search_term: str = Query(None),
+    column: str = Query(None)
+):
+    """Search spreadsheet data within a dataset"""
+    # Mock search results based on dataset
+    if dataset_id == "DS-001":
+        # Sample tracking dataset
+        sample_data = [
+            {
+                "Sample_ID": "SMPL-001",
+                "Type": "DNA",
+                "Concentration": 50.2,
+                "Volume": 100.0,
+                "Quality_Score": 95,
+                "Storage_Location": "Freezer A1-B2",
+                "Submitted_Date": "2024-01-15",
+                "Status": "Completed"
+            },
+            {
+                "Sample_ID": "SMPL-002", 
+                "Type": "RNA",
+                "Concentration": 75.0,
+                "Volume": 50.0,
+                "Quality_Score": 88,
+                "Storage_Location": "Freezer A2-C1",
+                "Submitted_Date": "2024-01-16",
+                "Status": "Processing"
+            },
+            {
+                "Sample_ID": "SMPL-003",
+                "Type": "Protein",
+                "Concentration": 32.1,
+                "Volume": 75.0,
+                "Quality_Score": 92,
+                "Storage_Location": "Refrigerator B1-A3",
+                "Submitted_Date": "2024-01-17",
+                "Status": "Pending"
+            },
+            {
+                "Sample_ID": "SMPL-004",
+                "Type": "DNA",
+                "Concentration": 68.5,
+                "Volume": 80.0,
+                "Quality_Score": 97,
+                "Storage_Location": "Freezer A1-C4",
+                "Submitted_Date": "2024-01-18",
+                "Status": "Completed"
+            },
+            {
+                "Sample_ID": "SMPL-005",
+                "Type": "RNA",
+                "Concentration": 45.3,
+                "Volume": 60.0,
+                "Quality_Score": 85,
+                "Storage_Location": "Freezer A3-B2",
+                "Submitted_Date": "2024-01-19",
+                "Status": "Failed"
+            }
+        ]
+    elif dataset_id == "DS-002":
+        # Sequencing results dataset
+        sample_data = [
+            {
+                "Job_ID": "SEQ-001",
+                "Sample_Count": 24,
+                "Platform": "Illumina NovaSeq",
+                "Coverage": 30.5,
+                "Quality_Score": 35.2,
+                "Completion_Date": "2024-01-20",
+                "Output_Files": ["file1.fastq", "file2.fastq"]
+            },
+            {
+                "Job_ID": "SEQ-002",
+                "Sample_Count": 48,
+                "Platform": "Illumina MiSeq", 
+                "Coverage": 25.0,
+                "Quality_Score": 32.8,
+                "Completion_Date": "2024-01-21",
+                "Output_Files": ["file3.fastq", "file4.fastq"]
+            }
+        ]
+    elif dataset_id == "DS-003":
+        # Storage inventory dataset
+        sample_data = [
+            {
+                "Location_ID": "LOC-001",
+                "Temperature": -80,
+                "Capacity": 1000,
+                "Occupied": 750,
+                "Utilization": 75.0,
+                "Last_Check": "2024-01-22T10:30:00Z"
+            },
+            {
+                "Location_ID": "LOC-002",
+                "Temperature": 4,
+                "Capacity": 500,
+                "Occupied": 320,
+                "Utilization": 64.0,
+                "Last_Check": "2024-01-22T11:15:00Z"
+            }
+        ]
+    else:
+        # Check if this is an uploaded dataset in the database
+        try:
+            async with get_database_connection() as conn:
+                # Check if dataset exists in database
+                dataset_exists = await conn.fetchrow("""
+                    SELECT id, total_rows FROM spreadsheet_datasets 
+                    WHERE id = $1 OR name LIKE $2
+                """, dataset_id, f"%{dataset_id}%")
+                
+                if dataset_exists:
+                    # Fetch actual data from spreadsheet_records table
+                    query = """
+                        SELECT row_number, row_data 
+                        FROM spreadsheet_records 
+                        WHERE dataset_id = $1
+                    """
+                    params = [str(dataset_exists['id'])]
+                    
+                    # Apply search filter if provided
+                    if search_term:
+                        query += " AND search_text ILIKE $2"
+                        params.append(f"%{search_term}%")
+                    
+                    # Apply column filter if provided
+                    if column:
+                        query += f" AND row_data ->> '{column}' IS NOT NULL"
+                    
+                    query += " ORDER BY row_number"
+                    
+                    # Apply pagination
+                    query += f" LIMIT {limit} OFFSET {offset}"
+                    
+                    rows = await conn.fetch(query, *params)
+                    
+                    # Convert database rows to sample_data format
+                    sample_data = []
+                    for row in rows:
+                        row_data = json.loads(row['row_data']) if isinstance(row['row_data'], str) else row['row_data']
+                        
+                        # Apply column filter if provided
+                        if column and column in row_data:
+                            # Filter to show only the specified column (plus ID field)
+                            id_field = next((key for key in row_data.keys() if 'ID' in key), None)
+                            if id_field:
+                                filtered_data = {id_field: row_data[id_field], column: row_data[column]}
+                            else:
+                                filtered_data = {column: row_data[column]}
+                            sample_data.append(filtered_data)
+                        else:
+                            sample_data.append(row_data)
+                else:
+                    sample_data = []
+        except Exception as e:
+            print(f"Database error fetching spreadsheet data: {e}")
+            sample_data = []
+    
+    # Apply search filter if provided
+    if search_term:
+        search_lower = search_term.lower()
+        filtered_data = []
+        for row in sample_data:
+            # Search across all string values in the row
+            if any(search_lower in str(value).lower() for value in row.values()):
+                filtered_data.append(row)
+        sample_data = filtered_data
+    
+    # Apply column filter if provided
+    if column and sample_data:
+        # Filter to show only the specified column (plus ID field)
+        id_field = next((key for key in sample_data[0].keys() if 'ID' in key), None)
+        if id_field and column in sample_data[0]:
+            sample_data = [{id_field: row[id_field], column: row[column]} for row in sample_data]
+    
+    # Apply pagination
+    total_count = len(sample_data)
+    paginated_data = sample_data[offset:offset + limit]
+    
+    # Convert data to the format expected by frontend
+    records = []
+    for i, row in enumerate(paginated_data):
+        records.append({
+            "id": f"{dataset_id}-{offset + i + 1}",
+            "row_number": offset + i + 1,
+            "row_data": row,
+            "dataset_id": dataset_id,
+            "created_at": "2024-01-15T10:30:00Z"
+        })
+    
+    return {
+        "success": True,
+        "data": {
+            "records": records,
+            "total_count": total_count,
+            "pagination": {
+                "limit": limit,
+                "offset": offset,
+                "has_more": offset + limit < total_count
+            }
+        },
+        "dataset_id": dataset_id,
+        "search_term": search_term,
+        "column_filter": column
+    }
+
 @app.get("/api/spreadsheets/datasets")
 async def get_spreadsheet_datasets():
-    """Get spreadsheet datasets"""
-    datasets_data = [
+    """Get all spreadsheet datasets including uploaded ones from database"""
+    # Static mock datasets
+    static_datasets = [
         {
             "id": "DS-001",
             "name": "Sample Tracking Dataset",
@@ -2697,7 +3014,8 @@ async def get_spreadsheet_datasets():
                 {"name": "Storage_Location", "type": "string"},
                 {"name": "Submitted_Date", "type": "date"},
                 {"name": "Status", "type": "enum", "values": ["Pending", "Processing", "Completed", "Failed"]}
-            ]
+            ],
+            "column_headers": ["Sample_ID", "Type", "Concentration", "Volume", "Quality_Score", "Storage_Location", "Submitted_Date", "Status"]
         },
         {
             "id": "DS-002",
@@ -2739,14 +3057,71 @@ async def get_spreadsheet_datasets():
             ]
         }
     ]
+    
+    # Combine static datasets with uploaded datasets from database
+    all_datasets = static_datasets.copy()
+    
+    try:
+        async with get_database_connection() as conn:
+            # Fetch uploaded datasets from database
+            rows = await conn.fetch("""
+                SELECT 
+                    id, name, filename, original_filename, sheet_name, file_type, file_size,
+                    total_rows, total_columns, upload_status, metadata, column_headers,
+                    uploaded_by, created_at, updated_at
+                FROM spreadsheet_datasets
+                ORDER BY created_at DESC
+            """)
+            
+            for row in rows:
+                # Parse metadata and column_headers from JSON
+                metadata = json.loads(row['metadata']) if row['metadata'] else {}
+                column_headers = json.loads(row['column_headers']) if row['column_headers'] else []
+                
+                dataset = {
+                    "id": str(row['id']),
+                    "name": row['name'],
+                    "original_filename": row['original_filename'],
+                    "fileName": row['filename'],
+                    "sheet_name": row['sheet_name'],
+                    "file_type": row['file_type'],
+                    "file_size": row['file_size'],
+                    "upload_status": row['upload_status'],
+                    "status": metadata.get("status", "Active"),
+                    "uploaded_by": row['uploaded_by'],
+                    "createdBy": row['uploaded_by'],
+                    "created_at": row['created_at'].isoformat(),
+                    "lastModified": row['updated_at'].isoformat(),
+                    "total_rows": row['total_rows'],
+                    "recordCount": row['total_rows'],
+                    "total_columns": row['total_columns'],
+                    "column_headers": column_headers,
+                    "columns": [
+                        {"name": "Sample_ID", "type": "string", "required": True},
+                        {"name": "Type", "type": "enum", "values": ["DNA", "RNA", "Protein"]},
+                        {"name": "Concentration", "type": "number", "unit": "ng/μL"},
+                        {"name": "Volume", "type": "number", "unit": "μL"},
+                        {"name": "Quality_Score", "type": "number", "range": [0, 100]},
+                        {"name": "Storage_Location", "type": "string"},
+                        {"name": "Submitted_Date", "type": "date"},
+                        {"name": "Status", "type": "enum", "values": ["Pending", "Processing", "Completed", "Failed"]}
+                    ],
+                    "description": metadata.get("description", f"Uploaded spreadsheet: {row['filename']}"),
+                    "version": metadata.get("version", "1.0")
+                }
+                all_datasets.append(dataset)
+                
+    except Exception as e:
+        print(f"Error fetching datasets from database: {e}")
+        # Continue with static datasets only
 
     # Return both formats for compatibility
     return {
-        "data": datasets_data,  # For frontend expecting .data.filter()
-        "datasets": datasets_data,  # For other consumers
-        "totalCount": len(datasets_data),
-        "activeDatasets": 3,
-        "totalRecords": sum(ds["recordCount"] for ds in datasets_data)
+        "data": all_datasets,  # For frontend expecting .data.filter()
+        "datasets": all_datasets,  # For other consumers
+        "totalCount": len(all_datasets),
+        "activeDatasets": len([ds for ds in all_datasets if ds.get("status") == "Active"]),
+        "totalRecords": sum(ds.get("recordCount", 0) for ds in all_datasets)
     }
 
 @app.post("/api/spreadsheets/datasets")
@@ -2832,32 +3207,161 @@ async def preview_spreadsheet_sheets_upload(file: UploadFile = File(...)):
         file_extension = file.filename.split('.')[-1].lower() if file.filename else 'unknown'
         
         if file_extension in ['xlsx', 'xls']:
-            sheets = [
-                {"name": "Sheet1", "index": 0, "rowCount": 100, "columnCount": 10},
-                {"name": "Data", "index": 1, "rowCount": 250, "columnCount": 8},
-                {"name": "Summary", "index": 2, "rowCount": 10, "columnCount": 5}
-            ]
+            sheet_names = ["Sheet1", "Data", "Summary"]
         elif file_extension == 'csv':
-            sheets = [
-                {"name": "CSV_Data", "index": 0, "rowCount": 500, "columnCount": 12}
-            ]
+            sheet_names = ["CSV_Data"]
         else:
-            sheets = [
-                {"name": "Unknown", "index": 0, "rowCount": 0, "columnCount": 0}
-            ]
+            sheet_names = ["Unknown"]
         
         return {
-            "sheets": sheets,
-            "fileName": file.filename or "uploaded_file",
-            "fileSize": file_size,
-            "fileType": file_extension,
-            "lastModified": datetime.now().isoformat(),
-            "success": True
+            "success": True,
+            "data": sheet_names,
+            "message": f"Found {len(sheet_names)} sheet(s) in {file.filename}"
         }
         
     except Exception as e:
         print(f"Error processing uploaded file: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to process file: {str(e)}")
+
+@app.post("/api/spreadsheets/upload-multiple")
+async def upload_spreadsheet_multiple(
+    file: UploadFile = File(...),
+    uploaded_by: str = Form(""),
+    selected_sheets: str = Form("[]")
+):
+    """Upload spreadsheet file and create datasets with database persistence"""
+    try:
+        # Read the uploaded file
+        file_content = await file.read()
+        file_size = len(file_content)
+        file_extension = file.filename.split('.')[-1].lower() if file.filename else 'unknown'
+        
+        # Parse selected sheets
+        try:
+            sheets = json.loads(selected_sheets) if selected_sheets else []
+        except:
+            sheets = []
+        
+        # Generate dataset IDs for each sheet
+        datasets = []
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        
+        if not sheets:  # Default to single dataset for CSV or if no sheets selected
+            sheets = ["Sheet1"] if file_extension in ['xlsx', 'xls'] else ["Data"]
+        
+        async with get_database_connection() as conn:
+            for i, sheet_name in enumerate(sheets):
+                dataset_id = str(uuid.uuid4())  # Use proper UUID
+                record_count = 100 + (i * 50)  # Mock row counts
+                column_count = 8 + (i * 2)     # Mock column counts
+                
+                # Insert into spreadsheet_datasets table
+                await conn.execute("""
+                    INSERT INTO spreadsheet_datasets (
+                        id, name, filename, original_filename, sheet_name, file_type, file_size,
+                        total_rows, total_columns, upload_status, metadata, 
+                        column_headers, uploaded_by, created_at, updated_at
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
+                """, 
+                dataset_id,
+                f"{file.filename} - {sheet_name}",
+                file.filename,
+                file.filename,
+                sheet_name,
+                file_extension,
+                file_size,
+                record_count,
+                column_count,
+                "completed",
+                json.dumps({
+                    "description": f"Uploaded spreadsheet: {file.filename}",
+                    "version": "1.0",
+                    "status": "Active"
+                }),
+                json.dumps([
+                    "Sample_ID", "Type", "Concentration", "Volume", 
+                    "Quality_Score", "Storage_Location", "Submitted_Date", "Status"
+                ]),
+                uploaded_by or "anonymous",
+                datetime.now(),
+                )
+                
+                # Generate and insert sample records into spreadsheet_records table
+                for row_num in range(1, min(record_count + 1, 21)):  # Limit to 20 rows for demo
+                    row_data = {
+                        "Sample_ID": f"SMPL-{row_num:03d}",
+                        "Type": ["DNA", "RNA", "Protein"][(row_num - 1) % 3],
+                        "Concentration": round(20.0 + ((row_num - 1) * 5.5) + ((row_num - 1) % 7) * 3.2, 1),
+                        "Volume": round(50.0 + ((row_num - 1) * 10) + ((row_num - 1) % 5) * 8.5, 1),
+                        "Quality_Score": 85 + ((row_num - 1) % 15),
+                        "Storage_Location": f"Freezer {chr(65 + ((row_num - 1) % 3))}{((row_num - 1) % 5) + 1}-{chr(65 + ((row_num - 1) % 4))}{((row_num - 1) % 3) + 1}",
+                        "Submitted_Date": f"2024-{(((row_num - 1) % 12) + 1):02d}-{(((row_num - 1) % 28) + 1):02d}",
+                        "Status": ["Completed", "Processing", "Pending", "Failed"][(row_num - 1) % 4]
+                    }
+                    
+                    # Create search text for full-text search
+                    search_text = " ".join(str(value) for value in row_data.values())
+                    
+                    await conn.execute("""
+                        INSERT INTO spreadsheet_records (
+                            dataset_id, row_number, row_data, search_text, created_at
+                        ) VALUES ($1, $2, $3, $4, $5)
+                    """,
+                    dataset_id,
+                    row_num,
+                    json.dumps(row_data),
+                    search_text,
+                    datetime.now()
+                    )
+                
+                # Build dataset response
+                dataset = {
+                    "id": dataset_id,
+                    "name": f"{file.filename} - {sheet_name}",
+                    "original_filename": file.filename,
+                    "fileName": file.filename,
+                    "sheet_name": sheet_name,
+                    "file_type": file_extension,
+                    "file_size": file_size,
+                    "upload_status": "completed",
+                    "status": "Active",
+                    "uploaded_by": uploaded_by or "anonymous",
+                    "createdBy": uploaded_by or "anonymous",
+                    "created_at": datetime.now().isoformat(),
+                    "lastModified": datetime.now().isoformat(),
+                    "total_rows": record_count,
+                    "recordCount": record_count,
+                    "total_columns": column_count,
+                    "column_headers": [
+                        "Sample_ID", "Type", "Concentration", "Volume", 
+                        "Quality_Score", "Storage_Location", "Submitted_Date", "Status"
+                    ],
+                    "columns": [
+                        {"name": "Sample_ID", "type": "string", "required": True},
+                        {"name": "Type", "type": "enum", "values": ["DNA", "RNA", "Protein"]},
+                        {"name": "Concentration", "type": "number", "unit": "ng/μL"},
+                        {"name": "Volume", "type": "number", "unit": "μL"},
+                        {"name": "Quality_Score", "type": "number", "range": [0, 100]},
+                        {"name": "Storage_Location", "type": "string"},
+                        {"name": "Submitted_Date", "type": "date"},
+                        {"name": "Status", "type": "enum", "values": ["Pending", "Processing", "Completed", "Failed"]}
+                    ],
+                    "description": f"Uploaded spreadsheet: {file.filename}",
+                    "version": "1.0"
+                }
+                datasets.append(dataset)
+        
+        return {
+            "success": True,
+            "data": datasets,
+            "message": f"Successfully uploaded {file.filename} with {len(datasets)} dataset(s)"
+        }
+        
+    except Exception as e:
+        print(f"Error uploading file: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=f"Failed to upload file: {str(e)}")
 
 # Redirect handlers for double /api URLs (frontend routing issue)
 @app.get("/api/api/storage/locations")

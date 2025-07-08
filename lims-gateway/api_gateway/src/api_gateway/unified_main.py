@@ -14,7 +14,6 @@ from typing import Any, Dict, Optional, List
 from urllib.parse import urlparse
 
 import httpx
-import structlog
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, Response, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,35 +24,120 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response as StarletteResponse
+import asyncpg
+import json
+
+# Try to import structlog, fallback to standard logging if not available
+try:
+    import structlog
+    
+    # Configure structured logging
+    structlog.configure(
+        processors=[
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.processors.UnicodeDecoder(),
+            structlog.processors.JSONRenderer()
+        ],
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+    
+    logger = structlog.get_logger(__name__)
+    
+except ImportError:
+    # Fallback to standard logging if structlog is not available
+    import logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger(__name__)
+    logger.warning("structlog not available, using standard logging")
 
 from api_gateway.core.config import TracSeqAPIGatewayConfig, get_config, ServiceEndpoint
-from api_gateway.core.monitoring import MonitoringManager
-from api_gateway.core.circuit_breaker import CircuitBreakerManager, CircuitBreakerConfig, CircuitOpenError
-from api_gateway.core.rate_limiter import RateLimitManager, RateLimitConfig, RateLimitAlgorithm
 
-# Configure structured logging
-structlog.configure(
-    processors=[
-        structlog.stdlib.filter_by_level,
-        structlog.stdlib.add_logger_name,
-        structlog.stdlib.add_log_level,
-        structlog.stdlib.PositionalArgumentsFormatter(),
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
-    ],
-    context_class=dict,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-    wrapper_class=structlog.stdlib.BoundLogger,
-    cache_logger_on_first_use=True,
-)
-
-logger = structlog.get_logger(__name__)
+# Try to import enhanced components, use fallbacks if not available
+try:
+    from api_gateway.core.monitoring import MonitoringManager
+    from api_gateway.core.circuit_breaker import CircuitBreakerManager, CircuitBreakerConfig, CircuitOpenError
+    from api_gateway.core.rate_limiter import RateLimitManager, RateLimitConfig, RateLimitAlgorithm
+    from api_gateway.core.database import init_database, close_database, get_db_health_status, get_db_connection
+    ENHANCED_FEATURES = True
+    logger.info("Enhanced features loaded successfully")
+except ImportError as e:
+    logger.warning(f"Enhanced features not available: {e}, using basic implementations")
+    ENHANCED_FEATURES = False
+    
+    # Fallback implementations
+    class MonitoringManager:
+        async def start(self): pass
+        async def stop(self): pass
+        async def get_health_status(self): return {"status": "healthy", "checks": {}}
+        def register_health_check(self, *args, **kwargs): pass
+    
+    class CircuitBreakerManager:
+        def get_breaker(self, *args, **kwargs): 
+            return type('MockBreaker', (), {'get_status': lambda: 'closed'})()
+        def get_all_status(self): return {}
+    
+    class RateLimitManager:
+        def get_status(self): return {}
+    
+    class CircuitOpenError(Exception): pass
+    
+    # Fallback database functions
+    async def init_database(): 
+        await init_db()
+        return None
+    
+    async def close_database(): 
+        await close_db()
+    
+    def get_db_health_status(): 
+        return {"healthy": db_pool is not None, "fallback": True}
+    
+    from contextlib import asynccontextmanager
+    
+    @asynccontextmanager
+    async def get_db_connection():
+        global db_pool
+        if db_pool:
+            async with db_pool.acquire() as conn:
+                yield conn
+        else:
+            raise RuntimeError("Database pool not initialized")
 
 # HTTP Bearer token security
 security = HTTPBearer(auto_error=False)
+
+# Database connection pool (fallback implementation)
+DATABASE_URL = os.getenv("DATABASE_URL", "postgres://postgres:postgres@lims-postgres:5432/lims_db")
+db_pool = None
+
+async def init_db():
+    """Initialize database connection pool (fallback)."""
+    global db_pool
+    try:
+        db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
+        logger.info("Database connection pool initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database pool: {e}")
+        db_pool = None
+
+async def close_db():
+    """Close database connection pool (fallback)."""
+    global db_pool
+    if db_pool:
+        await db_pool.close()
+        logger.info("Database connection pool closed")
 
 
 class TracSeqAPIGateway:
@@ -63,11 +147,11 @@ class TracSeqAPIGateway:
     
     def __init__(self, config: TracSeqAPIGatewayConfig):
         self.config = config
-        self.app = None
-        self.http_client = None
+        self.app: Optional[FastAPI] = None
+        self.http_client: Optional[httpx.AsyncClient] = None
         self.monitoring_manager = MonitoringManager()
         self.circuit_manager = CircuitBreakerManager()
-        self.rate_limit_manager = None
+        self.rate_limit_manager: Optional[RateLimitManager] = None
         self.start_time = time.time()
         
         # WebSocket connections for real-time features
@@ -76,6 +160,9 @@ class TracSeqAPIGateway:
     async def _initialize_components(self):
         """Initialize all gateway components."""
         logger.info("Initializing TracSeq API Gateway components...")
+        
+        # Initialize database connection
+        await init_database()
         
         # Initialize HTTP client with proper configuration
         self.http_client = httpx.AsyncClient(
@@ -95,7 +182,8 @@ class TracSeqAPIGateway:
         )
         
         # Initialize rate limiting
-        self.rate_limit_manager = RateLimitManager()
+        if ENHANCED_FEATURES:
+            self.rate_limit_manager = RateLimitManager()
         
         # Register health checks for all services
         await self._register_health_checks()
@@ -121,6 +209,9 @@ class TracSeqAPIGateway:
         """Create health check function for a service."""
         async def check_health():
             try:
+                if self.http_client is None:
+                    return {"healthy": False, "details": {"error": "HTTP client not initialized"}}
+                    
                 response = await self.http_client.get(
                     f"{endpoint.base_url}{endpoint.health_check_path}",
                     timeout=5.0
@@ -135,7 +226,7 @@ class TracSeqAPIGateway:
                     }
                 }
             except Exception as e:
-                logger.warning(f"Health check failed for {service_name}", error=str(e))
+                logger.warning(f"Health check failed for {service_name}: {str(e)}")
                 return {
                     "healthy": False,
                     "details": {
@@ -156,13 +247,16 @@ class TracSeqAPIGateway:
         if self.monitoring_manager:
             await self.monitoring_manager.stop()
         
+        # Close database connection
+        await close_database()
+        
         logger.info("TracSeq API Gateway components cleaned up")
     
     async def _validate_token(self, token: str) -> Optional[Dict[str, Any]]:
         """Validate JWT token with auth service."""
         try:
             auth_service = self.config.services.get("auth")
-            if not auth_service:
+            if not auth_service or self.http_client is None:
                 return None
             
             response = await self.http_client.post(
@@ -177,7 +271,7 @@ class TracSeqAPIGateway:
             return None
             
         except Exception as e:
-            logger.error("Token validation failed", error=str(e))
+            logger.error(f"Token validation failed: {str(e)}")
             return None
     
     def _get_service_for_path(self, path: str) -> Optional[ServiceEndpoint]:
@@ -250,6 +344,9 @@ class TracSeqAPIGateway:
         """Proxy request to upstream service."""
         start_time = time.time()
         
+        if self.http_client is None:
+            raise HTTPException(status_code=503, detail="Gateway not properly initialized")
+        
         try:
             # Get request body
             body = await request.body()
@@ -269,11 +366,7 @@ class TracSeqAPIGateway:
             headers["X-Forwarded-For"] = request.client.host if request.client else "unknown"
             
             logger.info(
-                "Proxying request",
-                method=request.method,
-                path=request.url.path,
-                service=service.name,
-                upstream_url=upstream_url
+                f"Proxying request: {request.method} {request.url.path} -> {service.name} ({upstream_url})"
             )
             
             # Make the request
@@ -405,6 +498,9 @@ class TracSeqAPIGateway:
     
     def _add_middleware(self):
         """Add middleware to the application."""
+        if self.app is None:
+            raise RuntimeError("FastAPI app not initialized")
+            
         # CORS middleware
         if self.config.cors.enabled:
             self.app.add_middleware(
@@ -440,6 +536,8 @@ class TracSeqAPIGateway:
     
     def _add_routes(self):
         """Add API routes."""
+        if self.app is None:
+            raise RuntimeError("FastAPI app not initialized")
         
         @self.app.get("/")
         async def root():
@@ -451,11 +549,11 @@ class TracSeqAPIGateway:
                 "environment": self.config.environment,
                 "features": {
                     "microservices": True,
-                    "database_connectivity": True,
+                    "database_connectivity": db_pool is not None,
                     "authentication": True,
-                    "rate_limiting": True,
-                    "circuit_breaker": True,
-                    "monitoring": True
+                    "rate_limiting": ENHANCED_FEATURES,
+                    "circuit_breaker": ENHANCED_FEATURES,
+                    "monitoring": ENHANCED_FEATURES
                 },
                 "services": {
                     name: {
@@ -474,16 +572,27 @@ class TracSeqAPIGateway:
             """Gateway health check with service status."""
             health_status = await self.monitoring_manager.get_health_status()
             
+            # Check database connectivity
+            db_healthy = False
+            if db_pool:
+                try:
+                    async with db_pool.acquire() as conn:
+                        await conn.execute("SELECT 1")
+                    db_healthy = True
+                except Exception as e:
+                    logger.error(f"Database health check failed: {e}")
+            
             gateway_health = {
-                "status": "healthy",
+                "status": "healthy" if db_healthy else "degraded",
                 "service": "TracSeq API Gateway",
                 "version": self.config.version,
                 "uptime": time.time() - self.start_time,
                 "environment": self.config.environment,
                 "components": {
                     "http_client": self.http_client is not None,
+                    "database": db_healthy,
                     "monitoring": True,
-                    "circuit_breaker": True,
+                    "circuit_breaker": ENHANCED_FEATURES,
                     "rate_limiter": self.rate_limit_manager is not None
                 }
             }
@@ -492,7 +601,7 @@ class TracSeqAPIGateway:
             if health_status:
                 gateway_health.update(health_status)
             
-            overall_status = "healthy" if gateway_health.get("status") == "healthy" else "unhealthy"
+            overall_status = "healthy" if gateway_health.get("status") == "healthy" and db_healthy else "unhealthy"
             status_code = 200 if overall_status == "healthy" else 503
             
             return JSONResponse(content=gateway_health, status_code=status_code)
@@ -536,7 +645,8 @@ class TracSeqAPIGateway:
                 "services_count": len(self.config.services),
                 "health_checks": await self.monitoring_manager.get_health_status(),
                 "circuit_breakers": self.circuit_manager.get_all_status() if self.circuit_manager else {},
-                "rate_limits": self.rate_limit_manager.get_status() if self.rate_limit_manager else {}
+                "rate_limits": self.rate_limit_manager.get_status() if self.rate_limit_manager else {},
+                "database_connected": db_pool is not None
             }
         
         # WebSocket endpoint for real-time chat
@@ -585,16 +695,27 @@ class TracSeqAPIGateway:
             if full_path == "/api/health":
                 health_status = await self.monitoring_manager.get_health_status()
                 
+                # Check database connectivity
+                db_healthy = False
+                if db_pool:
+                    try:
+                        async with db_pool.acquire() as conn:
+                            await conn.execute("SELECT 1")
+                        db_healthy = True
+                    except Exception as e:
+                        logger.error(f"Database health check failed: {e}")
+                
                 gateway_health = {
-                    "status": "healthy",
+                    "status": "healthy" if db_healthy else "degraded",
                     "service": "TracSeq API Gateway",
                     "version": self.config.version,
                     "uptime": time.time() - self.start_time,
                     "environment": self.config.environment,
                     "components": {
                         "http_client": self.http_client is not None,
+                        "database": db_healthy,
                         "monitoring": True,
-                        "circuit_breaker": True,
+                        "circuit_breaker": ENHANCED_FEATURES,
                         "rate_limiter": self.rate_limit_manager is not None
                     }
                 }
@@ -603,7 +724,7 @@ class TracSeqAPIGateway:
                 if health_status:
                     gateway_health.update(health_status)
                 
-                overall_status = "healthy" if gateway_health.get("status") == "healthy" else "unhealthy"
+                overall_status = "healthy" if gateway_health.get("status") == "healthy" and db_healthy else "unhealthy"
                 status_code = 200 if overall_status == "healthy" else 503
                 
                 return JSONResponse(content=gateway_health, status_code=status_code)
@@ -633,30 +754,34 @@ class TracSeqAPIGateway:
                         detail="Authentication required"
                     )
             
-            # Apply circuit breaker
-            service_name = next(
-                name for name, ep in self.config.services.items() if ep == service
-            )
-            
-            breaker = self.circuit_manager.get_breaker(
-                service_name,
-                CircuitBreakerConfig(
-                    failure_threshold=5,
-                    timeout=60,
-                    window_size=100
+            # Apply circuit breaker if enhanced features are available
+            if ENHANCED_FEATURES:
+                service_name = next(
+                    name for name, ep in self.config.services.items() if ep == service
                 )
-            )
-            
-            try:
-                async with breaker:
-                    return await self._proxy_request(request, service, upstream_url)
-                    
-            except CircuitOpenError:
-                logger.warning("Circuit breaker open", service=service_name)
-                raise HTTPException(
-                    status_code=503,
-                    detail=f"Service {service.name} temporarily unavailable"
+                
+                breaker = self.circuit_manager.get_breaker(
+                    service_name,
+                    CircuitBreakerConfig(
+                        failure_threshold=5,
+                        timeout=60,
+                        window_size=100
+                    )
                 )
+                
+                try:
+                    async with breaker:
+                        return await self._proxy_request(request, service, upstream_url)
+                        
+                except CircuitOpenError:
+                    logger.warning("Circuit breaker open", service=service_name)
+                    raise HTTPException(
+                        status_code=503,
+                        detail=f"Service {service.name} temporarily unavailable"
+                    )
+            else:
+                # Direct proxy without circuit breaker
+                return await self._proxy_request(request, service, upstream_url)
         
         # Catch-all proxy for non-API routes
         @self.app.api_route(
