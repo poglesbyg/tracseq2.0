@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Login - TracSeq 2.0</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="email"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .test-users {
+            background-color: #e7f3ff;
+            border: 1px solid #b8daff;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 TracSeq 2.0 - Login Test</h1>
+        
+        <div class="test-users">
+            <h3>Test Users Available:</h3>
+            <ul>
+                <li><strong>Admin:</strong> admin@tracseq.com / admin123</li>
+                <li><strong>User:</strong> user@tracseq.com / user123</li>
+            </ul>
+        </div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" value="admin@tracseq.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" value="admin123" required>
+            </div>
+            
+            <button type="submit">🔑 Login</button>
+            <button type="button" onclick="testHealth()">🏥 Test Health</button>
+            <button type="button" onclick="testUserMe()">👤 Test User Info</button>
+        </form>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const resultDiv = document.getElementById('result');
+        
+        function showResult(message, isSuccess = true) {
+            resultDiv.innerHTML = message;
+            resultDiv.className = `result ${isSuccess ? 'success' : 'error'}`;
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                console.log('🔑 Attempting login with:', email);
+                
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password }),
+                });
+                
+                console.log('📡 Response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('✅ Login success:', data);
+                    
+                    // Store token
+                    localStorage.setItem('auth_token', data.data.token);
+                    
+                    showResult(`✅ Login Successful!
+
+Response: ${JSON.stringify(data, null, 2)}
+
+Token stored in localStorage: ${data.data.token.substring(0, 50)}...`);
+                } else {
+                    const errorData = await response.json();
+                    console.log('❌ Login failed:', errorData);
+                    showResult(`❌ Login Failed!
+
+Status: ${response.status}
+Error: ${JSON.stringify(errorData, null, 2)}`, false);
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showResult(`❌ Network Error!
+
+Error: ${error.message}`, false);
+            }
+        });
+
+        async function testHealth() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult(`✅ Health Check Passed!
+
+Response: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    showResult(`❌ Health Check Failed!
+
+Status: ${response.status}
+Response: ${JSON.stringify(data, null, 2)}`, false);
+                }
+            } catch (error) {
+                showResult(`❌ Health Check Error!
+
+Error: ${error.message}`, false);
+            }
+        }
+
+        async function testUserMe() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    showResult('❌ No token found! Please login first.', false);
+                    return;
+                }
+
+                const response = await fetch('/api/users/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult(`✅ User Info Retrieved!
+
+Response: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    const errorData = await response.json();
+                    showResult(`❌ User Info Failed!
+
+Status: ${response.status}
+Error: ${JSON.stringify(errorData, null, 2)}`, false);
+                }
+            } catch (error) {
+                showResult(`❌ User Info Error!
+
+Error: ${error.message}`, false);
+            }
+        }
+    </script>
+</body>
+</html> 

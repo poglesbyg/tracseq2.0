@@ -214,14 +214,14 @@ How can I assist you today?`,
   // Initialize WebSocket connection
   useEffect(() => {
     if (isOpen && conversationId.current) {
-      // Get auth token from localStorage
-      const token = localStorage.getItem('authToken') || '';
+      // Get auth token from localStorage (using correct key)
+      const token = localStorage.getItem('auth_token') || '';
       
-      // Connect to WebSocket
-      const ws = new WebSocket(`ws://localhost:8089/ws/chat/${conversationId.current}?token=${token}`);
+      // Connect to WebSocket via Vite proxy
+      const ws = new WebSocket(`ws://localhost:5173/ws/chat/${conversationId.current}?token=${token}`);
       
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected via proxy');
         setWsConnected(true);
       };
       

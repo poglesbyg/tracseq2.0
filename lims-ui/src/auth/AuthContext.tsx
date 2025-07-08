@@ -65,6 +65,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     try {
+      console.log('🔑 Attempting login with:', credentials.email);
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
@@ -73,11 +74,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         body: JSON.stringify(credentials),
       });
 
+      console.log('📡 Login response status:', response.status);
+
       if (!response.ok) {
         let errorMessage = 'Invalid credentials';
         try {
           const errorData = await response.json();
-          errorMessage = errorData.error?.message || 'Invalid credentials';
+          console.log('❌ Login error response:', errorData);
+          errorMessage = errorData.detail || errorData.error?.message || 'Invalid credentials';
         } catch {
           // If JSON parsing fails, use default message
           errorMessage = 'Invalid credentials';
@@ -86,8 +90,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       const data = await response.json();
+      console.log('✅ Login success response:', data);
+      
+      // Handle API gateway response format: { data: { token, user } }
       const { user: userData, token } = data.data;
-      setUser(userData);
+      
+      // Map API gateway user format to our User type
+      const mappedUser: User = {
+        id: userData.id,
+        email: userData.email,
+        first_name: userData.name?.split(' ')[0] || userData.email.split('@')[0],
+        last_name: userData.name?.split(' ')[1] || '',
+        role: userData.role === 'admin' ? 'lab_administrator' : 'lab_technician',
+        status: 'active',
+        lab_affiliation: 'TracSeq Laboratory',
+        department: 'Laboratory Operations',
+        position: userData.role === 'admin' ? 'Administrator' : 'Technician',
+        email_verified: true,
+        created_at: new Date().toISOString(),
+      };
+      
+      setUser(mappedUser);
       localStorage.setItem('auth_token', token);
       
       // Reset login attempts on successful login
@@ -96,6 +119,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         newMap.delete(credentials.email);
         return newMap;
       });
+      
+      console.log('🎉 Login successful, user set:', mappedUser);
     } catch (error) {
       console.error('Login error:', error);
       
@@ -107,6 +132,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const testUser = Object.values(testUsers).find(user => user.email === credentials.email);
       
       if (testUser && credentials.password === testUser.password) {
+        console.log('🧪 Using test user fallback:', testUser.email);
         const mockUser: User = {
           id: `test-${testUser.role}`,
           email: testUser.email,

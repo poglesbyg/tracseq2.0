@@ -13,6 +13,7 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path, // Don't rewrite the path
         configure: (proxy) => {
           proxy.on('error', (err) => {
             console.log('🚨 Proxy error:', err);
@@ -22,6 +23,17 @@ export default defineConfig({
           });
           proxy.on('proxyRes', (proxyRes, req) => {
             console.log('📥 Proxy response:', proxyRes.statusCode, req.url);
+          });
+        },
+      },
+      // Proxy WebSocket connections for chat
+      '/ws': {
+        target: 'ws://localhost:8000',
+        ws: true,
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.log('🚨 WebSocket proxy error:', err);
           });
         },
       },
