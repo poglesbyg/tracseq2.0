@@ -10,62 +10,60 @@
 - Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
 
 
-The TracSeq 2.0 laboratory management system implements domain-specific business logic across several key components:
+The LIMS Microservice System implements a comprehensive laboratory information management platform with the following key business domains:
 
-## RAG Laboratory Document Processing
+## Core Laboratory Management
+- Sample tracking and chain of custody
+- Storage location optimization with temperature zones (-80°C to 37°C)
+- Workflow automation for sample processing
+- Quality control and validation workflows
+- Barcode generation and management
 
-### Document Analysis Engine
-- Specialized extraction of laboratory information using AI models
-- Document validation and confidence scoring for lab submissions
-- Integration with local and cloud LLM providers
-- Files: `lab_submission_rag/rag_orchestrator.py`, `lab_submission_rag/simple_lab_rag.py`
+## AI-Enhanced Processing
+- RAG (Retrieval Augmented Generation) for document analysis
+- Intelligent storage optimization using predictive analytics  
+- Quality control automation with machine learning
+- Maintenance prediction for laboratory equipment
 
-### Laboratory Submission Workflow
-- Sample tracking and metadata management
-- Chain of custody for sample movement
-- Quality control validation rules
-- Files: `enhanced_storage_service/src/services.rs`, `lab_submission_rag/models/submission.py`
-
-## Storage Management System
-
-### Intelligent Storage Allocation
-- Temperature zone management (-80°C, -20°C, 4°C, RT, 37°C)
-- Capacity optimization and predictive analytics
+## Integration Components
+- ERP integration for procurement and inventory
+- Equipment manufacturer API integration
+- Blockchain integration for sample custody tracking
 - IoT sensor integration for environmental monitoring
-- Files: `enhanced_storage_service/src/handlers/storage.rs`
 
-### Digital Twin Technology
-- Virtual modeling of storage environments
-- Simulation-based optimization
-- Real-time synchronization with physical storage
-- Files: `enhanced_storage_service/src/handlers/digital_twin.rs`
+## Storage Service Features  
+- Digital twin simulation of storage environments
+- Energy optimization and monitoring
+- Mobile device integration for sample tracking
+- Automated storage location assignments
+- Environmental condition monitoring
 
-## MLOps Pipeline
+## Document Processing
+- Laboratory document analysis using RAG
+- Template-based information extraction
+- Quality scoring for extracted data
+- Multi-agent workflow processing
 
-### Model Management
-- Laboratory-specific model registry
+## MLOps Integration
+- Continuous learning pipeline for model updates
 - A/B testing for extraction models
-- Continuous learning from new submissions
-- Files: `lab_submission_rag/mlops/model_registry.py`
+- Automated model deployment controls  
+- Performance monitoring and alerting
 
-### Experiment Tracking
-- Custom metrics for laboratory data extraction
-- Performance monitoring and validation
-- Files: `lab_submission_rag/mlops/experiment_tracker.py`
+## Compliance Management
+- Regulatory requirement validation
+- Chain of custody tracking
+- Audit trail maintenance
+- Access control and permissions
 
-## Enterprise Integration
-
-### Notification Service
-- Multi-channel laboratory alerts
-- Priority-based message routing
-- Template management for notifications
-- Files: `notification_service/src/handlers/channels.rs`
-
-### Event Service
-- Laboratory-specific event handling
-- Real-time processing capabilities
-- Redis-based message broker integration
-- Files: `event_service/src/events/handlers.rs`
+Critical File Paths:
+```
+/lims-core/        # Core laboratory services
+/lims-ai/          # AI and ML services
+/lims-enhanced/    # Advanced storage features
+/lims-laboratory/  # Lab workflow automation
+/lims-gateway/     # API gateway and routing
+```
 
 $END$
 

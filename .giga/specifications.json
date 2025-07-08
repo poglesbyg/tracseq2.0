@@ -1,86 +1,26 @@
-{
-  "project": "LIMS Microservice System",
-  "description": "A modular laboratory information management system built with Rust microservices, Python AI services, a React frontend, and PostgreSQL backend.",
-  "tech_stack": {
-    "backend": [
-      {
-        "language": "Rust",
-        "framework": "Actix Web",
-        "database": "PostgreSQL",
-        "orm": "SQLx"
-      },
-      {
-        "language": "Python",
-        "framework": "FastAPI",
-        "ai_stack": ["PyTorch", "Pandas", "NumPy"]
-      }
-    ],
-    "frontend": {
-      "language": "TypeScript",
-      "framework": "React",
-      "ui_library": "Chakra UI",
-      "state_management": "React Context + useReducer"
-    },
-    "infrastructure": {
-      "containerization": "Docker",
-      "orchestration": "Docker Compose",
-      "devops": ["Makefile", "dotenv"]
-    }
+[
+  {
+    "fileName": "main-overview.mdc",
+    "description": "Complete system overview documenting the LIMS microservice architecture, key components, and their interactions. Includes high-level overview of core services like sample management, RAG processing, and storage optimization."
   },
-  "capabilities": [
-    "Track and manage sample batches",
-    "Analyze lab results using AI",
-    "Flag patients for follow-up based on lab rules",
-    "Visualize status and analytics via dashboard"
-  ],
-  "api_contracts": {
-    "lims-core": "/api/sample_batches, /api/samples",
-    "lims-ai": "/analyze, /predict"
+  {
+    "fileName": "laboratory-data-models.mdc",
+    "description": "Comprehensive documentation of all laboratory-specific data models including samples, submissions, storage locations, workflows, and their relationships. Details schema definitions, validation rules, and state transitions."
   },
-  "data_sources": [
-    "CSV Uploads",
-    "Lab instrument integration (future)",
-    "Manual entry via UI"
-  ],
-  "output_targets": [
-    "Database entries",
-    "Frontend visualizations",
-    "AI-generated risk assessments"
-  ],
-  "team_guidelines": {
-    "code_style": "Follow idiomatic code style for each language (rustfmt, black, prettier)",
-    "testing": "Include unit tests for all components. Use Pytest, Jest, and Rust’s built-in test framework.",
-    "api_design": "Use RESTful principles. JSON for data interchange.",
-    "error_handling": "Graceful and explicit error responses with consistent format"
+  {
+    "fileName": "rag-algorithms.mdc",
+    "description": "Detailed documentation of the RAG (Retrieval Augmented Generation) algorithms, including document processing, information extraction, confidence scoring, and laboratory-specific query handling logic."
   },
-  "documentation_files": [
-    {
-      "fileName": "main-overview.mdc",
-      "description": "Complete system overview detailing the Lab Manager architecture, RAG integration, and core components interaction patterns"
-    },
-    {
-      "fileName": "data-models-and-relationships.mdc",
-      "description": "Comprehensive documentation of submission data models, domain entities, and their relationships including AdministrativeInfo, SourceMaterial, PoolingInfo, SequenceGeneration, ContainerInfo, InformaticsInfo, and SampleDetails models"
-    },
-    {
-      "fileName": "rag-algorithms.mdc",
-      "description": "Detailed documentation of the RAG system's core algorithms including document processing, information extraction, vector embedding, and similarity search implementations"
-    },
-    {
-      "fileName": "data-flow-patterns.mdc",
-      "description": "End-to-end documentation of data flow through the system including document processing pipeline, RAG orchestration, and information extraction workflows"
-    },
-    {
-      "fileName": "llm-integration.mdc",
-      "description": "Documentation of LLM integration patterns, prompt engineering, conversation context management, and enhanced response generation algorithms"
-    },
-    {
-      "fileName": "code-conventions.mdc",
-      "description": "Coding conventions for Rust, Python, and TypeScript used across the project, including formatting, naming, error handling, and module organization standards"
-    },
-    {
-      "fileName": "docker.mdc",
-      "description": "Detailed Docker and Docker Compose setup documentation including service definitions, networking, volumes, environment configuration, and local development workflows"
-    }
-  ]
-}
+  {
+    "fileName": "storage-optimization.mdc",
+    "description": "Documentation of storage optimization algorithms including capacity prediction, temperature zone management, AI-driven placement strategies, and digital twin simulation models."
+  },
+  {
+    "fileName": "workflow-orchestration.mdc",
+    "description": "Details the implementation of laboratory workflows including multi-agent coordination, quality control processes, MLOps experiment tracking, and continuous learning pipelines."
+  },
+  {
+    "fileName": "data-flow-paths.mdc",
+    "description": "Comprehensive documentation of data flows between microservices, including sample submission processing, storage management, RAG pipeline integration, and system monitoring."
+  }
+]

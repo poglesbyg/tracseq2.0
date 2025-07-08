@@ -1,65 +1,57 @@
 ---
-description: Specifies RAG algorithms, document processing, vector embeddings, and AI-driven information extraction for laboratory submissions.
-globs: **/rag/**,**/rag_service/**,**/*rag*.{py,rs},**/mlops/**
+description: Technical documentation for RAG algorithms and pipelines in the laboratory information management system
+globs: **/lab_submission_rag/**/*.py,**/lab_workflows/**/*.py,**/mlops/**/*.py,**/models/**/*.py
 alwaysApply: false
 ---
 
 
 # rag-algorithms
 
-The RAG system implements specialized algorithms for processing laboratory documents and extracting structured information through several key components:
+The system implements specialized RAG algorithms for laboratory document processing:
 
-### Document Processing Pipeline
-- Extracts text from PDF, DOCX, and TXT files using format-specific extractors
-- Chunks documents based on laboratory domain knowledge using a `RecursiveCharacterTextSplitter`
-- Maintains document metadata including file path, page numbers, and chunk indices
-- Assigns unique identifiers based on file stem, page number, and chunk position
+1. Laboratory Document Processing Pipeline:
+- Parses laboratory submissions and metadata using specialized extractors:
+  * Administrative data (submitter details, project info)
+  * Sample information (type, concentration, volume)
+  * Sequencing specifications (platform, parameters)
+  * Storage conditions (temperature, container)
+- Implements confidence scoring (0.0-1.0) for extracted information
+- Path: `lab_submission_rag/lab_workflows/document_processing.py`
 
-### Information Extraction
-- Uses LLM prompting to extract structured data from documents, focusing on laboratory-specific fields:
-  - Administrative information (submitter details, project info)
-  - Sample information (type, quantity, conditions)
-  - Sequencing requirements (platform, read length)
-  - Storage specifications (temperature, container type)
-- Assigns confidence scores to extracted information
-- Falls back to template-based extraction for standard forms
+2. Quality Control Workflow:
+- Multi-stage extraction pipeline with self-correction:
+  * Initial extraction with base confidence threshold (0.85)
+  * Automated retry with improved prompts if confidence < threshold
+  * Maximum 3 retry attempts before human review
+  * Confidence recalculation after each retry
+- Path: `lab_submission_rag/lab_workflows/quality_control.py`
 
-### Vector Store Implementation
-- Uses ChromaDB for storing document embeddings
-- Generates embeddings using SentenceTransformer with 'all-MiniLM-L6-v2' model
-- Implements similarity search with configurable thresholds
-- Maintains metadata about embeddings including model version and timestamp
+3. Laboratory Query System:
+- Context-aware query processing:
+  * Maintains conversation history
+  * Tracks sample and project references
+  * Incorporates laboratory domain knowledge
+- Specialized prompt enhancement for laboratory terminology
+- Path: `lab_submission_rag/rag/enhanced_llm_interface.py`
 
-### Query Processing
-- Processes natural language queries about laboratory submissions
-- Uses vector similarity to retrieve relevant context chunks
-- Enhances responses with structured data from database
-- Provides confidence scores for responses
+4. Vector Storage Management:
+- Custom chunking optimized for laboratory documents
+- Metadata tracking for sample submissions
+- Source document relationship preservation
+- Path: `lab_submission_rag/rag/vector_store.py`
 
-### MLOps Pipeline Integration
-- Tracks RAG model performance metrics
-- Implements A/B testing for extraction algorithms
-- Supports continuous learning from user feedback
-- Monitors extraction quality and confidence trends
+5. MLOps Integration:
+- A/B testing for extraction models
+- Continuous learning from validation feedback
+- Automated model retraining based on performance metrics
+- Path: `lab_submission_rag/mlops/continuous_learning.py`
 
-### Resilience Mechanisms
-- Implements retry logic for LLM calls
-- Provides fallback mechanisms between local and cloud LLMs
-- Caches extraction results to improve performance
-- Handles partial extraction results gracefully
-
-Relevant file paths:
-```
-lab_submission_rag/
-  rag/
-    document_processor.py
-    llm_interface.py 
-    vector_store.py
-  mlops/
-    experiment_tracker.py
-    model_registry.py
-    continuous_learning.py
-```
+Core algorithms prioritize:
+- Laboratory data extraction accuracy
+- Sample tracking integrity 
+- Chain of custody maintenance
+- Regulatory compliance validation
+- Document relationship preservation
 
 $END$
 
