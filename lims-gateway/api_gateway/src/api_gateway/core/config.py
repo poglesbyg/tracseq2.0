@@ -298,7 +298,9 @@ class TracSeqAPIGatewayConfig(BaseSettings):
                 port=8088,
                 path_prefix="/api/spreadsheets",
                 health_check_path="/health",
-                rate_limit=150
+                rate_limit=150,
+                add_version_prefix=False,
+                strip_path_prefix=False
             ),
             "transactions": ServiceEndpoint(
                 name="Transaction Service",

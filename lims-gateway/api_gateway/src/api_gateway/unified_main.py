@@ -581,6 +581,33 @@ class TracSeqAPIGateway:
             
             logger.info(f"DEBUG: Received request for path: {full_path}")
             
+            # Handle special case for /api/health - redirect to gateway health
+            if full_path == "/api/health":
+                health_status = await self.monitoring_manager.get_health_status()
+                
+                gateway_health = {
+                    "status": "healthy",
+                    "service": "TracSeq API Gateway",
+                    "version": self.config.version,
+                    "uptime": time.time() - self.start_time,
+                    "environment": self.config.environment,
+                    "components": {
+                        "http_client": self.http_client is not None,
+                        "monitoring": True,
+                        "circuit_breaker": True,
+                        "rate_limiter": self.rate_limit_manager is not None
+                    }
+                }
+                
+                # Combine with service health status
+                if health_status:
+                    gateway_health.update(health_status)
+                
+                overall_status = "healthy" if gateway_health.get("status") == "healthy" else "unhealthy"
+                status_code = 200 if overall_status == "healthy" else 503
+                
+                return JSONResponse(content=gateway_health, status_code=status_code)
+            
             # Find target service
             service = self._get_service_for_path(full_path)
             if not service:
@@ -594,7 +621,7 @@ class TracSeqAPIGateway:
             upstream_url = self._build_upstream_url(service, full_path, request)
             
             # Check authentication if required
-            auth_exempt_paths = ["/api/auth/login", "/api/auth/register", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/verify-email"]
+            auth_exempt_paths = ["/api/auth/login", "/api/auth/register", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/verify-email", "/api/health"]
             logger.info(f"DEBUG: Service {service.name} require_auth={service.require_auth}, path={full_path}")
             if service.require_auth and full_path not in auth_exempt_paths:
                 auth_header = request.headers.get("authorization")
