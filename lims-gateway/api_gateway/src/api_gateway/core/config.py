@@ -24,6 +24,13 @@ class ServiceEndpoint(BaseModel):
     retries: int = 3
     circuit_breaker_enabled: bool = True
     load_balancer_weight: int = 100
+    rate_limit: int = 100  # requests per minute
+    require_auth: bool = True
+    
+    # Additional service-specific configurations
+    custom_headers: Dict[str, str] = Field(default_factory=dict)
+    strip_path_prefix: bool = True
+    add_version_prefix: bool = True
 
     @property
     def base_url(self) -> str:
@@ -171,99 +178,186 @@ class TracSeqAPIGatewayConfig(BaseSettings):
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000)
 
-    # Service endpoints configuration
+    # Service endpoints configuration - Updated to match actual microservice deployments
     services: Dict[str, ServiceEndpoint] = Field(
         default={
+            # Core Services
             "auth": ServiceEndpoint(
                 name="Auth Service",
-                host="auth-service",
-                port=8080,
-                path_prefix="/auth",
-                health_check_path="/api/v1/health"
+                host="lims-auth",
+                port=8000,
+                path_prefix="/api/auth",
+                health_check_path="/health",
+                rate_limit=300,
+                require_auth=False,
+                strip_path_prefix=False,
+                add_version_prefix=False
+            ),
+            "users": ServiceEndpoint(
+                name="User Management",
+                host="lims-auth",
+                port=8000,
+                path_prefix="/api/users",
+                health_check_path="/health",
+                rate_limit=200,
+                add_version_prefix=False
             ),
             "samples": ServiceEndpoint(
                 name="Sample Service",
-                host="sample-service",
-                port=8081,
-                path_prefix="/samples",
-                health_check_path="/api/v1/health"
+                host="lims-samples",
+                port=8000,
+                path_prefix="/api/samples",
+                health_check_path="/health",
+                rate_limit=500
             ),
             "storage": ServiceEndpoint(
                 name="Enhanced Storage Service",
-                host="enhanced-storage-service",
-                port=8082,
-                path_prefix="/storage",
-                health_check_path="/api/v1/health"
+                host="lims-storage",
+                port=8080,
+                path_prefix="/api/storage",
+                health_check_path="/health",
+                rate_limit=300
             ),
             "templates": ServiceEndpoint(
                 name="Template Service",
-                host="lims-templates",
-                port=8000,
-                path_prefix="/templates",
-                health_check_path="/api/v1/health"
+                host="tracseq-templates",
+                port=8083,
+                path_prefix="/api/templates",
+                health_check_path="/health",
+                rate_limit=200
             ),
+            # Laboratory Services
             "sequencing": ServiceEndpoint(
                 name="Sequencing Service",
-                host="lims-sequencing",
-                port=8000,
-                path_prefix="/sequencing",
-                health_check_path="/api/v1/health"
+                host="tracseq-sequencing",
+                port=8084,
+                path_prefix="/api/sequencing",
+                health_check_path="/health",
+                rate_limit=200
             ),
-            "notifications": ServiceEndpoint(
-                name="Notification Service",
-                host="lims-notification",
-                port=8000,
-                path_prefix="/notifications",
-                health_check_path="/api/v1/health"
+            "qc": ServiceEndpoint(
+                name="QA/QC Service",
+                host="tracseq-qaqc",
+                port=8103,
+                path_prefix="/api/qc",
+                health_check_path="/health",
+                rate_limit=150
             ),
-            "rag": ServiceEndpoint(
-                name="Enhanced RAG Service",
-                host="enhanced-rag-service",
-                port=8086,
-                path_prefix="/rag",
-                health_check_path="/api/v1/health"
-            ),
-            "events": ServiceEndpoint(
-                name="Event Service",
-                host="lims-events",
-                port=8087,
-                path_prefix="/events",
-                health_check_path="/health"
-            ),
-            "transactions": ServiceEndpoint(
-                name="Transaction Service",
-                host="lims-transactions",
-                port=8000,
-                path_prefix="/transactions",
-                health_check_path="/api/v1/health"
-            ),
-            "projects": ServiceEndpoint(
-                name="Project Service",
-                host="project-service",
-                port=8101,
-                path_prefix="/projects",
-                health_check_path="/health"
+            "qaqc": ServiceEndpoint(
+                name="QA/QC Service (alt)",
+                host="tracseq-qaqc",
+                port=8103,
+                path_prefix="/api/qaqc",
+                health_check_path="/health",
+                rate_limit=150
             ),
             "library-prep": ServiceEndpoint(
                 name="Library Prep Service",
-                host="library-prep-service",
+                host="tracseq-library-prep",
                 port=8102,
-                path_prefix="/library-prep",
-                health_check_path="/health"
-            ),
-            "qaqc": ServiceEndpoint(
-                name="QA/QC Service",
-                host="lims-qaqc",
-                port=8089,
-                path_prefix="/qaqc",
-                health_check_path="/health"
+                path_prefix="/api/library-prep",
+                health_check_path="/health",
+                rate_limit=150
             ),
             "flow-cells": ServiceEndpoint(
                 name="Flow Cell Service",
-                host="flow-cell-service",
+                host="tracseq-flow-cells",
                 port=8104,
-                path_prefix="/flow-cells",
-                health_check_path="/health"
+                path_prefix="/api/flow-cells",
+                health_check_path="/health",
+                rate_limit=100
+            ),
+            "projects": ServiceEndpoint(
+                name="Project Service",
+                host="tracseq-projects",
+                port=8101,
+                path_prefix="/api/projects",
+                health_check_path="/health",
+                rate_limit=200
+            ),
+            # Enhanced Services
+            "notifications": ServiceEndpoint(
+                name="Notification Service",
+                host="tracseq-notification",
+                port=8085,
+                path_prefix="/api/notifications",
+                health_check_path="/health",
+                rate_limit=200
+            ),
+            "events": ServiceEndpoint(
+                name="Event Service",
+                host="tracseq-events",
+                port=8087,
+                path_prefix="/api/events",
+                health_check_path="/health",
+                rate_limit=300
+            ),
+            "spreadsheets": ServiceEndpoint(
+                name="Spreadsheet Service",
+                host="tracseq-spreadsheet",
+                port=8088,
+                path_prefix="/api/spreadsheets",
+                health_check_path="/health",
+                rate_limit=150
+            ),
+            "transactions": ServiceEndpoint(
+                name="Transaction Service",
+                host="tracseq-transactions",
+                port=8088,
+                path_prefix="/api/transactions",
+                health_check_path="/health",
+                rate_limit=100
+            ),
+            "reports": ServiceEndpoint(
+                name="Reports Service",
+                host="lims-reports",
+                port=8000,
+                path_prefix="/api/reports",
+                health_check_path="/health",
+                rate_limit=100
+            ),
+            "dashboard": ServiceEndpoint(
+                name="Dashboard Service",
+                host="tracseq-dashboard",
+                port=8015,
+                path_prefix="/api/dashboard",
+                health_check_path="/health",
+                rate_limit=200
+            ),
+            # AI Services
+            "rag": ServiceEndpoint(
+                name="Enhanced RAG Service",
+                host="tracseq-rag",
+                port=8000,
+                path_prefix="/api/rag",
+                health_check_path="/health",
+                rate_limit=50
+            ),
+            "chat": ServiceEndpoint(
+                name="Chat Service",
+                host="tracseq-rag",
+                port=8000,
+                path_prefix="/api/chat",
+                health_check_path="/health",
+                rate_limit=100
+            ),
+            # Fallback to Lab Manager for missing services
+            "lab-manager": ServiceEndpoint(
+                name="Lab Manager (Fallback)",
+                host="tracseq-lab-manager",
+                port=3001,
+                path_prefix="/api/fallback",
+                health_check_path="/health",
+                rate_limit=500
+            ),
+            # Gateway Management
+            "gateway": ServiceEndpoint(
+                name="Gateway Management",
+                host="localhost",
+                port=8089,
+                path_prefix="/api/gateway",
+                health_check_path="/health",
+                rate_limit=100
             ),
         }
     )
@@ -344,6 +438,7 @@ class TracSeqAPIGatewayConfig(BaseSettings):
         env_file_encoding = "utf-8"
         env_nested_delimiter = "__"
         case_sensitive = False
+        extra = "ignore"  # Ignore extra environment variables
 
 
 @lru_cache

@@ -209,7 +209,7 @@ class HealthChecker:
                 logger.error(f"Health check error for {name}", error=str(e))
                 self.results[name] = {
                     "status": "error",
-                    "last_check": datetime.now(),
+                    "last_check": datetime.now().isoformat(),
                     "error": str(e),
                     "critical": self.results[name].get("critical", True)
                 }
@@ -227,7 +227,7 @@ class HealthChecker:
             
             return {
                 "status": "healthy" if result.get("healthy", False) else "unhealthy",
-                "last_check": datetime.now(),
+                "last_check": datetime.now().isoformat(),
                 "duration": duration,
                 "details": result.get("details", {}),
                 "critical": self.results[name].get("critical", True)
@@ -237,7 +237,7 @@ class HealthChecker:
             duration = time.time() - start_time
             return {
                 "status": "unhealthy",
-                "last_check": datetime.now(),
+                "last_check": datetime.now().isoformat(),
                 "duration": duration,
                 "error": str(e),
                 "critical": self.results[name].get("critical", True)

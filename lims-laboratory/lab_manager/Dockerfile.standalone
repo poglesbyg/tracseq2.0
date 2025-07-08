@@ -1,0 +1,57 @@
+FROM rustlang/rust:nightly-slim as builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Cargo.toml and create a dummy main to cache dependencies
+COPY Cargo.toml.standalone ./Cargo.toml
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release
+RUN rm src/main.rs
+
+# Copy source code
+COPY src ./src
+
+# Build the application
+RUN cargo build --release
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN useradd -r -s /bin/false -m -d /app appuser
+
+# Copy the binary from builder
+COPY --from=builder /app/target/release/lab_manager ./
+
+# Create storage directory
+RUN mkdir -p /app/storage && chown -R appuser:appuser /app
+
+USER appuser
+
+# Set environment
+ENV RUST_LOG=info
+ENV STORAGE_PATH=/app/storage
+
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:3001/health || exit 1
+
+CMD ["./lab_manager"] 

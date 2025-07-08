@@ -1,0 +1,55 @@
+FROM rustlang/rust:nightly-slim as builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Cargo.toml and create a dummy main to cache dependencies
+COPY Cargo.toml.standalone ./Cargo.toml
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release
+RUN rm src/main.rs
+
+# Copy source code and use simple main
+COPY src ./src
+COPY src/main_simple.rs ./src/main.rs
+
+# Build the application
+RUN cargo build --release
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN useradd -r -s /bin/false -m -d /app appuser
+
+# Copy the binary from builder
+COPY --from=builder /app/target/release/spreadsheet_versioning_service ./
+
+# Change ownership to app user
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# Expose port
+EXPOSE 8088
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8088/health || exit 1
+
+# Run the application
+CMD ["./spreadsheet_versioning_service"] 

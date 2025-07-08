@@ -33,8 +33,8 @@ const isDevelopment = (import.meta as { env: Record<string, string | boolean | u
 // Default configuration
 const defaultConfig: AppConfig = {
   api: {
-    gatewayUrl: '',
-    baseUrl: '',
+    gatewayUrl: 'http://localhost:8089',
+    baseUrl: 'http://localhost:8089',
     wsUrl: isDevelopment ? 'ws://localhost:8089/ws' : `ws://${typeof window !== 'undefined' ? window.location.host : 'localhost'}/ws`,
     timeout: 30000,
     retries: 3,
@@ -91,16 +91,18 @@ const config: AppConfig = {
 
 // Service endpoints
 export const endpoints = {
-  auth: `${config.api.baseUrl}/auth`,
-  samples: `${config.api.baseUrl}/samples`,
-  storage: `${config.api.baseUrl}/storage`,
-  templates: `${config.api.baseUrl}/templates`,
-  sequencing: `${config.api.baseUrl}/sequencing`,
-  notifications: `${config.api.baseUrl}/notifications`,
-  rag: `${config.api.baseUrl}/rag`,
-  dashboard: `${config.api.baseUrl}/dashboard`,
-  spreadsheets: `${config.api.baseUrl}/spreadsheets`,
-  reports: `${config.api.baseUrl}/reports`,
+  auth: `${config.api.baseUrl}/api/auth`,
+  samples: `${config.api.baseUrl}/api/samples`,
+  storage: `${config.api.baseUrl}/api/storage`,
+  templates: `${config.api.baseUrl}/api/templates`,
+  sequencing: `${config.api.baseUrl}/api/sequencing`,
+  notifications: `${config.api.baseUrl}/api/notifications`,
+  rag: `${config.api.baseUrl}/api/rag`,
+  dashboard: `${config.api.baseUrl}/api/dashboard`,
+  spreadsheets: `${config.api.baseUrl}/api/spreadsheets`,
+  reports: `${config.api.baseUrl}/api/reports`,
+  events: `${config.api.baseUrl}/api/events`,
+  transactions: `${config.api.baseUrl}/api/transactions`,
 };
 
 export default config; 

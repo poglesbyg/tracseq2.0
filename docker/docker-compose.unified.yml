@@ -57,34 +57,35 @@ services:
       ENVIRONMENT: development
       HOST: 0.0.0.0
       PORT: 8000
+      VERSION: "2.0.0"
       
       # Database and Cache
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://redis:6379/0
       
-      # Monolith Configuration (fallback)
-      MONOLITH__HOST: tracseq-lab-manager
-      MONOLITH__PORT: 3001
+      # Authentication
+      JWT_SECRET_KEY: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+      JWT_ALGORITHM: "HS256"
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
       
-      # Use hardcoded microservice configuration from monolith_config.py
+      # CORS Configuration
+      CORS__ENABLED: true
+      CORS__ALLOW_ORIGINS: '["http://localhost:3000", "http://localhost:5173", "http://localhost:8089"]'
+      CORS__ALLOW_CREDENTIALS: true
       
-      # Feature flags - Enable microservices
-      USE_AUTH_SERVICE: true
-      USE_SAMPLE_SERVICE: true
-      USE_TEMPLATE_SERVICE: true
-      USE_STORAGE_SERVICE: true
-      USE_SEQUENCING_SERVICE: true
-      USE_NOTIFICATION_SERVICE: true
-      USE_RAG_SERVICE: true
-      USE_EVENT_SERVICE: true
-      USE_TRANSACTION_SERVICE: true
-      USE_SPREADSHEET_SERVICE: true
+      # Rate Limiting
+      RATE_LIMITING__ENABLED: true
+      RATE_LIMITING__REDIS_URL: redis://redis:6379/1
+      
+      # Monitoring
+      MONITORING__METRICS_ENABLED: true
+      MONITORING__TRACING_ENABLED: true
+      MONITORING__LOG_REQUESTS: true
+      MONITORING__LOG_RESPONSES: false
       
       # Gateway Settings
       REQUEST_TIMEOUT: 30
       MAX_CONCURRENT_REQUESTS: 1000
-      MONITORING__LOG_REQUESTS: true
-      MONITORING__LOG_RESPONSES: true
     depends_on:
       postgres:
         condition: service_healthy
@@ -171,7 +172,7 @@ services:
   storage-service:
     build:
       context: ../lims-enhanced/enhanced_storage_service
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.minimal
     image: tracseq-storage-service:latest
     container_name: tracseq-storage
     ports:
@@ -295,7 +296,7 @@ services:
   lab-manager:
     build:
       context: ../lims-laboratory/lab_manager
-      dockerfile: Dockerfile.simple
+      dockerfile: Dockerfile.standalone
     image: tracseq-lab-manager:latest
     container_name: tracseq-lab-manager
     ports:
@@ -371,7 +372,7 @@ services:
   spreadsheet-service:
     build:
       context: ../lims-enhanced/spreadsheet_versioning_service
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.minimal
     image: tracseq-spreadsheet-service:latest
     container_name: tracseq-spreadsheet
     ports:
@@ -412,6 +413,126 @@ services:
       - tracseq-network
     restart: unless-stopped
 
+  # Project Management Service
+  project-service:
+    build:
+      context: ../lims-core/project_service
+      dockerfile: Dockerfile
+    image: tracseq-project-service:latest
+    container_name: tracseq-projects
+    ports:
+      - "${PROJECT_PORT:-8101}:8101"
+    environment:
+      PORT: 8101
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://tracseq-auth:8080
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # QA/QC Service
+  qaqc-service:
+    build:
+      context: ../lims-laboratory/qaqc_service
+      dockerfile: Dockerfile
+    image: tracseq-qaqc-service:latest
+    container_name: tracseq-qaqc
+    ports:
+      - "${QAQC_PORT:-8103}:8103"
+    environment:
+      PORT: 8103
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://tracseq-auth:8080
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Library Preparation Service
+  library-prep-service:
+    build:
+      context: ../lims-laboratory/library_prep_service
+      dockerfile: Dockerfile
+    image: tracseq-library-prep-service:latest
+    container_name: tracseq-library-prep
+    ports:
+      - "${LIBRARY_PREP_PORT:-8102}:8102"
+    environment:
+      PORT: 8102
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://tracseq-auth:8080
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Flow Cell Service
+  flow-cell-service:
+    build:
+      context: ../lims-laboratory/flow_cell_service
+      dockerfile: Dockerfile
+    image: tracseq-flow-cell-service:latest
+    container_name: tracseq-flow-cells
+    ports:
+      - "${FLOW_CELL_PORT:-8104}:8104"
+    environment:
+      PORT: 8104
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://tracseq-auth:8080
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
+  # Dashboard Service
+  dashboard-service:
+    build:
+      context: ../lims-core/dashboard_service
+      dockerfile: Dockerfile
+    image: tracseq-dashboard-service:latest
+    container_name: tracseq-dashboard
+    ports:
+      - "${DASHBOARD_PORT:-8015}:8015"
+    environment:
+      PORT: 8015
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lab_manager
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://tracseq-auth:8080
+      JWT_SECRET: "this-is-a-secure-32-character-jwt-secret-key-change-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq-network
+    restart: unless-stopped
+
   # Frontend
   frontend:
     build:
@@ -421,6 +542,11 @@ services:
     container_name: tracseq-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:5173"
+    environment:
+      VITE_API_URL: http://localhost:8089
+      VITE_API_BASE_URL: http://localhost:8089/api
+      VITE_WS_URL: ws://localhost:8089/ws
+      NODE_ENV: development
     volumes:
       - ../lims-ui/src:/app/src:ro
       - ../lims-ui/public:/app/public:ro
@@ -428,8 +554,10 @@ services:
       - ../lims-ui/vite.config.ts:/app/vite.config.ts:ro
       - ../lims-ui/tsconfig.json:/app/tsconfig.json:ro
       - ../lims-ui/eslint.config.js:/app/eslint.config.js:ro
+      - ../lims-ui/.env.local:/app/.env.local:ro
     depends_on:
-      - api-gateway
+      api-gateway:
+        condition: service_started
     networks:
       - tracseq-network
     restart: unless-stopped
