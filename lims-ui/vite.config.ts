@@ -10,7 +10,7 @@ export default defineConfig({
     proxy: {
       // Proxy API requests to the API Gateway
       '/api': {
-        target: 'http://lims-gateway:8000',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
         configure: (proxy) => {

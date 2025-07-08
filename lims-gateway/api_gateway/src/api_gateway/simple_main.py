@@ -37,27 +37,53 @@ except ImportError:
     from routes.websocket_chat import websocket_chat_endpoint, manager
 
 # Import standardized database configuration
-try:
-    from api_gateway.core.database import init_database, close_database, get_db_health_status, get_db_connection, get_db_info
-    STANDARDIZED_DB = True
-    print("Using standardized database configuration")
-except ImportError:
-    # Fallback to simple database configuration
+if os.getenv("DISABLE_STANDARDIZED_DB") == "true":
+    # Force simple database configuration for testing
     STANDARDIZED_DB = False
-    print("Using simple database configuration fallback")
+    print("Using simple database configuration (testing mode)")
     DATABASE_URL = os.getenv("DATABASE_URL", "postgres://postgres:postgres@lims-postgres:5432/lims_db")
     db_pool = None
 
     # Initialize database pool on startup
     async def init_db():
         global db_pool
-        db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
+        try:
+            db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
+        except Exception as e:
+            print(f"Database connection failed: {e}")
+            db_pool = None
 
     # Close database pool on shutdown
     async def close_db():
         global db_pool
         if db_pool:
             await db_pool.close()
+else:
+    try:
+        from api_gateway.core.database import init_database, close_database, get_db_health_status, get_db_connection, get_db_info
+        STANDARDIZED_DB = True
+        print("Using standardized database configuration")
+    except ImportError:
+        # Fallback to simple database configuration
+        STANDARDIZED_DB = False
+        print("Using simple database configuration fallback")
+        DATABASE_URL = os.getenv("DATABASE_URL", "postgres://postgres:postgres@lims-postgres:5432/lims_db")
+        db_pool = None
+
+        # Initialize database pool on startup
+        async def init_db():
+            global db_pool
+            try:
+                db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
+            except Exception as e:
+                print(f"Database connection failed: {e}")
+                db_pool = None
+
+        # Close database pool on shutdown
+        async def close_db():
+            global db_pool
+            if db_pool:
+                await db_pool.close()
 
 # Database helper functions
 from contextlib import asynccontextmanager
@@ -2775,7 +2801,21 @@ async def get_spreadsheet_filters():
             ],
             "sample_types": ["DNA", "RNA", "Protein"],
             "statuses": ["Pending", "Processing", "Completed", "Failed"],
-            "platforms": ["Illumina NovaSeq", "Illumina MiSeq", "Ion Torrent"]
+            "platforms": ["Illumina NovaSeq", "Illumina MiSeq", "Ion Torrent"],
+            # Add the missing arrays that the frontend expects
+            "pools": ["Pool-A", "Pool-B", "Pool-C", "Pool-D"],
+            "samples": ["SMPL-001", "SMPL-002", "SMPL-003", "SMPL-004", "SMPL-005"],
+            "projects": ["Project-Alpha", "Project-Beta", "Project-Gamma", "Project-Delta"],
+            "all_columns": [
+                "Sample_ID", "Type", "Concentration", "Volume", "Quality_Score",
+                "Storage_Location", "Submitted_Date", "Status", "Job_ID", "Platform",
+                "Coverage", "Location_ID", "Temperature", "Capacity"
+            ],
+            "column_values": {
+                "Type": ["DNA", "RNA", "Protein"],
+                "Status": ["Pending", "Processing", "Completed", "Failed"],
+                "Platform": ["Illumina NovaSeq", "Illumina MiSeq", "Ion Torrent"]
+            }
         }
     }
 

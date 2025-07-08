@@ -257,11 +257,11 @@ export default function SpreadsheetSearchModal({ onClose }: SpreadsheetSearchMod
                 className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               >
                 <option value="">All pools</option>
-                {availableFilters?.pools.map((pool) => (
+                {availableFilters?.pools?.map((pool) => (
                   <option key={pool} value={pool}>
                     {pool}
                   </option>
-                ))}
+                )) || []}
               </select>
             </div>
             <div>
@@ -275,11 +275,11 @@ export default function SpreadsheetSearchModal({ onClose }: SpreadsheetSearchMod
                 className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               >
                 <option value="">All samples</option>
-                {availableFilters?.samples.map((sample) => (
+                {availableFilters?.samples?.map((sample) => (
                   <option key={sample} value={sample}>
                     {sample}
                   </option>
-                ))}
+                )) || []}
               </select>
             </div>
             <div>
@@ -293,11 +293,11 @@ export default function SpreadsheetSearchModal({ onClose }: SpreadsheetSearchMod
                 className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               >
                 <option value="">All projects</option>
-                {availableFilters?.projects.map((project) => (
+                {availableFilters?.projects?.map((project) => (
                   <option key={project} value={project}>
                     {project}
                   </option>
-                ))}
+                )) || []}
               </select>
             </div>
           </div>
