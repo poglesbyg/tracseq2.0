@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/axios';
 import {
   DocumentArrowUpIcon,
   EyeIcon,

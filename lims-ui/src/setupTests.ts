@@ -3,13 +3,13 @@ import '@testing-library/jest-dom';
 // Mock import.meta for Vite
 const mockImportMeta = {
   env: {
-    VITE_API_URL: 'http://localhost:3000/api',
+    VITE_API_URL: '', // Use empty string for Vite proxy in tests
     MODE: 'test',
     DEV: false,
     PROD: false,
     SSR: false,
   },
-  url: 'http://localhost:3000',
+  url: 'http://localhost:5173', // Use Vite dev server port
   hot: {
     accept: jest.fn(),
     dispose: jest.fn(),

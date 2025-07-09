@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/axios';
 import { 
   ExclamationTriangleIcon, 
   ArrowTrendingUpIcon, 
@@ -95,7 +95,7 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<DashboardStats>({
     queryKey: ['dashboardStats'],
     queryFn: async () => {
-      const response = await axios.get('/api/dashboard/stats');
+      const response = await api.get('/api/dashboard/stats');
       return response.data;
     },
     retry: 3,
@@ -106,7 +106,7 @@ export default function Dashboard() {
   const { data: recentTemplates } = useQuery<Template[]>({
     queryKey: ['recentTemplates'],
     queryFn: async () => {
-      const response = await axios.get('/api/templates');
+      const response = await api.get('/api/templates');
       // Handle API response format { data: [...], pagination: {...}, success: true }
       const templates = response.data && typeof response.data === 'object' && Array.isArray(response.data.data)
         ? response.data.data
@@ -119,7 +119,7 @@ export default function Dashboard() {
   const { data: recentSamples } = useQuery<Sample[]>({
     queryKey: ['recentSamples'],
     queryFn: async () => {
-      const response = await axios.get('/api/samples');
+      const response = await api.get('/api/samples');
       // Handle API response format { data: [...], pagination: {...}, success: true }
       const samples = response.data && typeof response.data === 'object' && Array.isArray(response.data.data)
         ? response.data.data
@@ -132,7 +132,7 @@ export default function Dashboard() {
   const { data: recentJobs } = useQuery<SequencingJob[]>({
     queryKey: ['recentJobs'],
     queryFn: async () => {
-      const response = await axios.get('/api/sequencing/jobs');
+      const response = await api.get('/api/sequencing/jobs');
       return response.data.slice(0, 3); // Get latest 3
     }
   });

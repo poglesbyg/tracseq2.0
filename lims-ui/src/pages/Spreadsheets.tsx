@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '../utils/axios';
 import {
   DocumentTextIcon,
   MagnifyingGlassIcon,
@@ -53,7 +53,7 @@ export default function Spreadsheets() {
   const { data: datasets, isLoading, error } = useQuery<SpreadsheetDataset[]>({
     queryKey: ['spreadsheet-datasets'],
     queryFn: async () => {
-      const response = await axios.get('/api/spreadsheets/datasets');
+      const response = await api.get('/api/spreadsheets/datasets');
       return response.data.data || [];
     },
   });
@@ -61,7 +61,7 @@ export default function Spreadsheets() {
   // Delete dataset mutation
   const deleteDatasetMutation = useMutation({
     mutationFn: async (datasetId: string) => {
-      await axios.delete(`/api/spreadsheets/datasets/${datasetId}`);
+      await api.delete(`/api/spreadsheets/datasets/${datasetId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['spreadsheet-datasets'] });

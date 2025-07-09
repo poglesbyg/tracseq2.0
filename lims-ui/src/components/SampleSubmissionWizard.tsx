@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '../utils/axios';
 import { BeakerIcon, DocumentIcon, MapPinIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
 interface Template {
@@ -58,7 +58,7 @@ export default function SampleSubmissionWizard({ onSuccess, onClose }: SampleSub
   const { data: templates } = useQuery<Template[]>({
     queryKey: ['templates'],
     queryFn: async () => {
-      const response = await axios.get('/api/templates');
+      const response = await api.get('/api/templates');
       // Handle API response format { data: [...], pagination: {...}, success: true }
       if (response.data && typeof response.data === 'object' && Array.isArray(response.data.data)) {
         return response.data.data;
@@ -72,7 +72,7 @@ export default function SampleSubmissionWizard({ onSuccess, onClose }: SampleSub
   const { data: storageLocations } = useQuery<StorageLocation[]>({
     queryKey: ['storage-locations'],
     queryFn: async () => {
-      const response = await axios.get('/api/storage/locations');
+      const response = await api.get('/api/storage/locations');
       // Handle both response formats - direct array or nested in data/locations
       return Array.isArray(response.data) 
         ? response.data 
@@ -83,7 +83,7 @@ export default function SampleSubmissionWizard({ onSuccess, onClose }: SampleSub
   // Submit sample mutation
   const submitSample = useMutation({
     mutationFn: async (data: SampleSubmissionData) => {
-      const response = await axios.post('/api/samples', data);
+      const response = await api.post('/api/samples', data);
       return response.data;
     },
     onSuccess: () => {

@@ -1,16 +1,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// Determine if we're running in Docker
+const isDocker = process.env.DOCKER_ENV === 'true'
+const apiTarget = isDocker ? 'http://lims-gateway:8000' : 'http://localhost:8089'
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    host: true,
+    host: '0.0.0.0', // Allow external connections (required for Docker)
+    watch: {
+      usePolling: true, // Enable polling for Docker file watching
+    },
     proxy: {
       // Proxy API requests to the API Gateway
       '/api': {
-        target: 'http://localhost:8000',
+        target: apiTarget,
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path, // Don't rewrite the path
@@ -28,7 +35,7 @@ export default defineConfig({
       },
       // Proxy WebSocket connections for chat
       '/ws': {
-        target: 'ws://localhost:8000',
+        target: apiTarget.replace('http:', 'ws:'),
         ws: true,
         changeOrigin: true,
         configure: (proxy) => {

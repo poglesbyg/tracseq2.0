@@ -1,0 +1,74 @@
+services:
+  # Frontend Development Service
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: tracseq-frontend-dev
+    ports:
+      - "5173:5173"  # Vite dev server
+    volumes:
+      # Mount source code for hot reloading
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./index.html:/app/index.html
+      - ./vite.config.ts:/app/vite.config.ts
+      - ./tailwind.config.js:/app/tailwind.config.js
+      - ./postcss.config.cjs:/app/postcss.config.cjs
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./tsconfig.app.json:/app/tsconfig.app.json
+      - ./tsconfig.node.json:/app/tsconfig.node.json
+      # Exclude node_modules to use container's version
+      - /app/node_modules
+    environment:
+      # Development environment variables
+      - NODE_ENV=development
+      - DOCKER_ENV=true
+      - VITE_API_URL=
+      - VITE_API_BASE_URL=
+      - VITE_WS_URL=ws://lims-gateway:8000/ws
+      - VITE_DEV_MODE=true
+      - VITE_DEBUG_MODE=true
+      # API Gateway URL for development (internal network)
+      - VITE_API_GATEWAY_URL=http://lims-gateway:8000
+    networks:
+      - docker_lims-network
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: API Gateway for development (if not running externally)
+  api-gateway-dev:
+    image: python:3.11-slim
+    container_name: tracseq-api-gateway-dev
+    working_dir: /app
+    command: >
+      sh -c "
+        cd /app &&
+        pip install -r requirements.txt &&
+        python run_without_db.py
+      "
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../lims-gateway/api_gateway:/app
+    environment:
+      - DISABLE_STANDARDIZED_DB=true
+      - GATEWAY_HOST=0.0.0.0
+      - GATEWAY_PORT=8000
+      - GATEWAY_DEBUG=true
+    networks:
+      - docker_lims-network
+    restart: unless-stopped
+    profiles:
+      - api-gateway  # Optional profile, enable with --profile api-gateway
+
+networks:
+  docker_lims-network:
+    external: true 
