@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import api from '../utils/axios';
@@ -67,8 +67,8 @@ export default function RagSubmissions({ windowContext }: WindowComponentProps) 
 
   const queryClient = useQueryClient();
   
-  // Get parameters from window context instead of URL
-  const getWindowParams = (): Record<string, string> => {
+  // Get parameters from window context instead of URL (memoized to prevent re-renders)
+  const windowParams = useMemo((): Record<string, string> => {
     if (windowContext?.windowId) {
       const params = (window as Record<string, any>).appParams?.[windowContext.windowId];
       console.log('🔍 RAG Submissions getting window params:', { windowId: windowContext.windowId, params });
@@ -76,9 +76,8 @@ export default function RagSubmissions({ windowContext }: WindowComponentProps) 
     }
     console.log('⚠️ RAG Submissions: No window context available');
     return {};
-  };
+  }, [windowContext?.windowId]);
 
-  const windowParams = getWindowParams();
   const submissionId = windowParams.submission;
   const mode = windowParams.mode;
   const isPreviewMode = mode === 'preview';

@@ -171,7 +171,7 @@ const DesktopContent: React.FC<DesktopProps> = ({ apps }) => {
       console.log('🔄 Clearing URL to /desktop');
       window.history.replaceState({}, '', '/desktop');
     }
-  }, [apps, openWindow, addWindowToSpace, windows.length]); // Include necessary dependencies
+  }, [apps]); // Only depend on apps to prevent infinite re-renders
 
   const handleCloseWindow = useCallback((windowId: string) => {
     closeWindow(windowId);

@@ -162,7 +162,7 @@ services:
     environment:
       AUTH_SERVICE_URL: http://auth-service:8000
       SAMPLE_SERVICE_URL: http://sample-service:8000
-      STORAGE_SERVICE_URL: http://storage-service:8080
+      STORAGE_SERVICE_URL: http://lims-storage:8080
       RAG_SERVICE_URL: http://rag-service:8000
       REPORTS_SERVICE_URL: http://reports-service:8000
       PROJECT_SERVICE_URL: http://project-service:8101
@@ -170,7 +170,7 @@ services:
       QAQC_SERVICE_URL: http://lims-qaqc:8089
       TRANSACTION_SERVICE_URL: http://lims-transactions:8088
       FLOW_CELL_SERVICE_URL: http://flow-cell-service:8104
-      TEMPLATE_SERVICE_URL: http://lims-templates:8083
+      TEMPLATE_SERVICE_URL: http://tracseq-templates:8083
       SEQUENCING_SERVICE_URL: http://lims-sequencing:8000
       NOTIFICATION_SERVICE_URL: http://lims-notification:8085
       USE_REPORTS_SERVICE: "true"
