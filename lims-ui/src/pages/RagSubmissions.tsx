@@ -36,6 +36,9 @@ interface RagExtractionResult {
   validation_warnings: string[];
   processing_time: number;
   source_document?: string;
+  id?: string;
+  status?: string;
+  message?: string;
   extraction_result?: {
     success: boolean;
     confidence_score: number;
@@ -75,12 +78,32 @@ export default function RagSubmissions() {
     queryFn: async () => {
       try {
         const url = `/api/rag/submissions`;
-        const response = await axios.get(url);
+        const response = await api.get(url);
+        
         // Handle the response structure from RAG service
-        if (response.data && response.data.results && Array.isArray(response.data.results)) {
-          return response.data.results;
+        let submissions = [];
+        if (response.data && response.data.data && Array.isArray(response.data.data)) {
+          submissions = response.data.data;
+        } else if (response.data && response.data.submissions && Array.isArray(response.data.submissions)) {
+          submissions = response.data.submissions;
+        } else if (Array.isArray(response.data)) {
+          submissions = response.data;
         }
-        return response.data || [];
+        
+        // Map the API response to the expected frontend format
+        return submissions.map((item: any) => ({
+          id: item.id || item.submission_id || `RAG-${Date.now()}`,
+          filename: item.filename || item.document_name || 'Unknown Document',
+          status: item.status === 'Processed' ? 'completed' : 
+                  item.status === 'Processing' ? 'processing' : 
+                  item.status === 'Pending' ? 'uploaded' : 'failed',
+          uploadedAt: item.submittedDate || item.uploadedAt || item.created_at || new Date().toISOString(),
+          processedAt: item.processedDate || item.processedAt,
+          confidence: item.confidenceScore || item.confidence_score || item.confidence || 0,
+          extractedSamples: item.extractedFields || item.extractedSamples || 0,
+          errors: item.errors || [],
+          metadata: item.metadata || {}
+        }));
       } catch (error) {
         console.error('Failed to fetch RAG submissions:', error);
         // Return empty array on error to prevent crashes
@@ -95,7 +118,7 @@ export default function RagSubmissions() {
   const processDocumentMutation = useMutation({
     mutationFn: async (formData: FormData) => {
       const url = `/api/rag/process`;
-      const response = await axios.post(url, formData, {
+      const response = await api.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -113,7 +136,7 @@ export default function RagSubmissions() {
   const previewDocumentMutation = useMutation({
     mutationFn: async (formData: FormData) => {
       const url = `/api/rag/process`;
-      const response = await axios.post(url, formData, {
+      const response = await api.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

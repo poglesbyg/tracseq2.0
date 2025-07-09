@@ -19,7 +19,13 @@ import {
   UserIcon,
   CalendarIcon,
   InformationCircleIcon,
+  PencilIcon,
+  TrashIcon,
+  ArrowDownTrayIcon,
+  DocumentDuplicateIcon,
+  ClipboardDocumentIcon,
 } from '@heroicons/react/24/outline';
+import SampleEditModal from '../components/SampleEditModal';
 
 // Type definitions
 interface ExtractedDataSection {
@@ -31,9 +37,10 @@ interface RagSample {
   name: string;
   barcode: string;
   location: string;
-  status: string;
+  status: 'Pending' | 'Validated' | 'InStorage' | 'InSequencing' | 'Completed';
   created_at: string;
-  metadata?: {
+  updated_at: string;
+  metadata: {
     confidence_score?: number;
     processing_time?: number;
     source_document?: string;
@@ -77,6 +84,7 @@ export default function RagSamples() {
   const [confidenceFilter, setConfidenceFilter] = useState<string>('');
   const [selectedSample, setSelectedSample] = useState<RagSample | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [editingSample, setEditingSample] = useState<RagSample | null>(null);
 
   // Fetch RAG samples
   const { data: ragSamples, isLoading: isLoadingSamples, error: samplesError, refetch } = useQuery<RagSample[]>({
@@ -95,26 +103,43 @@ export default function RagSamples() {
         const rawSamples = apiData.data || apiData.submissions || [];
         
         // Transform API data to RagSample format
-        let samples: RagSample[] = rawSamples.map((item: Record<string, unknown>, index: number) => ({
-          id: item.id || `rag-${index}`,
-          name: item.filename || item.name || `Document ${index + 1}`,
-          barcode: `RAG-${item.id || index}`,
-          location: 'AI-Processed',
-          status: item.status === 'Processed' ? 'Completed' : item.status === 'Processing' ? 'Pending' : item.status || 'Pending',
-          created_at: item.submittedDate || item.created_at || new Date().toISOString(),
-          metadata: {
-            confidence_score: item.confidenceScore || 0.85,
-            processing_time: 2.5,
-            source_document: item.filename || item.name,
-            submitter_name: item.submittedBy || 'Unknown',
-            submitter_email: item.submitterEmail || '',
-            rag_submission_id: item.id,
-            extraction_method: 'ai_rag',
-            sample_type: 'Document',
-            extraction_warnings: [],
-            validation_warnings: []
+        let samples: RagSample[] = rawSamples.map((item: Record<string, unknown>, index: number) => {
+          // Map API status to valid status values
+          let status: RagSample['status'] = 'Pending';
+          if (item.status === 'Processed') {
+            status = 'Completed';
+          } else if (item.status === 'Processing') {
+            status = 'Pending';
+          } else if (item.status === 'Validated') {
+            status = 'Validated';
+          } else if (item.status === 'InStorage') {
+            status = 'InStorage';
+          } else if (item.status === 'InSequencing') {
+            status = 'InSequencing';
           }
-        }));
+
+          return {
+            id: item.id || `rag-${index}`,
+            name: item.filename || item.name || `Document ${index + 1}`,
+            barcode: `RAG-${item.id || index}`,
+            location: 'AI-Processed',
+            status,
+            created_at: item.submittedDate || item.created_at || new Date().toISOString(),
+            updated_at: item.processedDate || item.updated_at || new Date().toISOString(),
+            metadata: {
+              confidence_score: item.confidenceScore || 0.85,
+              processing_time: 2.5,
+              source_document: item.filename || item.name,
+              submitter_name: item.submittedBy || 'Unknown',
+              submitter_email: item.submitterEmail || '',
+              rag_submission_id: item.id,
+              extraction_method: 'ai_rag',
+              sample_type: 'Document',
+              extraction_warnings: [],
+              validation_warnings: []
+            }
+          };
+        });
         
         // Ensure samples is always an array
         if (!Array.isArray(samples)) {
@@ -132,7 +157,7 @@ export default function RagSamples() {
               matches = matches && (
                 (sample.name?.toLowerCase() || '').includes(searchLower) ||
                 (sample.barcode?.toLowerCase() || '').includes(searchLower) ||
-                !!(sample.metadata?.submitter_name && typeof sample.metadata.submitter_name === 'string' && sample.metadata.submitter_name.toLowerCase().includes(searchLower))
+                !!(sample.metadata.submitter_name && typeof sample.metadata.submitter_name === 'string' && sample.metadata.submitter_name.toLowerCase().includes(searchLower))
               );
             }
             
@@ -141,7 +166,7 @@ export default function RagSamples() {
             }
             
             if (confidenceFilter) {
-              const confidence = sample.metadata?.confidence_score || 0;
+              const confidence = sample.metadata.confidence_score || 0;
               switch (confidenceFilter) {
                 case 'high':
                   matches = matches && confidence >= 0.8;
@@ -172,9 +197,9 @@ export default function RagSamples() {
 
   // Fetch RAG submission details
   const { data: ragSubmissionDetail, isLoading: isLoadingDetail } = useQuery<RagSubmissionDetail>({
-    queryKey: ['rag-submission-detail', selectedSample?.metadata?.rag_submission_id],
+    queryKey: ['rag-submission-detail', selectedSample?.metadata.rag_submission_id],
     queryFn: async () => {
-      if (!selectedSample?.metadata?.rag_submission_id) return null;
+      if (!selectedSample?.metadata.rag_submission_id) return null;
       
       try {
         const response = await axios.get(`/api/rag/submissions/${selectedSample.metadata.rag_submission_id}`);
@@ -184,7 +209,7 @@ export default function RagSamples() {
         return null;
       }
     },
-    enabled: !!selectedSample?.metadata?.rag_submission_id,
+    enabled: !!selectedSample?.metadata.rag_submission_id,
   });
 
   const getStatusColor = (status: string) => {
@@ -225,6 +250,59 @@ export default function RagSamples() {
     setSearchTerm('');
     setStatusFilter('');
     setConfidenceFilter('');
+  };
+
+  const handleEditSample = (sample: RagSample) => {
+    setEditingSample(sample);
+    setShowDetailModal(false);
+  };
+
+  const handleDeleteSample = async (sample: RagSample) => {
+    if (window.confirm(`Are you sure you want to delete sample "${sample.name}"?`)) {
+      try {
+        await axios.delete(`/api/samples/${sample.id}`);
+        // Refresh the samples list
+        refetch();
+      } catch (error) {
+        console.error('Failed to delete sample:', error);
+        alert('Failed to delete sample. Please try again.');
+      }
+    }
+  };
+
+  const handleExportSample = (sample: RagSample) => {
+    const sampleData = {
+      ...sample,
+      exportedAt: new Date().toISOString(),
+    };
+    
+    const dataStr = JSON.stringify(sampleData, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `sample_${sample.barcode}_${new Date().toISOString().split('T')[0]}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+
+  const handleDuplicateSample = (sample: RagSample) => {
+    const duplicatedSample = {
+      ...sample,
+      id: `${sample.id}-copy`,
+      name: `${sample.name} (Copy)`,
+      barcode: `${sample.barcode}-COPY`,
+      created_at: new Date().toISOString(),
+    };
+    setEditingSample(duplicatedSample);
+  };
+
+  const handleCopyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      // You could add a toast notification here
+      console.log('Copied to clipboard:', text);
+    });
   };
 
   const renderExtractedDataSection = (title: string, data: ExtractedDataSection | undefined) => {
@@ -361,7 +439,7 @@ export default function RagSamples() {
                     High Confidence
                   </dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {Array.isArray(ragSamples) ? ragSamples.filter(s => (s.metadata?.confidence_score || 0) >= 0.8).length : 0}
+                    {Array.isArray(ragSamples) ? ragSamples.filter(s => (s.metadata.confidence_score || 0) >= 0.8).length : 0}
                   </dd>
                 </dl>
               </div>
@@ -381,7 +459,7 @@ export default function RagSamples() {
                     Documents Processed
                   </dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {Array.isArray(ragSamples) ? new Set(ragSamples.map(s => s.metadata?.rag_submission_id).filter(Boolean)).size : 0}
+                    {Array.isArray(ragSamples) ? new Set(ragSamples.map(s => s.metadata.rag_submission_id).filter(Boolean)).size : 0}
                   </dd>
                 </dl>
               </div>
@@ -402,7 +480,7 @@ export default function RagSamples() {
                   </dt>
                   <dd className="text-lg font-medium text-gray-900">
                     {Array.isArray(ragSamples) && ragSamples.length > 0 ? 
-                      Math.round((ragSamples.reduce((sum, s) => sum + (s.metadata?.confidence_score || 0), 0) / ragSamples.length) * 100) : 0}%
+                      Math.round((ragSamples.reduce((sum, s) => sum + (s.metadata.confidence_score || 0), 0) / ragSamples.length) * 100) : 0}%
                   </dd>
                 </dl>
               </div>
@@ -539,7 +617,7 @@ export default function RagSamples() {
                           <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(sample.status)}`}>
                             {sample.status}
                           </span>
-                          {sample.metadata?.confidence_score && (
+                          {sample.metadata.confidence_score && (
                             <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getConfidenceColor(sample.metadata.confidence_score)}`}>
                               {getConfidenceLabel(sample.metadata.confidence_score)} ({(sample.metadata.confidence_score * 100).toFixed(1)}%)
                             </span>
@@ -549,7 +627,7 @@ export default function RagSamples() {
                           <p>Barcode: {sample.barcode}</p>
                           <span className="mx-2">•</span>
                           <p>Location: {sample.location}</p>
-                          {sample.metadata?.sample_type && (
+                          {sample.metadata.sample_type && (
                             <>
                               <span className="mx-2">•</span>
                               <p>Type: {sample.metadata.sample_type}</p>
@@ -557,13 +635,13 @@ export default function RagSamples() {
                           )}
                         </div>
                         <div className="mt-1 flex items-center text-xs text-gray-400">
-                          {sample.metadata?.source_document && (
+                          {sample.metadata.source_document && (
                             <>
                               <DocumentIcon className="h-3 w-3 mr-1" />
                               <p>Source: {sample.metadata.source_document}</p>
                             </>
                           )}
-                          {sample.metadata?.submitter_name && (
+                          {sample.metadata.submitter_name && (
                             <>
                               <span className="mx-2">•</span>
                               <UserIcon className="h-3 w-3 mr-1" />
@@ -658,7 +736,7 @@ export default function RagSamples() {
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 mb-3">AI Extraction Details</h4>
                     <dl className="space-y-2">
-                      {selectedSample.metadata?.confidence_score && (
+                      {selectedSample.metadata.confidence_score && (
                         <div className="flex justify-between">
                           <dt className="text-sm text-gray-500">Confidence Score:</dt>
                           <dd>
@@ -668,7 +746,7 @@ export default function RagSamples() {
                           </dd>
                         </div>
                       )}
-                      {selectedSample.metadata?.processing_time && (
+                      {selectedSample.metadata.processing_time && (
                         <div className="flex justify-between">
                           <dt className="text-sm text-gray-500">Processing Time:</dt>
                           <dd className="text-sm font-medium text-gray-900">
@@ -676,7 +754,7 @@ export default function RagSamples() {
                           </dd>
                         </div>
                       )}
-                      {selectedSample.metadata?.source_document && (
+                      {selectedSample.metadata.source_document && (
                         <div className="flex justify-between">
                           <dt className="text-sm text-gray-500">Source Document:</dt>
                           <dd className="text-sm font-medium text-gray-900 truncate" title={selectedSample.metadata.source_document}>
@@ -684,7 +762,7 @@ export default function RagSamples() {
                           </dd>
                         </div>
                       )}
-                      {selectedSample.metadata?.submitter_name && (
+                      {selectedSample.metadata.submitter_name && (
                         <div className="flex justify-between">
                           <dt className="text-sm text-gray-500">Submitted By:</dt>
                           <dd className="text-sm font-medium text-gray-900">
@@ -702,17 +780,17 @@ export default function RagSamples() {
                 {/* Warnings and Additional Information */}
                 <div className="space-y-4">
                   {/* Extraction Warnings */}
-                  {(selectedSample.metadata?.validation_warnings?.length || selectedSample.metadata?.extraction_warnings?.length) && (
+                  {(selectedSample.metadata.validation_warnings?.length || selectedSample.metadata.extraction_warnings?.length) && (
                     <div>
                       <h4 className="text-sm font-medium text-gray-900 mb-3">Warnings</h4>
                       <div className="space-y-2">
-                        {selectedSample.metadata?.validation_warnings?.map((warning, index) => (
+                        {selectedSample.metadata.validation_warnings?.map((warning, index) => (
                           <div key={`validation-${index}`} className="flex items-start">
                             <ExclamationTriangleIcon className="h-4 w-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0" />
                             <span className="text-sm text-yellow-700">{warning}</span>
                           </div>
                         ))}
-                        {selectedSample.metadata?.extraction_warnings?.map((warning, index) => (
+                        {selectedSample.metadata.extraction_warnings?.map((warning, index) => (
                           <div key={`extraction-${index}`} className="flex items-start">
                             <InformationCircleIcon className="h-4 w-4 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
                             <span className="text-sm text-blue-700">{warning}</span>
@@ -723,7 +801,7 @@ export default function RagSamples() {
                   )}
 
                                   {/* Extracted Data from Document */}
-                {selectedSample.metadata?.rag_submission_id && (
+                {selectedSample.metadata.rag_submission_id && (
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
                       <DocumentTextIcon className="h-4 w-4 mr-2" />
@@ -793,7 +871,7 @@ export default function RagSamples() {
                 )}
 
                   {/* RAG Submission Link */}
-                  {selectedSample.metadata?.rag_submission_id && (
+                  {selectedSample.metadata.rag_submission_id && (
                     <div>
                       <h4 className="text-sm font-medium text-gray-900 mb-3">Related Submission</h4>
                       <Link
@@ -811,25 +889,74 @@ export default function RagSamples() {
             </div>
 
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowDetailModal(false)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Close
-                </button>
-                <Link
-                  to={`/samples/${selectedSample.id}/edit`}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  onClick={() => setShowDetailModal(false)}
-                >
-                  Edit Sample
-                </Link>
+              <div className="flex justify-between">
+                <div className="flex space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyToClipboard(selectedSample.barcode)}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    title="Copy Barcode"
+                  >
+                    <ClipboardDocumentIcon className="h-4 w-4 mr-2" />
+                    Copy Barcode
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExportSample(selectedSample)}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    title="Export Sample Data"
+                  >
+                    <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+                    Export
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDuplicateSample(selectedSample)}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    title="Duplicate Sample"
+                  >
+                    <DocumentDuplicateIcon className="h-4 w-4 mr-2" />
+                    Duplicate
+                  </button>
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSample(selectedSample)}
+                    className="inline-flex items-center px-3 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    title="Delete Sample"
+                  >
+                    <TrashIcon className="h-4 w-4 mr-2" />
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDetailModal(false)}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEditSample(selectedSample)}
+                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    <PencilIcon className="h-4 w-4 mr-2" />
+                    Edit Sample
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Sample Edit Modal */}
+      {editingSample && (
+        <SampleEditModal
+          sample={editingSample}
+          onClose={() => setEditingSample(null)}
+        />
       )}
     </div>
   );
