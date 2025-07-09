@@ -833,22 +833,21 @@ async def create_sample_from_chat(
                     data = response.json()
                     
                     # Store sample creation in chat history
-                    if db_pool:
-                        try:
-                            async with db_pool.acquire() as conn:
-                                await conn.execute("""
-                                    INSERT INTO chat_messages (
-                                        conversation_id, role, content, metadata, created_at
-                                    ) VALUES ($1, $2, $3, $4, $5)
-                                """, 
-                                request.headers.get("X-Conversation-Id", "system"),
-                                "system",
-                                f"Sample created: {data.get('barcode', 'Unknown')}",
-                                json.dumps({"sample_id": data.get('id'), "action": "sample_created"}),
-                                datetime.utcnow()
-                                )
-                        except:
-                            pass
+                    try:
+                        async with get_database_connection() as conn:
+                            await conn.execute("""
+                                INSERT INTO chat_messages (
+                                    conversation_id, role, content, metadata, created_at
+                                ) VALUES ($1, $2, $3, $4, $5)
+                            """, 
+                            request.headers.get("X-Conversation-Id", "system"),
+                            "system",
+                            f"Sample created: {data.get('barcode', 'Unknown')}",
+                            json.dumps({"sample_id": data.get('id'), "action": "sample_created"}),
+                            datetime.utcnow()
+                            )
+                    except:
+                        pass
                     
                     return {
                         "success": True,
@@ -1025,7 +1024,7 @@ async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
     except:
         pass
     
-    await websocket_chat_endpoint(websocket, conversation_id, db_pool, auth_user)
+    await websocket_chat_endpoint(websocket, conversation_id, None, auth_user)
 
 # =============================================================================
 # End of Chat API Endpoints
@@ -1606,12 +1605,8 @@ async def storage_status():
 @app.get("/api/reports")
 async def get_reports():
     """Get all generated reports from database"""
-    if not db_pool:
-        # Fallback to empty array if DB not connected
-        return []
-    
     try:
-        async with db_pool.acquire() as conn:
+        async with get_database_connection() as conn:
             # Query all reports from the database
             rows = await conn.fetch("""
                 SELECT 
@@ -2477,12 +2472,8 @@ async def proxy_templates(path: str, request: Request):
 @app.get("/api/projects")
 async def get_projects():
     """Get all projects from database"""
-    if not db_pool:
-        # Fallback to empty array if DB not connected
-        return []
-    
     try:
-        async with db_pool.acquire() as conn:
+        async with get_database_connection() as conn:
             # Query all projects from the database
             rows = await conn.fetch("""
                 SELECT 
@@ -3506,6 +3497,19 @@ async def debug_problematic_endpoints():
 # NOTE: Storage endpoints are now defined earlier in the file (lines ~187-244)
 
 # NOTE: All storage endpoints removed from here - they are defined earlier in the file
+
+# File opening endpoints for Finder
+@app.get("/api/files/{file_id}/open")
+async def open_file(file_id: str):
+    """Open a file by ID"""
+    return {"message": f"Opening file {file_id}", "action": "open"}
+
+@app.get("/api/files/{file_id}/download")
+async def download_file(file_id: str):
+    """Download a file by ID"""
+    # For now, return a simple response
+    # In production, this would serve the actual file
+    return {"message": f"Downloading file {file_id}", "action": "download"}
 
 if __name__ == "__main__":
     # Get configuration from environment

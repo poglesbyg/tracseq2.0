@@ -47,7 +47,7 @@ const DesktopContent: React.FC<DesktopProps> = ({ apps }) => {
   const { showContextMenu } = useContextMenu();
   const [showChatBot, setShowChatBot] = useState(false);
 
-  const handleAppLaunch = useCallback((appId: string) => {
+  const handleAppLaunch = useCallback((appId: string, context?: Record<string, unknown>) => {
     const app = apps.find(a => a.id === appId);
     if (app) {
       const windowId = `${app.id}-${Date.now()}`;
@@ -64,8 +64,114 @@ const DesktopContent: React.FC<DesktopProps> = ({ apps }) => {
         zIndex: 1000 + windows.length,
       });
       addWindowToSpace(windowId);
+      
+      // Store parameters in a way that can be accessed by the component
+      if (context) {
+        (window as Record<string, any>).appParams = (window as Record<string, any>).appParams || {};
+        (window as Record<string, any>).appParams[windowId] = context;
+      }
     }
   }, [apps, openWindow, windows.length, addWindowToSpace]);
+
+  // Handle URL parameters on initial load
+  useEffect(() => {
+    // Check if we have a stored original route from the redirect
+    const originalRoute = sessionStorage.getItem('originalRoute');
+    let pathname = window.location.pathname;
+    let search = window.location.search;
+    
+    if (originalRoute) {
+      console.log('📍 Found stored original route:', originalRoute);
+      const url = new URL('http://localhost' + originalRoute); // Add dummy base for parsing
+      pathname = url.pathname;
+      search = url.search;
+      // Clear the stored route so it doesn't interfere with future navigation
+      sessionStorage.removeItem('originalRoute');
+    }
+    
+    const urlParams = new URLSearchParams(search);
+    
+    console.log('🔍 Desktop mounted, checking URL:', { pathname, search, originalRoute });
+    
+    const launchApp = (appId: string, context?: Record<string, unknown>) => {
+      const app = apps.find(a => a.id === appId);
+      if (app) {
+        console.log('📱 Launching app:', appId, 'with context:', context);
+        const windowId = `${app.id}-${Date.now()}`;
+        openWindow({
+          id: windowId,
+          appId: app.id,
+          title: app.name,
+          icon: app.icon,
+          component: app.component,
+          position: { x: 100 + (windows.length * 30), y: 100 + (windows.length * 30) },
+          size: app.defaultSize || { width: 800, height: 600 },
+          isMinimized: false,
+          isMaximized: false,
+          zIndex: 1000 + windows.length,
+        });
+        addWindowToSpace(windowId);
+        
+        // Store parameters in a way that can be accessed by the component
+        if (context) {
+          console.log('💾 Storing context for window:', windowId, context);
+          (window as Record<string, any>).appParams = (window as Record<string, any>).appParams || {};
+          (window as Record<string, any>).appParams[windowId] = context;
+        }
+      } else {
+        console.error('❌ App not found:', appId);
+      }
+    };
+    
+    // Check if we're trying to open a specific app with parameters
+    if (pathname.includes('rag-submissions')) {
+      const submissionId = urlParams.get('submission');
+      if (submissionId) {
+        console.log('🚀 Auto-opening RAG Submissions with submission:', submissionId);
+        // Use setTimeout to ensure the desktop is ready
+        setTimeout(() => {
+          launchApp('rag-submissions', { submission: submissionId });
+        }, 200);
+      } else {
+        console.log('🚀 Auto-opening RAG Submissions');
+        setTimeout(() => {
+          launchApp('rag-submissions');
+        }, 200);
+      }
+    } else if (pathname.includes('rag-samples')) {
+      console.log('🚀 Auto-opening RAG Samples');
+      setTimeout(() => {
+        launchApp('rag-samples');
+      }, 200);
+    } else if (pathname.includes('samples')) {
+      console.log('🚀 Auto-opening Samples');
+      setTimeout(() => {
+        launchApp('samples');
+      }, 200);
+    } else if (pathname.includes('templates')) {
+      console.log('🚀 Auto-opening Templates');
+      setTimeout(() => {
+        launchApp('templates');
+      }, 200);
+    } else if (pathname.includes('reports')) {
+      console.log('🚀 Auto-opening Reports');
+      setTimeout(() => {
+        launchApp('reports');
+      }, 200);
+    } else if (pathname.includes('dashboard')) {
+      console.log('🚀 Auto-opening Dashboard');
+      setTimeout(() => {
+        launchApp('dashboard');
+      }, 200);
+    }
+    
+    // Only clear the URL if we're not using a stored original route
+    // (The URL has already been cleared by the redirect in that case)
+    if (!originalRoute && pathname !== '/desktop') {
+      console.log('🔄 Clearing URL to /desktop');
+      window.history.replaceState({}, '', '/desktop');
+    }
+  }, [apps, openWindow, addWindowToSpace, windows.length]); // Include necessary dependencies
 
   const handleCloseWindow = useCallback((windowId: string) => {
     closeWindow(windowId);

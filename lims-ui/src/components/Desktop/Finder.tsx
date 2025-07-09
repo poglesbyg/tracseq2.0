@@ -117,6 +117,8 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
         return <FolderIcon className="w-12 h-12 text-amber-500" />;
       case 'report':
         return <DocumentTextIcon className="w-12 h-12 text-orange-500" />;
+      case 'document':
+        return <DocumentIcon className="w-12 h-12 text-red-500" />;
       default:
         return <DocumentIcon className="w-12 h-12 text-gray-500" />;
     }
@@ -134,6 +136,8 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
         return <FolderIcon className="w-5 h-5 text-amber-500" />;
       case 'report':
         return <DocumentTextIcon className="w-5 h-5 text-orange-500" />;
+      case 'document':
+        return <DocumentIcon className="w-5 h-5 text-red-500" />;
       default:
         return <DocumentIcon className="w-5 h-5 text-gray-500" />;
     }
@@ -245,6 +249,14 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
           }`}
         >
           Reports
+        </button>
+        <button 
+          onClick={() => navigateTo('documents-folder')}
+          className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
+            currentFolderId === 'documents-folder' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+          }`}
+        >
+          Documents
         </button>
       </div>
     </div>
