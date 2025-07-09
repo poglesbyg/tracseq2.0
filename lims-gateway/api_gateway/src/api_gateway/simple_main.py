@@ -1065,12 +1065,20 @@ async def get_samples(request: Request):
             
             if response.status_code == 200:
                 data = response.json()
-                # Sample service returns {data: [...], ...}
+                # Sample service returns {data: {samples: [...], ...}, ...}
                 # Transform to match frontend expectations
-                samples_data = data.get('data', [])
+                samples_data = data.get('data', {}).get('samples', [])
                 
                 return {
-                    "data": samples_data,
+                    "data": {
+                        "data": samples_data,
+                        "samples": samples_data,
+                        "pagination": {
+                            "total": len(samples_data),
+                            "page": 1,
+                            "per_page": len(samples_data)
+                        }
+                    },
                     "samples": samples_data,
                     "totalCount": len(samples_data),
                     "page": 1,
@@ -1080,7 +1088,15 @@ async def get_samples(request: Request):
                 print(f"Sample service returned {response.status_code}: {response.text}")
                 # Return empty response on error
                 return {
-                    "data": [],
+                    "data": {
+                        "data": [],
+                        "samples": [],
+                        "pagination": {
+                            "total": 0,
+                            "page": 1,
+                            "per_page": 10
+                        }
+                    },
                     "samples": [],
                     "totalCount": 0,
                     "page": 1,
@@ -1091,7 +1107,15 @@ async def get_samples(request: Request):
         print(f"Error fetching samples from service: {e}")
         # Return empty response on error
         return {
-            "data": [],
+            "data": {
+                "data": [],
+                "samples": [],
+                "pagination": {
+                    "total": 0,
+                    "page": 1,
+                    "per_page": 10
+                }
+            },
             "samples": [],
             "totalCount": 0,
             "page": 1,
