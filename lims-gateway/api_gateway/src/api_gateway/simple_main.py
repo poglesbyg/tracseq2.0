@@ -2482,27 +2482,187 @@ async def get_storage_containers(
 
 # Storage container details endpoint
 @app.get("/api/storage/containers/{container_id}")
-async def get_storage_container(container_id: str):
-    """Get a specific storage container"""
-    # Fallback mock data
-    mock_container = {
-        "id": container_id,
-        "name": f"Container-{container_id}",
-        "container_type": "freezer",
-        "parent_id": None,
-        "location_id": "lab-a",
-        "capacity": 1000,
-        "current_usage": 500,
-        "status": "active",
-        "min_temperature_celsius": -85.0,
-        "max_temperature_celsius": -75.0,
-        "barcode": f"BC{container_id}",
-        "description": f"Mock container {container_id}",
-        "created_at": "2024-01-01T00:00:00Z",
-        "updated_at": "2024-01-01T00:00:00Z"
-    }
+async def get_storage_container(container_id: str, include_samples: bool = Query(False)):
+    """Get specific storage container details with hierarchical children"""
     
-    return JSONResponse(content={"data": mock_container}, status_code=200)
+    # Determine container type and generate appropriate children
+    if "freezer" in container_id:
+        container_type = "freezer"
+        # Freezers contain racks
+        children = [
+            {
+                "id": f"rack-{container_id}-{i}",
+                "name": f"Rack {chr(65 + i)}",
+                "container_type": "rack",
+                "parent_container_id": container_id,
+                "capacity": 100,
+                "occupied_count": 40 + i * 10,
+                "status": "active",
+                "barcode": f"RCK{chr(65 + i)}0{i + 1}",
+                "description": f"Storage rack {chr(65 + i)} in {container_id}",
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z"
+            }
+            for i in range(4)  # 4 racks per freezer
+        ]
+    elif "rack" in container_id:
+        container_type = "rack"
+        # Racks contain boxes
+        children = [
+            {
+                "id": f"box-{container_id}-{i}",
+                "name": f"Box {i + 1}",
+                "container_type": "box",
+                "parent_container_id": container_id,
+                "capacity": 25,
+                "occupied_count": 15 + i * 2,
+                "status": "active",
+                "barcode": f"BOX{i + 1:03d}",
+                "description": f"Storage box {i + 1} in {container_id}",
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z"
+            }
+            for i in range(5)  # 5 boxes per rack
+        ]
+    elif "box" in container_id:
+        container_type = "box"
+        # Boxes contain positions
+        children = [
+            {
+                "id": f"pos-{container_id}-{i}",
+                "name": f"Position {chr(65 + i // 5)}{(i % 5) + 1}",
+                "container_type": "position",
+                "parent_container_id": container_id,
+                "capacity": 1,
+                "occupied_count": 1 if i < 15 else 0,  # First 15 positions occupied
+                "status": "active" if i < 15 else "available",
+                "barcode": f"POS{chr(65 + i // 5)}{(i % 5) + 1}",
+                "description": f"Sample position {chr(65 + i // 5)}{(i % 5) + 1} in {container_id}",
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z"
+            }
+            for i in range(25)  # 25 positions per box (5x5 grid)
+        ]
+    else:
+        container_type = "position"
+        children = []  # Positions don't have children
+    
+    # Generate sample data if requested and if this is a position-level container
+    samples = []
+    if include_samples and container_type in ["position", "box"]:
+        samples = [
+            {
+                "id": f"sample-{container_id}-{i}",
+                "name": f"Sample {i + 1}",
+                "barcode": f"SMPL{i + 1:04d}",
+                "sample_type": "DNA" if i % 2 == 0 else "RNA",
+                "status": "stored",
+                "volume": 100.0 - i * 5,
+                "concentration": 50.0 + i * 2,
+                "stored_at": "2024-01-15T10:30:00Z",
+                "position_id": container_id if container_type == "position" else f"pos-{container_id}-{i}"
+            }
+            for i in range(min(3, 15) if container_type == "box" else 1)  # 1 sample per position, up to 3 samples per box
+        ]
+    
+    # Determine temperature zone based on container type
+    if "freezer" in container_id:
+        temp_zone = "-80C" if "1" in container_id else "-20C" if "2" in container_id else "4C"
+        min_temp = -85.0 if temp_zone == "-80C" else -25.0 if temp_zone == "-20C" else 2.0
+        max_temp = -75.0 if temp_zone == "-80C" else -15.0 if temp_zone == "-20C" else 6.0
+    else:
+        temp_zone = "-80C"  # Default for child containers
+        min_temp = -85.0
+        max_temp = -75.0
+    
+    return JSONResponse(content={
+        "data": {
+            "container": {
+                "id": container_id,
+                "name": f"Container-{container_id}" if "freezer" in container_id else f"Storage {container_type.title()} {container_id.split('-')[-1]}",
+                "container_type": container_type,
+                "parent_id": None if "freezer" in container_id else f"parent-{container_id}",
+                "location_id": "lab-a",
+                "capacity": 1000 if container_type == "freezer" else 100 if container_type == "rack" else 25 if container_type == "box" else 1,
+                "current_usage": 500 if container_type == "freezer" else 60 if container_type == "rack" else 15 if container_type == "box" else 1,
+                "status": "active",
+                "temperature_zone": temp_zone,
+                "min_temperature_celsius": min_temp,
+                "max_temperature_celsius": max_temp,
+                "barcode": f"BC{container_id.upper()}",
+                "description": f"Hierarchical storage {container_type} {container_id}",
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z"
+            },
+            "children": children,
+            "samples": samples,
+            "capacity_info": {
+                "total_capacity": 1000 if container_type == "freezer" else 100 if container_type == "rack" else 25 if container_type == "box" else 1,
+                "used_capacity": len(children) if children else len(samples),
+                "available_capacity": (1000 if container_type == "freezer" else 100 if container_type == "rack" else 25 if container_type == "box" else 1) - (len(children) if children else len(samples)),
+                "utilization_percentage": ((len(children) if children else len(samples)) / (1000 if container_type == "freezer" else 100 if container_type == "rack" else 25 if container_type == "box" else 1)) * 100
+            }
+        }
+    }, status_code=200)
+
+@app.get("/api/storage/containers/{container_id}/grid")
+async def get_storage_container_grid(container_id: str, include_empty: bool = Query(True)):
+    """Get grid view for box-level storage containers"""
+    
+    # Only boxes have grid views
+    if "box" not in container_id:
+        raise HTTPException(status_code=404, detail="Grid view only available for box containers")
+    
+    # Generate 5x5 grid positions for the box
+    positions = []
+    for row in range(1, 6):  # 1-5 rows
+        for col in range(1, 6):  # 1-5 columns
+            position_id = f"pos-{container_id}-{(row-1)*5 + col-1}"
+            position_identifier = f"{chr(64 + row)}{col}"  # A1, A2, B1, B2, etc.
+            
+            # First 15 positions are occupied, rest are available
+            is_occupied = (row-1)*5 + col-1 < 15
+            
+            position = {
+                "container_id": position_id,
+                "position_identifier": position_identifier,
+                "row": row,
+                "column": col,
+                "is_occupied": is_occupied,
+                "temperature_zone": "-80C",
+                "status": "occupied" if is_occupied else "available"
+            }
+            
+            # Add sample info if occupied
+            if is_occupied:
+                sample_idx = (row-1)*5 + col-1
+                position["sample"] = {
+                    "id": f"sample-{container_id}-{sample_idx}",
+                    "name": f"Sample {sample_idx + 1}",
+                    "barcode": f"SMPL{sample_idx + 1:04d}",
+                    "sample_type": "DNA" if sample_idx % 2 == 0 else "RNA",
+                    "status": "stored",
+                    "volume": 100.0 - sample_idx * 5,
+                    "concentration": 50.0 + sample_idx * 2,
+                    "stored_at": "2024-01-15T10:30:00Z"
+                }
+            
+            positions.append(position)
+    
+    return JSONResponse(content={
+        "data": {
+            "container_id": container_id,
+            "grid_dimensions": {
+                "rows": 5,
+                "columns": 5
+            },
+            "positions": positions,
+            "total_positions": 25,
+            "occupied_positions": 15,
+            "available_positions": 10,
+            "utilization_percentage": 60.0
+        }
+    }, status_code=200)
 
 # Storage Service Proxy (forward to actual storage service)
 storage_service_url = os.getenv("STORAGE_SERVICE_URL", "http://storage-service:8000")
@@ -2569,116 +2729,415 @@ async def get_reports():
 
 @app.get("/api/reports/templates")
 async def get_report_templates():
-    """Get available report templates."""
+    """Get comprehensive report templates covering all database tables."""
+    templates = [
+        # Sample Management Templates
+        {
+            "id": "RPT-001",
+            "name": "Sample Status Summary",
+            "description": "Overview of all samples grouped by status",
+            "category": "samples",
+            "sql": "SELECT status, COUNT(*) as count, \n       AVG(EXTRACT(EPOCH FROM (NOW() - created_at))/86400) as avg_age_days\nFROM samples \nGROUP BY status \nORDER BY count DESC;",
+            "tags": ["samples", "status", "overview"]
+        },
+        {
+            "id": "RPT-002",
+            "name": "Sample Audit Trail",
+            "description": "Recent sample audit activities and changes",
+            "category": "samples",
+            "sql": "SELECT s.barcode, s.name, sal.action, sal.old_values, sal.new_values, sal.changed_at, sal.changed_by\nFROM sample_audit_log sal\nJOIN samples s ON s.id = sal.sample_id\nWHERE sal.changed_at >= NOW() - INTERVAL '7 days'\nORDER BY sal.changed_at DESC\nLIMIT 100;",
+            "tags": ["samples", "audit", "history"]
+        },
+        {
+            "id": "RPT-003",
+            "name": "Sample Validation Results",
+            "description": "Quality control validation results for samples",
+            "category": "samples",
+            "sql": "SELECT s.barcode, s.name, svr.validation_status, svr.error_count, svr.warning_count, svr.validated_at\nFROM sample_validation_results svr\nJOIN samples s ON s.id = svr.sample_id\nWHERE svr.validated_at >= NOW() - INTERVAL '30 days'\nORDER BY svr.validated_at DESC;",
+            "tags": ["samples", "validation", "quality"]
+        },
+        
+        # Storage Management Templates
+        {
+            "id": "RPT-010",
+            "name": "Storage Utilization by Zone",
+            "description": "Current storage usage across temperature zones",
+            "category": "storage",
+            "sql": "SELECT sl.temperature_zone, \n       COUNT(*) as total_locations,\n       SUM(sl.capacity) as total_capacity,\n       SUM(sl.current_usage) as total_used,\n       ROUND(AVG(sl.current_usage::float / sl.capacity * 100), 2) as avg_utilization_pct\nFROM storage_locations sl\nGROUP BY sl.temperature_zone\nORDER BY avg_utilization_pct DESC;",
+            "tags": ["storage", "utilization", "capacity"]
+        },
+        {
+            "id": "RPT-011",
+            "name": "Storage Container Hierarchy",
+            "description": "Hierarchical view of storage containers and their contents",
+            "category": "storage",
+            "sql": "SELECT sc.name, sc.container_type, sc.parent_container_id, \n       COUNT(sp.id) as sample_positions,\n       sc.temperature_min, sc.temperature_max\nFROM storage_containers sc\nLEFT JOIN sample_positions sp ON sp.container_id = sc.id\nGROUP BY sc.id, sc.name, sc.container_type, sc.parent_container_id, sc.temperature_min, sc.temperature_max\nORDER BY sc.container_type, sc.name;",
+            "tags": ["storage", "containers", "hierarchy"]
+        },
+        {
+            "id": "RPT-012",
+            "name": "Sample Position Tracking",
+            "description": "Current positions of all stored samples",
+            "category": "storage",
+            "sql": "SELECT s.barcode, s.name, sc.name as container_name, \n       sp.position_x, sp.position_y, sp.position_z,\n       sp.stored_at, sp.last_accessed\nFROM sample_positions sp\nJOIN samples s ON s.id = sp.sample_id\nJOIN storage_containers sc ON sc.id = sp.container_id\nWHERE sp.status = 'occupied'\nORDER BY sp.stored_at DESC;",
+            "tags": ["storage", "positions", "tracking"]
+        },
+        
+        # User Management Templates
+        {
+            "id": "RPT-020",
+            "name": "User Activity Summary",
+            "description": "User login and activity patterns",
+            "category": "users",
+            "sql": "SELECT u.email, u.role, \n       COUNT(ual.id) as total_activities,\n       MAX(ual.timestamp) as last_activity,\n       COUNT(DISTINCT DATE(ual.timestamp)) as active_days\nFROM users u\nLEFT JOIN user_activity_log ual ON ual.user_id = u.id\nWHERE ual.timestamp >= NOW() - INTERVAL '30 days'\nGROUP BY u.id, u.email, u.role\nORDER BY total_activities DESC;",
+            "tags": ["users", "activity", "analytics"]
+        },
+        {
+            "id": "RPT-021",
+            "name": "Security Audit Report",
+            "description": "Security events and authentication attempts",
+            "category": "security",
+            "sql": "SELECT sal.event_type, sal.user_id, sal.ip_address, \n       sal.user_agent, sal.timestamp, sal.success\nFROM security_audit_log sal\nWHERE sal.timestamp >= NOW() - INTERVAL '7 days'\nORDER BY sal.timestamp DESC\nLIMIT 100;",
+            "tags": ["security", "audit", "authentication"]
+        },
+        
+        # Template Management Templates
+        {
+            "id": "RPT-030",
+            "name": "Template Usage Statistics",
+            "description": "Most frequently used laboratory templates",
+            "category": "templates",
+            "sql": "SELECT t.name, t.category, t.version,\n       COUNT(ti.id) as usage_count,\n       MAX(ti.created_at) as last_used,\n       COUNT(DISTINCT ti.created_by) as unique_users\nFROM templates t\nLEFT JOIN template_instances ti ON ti.template_id = t.id\nGROUP BY t.id, t.name, t.category, t.version\nORDER BY usage_count DESC;",
+            "tags": ["templates", "usage", "statistics"]
+        },
+        {
+            "id": "RPT-031",
+            "name": "Template Field Analysis",
+            "description": "Analysis of template fields and their usage patterns",
+            "category": "templates",
+            "sql": "SELECT tf.field_name, tf.field_type, tf.is_required,\n       COUNT(DISTINCT tf.template_id) as template_count,\n       AVG(CASE WHEN tf.is_required THEN 1 ELSE 0 END) as required_percentage\nFROM template_fields tf\nGROUP BY tf.field_name, tf.field_type, tf.is_required\nORDER BY template_count DESC, tf.field_name;",
+            "tags": ["templates", "fields", "analysis"]
+        },
+        
+        # Spreadsheet Analysis Templates
+        {
+            "id": "RPT-040",
+            "name": "Spreadsheet Upload Summary",
+            "description": "Overview of uploaded spreadsheet datasets",
+            "category": "spreadsheets",
+            "sql": "SELECT sd.name, sd.file_type, sd.total_rows, sd.total_columns,\n       sd.upload_status, sd.uploaded_by, sd.created_at\nFROM spreadsheet_datasets sd\nORDER BY sd.created_at DESC\nLIMIT 50;",
+            "tags": ["spreadsheets", "uploads", "datasets"]
+        },
+        {
+            "id": "RPT-041",
+            "name": "Spreadsheet Data Analysis",
+            "description": "Analysis results from spreadsheet processing",
+            "category": "spreadsheets",
+            "sql": "SELECT sa.dataset_id, sa.analysis_type, sa.result_summary,\n       sa.confidence_score, sa.created_at\nFROM spreadsheet_analysis sa\nJOIN spreadsheet_datasets sd ON sd.id = sa.dataset_id\nWHERE sa.created_at >= NOW() - INTERVAL '30 days'\nORDER BY sa.created_at DESC;",
+            "tags": ["spreadsheets", "analysis", "ai"]
+        },
+        
+        # Barcode Management Templates
+        {
+            "id": "RPT-050",
+            "name": "Barcode Generation Report",
+            "description": "Recently generated barcodes and their assignments",
+            "category": "barcodes",
+            "sql": "SELECT bs.prefix, bs.current_value, bs.increment_by,\n       COUNT(ba.id) as audit_entries,\n       MAX(ba.timestamp) as last_generated\nFROM barcode_sequences bs\nLEFT JOIN barcode_audit ba ON ba.sequence_id = bs.id\nGROUP BY bs.id, bs.prefix, bs.current_value, bs.increment_by\nORDER BY last_generated DESC NULLS LAST;",
+            "tags": ["barcodes", "generation", "tracking"]
+        },
+        
+        # System Performance Templates
+        {
+            "id": "RPT-060",
+            "name": "Database Table Statistics",
+            "description": "Row counts and storage usage for all tables",
+            "category": "system",
+            "sql": "SELECT schemaname, tablename, n_tup_ins as inserts, n_tup_upd as updates, \n       n_tup_del as deletes, n_live_tup as live_rows, n_dead_tup as dead_rows\nFROM pg_stat_user_tables\nORDER BY n_live_tup DESC;",
+            "tags": ["system", "performance", "statistics"]
+        },
+        {
+            "id": "RPT-061",
+            "name": "Rate Limiting Statistics",
+            "description": "API rate limiting usage and patterns",
+            "category": "system",
+            "sql": "SELECT rl.key, rl.limit_value, rl.current_count, rl.reset_time,\n       CASE WHEN rl.current_count >= rl.limit_value THEN 'EXCEEDED' ELSE 'OK' END as status\nFROM rate_limits rl\nWHERE rl.reset_time > NOW()\nORDER BY rl.current_count DESC;",
+            "tags": ["system", "rate-limiting", "api"]
+        },
+        
+        # Advanced Analytics Templates
+        {
+            "id": "RPT-070",
+            "name": "Cross-Table Relationship Analysis",
+            "description": "Relationships between samples, storage, and templates",
+            "category": "analytics",
+            "sql": "SELECT \n    COUNT(DISTINCT s.id) as total_samples,\n    COUNT(DISTINCT sp.container_id) as containers_used,\n    COUNT(DISTINCT ti.template_id) as templates_used,\n    COUNT(DISTINCT u.id) as active_users\nFROM samples s\nLEFT JOIN sample_positions sp ON sp.sample_id = s.id\nLEFT JOIN template_instances ti ON ti.created_at >= s.created_at - INTERVAL '1 day' AND ti.created_at <= s.created_at + INTERVAL '1 day'\nLEFT JOIN users u ON u.id = s.created_by\nWHERE s.created_at >= NOW() - INTERVAL '30 days';",
+            "tags": ["analytics", "relationships", "overview"]
+        },
+        {
+            "id": "RPT-071",
+            "name": "Temporal Activity Patterns",
+            "description": "Activity patterns by hour of day and day of week",
+            "category": "analytics", 
+            "sql": "SELECT \n    EXTRACT(DOW FROM created_at) as day_of_week,\n    EXTRACT(HOUR FROM created_at) as hour_of_day,\n    COUNT(*) as activity_count\nFROM (\n    SELECT created_at FROM samples\n    UNION ALL\n    SELECT created_at FROM template_instances\n    UNION ALL\n    SELECT timestamp as created_at FROM user_activity_log\n) activities\nWHERE created_at >= NOW() - INTERVAL '30 days'\nGROUP BY day_of_week, hour_of_day\nORDER BY day_of_week, hour_of_day;",
+            "tags": ["analytics", "temporal", "patterns"]
+        }
+    ]
+    
+    # Add metadata
+    for template in templates:
+        template["created_at"] = datetime.now().isoformat()
+        template["updated_at"] = datetime.now().isoformat()
+    
+    # Group templates by category
+    categories = {}
+    for template in templates:
+        category = template["category"]
+        if category not in categories:
+            categories[category] = []
+        categories[category].append(template)
+    
     return {
-        "data": [
-            {
-                "id": "RPT-001",
-                "name": "Sample Summary Report",
-                "description": "Summary of all samples in the system",
-                "category": "samples",
-                "sql": "SELECT status, COUNT(*) as count FROM samples GROUP BY status ORDER BY count DESC;",
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            },
-            {
-                "id": "RPT-002",
-                "name": "Storage Utilization Report",
-                "description": "Current storage usage by temperature zone",
-                "category": "storage",
-                "sql": "SELECT temperature_zone, SUM(capacity) as total_capacity, SUM(current_usage) as total_usage FROM storage_locations GROUP BY temperature_zone;",
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            },
-            {
-                "id": "RPT-003",
-                "name": "Monthly Activity Report",
-                "description": "Summary of all activities in the past month",
-                "category": "activity",
-                "sql": "SELECT DATE(created_at) as date, COUNT(*) as activity_count FROM samples WHERE created_at >= CURRENT_DATE - INTERVAL '30 days' GROUP BY DATE(created_at) ORDER BY date;",
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
-        ],
-        "templates": [
-            {
-                "id": "RPT-001",
-                "name": "Sample Summary Report",
-                "description": "Summary of all samples in the system",
-                "category": "samples",
-                "sql": "SELECT status, COUNT(*) as count FROM samples GROUP BY status ORDER BY count DESC;"
-            },
-            {
-                "id": "RPT-002",
-                "name": "Storage Utilization Report",
-                "description": "Current storage usage by temperature zone",
-                "category": "storage",
-                "sql": "SELECT temperature_zone, SUM(capacity) as total_capacity, SUM(current_usage) as total_usage FROM storage_locations GROUP BY temperature_zone;"
-            },
-            {
-                "id": "RPT-003",
-                "name": "Monthly Activity Report",
-                "description": "Summary of all activities in the past month",
-                "category": "activity",
-                "sql": "SELECT DATE(created_at) as date, COUNT(*) as activity_count FROM samples WHERE created_at >= CURRENT_DATE - INTERVAL '30 days' GROUP BY DATE(created_at) ORDER BY date;"
-            }
-        ],
-        "totalCount": 3
+        "data": templates,
+        "templates": templates,  # For backward compatibility
+        "categories": categories,
+        "totalCount": len(templates),
+        "last_updated": datetime.now().isoformat()
     }
 
 @app.get("/api/reports/schema")
 async def get_database_schema():
-    """Get database schema information."""
-    return {
-        "tables": [
-            {
-                "name": "samples",
-                "columns": [
-                    {"name": "id", "type": "uuid", "nullable": False},
-                    {"name": "name", "type": "varchar", "nullable": False},
-                    {"name": "type", "type": "varchar", "nullable": False},
-                    {"name": "status", "type": "varchar", "nullable": False},
-                    {"name": "created_at", "type": "timestamp", "nullable": False},
-                    {"name": "updated_at", "type": "timestamp", "nullable": False}
-                ]
-            },
-            {
-                "name": "storage_locations",
-                "columns": [
-                    {"name": "id", "type": "uuid", "nullable": False},
-                    {"name": "name", "type": "varchar", "nullable": False},
-                    {"name": "temperature_zone", "type": "varchar", "nullable": False},
-                    {"name": "capacity", "type": "integer", "nullable": False},
-                    {"name": "current_usage", "type": "integer", "nullable": False}
-                ]
-            },
-            {
-                "name": "users",
-                "columns": [
-                    {"name": "id", "type": "uuid", "nullable": False},
-                    {"name": "email", "type": "varchar", "nullable": False},
-                    {"name": "name", "type": "varchar", "nullable": False},
-                    {"name": "role", "type": "varchar", "nullable": False},
-                    {"name": "created_at", "type": "timestamp", "nullable": False}
-                ]
+    """Get comprehensive database schema information from actual database."""
+    try:
+        async with get_database_connection() as conn:
+            # Get all tables in the public schema
+            tables_query = """
+                SELECT table_name, table_type, 
+                       obj_description(c.oid) as table_comment
+                FROM information_schema.tables t
+                LEFT JOIN pg_class c ON c.relname = t.table_name
+                WHERE table_schema = 'public' 
+                AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+            """
+            tables = await conn.fetch(tables_query)
+            
+            schema_tables = []
+            for table in tables:
+                table_name = table['table_name']
+                
+                # Get columns for this table
+                columns_query = """
+                    SELECT 
+                        column_name,
+                        data_type,
+                        is_nullable,
+                        column_default,
+                        character_maximum_length,
+                        numeric_precision,
+                        numeric_scale,
+                        col_description(pgc.oid, ordinal_position) as column_comment
+                    FROM information_schema.columns c
+                    LEFT JOIN pg_class pgc ON pgc.relname = c.table_name
+                    WHERE table_schema = 'public' 
+                    AND table_name = $1
+                    ORDER BY ordinal_position
+                """
+                columns = await conn.fetch(columns_query, table_name)
+                
+                # Get primary key information
+                pk_query = """
+                    SELECT column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu 
+                        ON tc.constraint_name = kcu.constraint_name
+                    WHERE tc.table_schema = 'public'
+                    AND tc.table_name = $1
+                    AND tc.constraint_type = 'PRIMARY KEY'
+                """
+                primary_keys = await conn.fetch(pk_query, table_name)
+                pk_columns = [pk['column_name'] for pk in primary_keys]
+                
+                # Get foreign key information
+                fk_query = """
+                    SELECT 
+                        kcu.column_name,
+                        ccu.table_name AS foreign_table_name,
+                        ccu.column_name AS foreign_column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu 
+                        ON tc.constraint_name = kcu.constraint_name
+                    JOIN information_schema.constraint_column_usage ccu 
+                        ON ccu.constraint_name = tc.constraint_name
+                    WHERE tc.table_schema = 'public'
+                    AND tc.table_name = $1
+                    AND tc.constraint_type = 'FOREIGN KEY'
+                """
+                foreign_keys = await conn.fetch(fk_query, table_name)
+                fk_map = {fk['column_name']: {
+                    'references_table': fk['foreign_table_name'],
+                    'references_column': fk['foreign_column_name']
+                } for fk in foreign_keys}
+                
+                # Get table row count
+                try:
+                    count_result = await conn.fetchval(f'SELECT COUNT(*) FROM "{table_name}"')
+                    row_count = count_result
+                except:
+                    row_count = 0
+                
+                # Format columns
+                formatted_columns = []
+                for col in columns:
+                    column_info = {
+                        "name": col['column_name'],
+                        "data_type": col['data_type'],
+                        "type": col['data_type'],  # For backward compatibility
+                        "is_nullable": col['is_nullable'] == 'YES',
+                        "nullable": col['is_nullable'] == 'YES',  # For backward compatibility
+                        "is_primary_key": col['column_name'] in pk_columns,
+                        "default": col['column_default'],
+                        "comment": col['column_comment']
+                    }
+                    
+                    # Add length/precision info
+                    if col['character_maximum_length']:
+                        column_info['max_length'] = col['character_maximum_length']
+                    if col['numeric_precision']:
+                        column_info['precision'] = col['numeric_precision']
+                    if col['numeric_scale']:
+                        column_info['scale'] = col['numeric_scale']
+                    
+                    # Add foreign key info
+                    if col['column_name'] in fk_map:
+                        column_info['foreign_key'] = fk_map[col['column_name']]
+                    
+                    formatted_columns.append(column_info)
+                
+                schema_tables.append({
+                    "name": table_name,
+                    "type": table['table_type'],
+                    "comment": table['table_comment'],
+                    "row_count": row_count,
+                    "columns": formatted_columns,
+                    "primary_keys": pk_columns
+                })
+            
+            return {
+                "tables": schema_tables,
+                "database_name": "lims_db",
+                "total_tables": len(schema_tables),
+                "last_updated": datetime.now().isoformat()
             }
-        ]
-    }
+            
+    except Exception as e:
+        print(f"Error fetching database schema: {e}")
+        # Fallback to basic schema
+        return {
+            "tables": [
+                {
+                    "name": "samples",
+                    "columns": [
+                        {"name": "id", "type": "uuid", "nullable": False, "is_primary_key": True},
+                        {"name": "name", "type": "varchar", "nullable": False},
+                        {"name": "type", "type": "varchar", "nullable": False},
+                        {"name": "status", "type": "varchar", "nullable": False},
+                        {"name": "created_at", "type": "timestamp", "nullable": False},
+                        {"name": "updated_at", "type": "timestamp", "nullable": False}
+                    ]
+                }
+            ],
+            "error": f"Could not fetch schema: {str(e)}"
+        }
 
 @app.post("/api/reports/execute")
 async def execute_report(request: Request):
-    """Execute a custom SQL report."""
-    # Mock response - in production this would execute the SQL safely
-    return {
-        "data": [
-            {"sample_count": 150, "status": "active"},
-            {"sample_count": 25, "status": "pending"},
-            {"sample_count": 10, "status": "completed"}
-        ],
-        "columns": ["sample_count", "status"],
-        "rowCount": 3,
-        "executionTime": 0.125
-    }
+    """Execute a custom SQL report safely with read-only queries."""
+    try:
+        body = await request.json()
+        sql_query = body.get("sql", "").strip()
+        
+        if not sql_query:
+            raise HTTPException(status_code=400, detail="SQL query is required")
+        
+        # Security: Only allow SELECT statements
+        sql_lower = sql_query.lower().strip()
+        if not sql_lower.startswith('select'):
+            raise HTTPException(
+                status_code=403, 
+                detail="Only SELECT queries are allowed for security reasons"
+            )
+        
+        # Additional security checks
+        forbidden_keywords = ['insert', 'update', 'delete', 'drop', 'create', 'alter', 'truncate', 'grant', 'revoke']
+        for keyword in forbidden_keywords:
+            if keyword in sql_lower:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Forbidden keyword '{keyword}' detected. Only SELECT queries are allowed."
+                )
+        
+        start_time = time.time()
+        
+        async with get_database_connection() as conn:
+            # Set a query timeout for safety
+            await conn.execute("SET statement_timeout = '30s'")
+            
+            # Execute the query
+            rows = await conn.fetch(sql_query)
+            
+            execution_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+            
+            # Convert rows to list of dicts
+            data = []
+            columns = []
+            
+            if rows:
+                # Get column names from the first row
+                columns = list(rows[0].keys())
+                
+                # Convert each row to a dict
+                for row in rows:
+                    row_dict = {}
+                    for col in columns:
+                        value = row[col]
+                        # Convert special types to JSON serializable format
+                        if hasattr(value, 'isoformat'):  # datetime objects
+                            value = value.isoformat()
+                        elif isinstance(value, (bytes, memoryview)):
+                            value = str(value)
+                        elif value is None:
+                            value = None
+                        else:
+                            value = value
+                        row_dict[col] = value
+                    data.append(row_dict)
+            
+            return {
+                "success": True,
+                "data": data,
+                "rows": data,  # For backward compatibility
+                "columns": columns,
+                "row_count": len(data),
+                "rowCount": len(data),  # For backward compatibility
+                "execution_time_ms": round(execution_time, 2),
+                "executionTime": round(execution_time, 2),  # For backward compatibility
+                "query": sql_query,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        error_message = str(e)
+        print(f"SQL execution error: {error_message}")
+        
+        # Return a proper error response
+        raise HTTPException(
+            status_code=500,
+            detail=f"Query execution failed: {error_message}"
+        )
 
 # RAG Service endpoints
 @app.get("/api/rag/submissions")
