@@ -11,3 +11,4 @@ pub mod integrations; // Phase 3: Enterprise Integration handlers
 pub mod iot;
 pub mod mobile;
 pub mod storage; // Phase 2: AI/ML Platform handlers
+pub mod hierarchical_storage;

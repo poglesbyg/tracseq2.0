@@ -5,7 +5,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 // ============================================================================
-// Storage Location Models
+// Storage Location Models (existing)
 // ============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -52,7 +52,236 @@ pub struct UpdateStorageLocationRequest {
 }
 
 // ============================================================================
-// Sample Models
+// Hierarchical Storage Container Models (new)
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct StorageContainer {
+    pub id: Uuid,
+    pub name: String,
+    pub container_type: String, // 'freezer', 'rack', 'box', 'position'
+    pub parent_container_id: Option<Uuid>,
+    pub location_id: Option<Uuid>,
+    pub grid_position: Option<serde_json::Value>,
+    pub dimensions: Option<serde_json::Value>,
+    pub capacity: i32,
+    pub occupied_count: i32,
+    pub temperature_zone: Option<String>,
+    pub barcode: Option<String>,
+    pub description: Option<String>,
+    pub status: String,
+    pub installation_date: Option<DateTime<Utc>>,
+    pub last_maintenance_date: Option<DateTime<Utc>>,
+    pub next_maintenance_date: Option<DateTime<Utc>>,
+    pub container_metadata: serde_json::Value,
+    pub access_restrictions: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub created_by: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct CreateStorageContainerRequest {
+    #[validate(length(min = 1, max = 255))]
+    pub name: String,
+    #[validate(length(min = 1))]
+    pub container_type: String, // 'freezer', 'rack', 'box', 'position'
+    pub parent_container_id: Option<Uuid>,
+    pub location_id: Option<Uuid>,
+    pub grid_position: Option<serde_json::Value>,
+    pub dimensions: Option<serde_json::Value>,
+    #[validate(range(min = 1))]
+    pub capacity: i32,
+    pub temperature_zone: Option<String>,
+    pub barcode: Option<String>,
+    pub description: Option<String>,
+    pub container_metadata: Option<serde_json::Value>,
+    pub access_restrictions: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate)]
+pub struct UpdateStorageContainerRequest {
+    pub name: Option<String>,
+    pub grid_position: Option<serde_json::Value>,
+    pub dimensions: Option<serde_json::Value>,
+    pub capacity: Option<i32>,
+    pub temperature_zone: Option<String>,
+    pub barcode: Option<String>,
+    pub description: Option<String>,
+    pub status: Option<String>,
+    pub last_maintenance_date: Option<DateTime<Utc>>,
+    pub next_maintenance_date: Option<DateTime<Utc>>,
+    pub container_metadata: Option<serde_json::Value>,
+    pub access_restrictions: Option<serde_json::Value>,
+}
+
+// ============================================================================
+// Sample Position Models (new)
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct SamplePosition {
+    pub id: Uuid,
+    pub sample_id: Uuid,
+    pub container_id: Uuid,
+    pub position_identifier: Option<String>,
+    pub assigned_at: DateTime<Utc>,
+    pub assigned_by: Option<Uuid>,
+    pub removed_at: Option<DateTime<Utc>>,
+    pub removed_by: Option<Uuid>,
+    pub status: String, // 'available', 'occupied', 'reserved', 'maintenance'
+    pub reservation_expires_at: Option<DateTime<Utc>>,
+    pub storage_conditions: serde_json::Value,
+    pub special_requirements: serde_json::Value,
+    pub chain_of_custody: serde_json::Value,
+    pub position_metadata: serde_json::Value,
+    pub notes: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct AssignSampleToPositionRequest {
+    pub sample_id: Uuid,
+    pub container_id: Uuid, // Must be a 'position' type container
+    pub position_identifier: Option<String>,
+    pub assigned_by: Option<Uuid>,
+    pub storage_conditions: Option<serde_json::Value>,
+    pub special_requirements: Option<serde_json::Value>,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Validate)]
+pub struct MoveSampleRequest {
+    pub new_container_id: Uuid,
+    pub new_position_identifier: Option<String>,
+    pub moved_by: Option<Uuid>,
+    pub reason: Option<String>,
+    pub notes: Option<String>,
+}
+
+// ============================================================================
+// Hierarchy and Navigation Models (new)
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct StorageHierarchy {
+    pub id: Uuid,
+    pub name: String,
+    pub container_type: String,
+    pub parent_container_id: Option<Uuid>,
+    pub location_id: Option<Uuid>,
+    pub grid_position: Option<serde_json::Value>,
+    pub capacity: i32,
+    pub occupied_count: i32,
+    pub temperature_zone: Option<String>,
+    pub barcode: Option<String>,
+    pub status: String,
+    pub level: i32,
+    pub path: Vec<String>,
+    pub full_path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct StorageCapacitySummary {
+    pub id: Uuid,
+    pub name: String,
+    pub container_type: String,
+    pub capacity: i32,
+    pub occupied_count: i32,
+    pub available_count: i32,
+    pub utilization_percentage: f64,
+    pub capacity_status: String, // 'normal', 'warning', 'critical'
+    pub temperature_zone: Option<String>,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct SampleLocationDetailed {
+    pub position_id: Uuid,
+    pub sample_id: Uuid,
+    pub position_identifier: Option<String>,
+    pub assigned_at: DateTime<Utc>,
+    pub assigned_by: Option<Uuid>,
+    pub position_status: String,
+    pub storage_conditions: serde_json::Value,
+    pub special_requirements: serde_json::Value,
+    pub notes: Option<String>,
+    
+    // Container information
+    pub container_id: Uuid,
+    pub container_name: String,
+    pub container_type: String,
+    pub container_barcode: Option<String>,
+    pub temperature_zone: Option<String>,
+    
+    // Hierarchy information
+    pub full_path: String,
+    pub level: i32,
+    pub path: Vec<String>,
+    
+    // Location information
+    pub location_name: Option<String>,
+    pub location_zone_type: Option<String>,
+}
+
+// ============================================================================
+// Container Navigation Models (new)
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerWithChildren {
+    pub container: StorageContainer,
+    pub children: Vec<StorageContainer>,
+    pub samples: Vec<SamplePosition>,
+    pub capacity_info: ContainerCapacityInfo,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerCapacityInfo {
+    pub total_capacity: i32,
+    pub occupied_count: i32,
+    pub available_count: i32,
+    pub utilization_percentage: f64,
+    pub capacity_status: String,
+    pub child_containers_count: i32,
+    pub direct_samples_count: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorageGridView {
+    pub container_id: Uuid,
+    pub container_name: String,
+    pub container_type: String,
+    pub grid_dimensions: GridDimensions,
+    pub positions: Vec<GridPosition>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GridDimensions {
+    pub rows: i32,
+    pub columns: i32,
+    pub total_positions: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GridPosition {
+    pub container_id: Uuid,
+    pub position_identifier: String,
+    pub row: i32,
+    pub column: i32,
+    pub is_occupied: bool,
+    pub sample_id: Option<Uuid>,
+    pub sample_barcode: Option<String>,
+    pub sample_type: Option<String>,
+    pub status: String,
+    pub temperature_zone: Option<String>,
+}
+
+// ============================================================================
+// Sample Models (existing, updated)
 // ============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -73,389 +302,55 @@ pub struct Sample {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct StoreSampleRequest {
-    #[validate(length(min = 1))]
+    #[validate(length(min = 1, max = 255))]
     pub barcode: String,
     #[validate(length(min = 1))]
     pub sample_type: String,
-    pub storage_location_id: Uuid,
+    pub storage_location_id: Option<Uuid>,
     pub position: Option<serde_json::Value>,
     pub temperature_requirements: Option<String>,
     pub metadata: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MoveSampleRequest {
-    pub new_location_id: Uuid,
-    pub new_position: Option<serde_json::Value>,
-    pub reason: String,
-}
-
 // ============================================================================
-// IoT Sensor Models
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct IoTSensor {
-    pub id: Uuid,
-    pub sensor_id: String,
-    pub sensor_type: String,
-    pub location_id: Option<Uuid>,
-    pub status: String,
-    pub last_reading: Option<serde_json::Value>,
-    pub calibration_data: serde_json::Value,
-    pub maintenance_schedule: serde_json::Value,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct SensorData {
-    pub id: Uuid,
-    pub sensor_id: Uuid,
-    pub reading_type: String,
-    pub value: f64,
-    pub unit: String,
-    pub quality_score: f64,
-    pub metadata: serde_json::Value,
-    pub recorded_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SensorReading {
-    pub sensor_id: String,
-    pub readings: Vec<SensorReadingValue>,
-    pub timestamp: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SensorReadingValue {
-    pub reading_type: String,
-    pub value: f64,
-    pub unit: String,
-    pub quality_score: Option<f64>,
-}
-
-// ============================================================================
-// Alert Models
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Alert {
-    pub id: Uuid,
-    pub alert_type: String,
-    pub severity: String,
-    pub title: String,
-    pub message: String,
-    pub source_type: String,
-    pub source_id: Option<Uuid>,
-    pub status: String,
-    pub acknowledged_by: Option<Uuid>,
-    pub acknowledged_at: Option<DateTime<Utc>>,
-    pub resolved_at: Option<DateTime<Utc>>,
-    pub metadata: serde_json::Value,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateAlertRequest {
-    pub alert_type: String,
-    pub severity: AlertSeverity,
-    pub title: String,
-    pub message: String,
-    pub source_type: String,
-    pub source_id: Option<Uuid>,
-    pub metadata: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum AlertSeverity {
-    Low,
-    Medium,
-    High,
-    Critical,
-}
-
-// ============================================================================
-// Analytics Models
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct AnalyticsModel {
-    pub id: Uuid,
-    pub model_name: String,
-    pub model_type: String,
-    pub version: String,
-    pub model_data: serde_json::Value,
-    pub performance_metrics: serde_json::Value,
-    pub training_metadata: serde_json::Value,
-    pub status: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Prediction {
-    pub id: Uuid,
-    pub model_id: Uuid,
-    pub prediction_type: String,
-    pub input_data: serde_json::Value,
-    pub prediction_result: serde_json::Value,
-    pub confidence_score: Option<f64>,
-    pub prediction_horizon: Option<i32>,
-    pub metadata: serde_json::Value,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PredictionRequest {
-    pub model_type: String,
-    pub input_data: serde_json::Value,
-    pub prediction_horizon: Option<i32>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CapacityPrediction {
-    pub location_id: Uuid,
-    pub predicted_capacity: f64,
-    pub prediction_date: DateTime<Utc>,
-    pub confidence: f64,
-    pub factors: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MaintenancePrediction {
-    pub equipment_id: String,
-    pub predicted_failure_date: DateTime<Utc>,
-    pub confidence: f64,
-    pub recommended_action: String,
-    pub priority: String,
-}
-
-// ============================================================================
-// Blockchain Models
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct BlockchainTransaction {
-    pub id: Uuid,
-    pub transaction_hash: String,
-    pub block_number: Option<i64>,
-    pub transaction_type: String,
-    pub data_hash: String,
-    pub previous_hash: Option<String>,
-    pub timestamp: DateTime<Utc>,
-    pub signature: String,
-    pub metadata: serde_json::Value,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BlockchainRecord {
-    pub transaction_type: String,
-    pub data: serde_json::Value,
-    pub timestamp: DateTime<Utc>,
-    pub previous_hash: Option<String>,
-}
-
-// ============================================================================
-// Automation Models
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct AutomationTask {
-    pub id: Uuid,
-    pub task_type: String,
-    pub priority: i32,
-    pub status: String,
-    pub input_parameters: serde_json::Value,
-    pub output_results: Option<serde_json::Value>,
-    pub assigned_robot_id: Option<String>,
-    pub scheduled_at: Option<DateTime<Utc>>,
-    pub started_at: Option<DateTime<Utc>>,
-    pub completed_at: Option<DateTime<Utc>>,
-    pub error_message: Option<String>,
-    pub metadata: serde_json::Value,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateAutomationTaskRequest {
-    pub task_type: String,
-    pub priority: Option<i32>,
-    pub input_parameters: serde_json::Value,
-    pub scheduled_at: Option<DateTime<Utc>>,
-    pub metadata: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RobotStatus {
-    pub robot_id: String,
-    pub status: String,
-    pub current_task: Option<Uuid>,
-    pub position: Option<serde_json::Value>,
-    pub battery_level: Option<f64>,
-    pub last_communication: DateTime<Utc>,
-}
-
-// ============================================================================
-// Energy Models
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct EnergyConsumption {
-    pub id: Uuid,
-    pub location_id: Option<Uuid>,
-    pub equipment_type: String,
-    pub consumption_kwh: f64,
-    pub cost_usd: Option<f64>,
-    pub efficiency_ratio: Option<f64>,
-    pub optimization_suggestions: serde_json::Value,
-    pub period_start: DateTime<Utc>,
-    pub period_end: DateTime<Utc>,
-    pub metadata: serde_json::Value,
-    pub recorded_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct EnergyOptimizationSuggestion {
-    pub suggestion_type: String,
-    pub description: String,
-    pub potential_savings_kwh: f64,
-    pub potential_savings_usd: f64,
-    pub implementation_effort: String,
-    pub priority: String,
-}
-
-// ============================================================================
-// Compliance Models
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ComplianceEvent {
-    pub id: Uuid,
-    pub event_type: String,
-    pub regulatory_standard: String,
-    pub compliance_status: String,
-    pub description: String,
-    pub affected_entity_type: String,
-    pub affected_entity_id: Uuid,
-    pub remediation_required: bool,
-    pub remediation_actions: serde_json::Value,
-    pub auditor_notes: Option<String>,
-    pub metadata: serde_json::Value,
-    pub occurred_at: DateTime<Utc>,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ComplianceStatus {
-    pub overall_status: String,
-    pub regulatory_standards: Vec<RegulatoryStandardStatus>,
-    pub violations: Vec<ComplianceViolation>,
-    pub last_audit_date: Option<DateTime<Utc>>,
-    pub next_audit_due: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RegulatoryStandardStatus {
-    pub standard: String,
-    pub status: String,
-    pub compliance_percentage: f64,
-    pub last_check: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ComplianceViolation {
-    pub id: Uuid,
-    pub violation_type: String,
-    pub severity: String,
-    pub description: String,
-    pub remediation_required: bool,
-    pub due_date: Option<DateTime<Utc>>,
-}
-
-// ============================================================================
-// Digital Twin Models
+// API Response Models (existing)
 // ============================================================================
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DigitalTwinState {
-    pub twin_id: Uuid,
-    pub physical_entity_id: Uuid,
-    pub entity_type: String,
-    pub current_state: serde_json::Value,
-    pub predicted_state: Option<serde_json::Value>,
-    pub simulation_parameters: serde_json::Value,
-    pub last_sync: DateTime<Utc>,
-    pub sync_status: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SimulationScenario {
-    pub scenario_name: String,
-    pub description: String,
-    pub parameters: serde_json::Value,
-    pub expected_outcomes: Option<serde_json::Value>,
-    pub simulation_duration: i32,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SimulationResult {
-    pub scenario_id: Uuid,
-    pub execution_time: i32,
-    pub results: serde_json::Value,
-    pub performance_metrics: serde_json::Value,
-    pub recommendations: Vec<String>,
-    pub completed_at: DateTime<Utc>,
-}
-
-// ============================================================================
-// Mobile Integration Models
-// ============================================================================
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MobileTaskAssignment {
-    pub task_id: Uuid,
-    pub user_id: Uuid,
-    pub task_type: String,
-    pub description: String,
-    pub location: Option<serde_json::Value>,
-    pub priority: String,
-    pub estimated_duration: Option<i32>,
-    pub assigned_at: DateTime<Utc>,
-    pub due_date: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BarcodeScanning {
-    pub barcode: String,
-    pub scan_type: String,
-    pub location: Option<serde_json::Value>,
-    pub user_id: Uuid,
-    pub metadata: Option<serde_json::Value>,
-    pub scanned_at: DateTime<Utc>,
-}
-
-// ============================================================================
-// API Response Models
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiResponse<T> {
     pub success: bool,
-    pub data: Option<T>,
+    pub data: T,
     pub message: Option<String>,
     pub timestamp: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl<T> ApiResponse<T> {
+    pub fn success(data: T) -> Self {
+        Self {
+            success: true,
+            data,
+            message: None,
+            timestamp: Utc::now(),
+        }
+    }
+
+    pub fn success_with_message(data: T, message: String) -> Self {
+        Self {
+            success: true,
+            data,
+            message: Some(message),
+            timestamp: Utc::now(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PaginatedResponse<T> {
     pub data: Vec<T>,
     pub pagination: PaginationInfo,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PaginationInfo {
     pub page: i32,
     pub per_page: i32,
@@ -465,22 +360,12 @@ pub struct PaginationInfo {
     pub has_prev: bool,
 }
 
-impl<T> ApiResponse<T> {
-    pub fn success(data: T) -> Self {
-        Self {
-            success: true,
-            data: Some(data),
-            message: None,
-            timestamp: Utc::now(),
-        }
-    }
-
-    pub fn error(message: String) -> Self {
-        Self {
-            success: false,
-            data: None,
-            message: Some(message),
-            timestamp: Utc::now(),
-        }
-    }
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CapacityInfo {
+    pub location_id: Uuid,
+    pub max_capacity: i32,
+    pub current_capacity: i32,
+    pub utilization_percentage: f64,
+    pub available_capacity: i32,
+    pub status: String,
 }

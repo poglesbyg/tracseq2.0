@@ -566,7 +566,7 @@ async def chat_stream(
                 # Try to connect to RAG service
                 try:
                     response = await client.post(
-                        f"{RAG_SERVICE_URL}/api/v1/rag/query",
+                        f"{RAG_SERVICE_URL}/query",
                         json=rag_payload,
                         timeout=30.0
                     )
@@ -574,10 +574,10 @@ async def chat_stream(
                     if response.status_code == 200:
                         # Process RAG response
                         data = response.json()
-                        if 'result' in data and 'response' in data['result']:
-                            content = data['result']['response']
-                            confidence = data['result'].get('confidence', 0.85)
-                            sources = data['result'].get('sources', [])
+                        if 'answer' in data:
+                            content = data['answer']
+                            confidence = data.get('confidence_score', 0.85)
+                            sources = data.get('sources', [])
                             
                             # Stream the response in chunks
                             words = content.split(' ')

@@ -80,7 +80,7 @@ pub fn create_app(state: AppState) -> axum::Router {
         .route("/health/ready", get(handlers::health::readiness_check))
         .route("/health/metrics", get(handlers::health::metrics));
 
-    // Storage management routes
+    // Storage management routes (existing)
     let storage_routes = Router::new()
         .route(
             "/storage/locations",
@@ -125,30 +125,162 @@ pub fn create_app(state: AppState) -> axum::Router {
             post(handlers::storage::retrieve_sample),
         );
 
-    // IoT integration routes
-    let iot_routes = Router::new()
-        .route("/iot/sensors", get(handlers::iot::list_sensors))
-        .route("/iot/sensors", post(handlers::iot::register_sensor))
-        .route("/iot/sensors/:sensor_id", get(handlers::iot::get_sensor))
+    // Hierarchical storage routes (new)
+    let hierarchical_storage_routes = Router::new()
+        // Container management
         .route(
-            "/iot/sensors/:sensor_id/data",
-            get(handlers::iot::get_sensor_data),
+            "/storage/containers",
+            post(handlers::hierarchical_storage::create_container),
+        )
+        .route(
+            "/storage/containers",
+            get(handlers::hierarchical_storage::list_containers),
+        )
+        .route(
+            "/storage/containers/:container_id",
+            get(handlers::hierarchical_storage::get_container_with_details),
+        )
+        .route(
+            "/storage/containers/:container_id/hierarchy",
+            get(handlers::hierarchical_storage::get_storage_hierarchy),
+        )
+        .route(
+            "/storage/containers/:container_id/grid",
+            get(handlers::hierarchical_storage::get_container_grid),
+        )
+        // Sample position management
+        .route(
+            "/storage/samples/assign",
+            post(handlers::hierarchical_storage::assign_sample_to_position),
+        )
+        .route(
+            "/storage/samples/:sample_id/move",
+            put(handlers::hierarchical_storage::move_sample_to_position),
+        )
+        .route(
+            "/storage/samples/:sample_id/location-detailed",
+            get(handlers::hierarchical_storage::get_sample_location_detailed),
+        )
+        .route(
+            "/storage/samples/:sample_id/position",
+            delete(handlers::hierarchical_storage::remove_sample_from_position),
+        );
+
+    // IoT and sensor routes
+    let iot_routes = Router::new()
+        .route("/iot/sensors", post(handlers::iot::create_sensor))
+        .route("/iot/sensors", get(handlers::iot::list_sensors))
+        .route("/iot/sensors/:sensor_id", get(handlers::iot::get_sensor))
+        .route("/iot/sensors/:sensor_id", put(handlers::iot::update_sensor))
+        .route(
+            "/iot/sensors/:sensor_id/readings",
+            post(handlers::iot::record_reading),
         )
         .route(
             "/iot/sensors/:sensor_id/readings",
-            post(handlers::iot::record_sensor_reading),
+            get(handlers::iot::get_readings),
         )
+        .route("/iot/readings/batch", post(handlers::iot::batch_readings))
         .route("/iot/alerts", get(handlers::iot::get_alerts))
-        .route(
-            "/iot/alerts/:alert_id/resolve",
-            post(handlers::iot::resolve_alert),
-        )
-        .route("/iot/health", get(handlers::iot::get_sensor_health));
+        .route("/iot/alerts/:alert_id/acknowledge", post(handlers::iot::acknowledge_alert));
+
+    // Analytics routes
+    let analytics_routes = Router::new()
+        .route("/analytics/capacity", get(handlers::analytics::capacity_analytics))
+        .route("/analytics/utilization", get(handlers::analytics::utilization_trends))
+        .route("/analytics/predictions", get(handlers::analytics::get_predictions))
+        .route("/analytics/models", get(handlers::analytics::list_models))
+        .route("/analytics/models", post(handlers::analytics::create_model))
+        .route("/analytics/models/:model_id", get(handlers::analytics::get_model))
+        .route("/analytics/models/:model_id/train", post(handlers::analytics::train_model))
+        .route("/analytics/models/:model_id/predict", post(handlers::analytics::make_prediction));
+
+    // Admin routes
+    let admin_routes = Router::new()
+        .route("/admin/system/status", get(handlers::admin::system_status))
+        .route("/admin/system/config", get(handlers::admin::get_config))
+        .route("/admin/system/config", put(handlers::admin::update_config))
+        .route("/admin/maintenance", post(handlers::admin::schedule_maintenance))
+        .route("/admin/maintenance", get(handlers::admin::list_maintenance))
+        .route("/admin/users", get(handlers::admin::list_users))
+        .route("/admin/users/:user_id/permissions", put(handlers::admin::update_permissions))
+        .route("/admin/audit/logs", get(handlers::admin::get_audit_logs))
+        .route("/admin/backup", post(handlers::admin::create_backup))
+        .route("/admin/backup", get(handlers::admin::list_backups))
+        .route("/admin/backup/:backup_id/restore", post(handlers::admin::restore_backup));
+
+    // Automation routes
+    let automation_routes = Router::new()
+        .route("/automation/tasks", post(handlers::automation::create_task))
+        .route("/automation/tasks", get(handlers::automation::list_tasks))
+        .route("/automation/tasks/:task_id", get(handlers::automation::get_task))
+        .route("/automation/tasks/:task_id/status", put(handlers::automation::update_task_status))
+        .route("/automation/robots", get(handlers::automation::list_robots))
+        .route("/automation/robots/:robot_id", get(handlers::automation::get_robot))
+        .route("/automation/robots/:robot_id/status", put(handlers::automation::update_robot_status))
+        .route("/automation/schedule", get(handlers::automation::get_schedule))
+        .route("/automation/schedule", post(handlers::automation::schedule_task));
+
+    // Blockchain routes
+    let blockchain_routes = Router::new()
+        .route("/blockchain/transactions", post(handlers::blockchain::create_transaction))
+        .route("/blockchain/transactions", get(handlers::blockchain::list_transactions))
+        .route("/blockchain/transactions/:tx_hash", get(handlers::blockchain::get_transaction))
+        .route("/blockchain/verify/:tx_hash", get(handlers::blockchain::verify_transaction))
+        .route("/blockchain/chain", get(handlers::blockchain::get_chain))
+        .route("/blockchain/integrity", get(handlers::blockchain::verify_integrity));
+
+    // Digital twin routes
+    let digital_twin_routes = Router::new()
+        .route("/digital-twin/models", post(handlers::digital_twin::create_model))
+        .route("/digital-twin/models", get(handlers::digital_twin::list_models))
+        .route("/digital-twin/models/:model_id", get(handlers::digital_twin::get_model))
+        .route("/digital-twin/models/:model_id/simulate", post(handlers::digital_twin::run_simulation))
+        .route("/digital-twin/simulations", get(handlers::digital_twin::list_simulations))
+        .route("/digital-twin/simulations/:sim_id", get(handlers::digital_twin::get_simulation))
+        .route("/digital-twin/sync/:entity_id", post(handlers::digital_twin::sync_entity));
+
+    // Energy management routes
+    let energy_routes = Router::new()
+        .route("/energy/consumption", get(handlers::energy::get_consumption))
+        .route("/energy/consumption", post(handlers::energy::record_consumption))
+        .route("/energy/optimization", get(handlers::energy::get_optimization_suggestions))
+        .route("/energy/reports", get(handlers::energy::generate_reports))
+        .route("/energy/efficiency", get(handlers::energy::efficiency_metrics))
+        .route("/energy/costs", get(handlers::energy::cost_analysis));
+
+    // Mobile integration routes
+    let mobile_routes = Router::new()
+        .route("/mobile/tasks", get(handlers::mobile::get_tasks))
+        .route("/mobile/tasks/:task_id/complete", post(handlers::mobile::complete_task))
+        .route("/mobile/scan", post(handlers::mobile::process_barcode_scan))
+        .route("/mobile/samples/nearby", get(handlers::mobile::get_nearby_samples))
+        .route("/mobile/locations/navigate", post(handlers::mobile::navigate_to_location))
+        .route("/mobile/sync", post(handlers::mobile::sync_data));
+
+    // Compliance routes
+    let compliance_routes = Router::new()
+        .route("/compliance/events", post(handlers::compliance::create_event))
+        .route("/compliance/events", get(handlers::compliance::list_events))
+        .route("/compliance/status", get(handlers::compliance::get_status))
+        .route("/compliance/audit", get(handlers::compliance::generate_audit_report))
+        .route("/compliance/violations", get(handlers::compliance::list_violations))
+        .route("/compliance/violations/:violation_id/remediate", post(handlers::compliance::remediate_violation));
 
     // Combine all routes
     Router::new()
         .merge(health_routes)
-        .nest("/api", storage_routes.merge(iot_routes))
+        .merge(storage_routes)
+        .merge(hierarchical_storage_routes)
+        .merge(iot_routes)
+        .merge(analytics_routes)
+        .merge(admin_routes)
+        .merge(automation_routes)
+        .merge(blockchain_routes)
+        .merge(digital_twin_routes)
+        .merge(energy_routes)
+        .merge(mobile_routes)
+        .merge(compliance_routes)
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
