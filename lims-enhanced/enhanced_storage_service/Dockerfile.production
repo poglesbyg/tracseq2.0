@@ -9,28 +9,31 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy service-specific Cargo.toml (use standalone version for hierarchical)
-COPY Cargo.toml.standalone ./Cargo.toml
+# Copy service-specific Cargo.toml
+COPY Cargo.toml ./
 
 # Create dummy source for dependency caching (both lib and bin)
 RUN mkdir src && echo "fn main() {}" > src/main.rs && echo "// dummy lib" > src/lib.rs
+
+# Copy the production main
+COPY src/main_production.rs ./src/main_production.rs
 
 # Set offline mode for SQLx
 ENV DATABASE_URL=postgres://postgres:postgres@localhost:5432/lab_manager
 ENV SQLX_OFFLINE=true
 
 # Build dependencies (cached layer)
-RUN cargo build --release
+RUN cargo build --release --bin enhanced_storage_service
 RUN rm src/main.rs src/lib.rs
 
 # Copy actual source code
 COPY src ./src
 
-# Use the production main.rs with full hierarchical storage features
-COPY src/main_production.rs ./src/main.rs
+# Replace main.rs with our production version
+RUN cp src/main_production.rs src/main.rs
 
 # Build the application
-RUN cargo build --release
+RUN cargo build --release --bin enhanced_storage_service
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -62,4 +65,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-CMD ["./enhanced_storage_service"]
+CMD ["./enhanced_storage_service"] 

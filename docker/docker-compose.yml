@@ -63,22 +63,25 @@ services:
   storage-service:
     build:
       context: ../lims-enhanced/enhanced_storage_service
-      dockerfile: Dockerfile.simple  # Use simplified version
+      dockerfile: Dockerfile  # Use regular Dockerfile since main.rs is already updated
     container_name: lims-storage
     environment:
       STORAGE_DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db  # Keep for SQLx
       REDIS_URL: redis://redis:6379
       AUTH_SERVICE_URL: http://auth-service:8000
-      STORAGE_PORT: "8080"  # Match the Dockerfile EXPOSE
-      # Disable all advanced features for initial deployment
+      PORT: "8080"  # Match the Dockerfile EXPOSE
+      # Enable hierarchical storage features
+      HIERARCHICAL_STORAGE_ENABLED: "true"
+      # Enable analytics for production
+      ANALYTICS_ENABLED: "true"
+      # Disable advanced features for initial deployment
       IOT_ENABLED: "false"
-      ANALYTICS_ENABLED: "false"
       DIGITAL_TWIN_ENABLED: "false"
       BLOCKCHAIN_ENABLED: "false"
       AUTOMATION_ENABLED: "false"
       # Add debug logging
-      RUST_LOG: "debug,enhanced_storage_service=trace"
+      RUST_LOG: "info,enhanced_storage_service=debug"
       RUST_BACKTRACE: "1"
     # Remove the command override now that we have a working binary
     depends_on:

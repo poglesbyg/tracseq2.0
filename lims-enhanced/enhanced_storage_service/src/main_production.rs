@@ -19,7 +19,7 @@ async fn main() -> Result<()> {
     info!("🏪 Starting Enhanced Storage Service - Production Version with Hierarchical Storage");
 
     // Load configuration from environment
-    let config = Config::from_env()?;
+    let config = Config::from_env();
     info!("📋 Configuration loaded successfully");
 
     // Create application state
@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
     let app = create_app(app_state);
 
     // Start the server
-    let port = config.server.port;
+    let port = config.port;
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     info!("🚀 Enhanced Storage Service (Production) listening on {}", addr);
 
@@ -38,4 +38,4 @@ async fn main() -> Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
-}
+} 

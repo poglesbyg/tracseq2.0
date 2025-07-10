@@ -75,6 +75,9 @@ pub enum StorageError {
 
     #[error("Not found: {0}")]
     NotFound(String),
+
+    #[error("Anyhow error: {0}")]
+    Anyhow(#[from] anyhow::Error),
 }
 
 impl IntoResponse for StorageError {
@@ -153,6 +156,10 @@ impl IntoResponse for StorageError {
             }
             StorageError::NotFound(ref _msg) => {
                 (StatusCode::NOT_FOUND, "Not found")
+            }
+            StorageError::Anyhow(ref e) => {
+                tracing::error!("Anyhow error: {}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
             }
         };
 

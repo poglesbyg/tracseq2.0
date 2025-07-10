@@ -1,53 +1,78 @@
 use anyhow::Result;
-use sqlx::{PgPool, postgres::PgPoolOptions};
-use tracing::info;
+use sqlx::{postgres::PgPoolOptions, PgPool, Pool, Postgres};
+use std::time::Duration;
+use tracing::{info, warn};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DatabasePool {
     pub pool: PgPool,
 }
 
 impl DatabasePool {
     pub async fn new(database_url: &str) -> Result<Self> {
-        info!("Connecting to database: {}", database_url);
+        info!("🔗 Connecting to database: {}", database_url);
 
         let pool = PgPoolOptions::new()
-            .max_connections(20)
-            .min_connections(5)
+            .max_connections(50)
+            .min_connections(10)
+            .acquire_timeout(Duration::from_secs(30))
+            .idle_timeout(Duration::from_secs(600))
+            .max_lifetime(Duration::from_secs(1800))
             .connect(database_url)
             .await?;
 
-        info!("Database connection pool established");
+        info!("✅ Database connection pool created successfully");
+
+        // Test the connection
+        let connection = pool.acquire().await?;
+        drop(connection);
+        info!("✅ Database connection test successful");
 
         Ok(Self { pool })
     }
 
-    pub async fn migrate(&self) -> Result<()> {
-        info!("Running database migrations");
-
-        // Create extensions
-        sqlx::query("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
-            .execute(&self.pool)
+    pub async fn test_connection(&self) -> Result<()> {
+        let _result = sqlx::query("SELECT 1")
+            .fetch_one(&self.pool)
             .await?;
+        Ok(())
+    }
 
-        sqlx::query("CREATE EXTENSION IF NOT EXISTS \"pg_trgm\"")
-            .execute(&self.pool)
-            .await?;
+    pub async fn run_migrations(&self) -> Result<()> {
+        info!("🚀 Running database migrations...");
+        
+        // Check if migrations table exists
+        let migrations_exist = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'migrations')"
+        )
+        .fetch_one(&self.pool)
+        .await?;
 
-        // Create storage locations table
+        if !migrations_exist {
+            warn!("⚠️ Migrations table not found. Creating basic storage tables...");
+            self.create_basic_tables().await?;
+        }
+
+        Ok(())
+    }
+
+    async fn create_basic_tables(&self) -> Result<()> {
+        info!("📋 Creating basic storage tables...");
+
+        // Create storage_locations table if it doesn't exist
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS storage_locations (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                name VARCHAR NOT NULL UNIQUE,
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                name VARCHAR(255) NOT NULL,
                 description TEXT,
-                location_type VARCHAR NOT NULL,
-                temperature_zone VARCHAR NOT NULL,
-                max_capacity INTEGER NOT NULL DEFAULT 100,
+                location_type VARCHAR(100) NOT NULL,
+                temperature_zone VARCHAR(100) NOT NULL,
+                max_capacity INTEGER NOT NULL DEFAULT 0,
                 current_capacity INTEGER NOT NULL DEFAULT 0,
                 coordinates JSONB,
-                status VARCHAR NOT NULL DEFAULT 'active',
-                metadata JSONB DEFAULT '{}',
+                status VARCHAR(50) NOT NULL DEFAULT 'active',
+                metadata JSONB NOT NULL DEFAULT '{}',
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
@@ -56,19 +81,77 @@ impl DatabasePool {
         .execute(&self.pool)
         .await?;
 
-        // Create samples table
+        // Create storage_containers table if it doesn't exist
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS storage_containers (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                name VARCHAR(255) NOT NULL,
+                container_type VARCHAR(100) NOT NULL,
+                parent_container_id UUID REFERENCES storage_containers(id) ON DELETE CASCADE,
+                location_id UUID REFERENCES storage_locations(id) ON DELETE SET NULL,
+                grid_position JSONB,
+                dimensions JSONB,
+                capacity INTEGER NOT NULL DEFAULT 0,
+                occupied_count INTEGER NOT NULL DEFAULT 0,
+                temperature_zone VARCHAR(100),
+                barcode VARCHAR(255) UNIQUE,
+                description TEXT,
+                status VARCHAR(50) NOT NULL DEFAULT 'active',
+                installation_date TIMESTAMPTZ,
+                last_maintenance_date TIMESTAMPTZ,
+                next_maintenance_date TIMESTAMPTZ,
+                container_metadata JSONB NOT NULL DEFAULT '{}',
+                access_restrictions JSONB NOT NULL DEFAULT '{}',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                created_by UUID
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Create sample_positions table if it doesn't exist
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS sample_positions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                sample_id UUID NOT NULL,
+                container_id UUID NOT NULL REFERENCES storage_containers(id) ON DELETE CASCADE,
+                position_identifier VARCHAR(100),
+                assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                assigned_by UUID,
+                removed_at TIMESTAMPTZ,
+                removed_by UUID,
+                status VARCHAR(50) NOT NULL DEFAULT 'occupied',
+                reservation_expires_at TIMESTAMPTZ,
+                storage_conditions JSONB NOT NULL DEFAULT '{}',
+                special_requirements JSONB NOT NULL DEFAULT '{}',
+                chain_of_custody JSONB NOT NULL DEFAULT '[]',
+                position_metadata JSONB NOT NULL DEFAULT '{}',
+                notes TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Create samples table if it doesn't exist
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS samples (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                barcode VARCHAR NOT NULL UNIQUE,
-                sample_type VARCHAR NOT NULL,
-                storage_location_id UUID REFERENCES storage_locations(id),
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                barcode VARCHAR(255) UNIQUE NOT NULL,
+                sample_type VARCHAR(100) NOT NULL,
+                storage_location_id UUID REFERENCES storage_locations(id) ON DELETE SET NULL,
                 position JSONB,
-                temperature_requirements VARCHAR,
-                status VARCHAR NOT NULL DEFAULT 'stored',
-                metadata JSONB DEFAULT '{}',
-                chain_of_custody JSONB DEFAULT '[]',
+                temperature_requirements VARCHAR(100),
+                status VARCHAR(50) NOT NULL DEFAULT 'active',
+                metadata JSONB NOT NULL DEFAULT '{}',
+                chain_of_custody JSONB NOT NULL DEFAULT '[]',
                 stored_at TIMESTAMPTZ,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -78,318 +161,221 @@ impl DatabasePool {
         .execute(&self.pool)
         .await?;
 
-        // Create IoT sensors table
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS iot_sensors (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                sensor_id VARCHAR NOT NULL UNIQUE,
-                sensor_type VARCHAR NOT NULL,
-                location_id UUID REFERENCES storage_locations(id),
-                status VARCHAR NOT NULL DEFAULT 'active',
-                last_reading TIMESTAMPTZ,
-                battery_level INTEGER,
-                signal_strength INTEGER,
-                firmware_version VARCHAR,
-                configuration JSONB,
-                calibration_data JSONB DEFAULT '{}',
-                maintenance_schedule JSONB DEFAULT '{}',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
+        // Create indexes for better performance
+        self.create_indexes().await?;
 
-        // Create sensor data table
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS sensor_data (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                sensor_id UUID REFERENCES iot_sensors(id),
-                reading_type VARCHAR NOT NULL,
-                value DOUBLE PRECISION NOT NULL,
-                unit VARCHAR NOT NULL,
-                quality_score DOUBLE PRECISION DEFAULT 1.0,
-                metadata JSONB DEFAULT '{}',
-                recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
+        info!("✅ Basic storage tables created successfully");
+        Ok(())
+    }
 
-        // Create alerts table
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS alerts (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                alert_type VARCHAR NOT NULL,
-                severity VARCHAR NOT NULL,
-                title VARCHAR NOT NULL,
-                message TEXT NOT NULL,
-                source_type VARCHAR NOT NULL,
-                source_id UUID,
-                status VARCHAR NOT NULL DEFAULT 'active',
-                acknowledged_by UUID,
-                acknowledged_at TIMESTAMPTZ,
-                resolved_at TIMESTAMPTZ,
-                metadata JSONB DEFAULT '{}',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
+    async fn create_indexes(&self) -> Result<()> {
+        info!("📊 Creating database indexes...");
 
-        // Create IoT alerts table
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS iot_alerts (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                sensor_id VARCHAR NOT NULL,
-                alert_type VARCHAR NOT NULL,
-                severity VARCHAR NOT NULL,
-                message TEXT NOT NULL,
-                threshold_value DOUBLE PRECISION,
-                actual_value DOUBLE PRECISION,
-                resolved BOOLEAN NOT NULL DEFAULT false,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                resolved_at TIMESTAMPTZ
-            )
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
+        // Indexes for storage_containers
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_storage_containers_type ON storage_containers(container_type)")
+            .execute(&self.pool).await?;
+        
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_storage_containers_parent ON storage_containers(parent_container_id)")
+            .execute(&self.pool).await?;
+        
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_storage_containers_location ON storage_containers(location_id)")
+            .execute(&self.pool).await?;
+        
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_storage_containers_temperature ON storage_containers(temperature_zone)")
+            .execute(&self.pool).await?;
+        
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_storage_containers_barcode ON storage_containers(barcode)")
+            .execute(&self.pool).await?;
 
-        // Create sensor maintenance table
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS sensor_maintenance (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                sensor_id VARCHAR NOT NULL,
-                maintenance_type VARCHAR NOT NULL,
-                description TEXT NOT NULL,
-                performed_by VARCHAR NOT NULL,
-                performed_at TIMESTAMPTZ NOT NULL,
-                next_maintenance TIMESTAMPTZ
-            )
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
+        // Indexes for sample_positions
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sample_positions_sample ON sample_positions(sample_id)")
+            .execute(&self.pool).await?;
+        
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sample_positions_container ON sample_positions(container_id)")
+            .execute(&self.pool).await?;
+        
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sample_positions_status ON sample_positions(status)")
+            .execute(&self.pool).await?;
+        
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sample_positions_removed ON sample_positions(removed_at)")
+            .execute(&self.pool).await?;
 
-        // Create analytics models table
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS analytics_models (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                model_name VARCHAR NOT NULL,
-                model_type VARCHAR NOT NULL,
-                version VARCHAR NOT NULL,
-                model_data JSONB NOT NULL,
-                performance_metrics JSONB DEFAULT '{}',
-                training_metadata JSONB DEFAULT '{}',
-                status VARCHAR NOT NULL DEFAULT 'active',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        // Create predictions table
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS predictions (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                model_id UUID REFERENCES analytics_models(id),
-                prediction_type VARCHAR NOT NULL,
-                input_data JSONB NOT NULL,
-                prediction_result JSONB NOT NULL,
-                confidence_score DOUBLE PRECISION,
-                prediction_horizon INTEGER,
-                metadata JSONB DEFAULT '{}',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        // Create blockchain transactions table
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS blockchain_transactions (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                transaction_hash VARCHAR NOT NULL UNIQUE,
-                block_number BIGINT,
-                transaction_type VARCHAR NOT NULL,
-                data_hash VARCHAR NOT NULL,
-                previous_hash VARCHAR,
-                timestamp TIMESTAMPTZ NOT NULL,
-                signature VARCHAR NOT NULL,
-                metadata JSONB DEFAULT '{}',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        // Create automation tasks table
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS automation_tasks (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                task_type VARCHAR NOT NULL,
-                priority INTEGER NOT NULL DEFAULT 5,
-                status VARCHAR NOT NULL DEFAULT 'pending',
-                input_parameters JSONB NOT NULL,
-                output_results JSONB,
-                assigned_robot_id VARCHAR,
-                scheduled_at TIMESTAMPTZ,
-                started_at TIMESTAMPTZ,
-                completed_at TIMESTAMPTZ,
-                error_message TEXT,
-                metadata JSONB DEFAULT '{}',
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        // Create energy consumption table
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS energy_consumption (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                location_id UUID REFERENCES storage_locations(id),
-                equipment_type VARCHAR NOT NULL,
-                consumption_kwh DOUBLE PRECISION NOT NULL,
-                cost_usd DOUBLE PRECISION,
-                efficiency_ratio DOUBLE PRECISION,
-                optimization_suggestions JSONB DEFAULT '[]',
-                period_start TIMESTAMPTZ NOT NULL,
-                period_end TIMESTAMPTZ NOT NULL,
-                metadata JSONB DEFAULT '{}',
-                recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        // Create compliance events table
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS compliance_events (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                event_type VARCHAR NOT NULL,
-                regulatory_standard VARCHAR NOT NULL,
-                compliance_status VARCHAR NOT NULL,
-                description TEXT NOT NULL,
-                affected_entity_type VARCHAR NOT NULL,
-                affected_entity_id UUID NOT NULL,
-                remediation_required BOOLEAN DEFAULT false,
-                remediation_actions JSONB DEFAULT '[]',
-                auditor_notes TEXT,
-                metadata JSONB DEFAULT '{}',
-                occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            "#,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        // Create indexes for performance
+        // Indexes for samples
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_samples_barcode ON samples(barcode)")
-            .execute(&self.pool)
-            .await?;
+            .execute(&self.pool).await?;
+        
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_samples_type ON samples(sample_type)")
+            .execute(&self.pool).await?;
+        
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_samples_status ON samples(status)")
+            .execute(&self.pool).await?;
 
+        // Indexes for storage_locations
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_storage_locations_type ON storage_locations(location_type)")
+            .execute(&self.pool).await?;
+        
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_storage_locations_temperature ON storage_locations(temperature_zone)")
+            .execute(&self.pool).await?;
+
+        info!("✅ Database indexes created successfully");
+        Ok(())
+    }
+
+    pub async fn get_health_info(&self) -> Result<DatabaseHealthInfo> {
+        let pool_info = self.pool.size();
+        
+        let total_connections = pool_info as i32;
+        let active_connections = self.pool.num_idle() as i32;
+        
+        // Test query performance
+        let start = std::time::Instant::now();
+        sqlx::query("SELECT 1").fetch_one(&self.pool).await?;
+        let query_time_ms = start.elapsed().as_millis() as i32;
+
+        // Get table counts
+        let total_containers: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM storage_containers"
+        ).fetch_one(&self.pool).await.unwrap_or(0);
+
+        let total_positions: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sample_positions WHERE removed_at IS NULL"
+        ).fetch_one(&self.pool).await.unwrap_or(0);
+
+        let total_samples: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM samples"
+        ).fetch_one(&self.pool).await.unwrap_or(0);
+
+        Ok(DatabaseHealthInfo {
+            connected: true,
+            total_connections,
+            active_connections,
+            query_time_ms,
+            total_containers,
+            total_positions,
+            total_samples,
+        })
+    }
+
+    pub async fn cleanup_expired_reservations(&self) -> Result<i64> {
+        let result = sqlx::query(
+            r#"
+            UPDATE sample_positions 
+            SET status = 'available', reservation_expires_at = NULL
+            WHERE status = 'reserved' AND reservation_expires_at < NOW()
+            "#
+        ).execute(&self.pool).await?;
+
+        Ok(result.rows_affected() as i64)
+    }
+
+    pub async fn update_container_occupancy(&self, container_id: uuid::Uuid) -> Result<()> {
         sqlx::query(
-            "CREATE INDEX IF NOT EXISTS idx_samples_location ON samples(storage_location_id)",
+            r#"
+            UPDATE storage_containers 
+            SET occupied_count = (
+                SELECT COUNT(*) 
+                FROM sample_positions 
+                WHERE container_id = $1 AND removed_at IS NULL
+            )
+            WHERE id = $1
+            "#
         )
+        .bind(container_id)
         .execute(&self.pool)
         .await?;
-
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sensor_data_sensor ON sensor_data(sensor_id)")
-            .execute(&self.pool)
-            .await?;
-
-        sqlx::query(
-            "CREATE INDEX IF NOT EXISTS idx_sensor_data_recorded_at ON sensor_data(recorded_at)",
-        )
-        .execute(&self.pool)
-        .await?;
-
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status)")
-            .execute(&self.pool)
-            .await?;
-
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_predictions_model ON predictions(model_id)")
-            .execute(&self.pool)
-            .await?;
-
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_blockchain_hash ON blockchain_transactions(transaction_hash)")
-            .execute(&self.pool)
-            .await?;
-
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_automation_status ON automation_tasks(status)")
-            .execute(&self.pool)
-            .await?;
-
-        sqlx::query(
-            "CREATE INDEX IF NOT EXISTS idx_energy_location ON energy_consumption(location_id)",
-        )
-        .execute(&self.pool)
-        .await?;
-
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_compliance_status ON compliance_events(compliance_status)")
-            .execute(&self.pool)
-            .await?;
-
-        // Create indexes for IoT alerts
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_iot_alerts_sensor_id ON iot_alerts(sensor_id)")
-            .execute(&self.pool)
-            .await?;
-
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_iot_alerts_resolved ON iot_alerts(resolved)")
-            .execute(&self.pool)
-            .await?;
-
-        // Create indexes for sensor maintenance
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sensor_maintenance_sensor_id ON sensor_maintenance(sensor_id)")
-            .execute(&self.pool)
-            .await?;
-
-        info!("Database migrations completed successfully");
 
         Ok(())
     }
 
-    pub async fn health_check(&self) -> Result<bool> {
-        let result = sqlx::query_scalar::<_, i64>("SELECT 1")
-            .fetch_one(&self.pool)
-            .await?;
+    pub async fn get_database_stats(&self) -> Result<DatabaseStats> {
+        let stats = sqlx::query_as::<_, DatabaseStats>(
+            r#"
+            SELECT 
+                (SELECT COUNT(*) FROM storage_locations) as total_locations,
+                (SELECT COUNT(*) FROM storage_containers) as total_containers,
+                (SELECT COUNT(*) FROM sample_positions WHERE removed_at IS NULL) as active_positions,
+                (SELECT COUNT(*) FROM samples) as total_samples,
+                (SELECT COUNT(*) FROM storage_containers WHERE container_type = 'freezer') as freezer_count,
+                (SELECT COUNT(*) FROM storage_containers WHERE container_type = 'rack') as rack_count,
+                (SELECT COUNT(*) FROM storage_containers WHERE container_type = 'box') as box_count,
+                (SELECT COUNT(*) FROM storage_containers WHERE container_type = 'position') as position_count,
+                (SELECT COALESCE(SUM(capacity), 0) FROM storage_containers) as total_capacity,
+                (SELECT COALESCE(SUM(occupied_count), 0) FROM storage_containers) as total_occupied
+            "#
+        ).fetch_one(&self.pool).await?;
 
-        Ok(result == 1)
+        Ok(stats)
     }
 }
 
-/// Create a new database connection pool (compatibility function)
-pub async fn create_pool(database_url: &str) -> Result<sqlx::PgPool> {
-    let pool = DatabasePool::new(database_url).await?;
-    Ok(pool.pool)
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct DatabaseHealthInfo {
+    pub connected: bool,
+    pub total_connections: i32,
+    pub active_connections: i32,
+    pub query_time_ms: i32,
+    pub total_containers: i64,
+    pub total_positions: i64,
+    pub total_samples: i64,
 }
 
-/// Run database migrations (compatibility function)
-pub async fn run_migrations(pool: &sqlx::PgPool) -> Result<()> {
-    let db_pool = DatabasePool { pool: pool.clone() };
-    db_pool.migrate().await
+#[derive(Debug, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
+pub struct DatabaseStats {
+    pub total_locations: i64,
+    pub total_containers: i64,
+    pub active_positions: i64,
+    pub total_samples: i64,
+    pub freezer_count: i64,
+    pub rack_count: i64,
+    pub box_count: i64,
+    pub position_count: i64,
+    pub total_capacity: i64,
+    pub total_occupied: i64,
+}
+
+// Helper functions for database operations
+pub async fn ensure_database_schema(pool: &PgPool) -> Result<()> {
+    info!("🔍 Ensuring database schema is up to date...");
+    
+    // Check if our tables exist
+    let tables_exist = sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_name IN ('storage_containers', 'sample_positions', 'storage_locations', 'samples')
+        )
+        "#
+    ).fetch_one(pool).await?;
+
+    if !tables_exist {
+        warn!("⚠️ Storage tables not found. Please run migrations first.");
+        return Err(anyhow::anyhow!("Database schema not initialized"));
+    }
+
+    info!("✅ Database schema verification complete");
+    Ok(())
+}
+
+pub async fn cleanup_database(pool: &PgPool) -> Result<()> {
+    info!("🧹 Running database cleanup...");
+    
+    // Clean up expired reservations
+    let expired_reservations = sqlx::query(
+        "UPDATE sample_positions SET status = 'available', reservation_expires_at = NULL WHERE status = 'reserved' AND reservation_expires_at < NOW()"
+    ).execute(pool).await?;
+
+    // Update container occupancy counts
+    sqlx::query(
+        r#"
+        UPDATE storage_containers 
+        SET occupied_count = (
+            SELECT COUNT(*) 
+            FROM sample_positions 
+            WHERE container_id = storage_containers.id AND removed_at IS NULL
+        )
+        "#
+    ).execute(pool).await?;
+
+    info!("✅ Database cleanup complete. Expired reservations: {}", expired_reservations.rows_affected());
+    Ok(())
 }
