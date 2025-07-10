@@ -2787,7 +2787,7 @@ async def get_report_templates():
             "name": "Sample Validation Results",
             "description": "Quality control validation results for samples",
             "category": "samples",
-            "sql": "SELECT s.barcode, s.name, svr.validation_status, svr.error_count, svr.warning_count, svr.validated_at\nFROM sample_validation_results svr\nJOIN samples s ON s.id = svr.sample_id\nWHERE svr.validated_at >= NOW() - INTERVAL '30 days'\nORDER BY svr.validated_at DESC;",
+            "sql": "SELECT s.barcode, s.name, svr.validation_passed, svr.error_message, svr.validated_at, svr.validated_by\nFROM sample_validation_results svr\nJOIN samples s ON s.id = svr.sample_id\nWHERE svr.validated_at >= NOW() - INTERVAL '30 days'\nORDER BY svr.validated_at DESC;",
             "tags": ["samples", "validation", "quality"]
         },
         
@@ -2797,7 +2797,7 @@ async def get_report_templates():
             "name": "Storage Utilization by Zone",
             "description": "Current storage usage across temperature zones",
             "category": "storage",
-            "sql": "SELECT sl.temperature_zone, \n       COUNT(*) as total_locations,\n       SUM(sl.capacity) as total_capacity,\n       SUM(sl.current_usage) as total_used,\n       ROUND(AVG(sl.current_usage::float / sl.capacity * 100), 2) as avg_utilization_pct\nFROM storage_locations sl\nGROUP BY sl.temperature_zone\nORDER BY avg_utilization_pct DESC;",
+            "sql": "SELECT sl.zone_type, \n       COUNT(*) as total_locations,\n       SUM(sl.capacity) as total_capacity,\n       SUM(sl.current_usage) as total_used,\n       ROUND(AVG(sl.current_usage::numeric / sl.capacity * 100)::numeric, 2) as avg_utilization_pct\nFROM storage_locations sl\nGROUP BY sl.zone_type\nORDER BY avg_utilization_pct DESC;",
             "tags": ["storage", "utilization", "capacity"]
         },
         {
@@ -2805,7 +2805,7 @@ async def get_report_templates():
             "name": "Storage Container Hierarchy",
             "description": "Hierarchical view of storage containers and their contents",
             "category": "storage",
-            "sql": "SELECT sc.name, sc.container_type, sc.parent_container_id, \n       COUNT(sp.id) as sample_positions,\n       sc.temperature_min, sc.temperature_max\nFROM storage_containers sc\nLEFT JOIN sample_positions sp ON sp.container_id = sc.id\nGROUP BY sc.id, sc.name, sc.container_type, sc.parent_container_id, sc.temperature_min, sc.temperature_max\nORDER BY sc.container_type, sc.name;",
+            "sql": "SELECT sc.name, sc.container_type, sc.parent_id, \n       COUNT(sp.id) as sample_positions,\n       sc.min_temperature_celsius, sc.max_temperature_celsius\nFROM storage_containers sc\nLEFT JOIN sample_positions sp ON sp.container_id = sc.id\nGROUP BY sc.id, sc.name, sc.container_type, sc.parent_id, sc.min_temperature_celsius, sc.max_temperature_celsius\nORDER BY sc.container_type, sc.name;",
             "tags": ["storage", "containers", "hierarchy"]
         },
         {
@@ -2813,7 +2813,7 @@ async def get_report_templates():
             "name": "Sample Position Tracking",
             "description": "Current positions of all stored samples",
             "category": "storage",
-            "sql": "SELECT s.barcode, s.name, sc.name as container_name, \n       sp.position_x, sp.position_y, sp.position_z,\n       sp.stored_at, sp.last_accessed\nFROM sample_positions sp\nJOIN samples s ON s.id = sp.sample_id\nJOIN storage_containers sc ON sc.id = sp.container_id\nWHERE sp.status = 'occupied'\nORDER BY sp.stored_at DESC;",
+            "sql": "SELECT s.barcode, s.name, sc.name as container_name, \n       sp.position_x, sp.position_y, sp.position_z,\n       sp.assigned_at, sp.assigned_by\nFROM sample_positions sp\nJOIN samples s ON s.id = sp.sample_id\nJOIN storage_containers sc ON sc.id = sp.container_id\nWHERE sp.status = 'occupied'\nORDER BY sp.assigned_at DESC;",
             "tags": ["storage", "positions", "tracking"]
         },
         
@@ -2831,7 +2831,7 @@ async def get_report_templates():
             "name": "Security Audit Report",
             "description": "Security events and authentication attempts",
             "category": "security",
-            "sql": "SELECT sal.event_type, sal.user_id, sal.ip_address, \n       sal.user_agent, sal.timestamp, sal.success\nFROM security_audit_log sal\nWHERE sal.timestamp >= NOW() - INTERVAL '7 days'\nORDER BY sal.timestamp DESC\nLIMIT 100;",
+            "sql": "SELECT sal.event_type, sal.user_id, sal.ip_address, \n       sal.user_agent, sal.timestamp, sal.severity\nFROM security_audit_log sal\nWHERE sal.timestamp >= NOW() - INTERVAL '7 days'\nORDER BY sal.timestamp DESC\nLIMIT 100;",
             "tags": ["security", "audit", "authentication"]
         },
         
@@ -2877,7 +2877,7 @@ async def get_report_templates():
             "name": "Barcode Generation Report",
             "description": "Recently generated barcodes and their assignments",
             "category": "barcodes",
-            "sql": "SELECT bs.prefix, bs.current_value, bs.increment_by,\n       COUNT(ba.id) as audit_entries,\n       MAX(ba.timestamp) as last_generated\nFROM barcode_sequences bs\nLEFT JOIN barcode_audit ba ON ba.sequence_id = bs.id\nGROUP BY bs.id, bs.prefix, bs.current_value, bs.increment_by\nORDER BY last_generated DESC NULLS LAST;",
+            "sql": "SELECT bs.prefix, bs.sequence_number,\n       COUNT(ba.id) as audit_entries,\n       MAX(ba.performed_at) as last_generated\nFROM barcode_sequences bs\nLEFT JOIN barcode_audit ba ON ba.barcode LIKE bs.prefix || '%'\nGROUP BY bs.id, bs.prefix, bs.sequence_number\nORDER BY last_generated DESC NULLS LAST;",
             "tags": ["barcodes", "generation", "tracking"]
         },
         
@@ -2895,7 +2895,7 @@ async def get_report_templates():
             "name": "Rate Limiting Statistics",
             "description": "API rate limiting usage and patterns",
             "category": "system",
-            "sql": "SELECT rl.key, rl.limit_value, rl.current_count, rl.reset_time,\n       CASE WHEN rl.current_count >= rl.limit_value THEN 'EXCEEDED' ELSE 'OK' END as status\nFROM rate_limits rl\nWHERE rl.reset_time > NOW()\nORDER BY rl.current_count DESC;",
+            "sql": "SELECT rl.identifier, rl.request_count, rl.window_start, rl.updated_at,\n       CASE WHEN rl.request_count > 100 THEN 'HIGH' ELSE 'NORMAL' END as status\nFROM rate_limits rl\nWHERE rl.window_start >= NOW() - INTERVAL '1 hour'\nORDER BY rl.request_count DESC;",
             "tags": ["system", "rate-limiting", "api"]
         },
         
