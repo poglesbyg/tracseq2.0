@@ -63,7 +63,7 @@ services:
   storage-service:
     build:
       context: ../lims-enhanced/enhanced_storage_service
-      dockerfile: Dockerfile  # Use regular Dockerfile since main.rs is already updated
+      dockerfile: Dockerfile.working  # Use working Dockerfile with regular Cargo.toml
     container_name: lims-storage
     environment:
       STORAGE_DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
