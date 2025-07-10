@@ -10,7 +10,8 @@ import {
   MagnifyingGlassIcon,
   CubeIcon,
   Squares2X2Icon,
-  ListBulletIcon
+  ListBulletIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 
 // Type definitions
@@ -75,53 +76,35 @@ export default function HierarchicalStorageNavigator() {
   
   const queryClient = useQueryClient();
 
-  // Fetch top-level containers (freezers) - using working analytics endpoint and transforming data
-  const { data: topLevelContainers, isLoading: isLoadingTopLevel } = useQuery({
+  // Fetch top-level containers (freezers)
+  const { data: topLevelContainers, isLoading: isLoadingTopLevel, error: topLevelError } = useQuery({
     queryKey: ['storage-containers', 'top-level'],
     queryFn: async () => {
+      console.log('🔍 Fetching top-level containers...');
       try {
-        // Use the working analytics endpoint and transform zones into containers
-        const response = await api.get('/api/storage/analytics/utilization');
-        const zones = response.data?.data?.zones || [];
+        const response = await api.get('/api/storage/containers?container_type=freezer');
+        console.log('✅ Top-level containers response:', response.data);
         
-        // Transform temperature zones into hierarchical storage containers
-        const containers = zones.map((zone: any, index: number) => ({
-          id: `freezer-${index + 1}`,
-          name: `ULF-A-Freezer-${index + 1} (${zone.name})`,
-          container_type: "freezer",
-          parent_id: null,
-          location_id: "lab-a",
-          capacity: zone.capacity,
-          current_usage: zone.used,
-          occupied_count: zone.used,
-          status: "active",
-          min_temperature_celsius: zone.name === "-80C" ? -85 : zone.name === "-20C" ? -25 : zone.name === "4C" ? 2 : 18,
-          max_temperature_celsius: zone.name === "-80C" ? -75 : zone.name === "-20C" ? -15 : zone.name === "4C" ? 6 : 25,
-          temperature_zone: zone.name,
-          barcode: `FRZ00${index + 1}`,
-          description: `${zone.name} temperature storage freezer`,
-          created_at: "2024-01-01T00:00:00Z",
-          updated_at: "2024-01-01T00:00:00Z"
-        }));
-        
-        return {
-          data: containers,
-          containers: containers,
-          total: containers.length,
-          message: "Hierarchical storage containers from analytics data"
-        };
+        // Handle different response structures
+        if (response.data?.data) {
+          return response.data;
+        } else if (Array.isArray(response.data)) {
+          return { data: response.data };
+        } else {
+          console.log('⚠️ Unexpected response structure, using fallback');
+          return { data: [] };
+        }
       } catch (error) {
-        console.error('Failed to fetch storage containers:', error);
-        // Fallback mock data
+        console.error('❌ Error fetching top-level containers:', error);
+        // Return fallback data for development
         const fallbackContainers = [
           {
             id: "freezer-1",
-            name: "ULF-A-Freezer-1 (-80C)",
+            name: "ULF-A-Freezer-1 (-80°C)",
             container_type: "freezer",
-            parent_id: null,
+            parent_container_id: null,
             location_id: "lab-a",
             capacity: 1000,
-            current_usage: 750,
             occupied_count: 750,
             status: "active",
             min_temperature_celsius: -85,
@@ -134,12 +117,11 @@ export default function HierarchicalStorageNavigator() {
           },
           {
             id: "freezer-2",
-            name: "ULF-A-Freezer-2 (-20C)",
+            name: "ULF-A-Freezer-2 (-20°C)",
             container_type: "freezer",
-            parent_id: null,
+            parent_container_id: null,
             location_id: "lab-a",
             capacity: 800,
-            current_usage: 600,
             occupied_count: 600,
             status: "active",
             min_temperature_celsius: -25,
@@ -154,9 +136,8 @@ export default function HierarchicalStorageNavigator() {
         
         return {
           data: fallbackContainers,
-          containers: fallbackContainers,
           total: fallbackContainers.length,
-          message: "Fallback hierarchical storage containers"
+          message: "Using fallback data due to API error"
         };
       }
     },
@@ -164,28 +145,56 @@ export default function HierarchicalStorageNavigator() {
   });
 
   // Fetch current container details with children
-  const { data: currentContainerData, isLoading: isLoadingContainer } = useQuery({
+  const { data: currentContainerData, isLoading: isLoadingContainer, error: containerError } = useQuery({
     queryKey: ['storage-container-details', currentContainerId],
     queryFn: async () => {
       if (!currentContainerId) return null;
-      const response = await api.get(`/api/storage/containers/${currentContainerId}?include_samples=true`);
-      return response.data;
+      
+      console.log('🔍 Fetching container details for:', currentContainerId);
+      try {
+        const response = await api.get(`/api/storage/containers/${currentContainerId}?include_samples=true`);
+        console.log('✅ Container details response:', response.data);
+        
+        // Handle the response structure properly
+        if (response.data?.data) {
+          return response.data;
+        } else {
+          console.log('⚠️ Unexpected container response structure:', response.data);
+          return response.data;
+        }
+      } catch (error) {
+        console.error('❌ Error fetching container details:', error);
+        throw error;
+      }
     },
     enabled: !!currentContainerId,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Fetch grid view for box-level containers
-  const { data: gridData } = useQuery({
+  const { data: gridData, error: gridError } = useQuery({
     queryKey: ['storage-grid', currentContainerId],
     queryFn: async () => {
       if (!currentContainerId) return null;
-      const response = await api.get(`/api/storage/containers/${currentContainerId}/grid?include_empty=true`);
-      return response.data;
+      
+      console.log('🔍 Fetching grid data for:', currentContainerId);
+      try {
+        const response = await api.get(`/api/storage/containers/${currentContainerId}/grid?include_empty=true`);
+        console.log('✅ Grid data response:', response.data);
+        return response.data;
+      } catch (error) {
+        console.error('❌ Error fetching grid data:', error);
+        // Return null if grid endpoint fails - this is expected for non-box containers
+        return null;
+      }
     },
     enabled: !!currentContainerId && currentContainerData?.data?.container?.container_type === 'box',
+    retry: 1,
   });
 
   const navigateToContainer = (container: StorageContainer) => {
+    console.log('🧭 Navigating to container:', container.id, container.name);
     setCurrentContainerId(container.id);
     setNavigationPath(prev => [
       ...prev,
@@ -194,6 +203,7 @@ export default function HierarchicalStorageNavigator() {
   };
 
   const navigateBack = (index: number) => {
+    console.log('⬅️ Navigating back to index:', index);
     if (index === -1) {
       // Navigate to top level
       setCurrentContainerId(null);
@@ -233,10 +243,49 @@ export default function HierarchicalStorageNavigator() {
     return { color: 'bg-green-100 text-green-800', status: 'Normal' };
   };
 
-  const filteredContainers = currentContainerData?.data?.children?.filter((container: StorageContainer) =>
+  // Helper to safely access container data
+  const getContainerData = () => {
+    if (!currentContainerData) return null;
+    
+    // Handle different response structures
+    if (currentContainerData.data) {
+      return currentContainerData.data;
+    }
+    
+    return currentContainerData;
+  };
+
+  const containerData = getContainerData();
+  const filteredContainers = containerData?.children?.filter((container: StorageContainer) =>
     container.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     container.barcode?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
+
+  const renderError = (error: Error | null, context: string) => {
+    if (!error) return null;
+    
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-md p-4">
+        <div className="flex">
+          <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-red-800">
+              Error loading {context}
+            </h3>
+            <p className="mt-1 text-sm text-red-700">
+              {error.message || 'An unexpected error occurred'}
+            </p>
+            <button
+              onClick={() => queryClient.invalidateQueries()}
+              className="mt-2 text-sm text-red-800 underline hover:text-red-900"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderBreadcrumbs = () => (
     <nav className="flex mb-6" aria-label="Breadcrumb">
@@ -268,85 +317,113 @@ export default function HierarchicalStorageNavigator() {
     </nav>
   );
 
-  const renderTopLevelContainers = () => (
-    <div className="space-y-6">
-      <div className="sm:flex sm:items-center">
-        <div className="sm:flex-auto">
-          <h3 className="text-lg font-medium text-gray-900">Storage Units</h3>
-          <p className="mt-2 text-sm text-gray-700">
-            Select a storage unit to navigate its contents.
-          </p>
-        </div>
-      </div>
+  const renderTopLevelContainers = () => {
+    if (topLevelError) {
+      return renderError(topLevelError, 'storage containers');
+    }
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {topLevelContainers?.data?.data?.map((container: StorageContainer) => {
-          const utilization = (container.occupied_count / container.capacity) * 100;
-          const statusInfo = getCapacityStatus(utilization);
-          
-          return (
-            <div
-              key={container.id}
-              className="bg-white overflow-hidden shadow rounded-lg cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => navigateToContainer(container)}
-            >
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="text-2xl">
-                      {getTemperatureIcon(container.temperature_zone)}
+    const containers = topLevelContainers?.data || [];
+    
+    return (
+      <div className="space-y-6">
+        <div className="sm:flex sm:items-center">
+          <div className="sm:flex-auto">
+            <h3 className="text-lg font-medium text-gray-900">Storage Units</h3>
+            <p className="mt-2 text-sm text-gray-700">
+              Select a storage unit to navigate its contents.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {containers.map((container: StorageContainer) => {
+            const utilization = (container.occupied_count / container.capacity) * 100;
+            const statusInfo = getCapacityStatus(utilization);
+            
+            return (
+              <div
+                key={container.id}
+                className="bg-white overflow-hidden shadow rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => navigateToContainer(container)}
+              >
+                <div className="p-5">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <div className="text-2xl">
+                        {getTemperatureIcon(container.temperature_zone)}
+                      </div>
+                    </div>
+                    <div className="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt className="text-sm font-medium text-gray-500 truncate">
+                          {container.name}
+                        </dt>
+                        <dd className="text-lg font-medium text-gray-900">
+                          {container.temperature_zone}
+                        </dd>
+                      </dl>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <ChevronRightIcon className="h-5 w-5 text-gray-400" />
                     </div>
                   </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">
-                        {container.name}
-                      </dt>
-                      <dd className="text-lg font-medium text-gray-900">
-                        {container.temperature_zone}
-                      </dd>
-                    </dl>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <ChevronRightIcon className="h-5 w-5 text-gray-400" />
-                  </div>
-                </div>
-                
-                <div className="mt-4">
-                  <div className="flex justify-between text-sm text-gray-500">
-                    <span>Capacity</span>
-                    <span>{container.occupied_count}/{container.capacity}</span>
-                  </div>
-                  <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${
-                        utilization >= 95 ? 'bg-red-500' : 
-                        utilization >= 80 ? 'bg-yellow-500' : 'bg-green-500'
-                      }`}
-                      style={{ width: `${utilization}%` }}
-                    ></div>
-                  </div>
-                  <div className="mt-2 flex justify-between items-center">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
-                      {statusInfo.status}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {container.barcode}
-                    </span>
+                  
+                  <div className="mt-4">
+                    <div className="flex justify-between text-sm text-gray-500">
+                      <span>Capacity</span>
+                      <span>{container.occupied_count}/{container.capacity}</span>
+                    </div>
+                    <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full ${
+                          utilization >= 95 ? 'bg-red-500' : 
+                          utilization >= 80 ? 'bg-yellow-500' : 'bg-green-500'
+                        }`}
+                        style={{ width: `${utilization}%` }}
+                      ></div>
+                    </div>
+                    <div className="mt-2 flex justify-between items-center">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
+                        {statusInfo.status}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {container.barcode}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderContainerContents = () => {
-    if (!currentContainerData?.data) return null;
+    if (containerError) {
+      return renderError(containerError, 'container details');
+    }
 
-    const { container, children, samples, capacity_info } = currentContainerData.data;
+    if (!containerData) {
+      return (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+          <div className="flex">
+            <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800">
+                No container data available
+              </h3>
+              <p className="mt-1 text-sm text-yellow-700">
+                The container data could not be loaded. Please try navigating back and selecting again.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const { container, children = [], samples = [], capacity_info } = containerData;
 
     // If this is a box, show grid view
     if (container.container_type === 'box' && viewMode === 'grid') {
@@ -387,26 +464,28 @@ export default function HierarchicalStorageNavigator() {
               )}
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-4">
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <dt className="text-sm font-medium text-gray-500">Total Capacity</dt>
-                <dd className="text-lg font-semibold text-gray-900">{capacity_info.total_capacity}</dd>
+            {capacity_info && (
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-4">
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <dt className="text-sm font-medium text-gray-500">Total Capacity</dt>
+                  <dd className="text-lg font-semibold text-gray-900">{capacity_info.total_capacity || container.capacity}</dd>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <dt className="text-sm font-medium text-gray-500">Occupied</dt>
+                  <dd className="text-lg font-semibold text-gray-900">{capacity_info.used_capacity || container.occupied_count}</dd>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <dt className="text-sm font-medium text-gray-500">Available</dt>
+                  <dd className="text-lg font-semibold text-gray-900">{capacity_info.available_capacity || (container.capacity - container.occupied_count)}</dd>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <dt className="text-sm font-medium text-gray-500">Utilization</dt>
+                  <dd className="text-lg font-semibold text-gray-900">
+                    {capacity_info.utilization_percentage?.toFixed(1) || ((container.occupied_count / container.capacity) * 100).toFixed(1)}%
+                  </dd>
+                </div>
               </div>
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <dt className="text-sm font-medium text-gray-500">Occupied</dt>
-                <dd className="text-lg font-semibold text-gray-900">{capacity_info.occupied_count}</dd>
-              </div>
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <dt className="text-sm font-medium text-gray-500">Available</dt>
-                <dd className="text-lg font-semibold text-gray-900">{capacity_info.available_count}</dd>
-              </div>
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <dt className="text-sm font-medium text-gray-500">Utilization</dt>
-                <dd className="text-lg font-semibold text-gray-900">
-                  {capacity_info.utilization_percentage.toFixed(1)}%
-                </dd>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -509,7 +588,27 @@ export default function HierarchicalStorageNavigator() {
   };
 
   const renderGridView = () => {
-    if (!gridData?.data) return null;
+    if (gridError) {
+      return renderError(gridError, 'grid view');
+    }
+
+    if (!gridData?.data) {
+      return (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+          <div className="flex">
+            <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800">
+                Grid view not available
+              </h3>
+              <p className="mt-1 text-sm text-yellow-700">
+                Grid view is only available for box-type containers with position data.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     const { grid_dimensions, positions } = gridData.data;
 
@@ -548,7 +647,7 @@ export default function HierarchicalStorageNavigator() {
                         setSelectedPosition({
                           id: position.container_id,
                           name: position.position_identifier,
-                          path: `${currentContainerData?.data?.container?.name || 'Container'}`,
+                          path: `${containerData?.container?.name || 'Container'}`,
                           temperatureZone: position.temperature_zone
                         });
                         setShowAssignModal(true);
