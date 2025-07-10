@@ -108,10 +108,27 @@ export default function Reports() {
       setError(null);
     },
     onError: (error: unknown) => {
-      const errorMessage = error && typeof error === 'object' && 'response' in error && 
-                          error.response && typeof error.response === 'object' && 'data' in error.response 
-                          ? (error.response.data as string) 
-                          : 'An error occurred while executing the query';
+      let errorMessage = 'An error occurred while executing the query';
+      
+      if (error && typeof error === 'object' && 'response' in error && 
+          error.response && typeof error.response === 'object' && 'data' in error.response) {
+        const responseData = error.response.data;
+        
+        // Handle different response data formats
+        if (typeof responseData === 'string') {
+          errorMessage = responseData;
+        } else if (responseData && typeof responseData === 'object') {
+          // Handle FastAPI error response format
+          if ('detail' in responseData && typeof responseData.detail === 'string') {
+            errorMessage = responseData.detail;
+          } else if ('message' in responseData && typeof responseData.message === 'string') {
+            errorMessage = responseData.message;
+          } else {
+            errorMessage = JSON.stringify(responseData);
+          }
+        }
+      }
+      
       setError(errorMessage);
       setReportResult(null);
     },

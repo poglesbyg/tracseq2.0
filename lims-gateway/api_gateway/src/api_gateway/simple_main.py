@@ -2779,7 +2779,7 @@ async def get_report_templates():
             "name": "Sample Audit Trail",
             "description": "Recent sample audit activities and changes",
             "category": "samples",
-            "sql": "SELECT s.barcode, s.name, sal.action, sal.old_values, sal.new_values, sal.changed_at, sal.changed_by\nFROM sample_audit_log sal\nJOIN samples s ON s.id = sal.sample_id\nWHERE sal.changed_at >= NOW() - INTERVAL '7 days'\nORDER BY sal.changed_at DESC\nLIMIT 100;",
+            "sql": "SELECT s.barcode, s.name, sal.action, sal.old_values, sal.new_values, sal.performed_at, sal.performed_by\nFROM sample_audit_log sal\nJOIN samples s ON s.id = sal.sample_id\nWHERE sal.performed_at >= NOW() - INTERVAL '7 days'\nORDER BY sal.performed_at DESC\nLIMIT 100;",
             "tags": ["samples", "audit", "history"]
         },
         {
