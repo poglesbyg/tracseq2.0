@@ -1982,14 +1982,15 @@ async def get_storage_utilization_working():
     return mock_utilization
 
 # CONTAINERS ALIAS: Map containers request to locations (WORKING FIX)
-@app.get("/api/storage/containers")
-async def get_storage_containers_alias(
+# DISABLED: Duplicate endpoint - using the one at line 2309
+# @app.get("/api/storage/containers")
+async def DISABLED_get_storage_containers_alias(
     container_type: str = Query(None),
     parent_id: str = Query(None), 
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100)
 ):
-    """Get storage containers - alias to locations for frontend compatibility"""
+    '''Get storage containers - alias to locations for frontend compatibility'''
     # Return hierarchical storage containers data from database
     containers = [
         {
@@ -2130,8 +2131,9 @@ async def get_hierarchical_containers(
     }
 
 # HIERARCHICAL STORAGE: Containers endpoint (simplified)
-@app.get("/api/storage/containers")
-async def get_storage_containers_simple(
+# DISABLED: Duplicate endpoint - using the one at line 2309
+# @app.get("/api/storage/containers")
+async def DISABLED_get_storage_containers_simple(
     container_type: str = Query(None)
 ):
     """Get storage containers with hierarchical filtering"""
@@ -2486,46 +2488,15 @@ async def get_storage_container(container_id: str, include_samples: bool = Query
     """Get specific storage container details with hierarchical children"""
     
     # Determine container type and generate appropriate children
-    if "freezer" in container_id:
-        container_type = "freezer"
-        # Freezers contain racks
-        children = [
-            {
-                "id": f"rack-{container_id}-{i}",
-                "name": f"Rack {chr(65 + i)}",
-                "container_type": "rack",
-                "parent_container_id": container_id,
-                "capacity": 100,
-                "occupied_count": 40 + i * 10,
-                "status": "active",
-                "barcode": f"RCK{chr(65 + i)}0{i + 1}",
-                "description": f"Storage rack {chr(65 + i)} in {container_id}",
-                "created_at": "2024-01-01T00:00:00Z",
-                "updated_at": "2024-01-01T00:00:00Z"
-            }
-            for i in range(4)  # 4 racks per freezer
-        ]
-    elif "rack" in container_id:
-        container_type = "rack"
-        # Racks contain boxes
-        children = [
-            {
-                "id": f"box-{container_id}-{i}",
-                "name": f"Box {i + 1}",
-                "container_type": "box",
-                "parent_container_id": container_id,
-                "capacity": 25,
-                "occupied_count": 15 + i * 2,
-                "status": "active",
-                "barcode": f"BOX{i + 1:03d}",
-                "description": f"Storage box {i + 1} in {container_id}",
-                "created_at": "2024-01-01T00:00:00Z",
-                "updated_at": "2024-01-01T00:00:00Z"
-            }
-            for i in range(5)  # 5 boxes per rack
-        ]
-    elif "box" in container_id:
+    # Check in order from most specific to least specific
+    print(f"DEBUG: Determining container type for ID: {container_id}")
+    if container_id.startswith("pos-"):
+        container_type = "position"
+        print(f"DEBUG: Identified as position")
+        children = []  # Positions don't have children
+    elif container_id.startswith("box-"):
         container_type = "box"
+        print(f"DEBUG: Identified as box")
         # Boxes contain positions
         children = [
             {
@@ -2543,9 +2514,49 @@ async def get_storage_container(container_id: str, include_samples: bool = Query
             }
             for i in range(25)  # 25 positions per box (5x5 grid)
         ]
+    elif container_id.startswith("rack-"):
+        container_type = "rack"
+        print(f"DEBUG: Identified as rack")
+        # Racks contain boxes
+        children = [
+            {
+                "id": f"box-{container_id}-{i}",
+                "name": f"Box {i + 1}",
+                "container_type": "box",
+                "parent_container_id": container_id,
+                "capacity": 25,
+                "occupied_count": 15 + i * 2,
+                "status": "active",
+                "barcode": f"BOX{i + 1:03d}",
+                "description": f"Storage box {i + 1} in {container_id}",
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z"
+            }
+            for i in range(5)  # 5 boxes per rack
+        ]
+    elif container_id.startswith("freezer-"):
+        container_type = "freezer"
+        print(f"DEBUG: Identified as freezer")
+        # Freezers contain racks
+        children = [
+            {
+                "id": f"rack-{container_id}-{i}",
+                "name": f"Rack {chr(65 + i)}",
+                "container_type": "rack",
+                "parent_container_id": container_id,
+                "capacity": 100,
+                "occupied_count": 40 + i * 10,
+                "status": "active",
+                "barcode": f"RCK{chr(65 + i)}0{i + 1}",
+                "description": f"Storage rack {chr(65 + i)} in {container_id}",
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z"
+            }
+            for i in range(4)  # 4 racks per freezer
+        ]
     else:
-        container_type = "position"
-        children = []  # Positions don't have children
+        container_type = "unknown"
+        children = []
     
     # Generate sample data if requested and if this is a position-level container
     samples = []
@@ -2553,14 +2564,11 @@ async def get_storage_container(container_id: str, include_samples: bool = Query
         samples = [
             {
                 "id": f"sample-{container_id}-{i}",
-                "name": f"Sample {i + 1}",
-                "barcode": f"SMPL{i + 1:04d}",
-                "sample_type": "DNA" if i % 2 == 0 else "RNA",
-                "status": "stored",
-                "volume": 100.0 - i * 5,
-                "concentration": 50.0 + i * 2,
-                "stored_at": "2024-01-15T10:30:00Z",
-                "position_id": container_id if container_type == "position" else f"pos-{container_id}-{i}"
+                "sample_id": f"sample-{container_id}-{i}",
+                "position_identifier": f"pos-{container_id}-{i}",
+                "assigned_at": "2024-01-15T10:30:00Z",
+                "status": "occupied",
+                "notes": f"Sample {i + 1} stored in {container_id}"
             }
             for i in range(min(3, 15) if container_type == "box" else 1)  # 1 sample per position, up to 3 samples per box
         ]
@@ -2575,21 +2583,33 @@ async def get_storage_container(container_id: str, include_samples: bool = Query
         min_temp = -85.0
         max_temp = -75.0
     
+    # Generate proper container name based on type
+    if container_type == "freezer":
+        container_name = f"ULF-A-Freezer-{container_id.split('-')[-1]}"
+    elif container_type == "rack":
+        rack_letter = container_id.split('-')[-1]
+        container_name = f"Rack {chr(65 + int(rack_letter)) if rack_letter.isdigit() else rack_letter.upper()}"
+    elif container_type == "box":
+        box_number = container_id.split('-')[-1]
+        container_name = f"Box {box_number}"
+    else:
+        container_name = f"Position {container_id.split('-')[-1]}"
+    
     return JSONResponse(content={
         "data": {
             "container": {
                 "id": container_id,
-                "name": f"Container-{container_id}" if "freezer" in container_id else f"Storage {container_type.title()} {container_id.split('-')[-1]}",
+                "name": container_name,
                 "container_type": container_type,
-                "parent_id": None if "freezer" in container_id else f"parent-{container_id}",
+                "parent_container_id": None if "freezer" in container_id else extract_parent_id(container_id),
                 "location_id": "lab-a",
                 "capacity": 1000 if container_type == "freezer" else 100 if container_type == "rack" else 25 if container_type == "box" else 1,
-                "current_usage": 500 if container_type == "freezer" else 60 if container_type == "rack" else 15 if container_type == "box" else 1,
+                "occupied_count": len(children) if children else len(samples),
                 "status": "active",
                 "temperature_zone": temp_zone,
                 "min_temperature_celsius": min_temp,
                 "max_temperature_celsius": max_temp,
-                "barcode": f"BC{container_id.upper()}",
+                "barcode": f"BC{container_id.upper().replace('-', '')}",
                 "description": f"Hierarchical storage {container_type} {container_id}",
                 "created_at": "2024-01-01T00:00:00Z",
                 "updated_at": "2024-01-01T00:00:00Z"
@@ -2604,6 +2624,20 @@ async def get_storage_container(container_id: str, include_samples: bool = Query
             }
         }
     }, status_code=200)
+
+def extract_parent_id(container_id: str) -> str:
+    """Extract parent container ID from hierarchical container ID"""
+    parts = container_id.split('-')
+    if "box" in container_id:
+        # box-rack-freezer-1-0-2 -> rack-freezer-1-0
+        return '-'.join(parts[1:-1])
+    elif "rack" in container_id:
+        # rack-freezer-1-0 -> freezer-1
+        return '-'.join(parts[1:-1])
+    elif "pos" in container_id:
+        # pos-box-rack-freezer-1-0-2-5 -> box-rack-freezer-1-0-2
+        return '-'.join(parts[1:-1])
+    return ""
 
 @app.get("/api/storage/containers/{container_id}/grid")
 async def get_storage_container_grid(container_id: str, include_empty: bool = Query(True)):
@@ -4866,17 +4900,7 @@ async def redirect_storage_locations():
     # Just redirect to the correct endpoint internally
     return await get_storage_locations()
 
-# CONTAINERS REDIRECT: Map containers to locations with container_type
-@app.get("/api/storage/containers")
-async def redirect_containers_to_locations(
-    container_type: str = Query(None),
-    parent_id: str = Query(None),
-    page: int = Query(1, ge=1),
-    per_page: int = Query(20, ge=1, le=100)
-):
-    """Redirect containers requests to locations endpoint with container_type"""
-    # Call the locations endpoint with container_type to get hierarchical data
-    return await get_storage_locations(page=page, per_page=per_page, container_type=container_type or "freezer")
+# CONTAINERS REDIRECT: Remove duplicate endpoint - using the main one at line 2310
 
 @app.get("/api/api/samples")
 async def redirect_samples(request: Request):
