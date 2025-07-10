@@ -31,48 +31,98 @@ export const Dock: React.FC<DockProps> = ({ apps, onAppClick, activeWindows }) =
     setTrashItems(items => items.filter(item => item.id !== itemId));
   };
 
+  // Group apps by section
+  const desktopApps = apps.filter((app: AppDefinition) => app.section === 'desktop');
+  const customerSupportApps = apps.filter((app: AppDefinition) => app.section === 'customer-support');
+  const scienceApps = apps.filter((app: AppDefinition) => app.section === 'science');
+  const dataApps = apps.filter((app: AppDefinition) => app.section === 'data');
+
+  const renderAppIcon = (app: AppDefinition) => {
+    const isHovered = hoveredApp === app.id;
+    const hasActiveWindows = getActiveWindowsForApp(app.id).length > 0;
+    
+    return (
+      <div
+        key={app.id}
+        className="relative"
+        onMouseEnter={() => setHoveredApp(app.id)}
+        onMouseLeave={() => setHoveredApp(null)}
+      >
+        {/* Tooltip */}
+        {isHovered && (
+          <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-black/80 text-white text-xs rounded whitespace-nowrap z-10">
+            {app.name}
+          </div>
+        )}
+        
+        {/* App Icon */}
+        <button
+          onClick={() => onAppClick(app.id)}
+          className={`relative transition-all duration-200 ${
+            isHovered ? 'transform -translate-y-2 scale-125' : ''
+          }`}
+        >
+          <div className={`w-12 h-12 ${app.dockIconClass || 'bg-gradient-to-br from-blue-400 to-blue-600'} rounded-xl shadow-lg flex items-center justify-center text-white transform transition-all`}>
+            {app.icon}
+          </div>
+        </button>
+        
+        {/* Active Indicator */}
+        {hasActiveWindows && (
+          <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-gray-600 dark:bg-gray-300 rounded-full" />
+        )}
+      </div>
+    );
+  };
+
+  const renderSection = (apps: AppDefinition[], sectionName: string, sectionColor: string) => {
+    if (apps.length === 0) return null;
+    
+    return (
+      <div key={sectionName} className="flex flex-col items-center">
+        {/* Section Label */}
+        <div className="mb-2 px-2 py-1 bg-white/20 dark:bg-black/20 rounded text-xs font-medium text-gray-700 dark:text-gray-300 backdrop-blur-sm">
+          {sectionName}
+        </div>
+        {/* Apps */}
+        <div className="flex items-end gap-2">
+          {apps.map(renderAppIcon)}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-        <div className="bg-white/30 dark:bg-black/30 backdrop-blur-2xl rounded-2xl px-3 py-2 shadow-2xl border border-white/20">
-          <div className="flex items-end gap-2">
-            {apps.map((app) => {
-              const isHovered = hoveredApp === app.id;
-              const hasActiveWindows = getActiveWindowsForApp(app.id).length > 0;
-              
-              return (
-                <div
-                  key={app.id}
-                  className="relative"
-                  onMouseEnter={() => setHoveredApp(app.id)}
-                  onMouseLeave={() => setHoveredApp(null)}
-                >
-                  {/* Tooltip */}
-                  {isHovered && (
-                    <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-black/80 text-white text-xs rounded whitespace-nowrap">
-                      {app.name}
-                    </div>
-                  )}
-                  
-                  {/* App Icon */}
-                  <button
-                    onClick={() => onAppClick(app.id)}
-                    className={`relative transition-all duration-200 ${
-                      isHovered ? 'transform -translate-y-2 scale-125' : ''
-                    }`}
-                  >
-                    <div className={`w-12 h-12 ${app.dockIconClass || 'bg-gradient-to-br from-blue-400 to-blue-600'} rounded-xl shadow-lg flex items-center justify-center text-white transform transition-all`}>
-                      {app.icon}
-                    </div>
-                  </button>
-                  
-                  {/* Active Indicator */}
-                  {hasActiveWindows && (
-                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-gray-600 dark:bg-gray-300 rounded-full" />
-                  )}
-                </div>
-              );
-            })}
+        <div className="bg-white/30 dark:bg-black/30 backdrop-blur-2xl rounded-2xl px-4 py-3 shadow-2xl border border-white/20">
+          <div className="flex items-end gap-6">
+            {/* Desktop Apps */}
+            {renderSection(desktopApps, 'Desktop', 'from-blue-400 to-blue-600')}
+            
+            {/* Section Separator */}
+            {desktopApps.length > 0 && (customerSupportApps.length > 0 || scienceApps.length > 0 || dataApps.length > 0) && (
+              <div className="mx-2 w-px h-12 bg-gray-400/50" />
+            )}
+            
+            {/* Customer Support Section */}
+            {renderSection(customerSupportApps, 'Customer Support', 'from-violet-400 to-violet-600')}
+            
+            {/* Section Separator */}
+            {customerSupportApps.length > 0 && (scienceApps.length > 0 || dataApps.length > 0) && (
+              <div className="mx-2 w-px h-12 bg-gray-400/50" />
+            )}
+            
+            {/* Science Section */}
+            {renderSection(scienceApps, 'Science', 'from-pink-400 to-pink-600')}
+            
+            {/* Section Separator */}
+            {scienceApps.length > 0 && dataApps.length > 0 && (
+              <div className="mx-2 w-px h-12 bg-gray-400/50" />
+            )}
+            
+            {/* Data Section */}
+            {renderSection(dataApps, 'Data', 'from-emerald-400 to-emerald-600')}
             
             {/* Dock Separator */}
             <div className="mx-2 w-px h-10 bg-gray-400/50" />
