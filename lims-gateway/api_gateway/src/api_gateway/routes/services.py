@@ -18,6 +18,10 @@ import httpx
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Request, Response, Form, File, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
+import time
+from pathlib import Path
+import json
+from datetime import datetime
 
 router = APIRouter()
 
@@ -38,7 +42,12 @@ QAQC_SERVICE_URL = os.getenv("QAQC_SERVICE_URL", "http://lims-qaqc:8000")
 PROJECT_SERVICE_URL = os.getenv("PROJECT_SERVICE_URL", "http://lims-projects:8000")
 LIBRARY_PREP_SERVICE_URL = os.getenv("LIBRARY_PREP_SERVICE_URL", "http://lims-library-prep:8000")
 FLOW_CELL_SERVICE_URL = os.getenv("FLOW_CELL_SERVICE_URL", "http://lims-flow-cells:8000")
-SPREADSHEET_SERVICE_URL = os.getenv("SPREADSHEET_SERVICE_URL", "http://lims-spreadsheets:8000")
+SPREADSHEET_SERVICE_URL = os.getenv("SPREADSHEET_SERVICE_URL", "http://tracseq-versioning-service:8000")
+
+# Infrastructure services
+POSTGRES_SERVICE_URL = os.getenv("POSTGRES_SERVICE_URL", "http://lims-postgres:5432")
+REDIS_SERVICE_URL = os.getenv("REDIS_SERVICE_URL", "http://lims-redis:6379")
+OLLAMA_SERVICE_URL = os.getenv("OLLAMA_SERVICE_URL", "http://lims-ollama:11434")
 
 async def proxy_request(
     service_url: str,
@@ -159,28 +168,162 @@ async def templates_health():
 # Samples Service Proxy Routes  
 @router.get("/samples", tags=["samples"])
 async def get_samples(request: Request):
-    """Get all samples"""
-    return await proxy_request(SAMPLE_SERVICE_URL, "/samples", request)
+    """Get all samples (mock implementation)"""
+    # Mock samples data for display
+    mock_samples = [
+        {
+            "id": "sample-001",
+            "name": "DNA Sample 001",
+            "barcode": "DNA-001-2024",
+            "sample_type": "DNA",
+            "status": "validated",
+            "concentration": 150.5,
+            "volume": 2.0,
+            "storage_location": "Freezer A1-B2",
+            "submitter": "Dr. Smith",
+            "department": "Genomics",
+            "created_at": "2024-12-15T10:30:00Z",
+            "updated_at": "2024-12-15T11:00:00Z",
+            "metadata": {
+                "patient_id": "P12345",
+                "collection_date": "2024-12-14",
+                "analysis_type": "WGS",
+                "priority": "high"
+            }
+        },
+        {
+            "id": "sample-002", 
+            "name": "RNA Sample 002",
+            "barcode": "RNA-002-2024",
+            "sample_type": "RNA",
+            "status": "in_storage",
+            "concentration": 89.3,
+            "volume": 1.5,
+            "storage_location": "Freezer B2-C3",
+            "submitter": "Dr. Johnson",
+            "department": "Transcriptomics",
+            "created_at": "2024-12-15T09:15:00Z",
+            "updated_at": "2024-12-15T09:45:00Z",
+            "metadata": {
+                "patient_id": "P12346",
+                "collection_date": "2024-12-13",
+                "analysis_type": "RNA-seq",
+                "priority": "medium"
+            }
+        },
+        {
+            "id": "sample-003",
+            "name": "Protein Sample 003", 
+            "barcode": "PRT-003-2024",
+            "sample_type": "Protein",
+            "status": "pending",
+            "concentration": 45.7,
+            "volume": 0.8,
+            "storage_location": "Freezer C1-D2",
+            "submitter": "Dr. Brown",
+            "department": "Proteomics",
+            "created_at": "2024-12-15T08:00:00Z",
+            "updated_at": "2024-12-15T08:30:00Z",
+            "metadata": {
+                "patient_id": "P12347",
+                "collection_date": "2024-12-12",
+                "analysis_type": "MS/MS",
+                "priority": "low"
+            }
+        }
+    ]
+    
+    return {
+        "success": True,
+        "data": mock_samples,
+        "pagination": {
+            "total": len(mock_samples),
+            "page": 1,
+            "per_page": 50,
+            "pages": 1
+        },
+        "filters": {
+            "status": ["pending", "validated", "in_storage", "completed"],
+            "sample_type": ["DNA", "RNA", "Protein"],
+            "department": ["Genomics", "Transcriptomics", "Proteomics"]
+        }
+    }
 
 @router.post("/samples", tags=["samples"])
 async def create_sample(request: Request):
     """Create a new sample"""
-    return await proxy_request(SAMPLE_SERVICE_URL, "/samples", request)
+    return await proxy_request(SAMPLE_SERVICE_URL, "/api/samples", request)
+
+@router.post("/samples/batch", tags=["samples"])
+async def create_samples_batch(request: Request):
+    """Create multiple samples in batch (mock implementation)"""
+    try:
+        # Get the request body
+        body = await request.body()
+        data = json.loads(body) if body else {}
+        samples = data.get('samples', [])
+        
+        if not samples:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No samples provided", "message": "samples array is required"}
+            )
+        
+        # Mock successful batch creation response
+        created_samples = []
+        for i, sample in enumerate(samples):
+            # Generate a mock sample response
+            created_sample = {
+                "id": f"sample-batch-{i+1}-{hash(str(sample)) % 10000}",
+                "name": sample.get('name', f'Sample {i+1}'),
+                "barcode": f"BAT-{i+1:03d}-{hash(str(sample)) % 1000:03d}",
+                "sample_type": sample.get('sample_type', 'unknown'),
+                "status": "pending",
+                "concentration": sample.get('concentration'),
+                "volume": sample.get('volume'),
+                "storage_location": sample.get('storage_location'),
+                "submitter": sample.get('submitter', 'Batch Upload'),
+                "created_at": datetime.now().isoformat(),
+                "metadata": sample.get('metadata', {})
+            }
+            created_samples.append(created_sample)
+        
+        return {
+            "success": True,
+            "message": f"Successfully created {len(created_samples)} samples",
+            "samples": created_samples,
+            "batch_id": f"batch-{hash(str(samples)) % 100000}",
+            "total_created": len(created_samples),
+            "failed": 0,
+            "errors": []
+        }
+        
+    except json.JSONDecodeError:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid JSON", "message": "Request body must be valid JSON"}
+        )
+    except Exception as e:
+        # logger.error(f"Error in create_samples_batch: {e}") # Original code had this line commented out
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error", "message": str(e)}
+        )
 
 @router.get("/samples/{sample_id}", tags=["samples"])
 async def get_sample(request: Request, sample_id: str):
     """Get a specific sample"""
-    return await proxy_request(SAMPLE_SERVICE_URL, f"/samples/{sample_id}", request)
+    return await proxy_request(SAMPLE_SERVICE_URL, f"/api/samples/{sample_id}", request)
 
 @router.put("/samples/{sample_id}", tags=["samples"])
 async def update_sample(request: Request, sample_id: str):
     """Update a sample"""
-    return await proxy_request(SAMPLE_SERVICE_URL, f"/samples/{sample_id}", request)
+    return await proxy_request(SAMPLE_SERVICE_URL, f"/api/samples/{sample_id}", request)
 
 @router.delete("/samples/{sample_id}", tags=["samples"])
 async def delete_sample(request: Request, sample_id: str):
     """Delete a sample"""
-    return await proxy_request(SAMPLE_SERVICE_URL, f"/samples/{sample_id}", request)
+    return await proxy_request(SAMPLE_SERVICE_URL, f"/api/samples/{sample_id}", request)
 
 # Storage Service Proxy Routes
 @router.get("/storage", tags=["storage"])
@@ -491,11 +634,6 @@ async def rag_health():
         raise HTTPException(status_code=503, detail=f"RAG service unavailable: {str(e)}")
 
 # File-based persistence for RAG submissions
-import json
-import os
-from datetime import datetime
-from pathlib import Path
-
 RAG_SUBMISSIONS_FILE = Path("/tmp/rag_submissions.json")
 
 def load_rag_submissions():
@@ -800,43 +938,241 @@ async def qaqc_health():
 @router.get("/services", tags=["services"])
 async def get_services_status():
     """Get status of all microservices"""
-    services = {
+    # Core application services
+    application_services = {
         "auth": AUTH_SERVICE_URL,
         "samples": SAMPLE_SERVICE_URL,
         "storage": STORAGE_SERVICE_URL,
         "templates": TEMPLATE_SERVICE_URL,
         "reports": REPORTS_SERVICE_URL,
         "rag": RAG_SERVICE_URL,
+        "dashboard": "http://lims-gateway-new:8000",  # Self-reference for dashboard
+    }
+    
+    # Laboratory workflow services
+    laboratory_services = {
         "sequencing": SEQUENCING_SERVICE_URL,
+        "qaqc": QAQC_SERVICE_URL,
+        "library_prep": LIBRARY_PREP_SERVICE_URL,
+        "flow_cells": FLOW_CELL_SERVICE_URL,
+        "projects": PROJECT_SERVICE_URL,
+    }
+    
+    # Data and reporting services
+    data_services = {
+        "spreadsheets": SPREADSHEET_SERVICE_URL,
         "notifications": NOTIFICATION_SERVICE_URL,
         "events": EVENT_SERVICE_URL,
         "transactions": TRANSACTION_SERVICE_URL,
-        "qaqc": QAQC_SERVICE_URL,
-        "projects": PROJECT_SERVICE_URL,
-        "library_prep": LIBRARY_PREP_SERVICE_URL,
-        "flow_cells": FLOW_CELL_SERVICE_URL,
-        "spreadsheets": SPREADSHEET_SERVICE_URL,
+    }
+    
+    # Infrastructure services
+    infrastructure_services = {
+        "postgres": POSTGRES_SERVICE_URL,
+        "redis": REDIS_SERVICE_URL,
+        "ollama": OLLAMA_SERVICE_URL,
+    }
+    
+    # Combine all services
+    all_services = {
+        **application_services,
+        **laboratory_services,
+        **data_services,
+        **infrastructure_services
     }
     
     status = {}
+    service_details = {}
     
     async with httpx.AsyncClient() as client:
-        for service_name, service_url in services.items():
+        for service_name, service_url in all_services.items():
             try:
-                response = await client.get(f"{service_url}/health", timeout=3.0)
-                if response.status_code == 200:
-                    status[service_name] = "healthy"
+                # Special handling for infrastructure services
+                if service_name in ["postgres", "redis"]:
+                    # These don't have HTTP health endpoints, mark as infrastructure
+                    status[service_name] = "infrastructure"
+                    service_details[service_name] = {
+                        "status": "infrastructure",
+                        "url": service_url,
+                        "type": "database" if service_name == "postgres" else "cache",
+                        "description": "Infrastructure service"
+                    }
+                elif service_name == "ollama":
+                    # Ollama has a different health endpoint
+                    try:
+                        response = await client.get(f"{service_url}/api/tags", timeout=3.0)
+                        if response.status_code == 200:
+                            status[service_name] = "healthy"
+                            service_details[service_name] = {
+                                "status": "healthy",
+                                "url": service_url,
+                                "type": "ai_service",
+                                "description": "LLM service for AI processing"
+                            }
+                        else:
+                            status[service_name] = "unhealthy"
+                            service_details[service_name] = {
+                                "status": "unhealthy",
+                                "url": service_url,
+                                "type": "ai_service",
+                                "description": "LLM service unavailable"
+                            }
+                    except:
+                        status[service_name] = "unreachable"
+                        service_details[service_name] = {
+                            "status": "unreachable",
+                            "url": service_url,
+                            "type": "ai_service",
+                            "description": "LLM service unreachable"
+                        }
                 else:
-                    status[service_name] = "unhealthy"
+                    # Standard HTTP health check
+                    response = await client.get(f"{service_url}/health", timeout=3.0)
+                    if response.status_code == 200:
+                        status[service_name] = "healthy"
+                        service_details[service_name] = {
+                            "status": "healthy",
+                            "url": service_url,
+                            "type": "microservice",
+                            "description": "Service operational"
+                        }
+                    else:
+                        status[service_name] = "unhealthy"
+                        service_details[service_name] = {
+                            "status": "unhealthy",
+                            "url": service_url,
+                            "type": "microservice",
+                            "description": "Service responding but unhealthy"
+                        }
             except:
                 status[service_name] = "unreachable"
+                service_details[service_name] = {
+                    "status": "unreachable",
+                    "url": service_url,
+                    "type": "microservice",
+                    "description": "Service not reachable"
+                }
+    
+    # Calculate overall health
+    healthy_count = len([s for s in status.values() if s == "healthy"])
+    infrastructure_count = len([s for s in status.values() if s == "infrastructure"])
+    total_services = len(status)
+    
+    # Determine overall status
+    if healthy_count + infrastructure_count == total_services:
+        overall_status = "healthy"
+    elif healthy_count > 0:
+        overall_status = "degraded"
+    else:
+        overall_status = "critical"
     
     return {
         "services": status,
-        "overall": "healthy" if all(s in ["healthy"] for s in status.values()) else "degraded"
+        "service_details": service_details,
+        "summary": {
+            "total_services": total_services,
+            "healthy": healthy_count,
+            "infrastructure": infrastructure_count,
+            "unhealthy": len([s for s in status.values() if s == "unhealthy"]),
+            "unreachable": len([s for s in status.values() if s == "unreachable"]),
+        },
+        "categories": {
+            "application": list(application_services.keys()),
+            "laboratory": list(laboratory_services.keys()),
+            "data": list(data_services.keys()),
+            "infrastructure": list(infrastructure_services.keys()),
+        },
+        "overall": overall_status,
+        "gateway_version": "2.0.0",
+        "timestamp": time.time()
     }
 
 
+
+# =============================================================================
+# DASHBOARD SERVICE ROUTES
+# =============================================================================
+
+@router.get("/dashboard/stats", tags=["dashboard"])
+async def get_dashboard_stats(request: Request):
+    """Get dashboard statistics (mock implementation)"""
+    # Mock dashboard stats data
+    return {
+        "totalTemplates": 12,
+        "totalSamples": 847,
+        "pendingSequencing": 23,
+        "completedSequencing": 156,
+        "byStatus": {
+            "pending": 45,
+            "validated": 123,
+            "in_storage": 234,
+            "in_sequencing": 23,
+            "completed": 422
+        },
+        "averageProcessingTime": {
+            "validation": 2.3,
+            "storage": 1.8,
+            "sequencing": 24.5,
+            "overall": 28.6
+        },
+        "recentThroughput": {
+            "last24h": 12,
+            "last7d": 89,
+            "last30d": 347
+        },
+        "bottlenecks": [
+            {
+                "stage": "sequencing",
+                "count": 23,
+                "avgWaitTime": 4.2
+            },
+            {
+                "stage": "validation",
+                "count": 8,
+                "avgWaitTime": 2.1
+            }
+        ],
+        "pendingSamples": 45,
+        "completedSamples": 422,
+        "recentActivity": [
+            {
+                "id": "ACT-001",
+                "type": "sample_created",
+                "title": "New sample added",
+                "description": "Sample DNA-2024-001 created",
+                "timestamp": "2024-12-15T10:30:00Z",
+                "status": "completed",
+                "metadata": {
+                    "sample_id": "DNA-2024-001",
+                    "user": "Dr. Smith"
+                }
+            },
+            {
+                "id": "ACT-002", 
+                "type": "sequencing_completed",
+                "title": "Sequencing job completed",
+                "description": "Job SEQ-2024-045 finished successfully",
+                "timestamp": "2024-12-15T09:15:00Z",
+                "status": "completed",
+                "metadata": {
+                    "job_id": "SEQ-2024-045",
+                    "samples_processed": 24
+                }
+            },
+            {
+                "id": "ACT-003",
+                "type": "template_uploaded",
+                "title": "New template uploaded",
+                "description": "Template Lab-Protocol-v2.xlsx uploaded",
+                "timestamp": "2024-12-15T08:45:00Z",
+                "status": "completed",
+                "metadata": {
+                    "template_name": "Lab-Protocol-v2.xlsx",
+                    "user": "Lab Manager"
+                }
+            }
+        ]
+    }
 
 # =============================================================================
 # LIBRARY PREP SERVICE PROXY ROUTES  
