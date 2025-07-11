@@ -82,13 +82,9 @@ export const FinderAppWrapper: React.FC<FinderAppWrapperProps> = ({ windowContex
         setIsLoading(true);
         setError(null);
         
-        const [samplesRes, templatesRes, projectsRes, reportsRes, ragSubmissionsRes] = await Promise.all([
-          axios.get('/api/samples'),
-          axios.get('/api/templates'),
-          axios.get('/api/projects'),
-          axios.get('/api/reports'),
-          axios.get('/api/rag/submissions')
-        ]);
+        // Use the new comprehensive finder endpoint
+        const finderRes = await axios.get('/api/finder/all-data?limit=1000');
+        const ragSubmissionsRes = await axios.get('/api/rag/submissions');
 
         const fileItems: FileSystemItem[] = [
           { id: 'samples-folder', name: 'Samples', type: 'folder', parent: null, created: new Date(), modified: new Date(), children: [] },
@@ -96,110 +92,143 @@ export const FinderAppWrapper: React.FC<FinderAppWrapperProps> = ({ windowContex
           { id: 'projects-folder', name: 'Projects', type: 'folder', parent: null, created: new Date(), modified: new Date(), children: [] },
           { id: 'reports-folder', name: 'Reports', type: 'folder', parent: null, created: new Date(), modified: new Date(), children: [] },
           { id: 'documents-folder', name: 'Documents', type: 'folder', parent: null, created: new Date(), modified: new Date(), children: [] },
+          { id: 'storage-folder', name: 'Storage', type: 'folder', parent: null, created: new Date(), modified: new Date(), children: [] },
+          { id: 'sequencing-folder', name: 'Sequencing', type: 'folder', parent: null, created: new Date(), modified: new Date(), children: [] },
+          { id: 'qc-folder', name: 'Quality Control', type: 'folder', parent: null, created: new Date(), modified: new Date(), children: [] },
+          { id: 'library-folder', name: 'Library Prep', type: 'folder', parent: null, created: new Date(), modified: new Date(), children: [] },
         ];
 
-        // Process samples
-        const samplesData = samplesRes.data?.data || samplesRes.data || [];
-        if (Array.isArray(samplesData)) {
-          samplesData.forEach((sample: SampleApiResponse) => {
-            const metadata: SampleMetadata = {
-              id: sample.id,
-              barcode: sample.barcode,
-              status: sample.status,
-              location: sample.location,
-              sampleType: sample.metadata?.sample_type,
-              concentration: sample.metadata?.concentration_ng_ul,
-              project: sample.metadata?.project,
-              description: sample.description
-            };
-            
-            fileItems.push({
-              id: `sample-${sample.id}`,
-              name: sample.name || sample.barcode,
-              type: 'sample',
-              parent: 'samples-folder',
-              created: new Date(sample.created_at),
-              modified: new Date(sample.updated_at || sample.created_at),
-              size: sample.metadata?.volume_ul ? Math.round(sample.metadata.volume_ul * 100) : 1024,
-              metadata
-            });
-          });
-        }
+        // Process unified finder data
+        const finderData = finderRes.data?.data || [];
+        if (Array.isArray(finderData)) {
+          finderData.forEach((item: any) => {
+            let parent = 'samples-folder'; // default
+            let metadata: any = {};
+            let size = 1024;
 
-        // Process templates
-        const templatesData = templatesRes.data?.data || templatesRes.data || [];
-        if (Array.isArray(templatesData)) {
-          templatesData.forEach((template: TemplateApiResponse) => {
-            const metadata: TemplateMetadata = {
-              id: template.id,
-              version: template.version,
-              isActive: template.is_active,
-              description: template.description
-            };
-            
-            fileItems.push({
-              id: `template-${template.id}`,
-              name: template.name,
-              type: 'template',
-              parent: 'templates-folder',
-              created: new Date(template.created_at),
-              modified: new Date(template.updated_at || template.created_at),
-              size: 2048,
-              metadata
-            });
-          });
-        }
+            // Determine parent folder and metadata based on item type
+            switch (item.category) {
+              case 'samples':
+                parent = 'samples-folder';
+                metadata = {
+                  id: item.id,
+                  barcode: item.barcode,
+                  status: item.status,
+                  location: item.location || 'Unknown',
+                  sampleType: item.sample_type,
+                  concentration: item.concentration,
+                  project: item.patient_id,
+                  description: item.notes || item.description
+                };
+                size = item.volume ? Math.round(parseFloat(item.volume) * 100) : 1024;
+                break;
 
-        // Process projects
-        const projectsData = projectsRes.data?.data || projectsRes.data || [];
-        if (Array.isArray(projectsData)) {
-          projectsData.forEach((project: ProjectApiResponse) => {
-            const metadata: ProjectMetadata = {
-              id: project.id,
-              name: project.name,
-              projectCode: project.project_code,
-              projectType: project.project_type,
-              status: project.status,
-              priority: project.priority,
-              department: project.department,
-              budgetApproved: project.budget_approved,
-              budgetUsed: project.budget_used,
-              description: project.description
-            };
-            
-            fileItems.push({
-              id: `project-${project.id}`,
-              name: `${project.project_code} - ${project.name}`,
-              type: 'project',
-              parent: 'projects-folder',
-              created: new Date(project.created_at),
-              modified: new Date(project.updated_at || project.created_at),
-              size: project.budget_approved ? Math.round(project.budget_approved / 100) : 5120,
-              metadata
-            });
-          });
-        }
+              case 'templates':
+                parent = 'templates-folder';
+                metadata = {
+                  id: item.id,
+                  version: item.version,
+                  isActive: item.status === 'Published',
+                  description: item.description
+                };
+                size = 2048;
+                break;
 
-        // Process reports
-        const reportsData = reportsRes.data?.data || reportsRes.data || [];
-        if (Array.isArray(reportsData)) {
-          reportsData.forEach((report: ReportApiResponse) => {
-            const metadata: ReportMetadata = {
-              id: report.id,
-              format: report.format,
-              status: report.status,
-              filePath: report.file_path,
-              description: report.description
-            };
+              case 'projects':
+                parent = 'projects-folder';
+                metadata = {
+                  id: item.id,
+                  name: item.name,
+                  projectCode: item.project_code,
+                  projectType: item.project_type,
+                  status: item.status,
+                  priority: item.priority,
+                  department: item.department,
+                  budgetApproved: item.budget_approved,
+                  budgetUsed: item.budget_used,
+                  description: item.description
+                };
+                size = item.budget_approved ? Math.round(item.budget_approved / 100) : 5120;
+                break;
+
+              case 'reports':
+                parent = 'reports-folder';
+                metadata = {
+                  id: item.id,
+                  format: item.format,
+                  status: item.status,
+                  filePath: item.file_path,
+                  description: item.description
+                };
+                size = item.file_size || 1024;
+                break;
+
+              case 'storage':
+                parent = 'storage-folder';
+                metadata = {
+                  id: item.id,
+                  zoneType: item.zone_type,
+                  temperature: item.temperature,
+                  capacity: item.capacity,
+                  currentUsage: item.current_usage,
+                  utilization: item.utilization,
+                  locationCode: item.location_code,
+                  description: item.description
+                };
+                size = item.capacity || 1024;
+                break;
+
+              case 'sequencing':
+                parent = 'sequencing-folder';
+                metadata = {
+                  id: item.id,
+                  jobId: item.job_id,
+                  platform: item.platform,
+                  sampleCount: item.sample_count,
+                  status: item.status,
+                  priority: item.priority,
+                  estimatedCost: item.estimated_cost,
+                  description: item.description
+                };
+                size = (item.sample_count || 1) * 100;
+                break;
+
+              case 'qc':
+                parent = 'qc-folder';
+                metadata = {
+                  id: item.id,
+                  sampleId: item.sample_id,
+                  score: item.score,
+                  decision: item.decision,
+                  assessedBy: item.assessed_by,
+                  comments: item.comments
+                };
+                size = 512;
+                break;
+
+              case 'library':
+                parent = 'library-folder';
+                metadata = {
+                  id: item.id,
+                  libraryId: item.library_id,
+                  libraryType: item.library_type,
+                  concentration: item.concentration,
+                  volume: item.volume,
+                  fragmentSize: item.fragment_size,
+                  preparedBy: item.prepared_by
+                };
+                size = 256;
+                break;
+            }
             
             fileItems.push({
-              id: `report-${report.id}`,
-              name: report.name,
-              type: 'report',
-              parent: 'reports-folder',
-              created: new Date(report.created_at),
-              modified: new Date(report.completed_at || report.created_at),
-              size: report.file_size || 1024,
+              id: item.id,
+              name: item.name,
+              type: item.type as any,
+              parent: parent,
+              created: new Date(item.created_at || item.submission_date || item.assessment_date || Date.now()),
+              modified: new Date(item.updated_at || item.created_at || item.submission_date || item.assessment_date || Date.now()),
+              size: size,
               metadata
             });
           });

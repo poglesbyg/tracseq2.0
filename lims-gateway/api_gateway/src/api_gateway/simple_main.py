@@ -208,7 +208,7 @@ GATEWAY_DEBUG = os.getenv("GATEWAY_DEBUG", "false").lower() == "true"
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8080")
 SAMPLE_SERVICE_URL = os.getenv("SAMPLE_SERVICE_URL", "http://sample-service:8081")
 STORAGE_SERVICE_URL = os.getenv("STORAGE_SERVICE_URL", "http://storage-service:8082")
-TEMPLATE_SERVICE_URL = os.getenv("TEMPLATE_SERVICE_URL", "http://template-service:8083")
+TEMPLATE_SERVICE_URL = os.getenv("TEMPLATE_SERVICE_URL", "http://lims-templates:8000")
 SEQUENCING_SERVICE_URL = os.getenv("SEQUENCING_SERVICE_URL", "http://tracseq-sequencing:8084")
 NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://tracseq-notification:8085")
 RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://tracseq-rag:8000")
@@ -5012,7 +5012,1161 @@ async def download_file(file_id: str):
     # In production, this would serve the actual file
     return {"message": f"Downloading file {file_id}", "action": "download"}
 
+# =============================================================================
+# COMPREHENSIVE FINDER DATA ENDPOINTS
+# =============================================================================
 
+@app.get("/api/finder/all-data")
+async def get_all_finder_data(
+    search: Optional[str] = Query(None, description="Search term to filter across all data"),
+    category: Optional[str] = Query(None, description="Filter by category: samples, templates, projects, reports, storage, sequencing, qc, library"),
+    limit: int = Query(1000, ge=1, le=5000, description="Maximum number of items to return"),
+    offset: int = Query(0, ge=0, description="Number of items to skip")
+):
+    """
+    Get all laboratory data for the finder interface.
+    
+    This endpoint aggregates data from all services and presents it in a unified format
+    that the finder can use to display all laboratory records.
+    """
+    try:
+        all_data = []
+        
+        # Get samples data
+        try:
+            async with get_database_connection() as conn:
+                samples_query = """
+                    SELECT id, name, barcode, sample_type, status, created_at, updated_at, 
+                           metadata, concentration, volume, quality_score, notes, template_id
+                    FROM samples 
+                    ORDER BY created_at DESC
+                """
+                samples_rows = await conn.fetch(samples_query)
+                
+                for row in samples_rows:
+                    metadata = row['metadata'] if row['metadata'] else {}
+                    # Handle metadata - it could be a string or dict
+                    if isinstance(metadata, str):
+                        try:
+                            import json
+                            metadata = json.loads(metadata)
+                        except:
+                            metadata = {}
+                    
+                    template_data = metadata.get('template_data', {}) if isinstance(metadata, dict) else {}
+                    
+                    sample_item = {
+                        "id": f"sample-{row['id']}",
+                        "name": row['name'],
+                        "type": "sample",
+                        "category": "samples",
+                        "barcode": row['barcode'],
+                        "status": row['status'],
+                        "sample_type": row['sample_type'],
+                        "created_at": row['created_at'].isoformat() if row['created_at'] else None,
+                        "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None,
+                        "concentration": template_data.get('Concentration_ng_uL') or row['concentration'],
+                        "volume": template_data.get('Volume_mL') or row['volume'],
+                        "quality_score": template_data.get('Quality_Score') or row['quality_score'],
+                        "department": template_data.get('Department'),
+                        "submitter": template_data.get('Submitter'),
+                        "analysis_type": template_data.get('Analysis_Type'),
+                        "priority": template_data.get('Priority'),
+                        "notes": template_data.get('Notes') or row['notes'],
+                        "patient_id": template_data.get('Patient_ID'),
+                        "collection_date": template_data.get('Collection_Date'),
+                        "storage_temp": template_data.get('Storage_Temp'),
+                        "metadata": metadata
+                    }
+                    
+                    # Add search relevance
+                    if search:
+                        search_text = f"{sample_item['name']} {sample_item['barcode']} {sample_item['sample_type']} {sample_item.get('department', '')} {sample_item.get('submitter', '')}".lower()
+                        if search.lower() in search_text:
+                            all_data.append(sample_item)
+                    else:
+                        all_data.append(sample_item)
+        except Exception as e:
+            print(f"Error fetching samples: {e}")
+        
+        # Get templates data
+        try:
+            async with get_database_connection() as conn:
+                templates_query = """
+                    SELECT id, name, description, category, status, created_at, updated_at,
+                           tags, is_public, usage_count, version
+                    FROM templates 
+                    ORDER BY created_at DESC
+                """
+                templates_rows = await conn.fetch(templates_query)
+                
+                for row in templates_rows:
+                    template_item = {
+                        "id": f"template-{row['id']}",
+                        "name": row['name'],
+                        "type": "template",
+                        "category": "templates",
+                        "description": row['description'],
+                        "template_category": row['category'],
+                        "status": row['status'],
+                        "template_type": "unknown",
+                        "created_at": row['created_at'].isoformat() if row['created_at'] else None,
+                        "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None,
+                        "tags": row['tags'] if row['tags'] else [],
+                        "is_public": row['is_public'],
+                        "usage_count": row['usage_count'],
+                        "version": row['version']
+                    }
+                    
+                    if search:
+                        search_text = f"{template_item['name']} {template_item['description']} {template_item['template_category']}".lower()
+                        if search.lower() in search_text:
+                            all_data.append(template_item)
+                    else:
+                        all_data.append(template_item)
+        except Exception as e:
+            print(f"Error fetching templates: {e}")
+        
+        # Get storage locations data
+        try:
+            async with get_database_connection() as conn:
+                storage_query = """
+                    SELECT id, name, zone_type, temperature_celsius, capacity, current_usage,
+                           status, location_code, description, created_at, updated_at
+                    FROM storage_locations 
+                    ORDER BY created_at DESC
+                """
+                storage_rows = await conn.fetch(storage_query)
+                
+                for row in storage_rows:
+                    storage_item = {
+                        "id": f"storage-{row['id']}",
+                        "name": row['name'],
+                        "type": "storage",
+                        "category": "storage",
+                        "zone_type": row['zone_type'],
+                        "temperature": row['temperature_celsius'],
+                        "capacity": row['capacity'],
+                        "current_usage": row['current_usage'],
+                        "utilization": round((row['current_usage'] / row['capacity']) * 100, 1) if row['capacity'] > 0 else 0,
+                        "status": row['status'],
+                        "location_code": row['location_code'],
+                        "description": row['description'],
+                        "created_at": row['created_at'].isoformat() if row['created_at'] else None,
+                        "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None
+                    }
+                    
+                    if search:
+                        search_text = f"{storage_item['name']} {storage_item['zone_type']} {storage_item['location_code']}".lower()
+                        if search.lower() in search_text:
+                            all_data.append(storage_item)
+                    else:
+                        all_data.append(storage_item)
+        except Exception as e:
+            print(f"Error fetching storage locations: {e}")
+        
+        # Get sequencing jobs data
+        try:
+            async with get_database_connection() as conn:
+                sequencing_query = """
+                    SELECT id, job_id, job_name, description, status, priority, run_type,
+                           platform, sample_count, submission_date, scheduled_start,
+                           completion_date, estimated_cost, actual_cost, notes
+                    FROM sequencing_jobs 
+                    ORDER BY submission_date DESC
+                """
+                sequencing_rows = await conn.fetch(sequencing_query)
+                
+                for row in sequencing_rows:
+                    sequencing_item = {
+                        "id": f"sequencing-{row['id']}",
+                        "name": row['job_name'],
+                        "type": "sequencing",
+                        "category": "sequencing",
+                        "job_id": row['job_id'],
+                        "description": row['description'],
+                        "status": row['status'],
+                        "priority": row['priority'],
+                        "run_type": row['run_type'],
+                        "platform": row['platform'],
+                        "sample_count": row['sample_count'],
+                        "submission_date": row['submission_date'].isoformat() if row['submission_date'] else None,
+                        "scheduled_start": row['scheduled_start'].isoformat() if row['scheduled_start'] else None,
+                        "completion_date": row['completion_date'].isoformat() if row['completion_date'] else None,
+                        "estimated_cost": row['estimated_cost'],
+                        "actual_cost": row['actual_cost'],
+                        "notes": row['notes']
+                    }
+                    
+                    if search:
+                        search_text = f"{sequencing_item['name']} {sequencing_item['job_id']} {sequencing_item['platform']}".lower()
+                        if search.lower() in search_text:
+                            all_data.append(sequencing_item)
+                    else:
+                        all_data.append(sequencing_item)
+        except Exception as e:
+            print(f"Error fetching sequencing jobs: {e}")
+        
+        # Get QC reviews data
+        try:
+            async with get_database_connection() as conn:
+                qc_query = """
+                    SELECT id, sample_id, assessment_date, overall_status, overall_score,
+                           acceptance_decision, rejection_reason, assessed_by, comments
+                    FROM sample_quality_assessments 
+                    ORDER BY assessment_date DESC
+                """
+                qc_rows = await conn.fetch(qc_query)
+                
+                for row in qc_rows:
+                    qc_item = {
+                        "id": f"qc-{row['id']}",
+                        "name": f"QC Assessment {row['sample_id']}",
+                        "type": "qc",
+                        "category": "qc",
+                        "sample_id": row['sample_id'],
+                        "assessment_date": row['assessment_date'].isoformat() if row['assessment_date'] else None,
+                        "status": row['overall_status'],
+                        "score": row['overall_score'],
+                        "decision": row['acceptance_decision'],
+                        "rejection_reason": row['rejection_reason'],
+                        "assessed_by": row['assessed_by'],
+                        "comments": row['comments']
+                    }
+                    
+                    if search:
+                        search_text = f"{qc_item['name']} {qc_item['sample_id']} {qc_item['decision']}".lower()
+                        if search.lower() in search_text:
+                            all_data.append(qc_item)
+                    else:
+                        all_data.append(qc_item)
+        except Exception as e:
+            print(f"Error fetching QC reviews: {e}")
+        
+        # Get library preparations data
+        try:
+            async with get_database_connection() as conn:
+                library_query = """
+                    SELECT id, library_id, sample_id, library_name, library_type, prep_status,
+                           concentration, volume, fragment_size_bp, prep_date, prepared_by, notes
+                    FROM libraries 
+                    ORDER BY prep_date DESC
+                """
+                library_rows = await conn.fetch(library_query)
+                
+                for row in library_rows:
+                    library_item = {
+                        "id": f"library-{row['id']}",
+                        "name": row['library_name'] or f"Library {row['library_id']}",
+                        "type": "library",
+                        "category": "library",
+                        "library_id": row['library_id'],
+                        "sample_id": row['sample_id'],
+                        "library_type": row['library_type'],
+                        "status": row['prep_status'],
+                        "concentration": row['concentration'],
+                        "volume": row['volume'],
+                        "fragment_size": row['fragment_size_bp'],
+                        "prep_date": row['prep_date'].isoformat() if row['prep_date'] else None,
+                        "prepared_by": row['prepared_by'],
+                        "notes": row['notes']
+                    }
+                    
+                    if search:
+                        search_text = f"{library_item['name']} {library_item['library_id']} {library_item['library_type']}".lower()
+                        if search.lower() in search_text:
+                            all_data.append(library_item)
+                    else:
+                        all_data.append(library_item)
+        except Exception as e:
+            print(f"Error fetching library preparations: {e}")
+        
+        # Get projects data
+        try:
+            async with get_database_connection() as conn:
+                projects_query = """
+                    SELECT id, project_code, name, description, project_type, status, priority,
+                           department, budget_approved, budget_used, created_at, updated_at
+                    FROM projects 
+                    ORDER BY created_at DESC
+                """
+                projects_rows = await conn.fetch(projects_query)
+                
+                for row in projects_rows:
+                    project_item = {
+                        "id": f"project-{row['id']}",
+                        "name": row['name'],
+                        "type": "project",
+                        "category": "projects",
+                        "project_code": row['project_code'],
+                        "description": row['description'],
+                        "project_type": row['project_type'],
+                        "status": row['status'],
+                        "priority": row['priority'],
+                        "department": row['department'],
+                        "budget_approved": row['budget_approved'],
+                        "budget_used": row['budget_used'],
+                        "budget_remaining": (row['budget_approved'] - row['budget_used']) if row['budget_approved'] and row['budget_used'] else None,
+                        "created_at": row['created_at'].isoformat() if row['created_at'] else None,
+                        "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None
+                    }
+                    
+                    if search:
+                        search_text = f"{project_item['name']} {project_item['project_code']} {project_item['department']}".lower()
+                        if search.lower() in search_text:
+                            all_data.append(project_item)
+                    else:
+                        all_data.append(project_item)
+        except Exception as e:
+            print(f"Error fetching projects: {e}")
+        
+        # Get reports data
+        try:
+            async with get_database_connection() as conn:
+                reports_query = """
+                    SELECT id, name, description, status, format, file_path, file_size,
+                           generated_by, started_at, completed_at, error_message
+                    FROM generated_reports 
+                    ORDER BY started_at DESC
+                """
+                reports_rows = await conn.fetch(reports_query)
+                
+                for row in reports_rows:
+                    report_item = {
+                        "id": f"report-{row['id']}",
+                        "name": row['name'],
+                        "type": "report",
+                        "category": "reports",
+                        "description": row['description'],
+                        "status": row['status'],
+                        "format": row['format'],
+                        "file_path": row['file_path'],
+                        "file_size": row['file_size'],
+                        "generated_by": row['generated_by'],
+                        "started_at": row['started_at'].isoformat() if row['started_at'] else None,
+                        "completed_at": row['completed_at'].isoformat() if row['completed_at'] else None,
+                        "error_message": row['error_message']
+                    }
+                    
+                    if search:
+                        search_text = f"{report_item['name']} {report_item['description']} {report_item['format']}".lower()
+                        if search.lower() in search_text:
+                            all_data.append(report_item)
+                    else:
+                        all_data.append(report_item)
+        except Exception as e:
+            print(f"Error fetching reports: {e}")
+        
+        # Filter by category if specified
+        if category:
+            all_data = [item for item in all_data if item.get('category') == category]
+        
+        # Sort by most recent first
+        all_data.sort(key=lambda x: x.get('created_at') or x.get('updated_at') or x.get('submission_date') or x.get('assessment_date') or '1970-01-01', reverse=True)
+        
+        # Apply pagination
+        total_count = len(all_data)
+        paginated_data = all_data[offset:offset + limit]
+        
+        return {
+            "success": True,
+            "data": paginated_data,
+            "pagination": {
+                "total": total_count,
+                "offset": offset,
+                "limit": limit,
+                "has_more": offset + limit < total_count
+            },
+            "categories": {
+                "samples": len([item for item in all_data if item.get('category') == 'samples']),
+                "templates": len([item for item in all_data if item.get('category') == 'templates']),
+                "storage": len([item for item in all_data if item.get('category') == 'storage']),
+                "sequencing": len([item for item in all_data if item.get('category') == 'sequencing']),
+                "qc": len([item for item in all_data if item.get('category') == 'qc']),
+                "library": len([item for item in all_data if item.get('category') == 'library']),
+                "projects": len([item for item in all_data if item.get('category') == 'projects']),
+                "reports": len([item for item in all_data if item.get('category') == 'reports'])
+            }
+        }
+        
+    except Exception as e:
+        print(f"Error in get_all_finder_data: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "data": [],
+            "pagination": {"total": 0, "offset": 0, "limit": limit, "has_more": False},
+            "categories": {}
+        }
+
+@app.get("/api/finder/categories")
+async def get_finder_categories():
+    """Get available categories and their counts for the finder."""
+    try:
+        categories = {}
+        
+        async with get_database_connection() as conn:
+            # Count samples
+            samples_count = await conn.fetchval("SELECT COUNT(*) FROM samples")
+            categories["samples"] = {"count": samples_count, "label": "Samples", "icon": "beaker"}
+            
+            # Count templates
+            templates_count = await conn.fetchval("SELECT COUNT(*) FROM templates")
+            categories["templates"] = {"count": templates_count, "label": "Templates", "icon": "document"}
+            
+            # Count storage locations
+            try:
+                storage_count = await conn.fetchval("SELECT COUNT(*) FROM storage_locations")
+                categories["storage"] = {"count": storage_count, "label": "Storage", "icon": "archive"}
+            except:
+                categories["storage"] = {"count": 0, "label": "Storage", "icon": "archive"}
+            
+            # Count sequencing jobs
+            try:
+                sequencing_count = await conn.fetchval("SELECT COUNT(*) FROM sequencing_jobs")
+                categories["sequencing"] = {"count": sequencing_count, "label": "Sequencing", "icon": "chart-bar"}
+            except:
+                categories["sequencing"] = {"count": 0, "label": "Sequencing", "icon": "chart-bar"}
+            
+            # Count QC assessments
+            try:
+                qc_count = await conn.fetchval("SELECT COUNT(*) FROM sample_quality_assessments")
+                categories["qc"] = {"count": qc_count, "label": "Quality Control", "icon": "shield-check"}
+            except:
+                categories["qc"] = {"count": 0, "label": "Quality Control", "icon": "shield-check"}
+            
+            # Count library preparations
+            try:
+                library_count = await conn.fetchval("SELECT COUNT(*) FROM libraries")
+                categories["library"] = {"count": library_count, "label": "Libraries", "icon": "test-tube"}
+            except:
+                categories["library"] = {"count": 0, "label": "Libraries", "icon": "test-tube"}
+            
+            # Count projects
+            try:
+                projects_count = await conn.fetchval("SELECT COUNT(*) FROM projects")
+                categories["projects"] = {"count": projects_count, "label": "Projects", "icon": "folder"}
+            except:
+                categories["projects"] = {"count": 0, "label": "Projects", "icon": "folder"}
+            
+            # Count reports
+            try:
+                reports_count = await conn.fetchval("SELECT COUNT(*) FROM generated_reports")
+                categories["reports"] = {"count": reports_count, "label": "Reports", "icon": "document-text"}
+            except:
+                categories["reports"] = {"count": 0, "label": "Reports", "icon": "document-text"}
+        
+        return {
+            "success": True,
+            "categories": categories,
+            "total_items": sum(cat["count"] for cat in categories.values())
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "categories": {},
+            "total_items": 0
+        }
+
+@app.get("/api/finder/search")
+async def search_finder_data(
+    q: str = Query(..., description="Search query"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0)
+):
+    """Advanced search across all laboratory data."""
+    try:
+        # Use the existing all-data endpoint with search
+        return await get_all_finder_data(search=q, category=category, limit=limit, offset=offset)
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "data": [],
+            "pagination": {"total": 0, "offset": 0, "limit": limit, "has_more": False}
+        }
+
+@app.get("/api/finder/recent")
+async def get_recent_finder_data(
+    days: int = Query(30, ge=1, le=365, description="Number of days to look back"),
+    limit: int = Query(20, ge=1, le=100)
+):
+    """Get recently created or updated items."""
+    try:
+        from datetime import datetime, timedelta
+        
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        recent_items = []
+        
+        async with get_database_connection() as conn:
+            # Recent samples
+            samples_query = """
+                SELECT id, name, barcode, sample_type, status, created_at, updated_at
+                FROM samples 
+                WHERE created_at >= $1 OR updated_at >= $1
+                ORDER BY GREATEST(created_at, updated_at) DESC
+                LIMIT $2
+            """
+            samples_rows = await conn.fetch(samples_query, cutoff_date, limit)
+            
+            for row in samples_rows:
+                recent_items.append({
+                    "id": f"sample-{row['id']}",
+                    "name": row['name'],
+                    "type": "sample",
+                    "category": "samples",
+                    "barcode": row['barcode'],
+                    "status": row['status'],
+                    "last_activity": max(row['created_at'], row['updated_at']).isoformat()
+                })
+            
+            # Recent templates
+            templates_query = """
+                SELECT id, name, category, status, created_at, updated_at
+                FROM templates 
+                WHERE created_at >= $1 OR updated_at >= $1
+                ORDER BY GREATEST(created_at, updated_at) DESC
+                LIMIT $2
+            """
+            templates_rows = await conn.fetch(templates_query, cutoff_date, limit)
+            
+            for row in templates_rows:
+                recent_items.append({
+                    "id": f"template-{row['id']}",
+                    "name": row['name'],
+                    "type": "template",
+                    "category": "templates",
+                    "template_category": row['category'],
+                    "status": row['status'],
+                    "last_activity": max(row['created_at'], row['updated_at']).isoformat()
+                })
+        
+        # Sort by most recent activity
+        recent_items.sort(key=lambda x: x['last_activity'], reverse=True)
+        
+        return {
+            "success": True,
+            "data": recent_items[:limit],
+            "cutoff_date": cutoff_date.isoformat(),
+            "days": days
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "data": []
+        }
+
+@app.get("/api/finder/filter")
+async def filter_finder_data(
+    category: Optional[str] = Query(None, description="Filter by category"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    department: Optional[str] = Query(None, description="Filter by department"),
+    priority: Optional[str] = Query(None, description="Filter by priority"),
+    date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    has_metadata: Optional[bool] = Query(None, description="Filter items with metadata"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0)
+):
+    """Advanced filtering of finder data with multiple criteria."""
+    try:
+        from datetime import datetime
+        
+        # Build filter conditions
+        filters = []
+        params = []
+        
+        if date_from:
+            try:
+                date_from_parsed = datetime.strptime(date_from, "%Y-%m-%d")
+                filters.append("created_at >= $" + str(len(params) + 1))
+                params.append(date_from_parsed)
+            except ValueError:
+                pass
+        
+        if date_to:
+            try:
+                date_to_parsed = datetime.strptime(date_to, "%Y-%m-%d")
+                filters.append("created_at <= $" + str(len(params) + 1))
+                params.append(date_to_parsed)
+            except ValueError:
+                pass
+        
+        filtered_data = []
+        
+        async with get_database_connection() as conn:
+            # Filter samples
+            if not category or category == 'samples':
+                sample_filters = filters.copy()
+                sample_params = params.copy()
+                
+                if status:
+                    sample_filters.append("status = $" + str(len(sample_params) + 1))
+                    sample_params.append(status)
+                
+                if has_metadata is not None:
+                    if has_metadata:
+                        sample_filters.append("metadata IS NOT NULL AND metadata != '{}'")
+                    else:
+                        sample_filters.append("(metadata IS NULL OR metadata = '{}')")
+                
+                where_clause = " WHERE " + " AND ".join(sample_filters) if sample_filters else ""
+                
+                samples_query = f"""
+                    SELECT id, name, barcode, sample_type, status, created_at, updated_at, metadata
+                    FROM samples
+                    {where_clause}
+                    ORDER BY created_at DESC
+                    LIMIT {limit} OFFSET {offset}
+                """
+                
+                samples_rows = await conn.fetch(samples_query, *sample_params)
+                
+                for row in samples_rows:
+                    # Handle metadata parsing
+                    metadata = row['metadata'] if row['metadata'] else {}
+                    if isinstance(metadata, str):
+                        try:
+                            import json
+                            metadata = json.loads(metadata)
+                        except:
+                            metadata = {}
+                    
+                    template_data = metadata.get('template_data', {}) if isinstance(metadata, dict) else {}
+                    
+                    # Apply department filter if specified
+                    if department and template_data.get('Department') != department:
+                        continue
+                    
+                    # Apply priority filter if specified
+                    if priority and template_data.get('Priority') != priority:
+                        continue
+                    
+                    filtered_data.append({
+                        "id": f"sample-{row['id']}",
+                        "name": row['name'],
+                        "type": "sample",
+                        "category": "samples",
+                        "barcode": row['barcode'],
+                        "status": row['status'],
+                        "sample_type": row['sample_type'],
+                        "created_at": row['created_at'].isoformat() if row['created_at'] else None,
+                        "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None,
+                        "department": template_data.get('Department'),
+                        "priority": template_data.get('Priority'),
+                        "metadata": metadata
+                    })
+            
+            # Filter storage locations
+            if not category or category == 'storage':
+                storage_filters = filters.copy()
+                storage_params = params.copy()
+                
+                if status:
+                    storage_filters.append("status = $" + str(len(storage_params) + 1))
+                    storage_params.append(status)
+                
+                where_clause = " WHERE " + " AND ".join(storage_filters) if storage_filters else ""
+                
+                storage_query = f"""
+                    SELECT id, name, zone_type, temperature_celsius, capacity, current_usage,
+                           status, location_code, description, created_at, updated_at
+                    FROM storage_locations
+                    {where_clause}
+                    ORDER BY created_at DESC
+                    LIMIT {limit} OFFSET {offset}
+                """
+                
+                storage_rows = await conn.fetch(storage_query, *storage_params)
+                
+                for row in storage_rows:
+                    filtered_data.append({
+                        "id": f"storage-{row['id']}",
+                        "name": row['name'],
+                        "type": "storage",
+                        "category": "storage",
+                        "zone_type": row['zone_type'],
+                        "temperature": row['temperature_celsius'],
+                        "capacity": row['capacity'],
+                        "current_usage": row['current_usage'],
+                        "utilization": round((row['current_usage'] / row['capacity']) * 100, 1) if row['capacity'] > 0 else 0,
+                        "status": row['status'],
+                        "location_code": row['location_code'],
+                        "description": row['description'],
+                        "created_at": row['created_at'].isoformat() if row['created_at'] else None,
+                        "updated_at": row['updated_at'].isoformat() if row['updated_at'] else None
+                    })
+        
+        # Sort by most recent first
+        filtered_data.sort(key=lambda x: x.get('created_at') or x.get('updated_at') or '1970-01-01', reverse=True)
+        
+        return {
+            "success": True,
+            "data": filtered_data,
+            "pagination": {
+                "total": len(filtered_data),
+                "offset": offset,
+                "limit": limit,
+                "has_more": len(filtered_data) == limit
+            },
+            "filters_applied": {
+                "category": category,
+                "status": status,
+                "department": department,
+                "priority": priority,
+                "date_from": date_from,
+                "date_to": date_to,
+                "has_metadata": has_metadata
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "data": [],
+            "pagination": {"total": 0, "offset": 0, "limit": limit, "has_more": False}
+        }
+
+@app.post("/api/finder/seed-data")
+async def seed_finder_data():
+    """
+    Seed the database with sample data for demonstration purposes.
+    This creates realistic laboratory data across all categories.
+    """
+    try:
+        async with get_database_connection() as conn:
+            # Seed storage locations
+            storage_locations = [
+                {
+                    "name": "Ultra-Low Freezer A1",
+                    "zone_type": "ultra_low_freezer",
+                    "temperature": -80.0,
+                    "capacity": 500,
+                    "current_usage": 320,
+                    "location_code": "ULF-A1",
+                    "description": "Primary -80°C storage for DNA samples"
+                },
+                {
+                    "name": "Ultra-Low Freezer B2",
+                    "zone_type": "ultra_low_freezer", 
+                    "temperature": -80.0,
+                    "capacity": 500,
+                    "current_usage": 180,
+                    "location_code": "ULF-B2",
+                    "description": "Secondary -80°C storage for RNA samples"
+                },
+                {
+                    "name": "Standard Freezer C1",
+                    "zone_type": "freezer",
+                    "temperature": -20.0,
+                    "capacity": 200,
+                    "current_usage": 150,
+                    "location_code": "FRZ-C1",
+                    "description": "General purpose -20°C storage"
+                },
+                {
+                    "name": "Refrigerated Storage D1",
+                    "zone_type": "refrigerated",
+                    "temperature": 4.0,
+                    "capacity": 100,
+                    "current_usage": 45,
+                    "location_code": "REF-D1",
+                    "description": "Short-term 4°C storage for reagents"
+                },
+                {
+                    "name": "Incubator E1",
+                    "zone_type": "incubator",
+                    "temperature": 37.0,
+                    "capacity": 50,
+                    "current_usage": 25,
+                    "location_code": "INC-E1",
+                    "description": "Cell culture incubator"
+                }
+            ]
+            
+            for location in storage_locations:
+                await conn.execute("""
+                    INSERT INTO storage_locations (name, zone_type, temperature_celsius, capacity, current_usage, location_code, description, status)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+                    ON CONFLICT (location_code) DO UPDATE SET
+                        current_usage = EXCLUDED.current_usage,
+                        updated_at = NOW()
+                """, location["name"], location["zone_type"], location["temperature"], 
+                location["capacity"], location["current_usage"], location["location_code"], location["description"])
+            
+            # Seed projects
+            projects = [
+                {
+                    "project_code": "PROJ-2024-001",
+                    "name": "Genomic Analysis of Rare Diseases",
+                    "description": "Comprehensive genomic study of rare genetic disorders",
+                    "project_type": "research",
+                    "status": "active",
+                    "priority": "high",
+                    "department": "Genetics",
+                    "budget_approved": 150000.00,
+                    "budget_used": 75000.00
+                },
+                {
+                    "project_code": "PROJ-2024-002",
+                    "name": "Cancer Biomarker Discovery",
+                    "description": "Identification of novel biomarkers for early cancer detection",
+                    "project_type": "research",
+                    "status": "active",
+                    "priority": "high",
+                    "department": "Oncology",
+                    "budget_approved": 200000.00,
+                    "budget_used": 45000.00
+                },
+                {
+                    "project_code": "PROJ-2024-003",
+                    "name": "Pharmacogenomics Study",
+                    "description": "Drug response prediction based on genetic variants",
+                    "project_type": "clinical",
+                    "status": "planning",
+                    "priority": "medium",
+                    "department": "Pharmacology",
+                    "budget_approved": 120000.00,
+                    "budget_used": 0.00
+                },
+                {
+                    "project_code": "PROJ-2024-004",
+                    "name": "Microbial Resistance Analysis",
+                    "description": "Study of antibiotic resistance mechanisms",
+                    "project_type": "research",
+                    "status": "completed",
+                    "priority": "medium",
+                    "department": "Microbiology",
+                    "budget_approved": 80000.00,
+                    "budget_used": 78500.00
+                }
+            ]
+            
+            for project in projects:
+                await conn.execute("""
+                    INSERT INTO projects (project_code, name, description, project_type, status, priority, department, budget_approved, budget_used, principal_investigator_id, created_by)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, gen_random_uuid(), gen_random_uuid())
+                    ON CONFLICT (project_code) DO UPDATE SET
+                        status = EXCLUDED.status,
+                        budget_used = EXCLUDED.budget_used,
+                        updated_at = NOW()
+                """, project["project_code"], project["name"], project["description"], 
+                project["project_type"], project["status"], project["priority"], 
+                project["department"], project["budget_approved"], project["budget_used"])
+            
+            # Seed sequencing jobs
+            sequencing_jobs = [
+                {
+                    "job_id": "SEQ-2024-001",
+                    "job_name": "Whole Genome Sequencing Batch 1",
+                    "description": "WGS for rare disease samples",
+                    "status": "running",
+                    "priority": "high",
+                    "run_type": "production",
+                    "platform": "NovaSeq 6000",
+                    "sample_count": 24,
+                    "estimated_cost": 12000.00
+                },
+                {
+                    "job_id": "SEQ-2024-002",
+                    "job_name": "RNA-Seq Cancer Panel",
+                    "description": "Transcriptome analysis for cancer biomarkers",
+                    "status": "pending",
+                    "priority": "high",
+                    "run_type": "production",
+                    "platform": "NextSeq 2000",
+                    "sample_count": 48,
+                    "estimated_cost": 8000.00
+                },
+                {
+                    "job_id": "SEQ-2024-003",
+                    "job_name": "Targeted Panel Sequencing",
+                    "description": "Pharmacogenomics panel for drug response",
+                    "status": "completed",
+                    "priority": "medium",
+                    "run_type": "production",
+                    "platform": "MiSeq v3",
+                    "sample_count": 96,
+                    "estimated_cost": 4800.00,
+                    "actual_cost": 4750.00
+                },
+                {
+                    "job_id": "SEQ-2024-004",
+                    "job_name": "Microbial Genome Assembly",
+                    "description": "Bacterial resistance gene analysis",
+                    "status": "completed",
+                    "priority": "low",
+                    "run_type": "research",
+                    "platform": "MinION",
+                    "sample_count": 12,
+                    "estimated_cost": 2400.00,
+                    "actual_cost": 2350.00
+                }
+            ]
+            
+            for job in sequencing_jobs:
+                await conn.execute("""
+                    INSERT INTO sequencing_jobs (job_id, job_name, description, status, priority, run_type, platform, sample_count, estimated_cost, actual_cost, submission_date, requester_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), gen_random_uuid())
+                    ON CONFLICT (job_id) DO UPDATE SET
+                        status = EXCLUDED.status,
+                        actual_cost = EXCLUDED.actual_cost,
+                        updated_at = NOW()
+                """, job["job_id"], job["job_name"], job["description"], job["status"], 
+                job["priority"], job["run_type"], job["platform"], job["sample_count"], 
+                job["estimated_cost"], job.get("actual_cost"))
+            
+            # Seed library preparations
+            libraries = [
+                {
+                    "library_id": "LIB-2024-001",
+                    "library_name": "WGS Library Prep Batch 1",
+                    "library_type": "whole_genome",
+                    "prep_status": "completed",
+                    "concentration": 25.5,
+                    "volume": 50.0,
+                    "fragment_size_bp": 350
+                },
+                {
+                    "library_id": "LIB-2024-002",
+                    "library_name": "RNA-Seq Library Prep",
+                    "library_type": "rna_seq",
+                    "prep_status": "in_progress",
+                    "concentration": 18.2,
+                    "volume": 30.0,
+                    "fragment_size_bp": 200
+                },
+                {
+                    "library_id": "LIB-2024-003",
+                    "library_name": "Targeted Panel Library",
+                    "library_type": "targeted_panel",
+                    "prep_status": "completed",
+                    "concentration": 45.8,
+                    "volume": 25.0,
+                    "fragment_size_bp": 180
+                }
+            ]
+            
+            for library in libraries:
+                await conn.execute("""
+                    INSERT INTO libraries (library_id, sample_id, library_name, library_type, prep_status, concentration, volume, fragment_size_bp, prep_date, prepared_by)
+                    VALUES ($1, gen_random_uuid(), $2, $3, $4, $5, $6, $7, NOW(), gen_random_uuid())
+                    ON CONFLICT (library_id) DO UPDATE SET
+                        prep_status = EXCLUDED.prep_status,
+                        concentration = EXCLUDED.concentration
+                """, library["library_id"], library["library_name"], library["library_type"], 
+                library["prep_status"], library["concentration"], library["volume"], library["fragment_size_bp"])
+            
+            # Seed QC assessments
+            qc_assessments = [
+                {
+                    "overall_status": "passed",
+                    "overall_score": 8.5,
+                    "acceptance_decision": "accept",
+                    "assessed_by": "qc_analyst_1",
+                    "comments": "Sample quality meets standards for sequencing"
+                },
+                {
+                    "overall_status": "passed",
+                    "overall_score": 9.2,
+                    "acceptance_decision": "accept",
+                    "assessed_by": "qc_analyst_2",
+                    "comments": "Excellent sample quality, high purity"
+                },
+                {
+                    "overall_status": "warning",
+                    "overall_score": 7.1,
+                    "acceptance_decision": "conditional_accept",
+                    "assessed_by": "qc_analyst_1",
+                    "comments": "Slightly degraded but acceptable for analysis"
+                },
+                {
+                    "overall_status": "failed",
+                    "overall_score": 4.2,
+                    "acceptance_decision": "reject",
+                    "rejection_reason": "Insufficient DNA concentration",
+                    "assessed_by": "qc_analyst_2",
+                    "comments": "Sample requires re-extraction"
+                }
+            ]
+            
+            for qc in qc_assessments:
+                await conn.execute("""
+                    INSERT INTO sample_quality_assessments (sample_id, assessment_date, overall_status, overall_score, acceptance_decision, rejection_reason, assessed_by, comments)
+                    VALUES (gen_random_uuid(), NOW(), $1, $2, $3, $4, $5, $6)
+                """, qc["overall_status"], qc["overall_score"], qc["acceptance_decision"], 
+                qc.get("rejection_reason"), qc["assessed_by"], qc["comments"])
+            
+            # Seed reports
+            reports = [
+                {
+                    "name": "Monthly QC Summary Report",
+                    "description": "Quality control metrics for all samples processed in the last month",
+                    "status": "completed",
+                    "format": "pdf",
+                    "file_size": 2048576,
+                    "generated_by": "system"
+                },
+                {
+                    "name": "Sample Inventory Report",
+                    "description": "Current inventory status across all storage locations",
+                    "status": "completed",
+                    "format": "xlsx",
+                    "file_size": 1024000,
+                    "generated_by": "system"
+                },
+                {
+                    "name": "Sequencing Utilization Report",
+                    "description": "Platform usage and efficiency metrics",
+                    "status": "pending",
+                    "format": "pdf",
+                    "generated_by": "system"
+                }
+            ]
+            
+            for report in reports:
+                await conn.execute("""
+                    INSERT INTO generated_reports (name, description, status, format, file_size, generated_by, started_at, completed_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, NOW(), CASE WHEN $3 = 'completed' THEN NOW() ELSE NULL END)
+                """, report["name"], report["description"], report["status"], 
+                report["format"], report.get("file_size"), report["generated_by"])
+        
+        return {
+            "success": True,
+            "message": "Sample data seeded successfully",
+            "seeded_categories": {
+                "storage_locations": 5,
+                "projects": 4,
+                "sequencing_jobs": 4,
+                "libraries": 3,
+                "qc_assessments": 4,
+                "reports": 3
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to seed sample data"
+        }
+
+@app.get("/api/finder/stats")
+async def get_finder_stats():
+    """Get comprehensive statistics about all laboratory data."""
+    try:
+        stats = {
+            "overview": {},
+            "by_category": {},
+            "recent_activity": {},
+            "status_distribution": {},
+            "department_distribution": {},
+            "priority_distribution": {}
+        }
+        
+        async with get_database_connection() as conn:
+            # Overview stats
+            total_samples = await conn.fetchval("SELECT COUNT(*) FROM samples")
+            total_templates = await conn.fetchval("SELECT COUNT(*) FROM templates")
+            total_storage = await conn.fetchval("SELECT COUNT(*) FROM storage_locations WHERE status = 'active'")
+            
+            stats["overview"] = {
+                "total_items": total_samples + total_templates + total_storage,
+                "samples": total_samples,
+                "templates": total_templates,
+                "storage_locations": total_storage
+            }
+            
+            # Sample status distribution
+            sample_status_query = """
+                SELECT status, COUNT(*) as count
+                FROM samples
+                GROUP BY status
+                ORDER BY count DESC
+            """
+            sample_status_rows = await conn.fetch(sample_status_query)
+            stats["status_distribution"] = {row['status']: row['count'] for row in sample_status_rows}
+            
+            # Department distribution (from sample metadata)
+            dept_query = """
+                SELECT 
+                    COALESCE(metadata->>'template_data'->>'Department', 'Unknown') as department,
+                    COUNT(*) as count
+                FROM samples
+                WHERE metadata IS NOT NULL
+                GROUP BY department
+                ORDER BY count DESC
+            """
+            dept_rows = await conn.fetch(dept_query)
+            stats["department_distribution"] = {row['department']: row['count'] for row in dept_rows}
+            
+            # Priority distribution (from sample metadata)
+            priority_query = """
+                SELECT 
+                    COALESCE(metadata->>'template_data'->>'Priority', 'Unknown') as priority,
+                    COUNT(*) as count
+                FROM samples
+                WHERE metadata IS NOT NULL
+                GROUP BY priority
+                ORDER BY count DESC
+            """
+            priority_rows = await conn.fetch(priority_query)
+            stats["priority_distribution"] = {row['priority']: row['count'] for row in priority_rows}
+            
+            # Recent activity (last 7 days)
+            recent_query = """
+                SELECT 
+                    DATE(created_at) as date,
+                    COUNT(*) as count
+                FROM samples
+                WHERE created_at >= NOW() - INTERVAL '7 days'
+                GROUP BY DATE(created_at)
+                ORDER BY date DESC
+            """
+            recent_rows = await conn.fetch(recent_query)
+            stats["recent_activity"] = {row['date'].isoformat(): row['count'] for row in recent_rows}
+            
+            # Storage utilization
+            storage_query = """
+                SELECT 
+                    zone_type,
+                    COUNT(*) as locations,
+                    SUM(capacity) as total_capacity,
+                    SUM(current_usage) as total_usage,
+                    ROUND(AVG(current_usage::float / capacity * 100), 1) as avg_utilization
+                FROM storage_locations
+                WHERE status = 'active'
+                GROUP BY zone_type
+                ORDER BY avg_utilization DESC
+            """
+            storage_rows = await conn.fetch(storage_query)
+            stats["storage_utilization"] = {
+                row['zone_type']: {
+                    "locations": row['locations'],
+                    "total_capacity": row['total_capacity'],
+                    "total_usage": row['total_usage'],
+                    "avg_utilization": float(row['avg_utilization']) if row['avg_utilization'] else 0
+                } for row in storage_rows
+            }
+        
+        return {
+            "success": True,
+            "stats": stats,
+            "generated_at": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "stats": {}
+        }
 
 if __name__ == "__main__":
     # Get configuration from environment

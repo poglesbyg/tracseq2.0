@@ -55,7 +55,7 @@ export interface ReportMetadata {
 export interface FileSystemItem {
   id: string;
   name: string;
-  type: 'folder' | 'sample' | 'template' | 'document' | 'project' | 'report';
+  type: 'folder' | 'sample' | 'template' | 'document' | 'project' | 'report' | 'storage' | 'sequencing' | 'qc' | 'library';
   parent: string | null;
   created: Date;
   modified: Date;
@@ -119,6 +119,14 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
         return <DocumentTextIcon className="w-12 h-12 text-orange-500" />;
       case 'document':
         return <DocumentIcon className="w-12 h-12 text-red-500" />;
+      case 'storage':
+        return <FolderIcon className="w-12 h-12 text-cyan-500" />;
+      case 'sequencing':
+        return <Squares2X2Icon className="w-12 h-12 text-pink-500" />;
+      case 'qc':
+        return <DocumentTextIcon className="w-12 h-12 text-yellow-500" />;
+      case 'library':
+        return <BeakerIcon className="w-12 h-12 text-teal-500" />;
       default:
         return <DocumentIcon className="w-12 h-12 text-gray-500" />;
     }
@@ -138,6 +146,14 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
         return <DocumentTextIcon className="w-5 h-5 text-orange-500" />;
       case 'document':
         return <DocumentIcon className="w-5 h-5 text-red-500" />;
+      case 'storage':
+        return <FolderIcon className="w-5 h-5 text-cyan-500" />;
+      case 'sequencing':
+        return <Squares2X2Icon className="w-5 h-5 text-pink-500" />;
+      case 'qc':
+        return <DocumentTextIcon className="w-5 h-5 text-yellow-500" />;
+      case 'library':
+        return <BeakerIcon className="w-5 h-5 text-teal-500" />;
       default:
         return <DocumentIcon className="w-5 h-5 text-gray-500" />;
     }
@@ -257,6 +273,38 @@ export const Finder: React.FC<FinderProps> = ({ items, onItemOpen, onItemSelect,
           }`}
         >
           Documents
+        </button>
+        <button 
+          onClick={() => navigateTo('storage-folder')}
+          className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
+            currentFolderId === 'storage-folder' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+          }`}
+        >
+          Storage
+        </button>
+        <button 
+          onClick={() => navigateTo('sequencing-folder')}
+          className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
+            currentFolderId === 'sequencing-folder' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+          }`}
+        >
+          Sequencing
+        </button>
+        <button 
+          onClick={() => navigateTo('qc-folder')}
+          className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
+            currentFolderId === 'qc-folder' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+          }`}
+        >
+          Quality Control
+        </button>
+        <button 
+          onClick={() => navigateTo('library-folder')}
+          className={`w-full text-left px-3 py-1.5 rounded-md text-sm ${
+            currentFolderId === 'library-folder' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+          }`}
+        >
+          Library Prep
         </button>
       </div>
     </div>
