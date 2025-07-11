@@ -83,14 +83,13 @@ def create_app() -> FastAPI:
     )
 
     # Add middleware
-    if config.cors.enabled:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=config.cors.allow_origins,
-            allow_credentials=config.cors.allow_credentials,
-            allow_methods=config.cors.allow_methods,
-            allow_headers=config.cors.allow_headers,
-        )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=config.cors.allow_origins,
+        allow_credentials=config.cors.allow_credentials,
+        allow_methods=config.cors.allow_methods,
+        allow_headers=config.cors.allow_headers,
+    )
 
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
@@ -100,10 +99,9 @@ def create_app() -> FastAPI:
         """Root endpoint with gateway information."""
         return {
             "service": "TracSeq API Gateway",
-            "version": config.version,
+            "version": config.app_version,
             "status": "operational",
             "environment": config.environment,
-            "services": list(config.services.keys()),
             "docs": "/docs",
             "health": "/health"
         }
@@ -115,7 +113,7 @@ def create_app() -> FastAPI:
         return {
             "status": "healthy",
             "service": "TracSeq API Gateway",
-            "version": config.version,
+            "version": config.app_version,
             "timestamp": time.time()
         }
 
@@ -123,20 +121,20 @@ def create_app() -> FastAPI:
     @app.get("/services")
     async def list_services():
         """List all available services."""
-        services = []
-        for name, endpoint in config.services.items():
-            services.append({
-                "name": name,
-                "display_name": endpoint.name,
-                "path_prefix": endpoint.path_prefix,
-                "base_url": endpoint.base_url,
-                "health_url": endpoint.health_url
-            })
+        services = [
+            {"name": "auth", "url": config.services.auth_service_url},
+            {"name": "samples", "url": config.services.sample_service_url},
+            {"name": "storage", "url": config.services.storage_service_url},
+            {"name": "templates", "url": config.services.template_service_url},
+            {"name": "sequencing", "url": config.services.sequencing_service_url},
+            {"name": "rag", "url": config.services.rag_service_url},
+            {"name": "notifications", "url": config.services.notification_service_url}
+        ]
 
         return {
             "services": services,
             "total": len(services),
-            "gateway_version": config.version
+            "gateway_version": config.app_version
         }
 
     # Main proxy handler
@@ -163,7 +161,11 @@ def create_app() -> FastAPI:
         if upstream_path == "/health" or upstream_path.startswith("/health"):
             upstream_url = service_endpoint.health_url
         else:
-            upstream_url = f"{service_endpoint.base_url}/api/v1{upstream_path}"
+            # Special handling for templates service which uses /templates/* directly
+            if service_endpoint.name == "templates":
+                upstream_url = f"{service_endpoint.base_url}/templates{upstream_path}"
+            else:
+                upstream_url = f"{service_endpoint.base_url}/api/v1{upstream_path}"
 
         # Get request data
         body = await request.body()
@@ -210,14 +212,14 @@ if __name__ == "__main__":
     config = get_config()
 
     logger.info("🚀 Starting TracSeq API Gateway",
-                host=config.host,
-                port=config.port,
+                host=config.gateway.host,
+                port=config.gateway.port,
                 environment=config.environment)
 
     uvicorn.run(
         "api_gateway.main:app",
-        host=config.host,
-        port=config.port,
-        reload=config.is_development,
+        host=config.gateway.host,
+        port=config.gateway.port,
+        reload=config.is_development(),
         log_config=None,
     )

@@ -339,6 +339,22 @@ class AppConfig(BaseModel):
         """Check if running in testing environment."""
         return self.environment == "testing" or self.testing
 
+    def get_service_by_path(self, path: str):
+        """
+        Find the appropriate service endpoint for a given path.
+        
+        This method provides routing logic for the API Gateway.
+        It imports the routing module to avoid circular dependencies.
+        
+        Args:
+            path: The request path to match
+            
+        Returns:
+            ServiceEndpoint if found, None otherwise
+        """
+        from api_gateway.core.routing import get_service_by_path
+        return get_service_by_path(path)
+
 
 # Global configuration instance
 _config: Optional[AppConfig] = None

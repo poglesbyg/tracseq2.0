@@ -28,7 +28,6 @@ def register_routes(app: FastAPI) -> None:
     # Register individual route modules
     api_v1_router.include_router(finder_router, prefix="/finder", tags=["finder"])
     api_v1_router.include_router(auth_router, prefix="/auth", tags=["auth"])
-    api_v1_router.include_router(health_router, prefix="/health", tags=["health"])
     
     # Register service proxy routes (no prefix since they handle their own /api paths)
     api_v1_router.include_router(services_router, tags=["services"])
@@ -40,7 +39,7 @@ def register_routes(app: FastAPI) -> None:
     # Register the API router
     app.include_router(api_v1_router)
     
-    # Register health check at root level
+    # Register health check routes at root level (includes both /health and /api/health)
     app.include_router(health_router, tags=["health"])
 
 

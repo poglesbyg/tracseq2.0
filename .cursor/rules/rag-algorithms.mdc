@@ -1,57 +1,71 @@
 ---
-description: Technical documentation for RAG algorithms and pipelines in the laboratory information management system
-globs: **/lab_submission_rag/**/*.py,**/lab_workflows/**/*.py,**/mlops/**/*.py,**/models/**/*.py
+description: Specification for RAG (Retrieval Augmented Generation) algorithms focused on laboratory document processing and information extraction.
+globs: **/lab_submission_rag/**,**/rag/**,**/enhanced_rag_service/**
 alwaysApply: false
 ---
 
 
 # rag-algorithms
 
-The system implements specialized RAG algorithms for laboratory document processing:
+Core RAG Algorithm Components:
 
-1. Laboratory Document Processing Pipeline:
-- Parses laboratory submissions and metadata using specialized extractors:
-  * Administrative data (submitter details, project info)
-  * Sample information (type, concentration, volume)
-  * Sequencing specifications (platform, parameters)
-  * Storage conditions (temperature, container)
-- Implements confidence scoring (0.0-1.0) for extracted information
-- Path: `lab_submission_rag/lab_workflows/document_processing.py`
+1. Laboratory Document Processing Pipeline
+- Custom document chunking optimized for laboratory submissions:
+  * Administrative sections (submitter, project details)
+  * Sample specifications (type, concentration, storage)
+  * Sequencing requirements (platform, coverage, read length)
+- Context-aware text segmentation preserving laboratory metadata
+- Temperature and measurement unit standardization (-80°C, μg/μL)
 
-2. Quality Control Workflow:
-- Multi-stage extraction pipeline with self-correction:
-  * Initial extraction with base confidence threshold (0.85)
-  * Automated retry with improved prompts if confidence < threshold
-  * Maximum 3 retry attempts before human review
-  * Confidence recalculation after each retry
-- Path: `lab_submission_rag/lab_workflows/quality_control.py`
+2. Information Extraction Rules
+- Multi-stage extraction process:
+  * Basic field parsing with confidence scoring
+  * Domain validation against laboratory standards
+  * Quality control with threshold validation (0.7 minimum)
+  * Cross-reference validation for sample IDs
+- Laboratory-specific entity recognition for:
+  * Sample barcodes
+  * Equipment IDs
+  * Storage locations
+  * Protocol references
 
-3. Laboratory Query System:
-- Context-aware query processing:
-  * Maintains conversation history
-  * Tracks sample and project references
-  * Incorporates laboratory domain knowledge
-- Specialized prompt enhancement for laboratory terminology
-- Path: `lab_submission_rag/rag/enhanced_llm_interface.py`
+3. RAG Query Processing
+- Specialized prompt engineering for laboratory context
+- Response generation incorporating:
+  * Storage condition requirements
+  * Sample handling protocols
+  * Equipment compatibility rules
+  * Safety guidelines
+- Knowledge base integration with laboratory standards
 
-4. Vector Storage Management:
-- Custom chunking optimized for laboratory documents
-- Metadata tracking for sample submissions
-- Source document relationship preservation
-- Path: `lab_submission_rag/rag/vector_store.py`
+4. Quality Control System
+- Automated validation of extracted information:
+  * Required field completeness
+  * Unit compatibility
+  * Value range verification
+  * Cross-reference integrity
+- Self-correction mechanisms with domain expertise
 
-5. MLOps Integration:
-- A/B testing for extraction models
-- Continuous learning from validation feedback
-- Automated model retraining based on performance metrics
-- Path: `lab_submission_rag/mlops/continuous_learning.py`
+5. Laboratory MLOps Integration
+- Model performance tracking with domain metrics
+- A/B testing for extraction accuracy
+- Continuous learning from laboratory feedback
+- Version control for model improvements
 
-Core algorithms prioritize:
-- Laboratory data extraction accuracy
-- Sample tracking integrity 
-- Chain of custody maintenance
-- Regulatory compliance validation
-- Document relationship preservation
+File Paths:
+```
+lab_submission_rag/
+  ├── lab_workflows/
+  │   ├── document_processing.py
+  │   ├── quality_control.py
+  │   └── multi_agent.py
+  ├── mlops/
+  │   ├── model_registry.py
+  │   └── experiment_tracker.py
+  └── rag/
+      ├── document_processor.py
+      └── enhanced_llm_interface.py
+```
 
 $END$
 

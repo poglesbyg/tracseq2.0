@@ -264,6 +264,200 @@ def create_app() -> FastAPI:
         """Get all processed submissions"""
         return {"submissions": submissions_storage, "total": len(submissions_storage)}
 
+    # RAG submissions endpoint (frontend expects this path)
+    @app.get("/api/rag/submissions")
+    async def get_rag_submissions():
+        """Get all RAG processed submissions"""
+        logger.info("Fetching RAG submissions")
+        
+        # Mock data to match frontend expectations
+        mock_submissions = [
+            {
+                "id": "RAG-001",
+                "submission_id": "RAG-001",
+                "source_document": "lab_report_2024_01.pdf",
+                "submitter_name": "Dr. Smith",
+                "submitter_email": "dr.smith@lab.com",
+                "sample_type": "DNA",
+                "confidence_score": 0.92,
+                "status": "completed",
+                "created_at": datetime.utcnow().isoformat(),
+                "processing_time": 2.3,
+                "extracted_data": {
+                    "administrative": {
+                        "submitter_name": "Dr. Smith",
+                        "submitter_email": "dr.smith@lab.com",
+                        "institution": "Research Lab"
+                    },
+                    "sample": {
+                        "sample_type": "DNA",
+                        "volume": "50μL",
+                        "concentration": "100ng/μL"
+                    }
+                }
+            },
+            {
+                "id": "RAG-002",
+                "submission_id": "RAG-002",
+                "source_document": "sequencing_request_2024_02.pdf",
+                "submitter_name": "Dr. Johnson",
+                "submitter_email": "dr.johnson@lab.com",
+                "sample_type": "RNA",
+                "confidence_score": 0.88,
+                "status": "processing",
+                "created_at": datetime.utcnow().isoformat(),
+                "processing_time": 1.8,
+                "extracted_data": {
+                    "administrative": {
+                        "submitter_name": "Dr. Johnson",
+                        "submitter_email": "dr.johnson@lab.com",
+                        "institution": "University Lab"
+                    },
+                    "sample": {
+                        "sample_type": "RNA",
+                        "volume": "25μL",
+                        "concentration": "200ng/μL"
+                    }
+                }
+            },
+            {
+                "id": "RAG-003",
+                "submission_id": "RAG-003",
+                "source_document": "protein_analysis_2024_03.pdf",
+                "submitter_name": "Dr. Brown",
+                "submitter_email": "dr.brown@lab.com",
+                "sample_type": "Protein",
+                "confidence_score": 0.95,
+                "status": "completed",
+                "created_at": datetime.utcnow().isoformat(),
+                "processing_time": 3.1,
+                "extracted_data": {
+                    "administrative": {
+                        "submitter_name": "Dr. Brown",
+                        "submitter_email": "dr.brown@lab.com",
+                        "institution": "Biotech Lab"
+                    },
+                    "sample": {
+                        "sample_type": "Protein",
+                        "volume": "100μL",
+                        "concentration": "500ng/μL"
+                    }
+                }
+            }
+        ]
+        
+        # Combine with actual submissions from storage
+        all_submissions = mock_submissions + submissions_storage
+        
+        # Calculate statistics
+        total_count = len(all_submissions)
+        processing_count = len([s for s in all_submissions if s.get("status") == "processing"])
+        completed_count = len([s for s in all_submissions if s.get("status") == "completed"])
+        failed_count = len([s for s in all_submissions if s.get("status") == "failed"])
+        
+        return {
+            "submissions": all_submissions,
+            "data": all_submissions,  # Frontend expects both keys
+            "totalCount": total_count,
+            "processing": processing_count,
+            "completed": completed_count,
+            "failed": failed_count
+        }
+
+    # Individual RAG submission endpoint (frontend expects this)
+    @app.get("/api/rag/submissions/{submission_id}")
+    async def get_rag_submission(submission_id: str):
+        """Get individual RAG submission by ID"""
+        logger.info(f"Fetching RAG submission: {submission_id}")
+        
+        # Mock data for known submissions
+        mock_submissions = {
+            "RAG-001": {
+                "id": "RAG-001",
+                "submission_id": "RAG-001",
+                "source_document": "lab_report_2024_01.pdf",
+                "submitter_name": "Dr. Smith",
+                "submitter_email": "dr.smith@lab.com",
+                "sample_type": "DNA",
+                "confidence_score": 0.92,
+                "status": "completed",
+                "created_at": datetime.utcnow().isoformat(),
+                "processing_time": 2.3,
+                "extracted_data": {
+                    "administrative": {
+                        "submitter_name": "Dr. Smith",
+                        "submitter_email": "dr.smith@lab.com",
+                        "institution": "Research Lab"
+                    },
+                    "sample": {
+                        "sample_type": "DNA",
+                        "volume": "50μL",
+                        "concentration": "100ng/μL"
+                    }
+                }
+            },
+            "RAG-002": {
+                "id": "RAG-002",
+                "submission_id": "RAG-002",
+                "source_document": "sequencing_request_2024_02.pdf",
+                "submitter_name": "Dr. Johnson",
+                "submitter_email": "dr.johnson@lab.com",
+                "sample_type": "RNA",
+                "confidence_score": 0.88,
+                "status": "processing",
+                "created_at": datetime.utcnow().isoformat(),
+                "processing_time": 1.8,
+                "extracted_data": {
+                    "administrative": {
+                        "submitter_name": "Dr. Johnson",
+                        "submitter_email": "dr.johnson@lab.com",
+                        "institution": "University Lab"
+                    },
+                    "sample": {
+                        "sample_type": "RNA",
+                        "volume": "25μL",
+                        "concentration": "200ng/μL"
+                    }
+                }
+            },
+            "RAG-003": {
+                "id": "RAG-003",
+                "submission_id": "RAG-003",
+                "source_document": "protein_analysis_2024_03.pdf",
+                "submitter_name": "Dr. Brown",
+                "submitter_email": "dr.brown@lab.com",
+                "sample_type": "Protein",
+                "confidence_score": 0.95,
+                "status": "completed",
+                "created_at": datetime.utcnow().isoformat(),
+                "processing_time": 3.1,
+                "extracted_data": {
+                    "administrative": {
+                        "submitter_name": "Dr. Brown",
+                        "submitter_email": "dr.brown@lab.com",
+                        "institution": "Biotech Lab"
+                    },
+                    "sample": {
+                        "sample_type": "Protein",
+                        "volume": "100μL",
+                        "concentration": "500ng/μL"
+                    }
+                }
+            }
+        }
+        
+        # Check mock data first
+        if submission_id in mock_submissions:
+            return mock_submissions[submission_id]
+        
+        # Check actual storage
+        for submission in submissions_storage:
+            if submission.get("id") == submission_id or submission.get("submission_id") == submission_id:
+                return submission
+        
+        # Not found
+        raise HTTPException(status_code=404, detail=f"Submission {submission_id} not found")
+
     return app
 
 

@@ -210,8 +210,8 @@ services:
       AUTH_SERVICE_URL: http://auth-service:8000
       SAMPLE_SERVICE_URL: http://sample-service:8000
       STORAGE_SERVICE_URL: http://lims-storage:8082
-      RAG_SERVICE_URL: http://tracseq-rag:8000
-      REPORTS_SERVICE_URL: http://reports-service:8000
+      RAG_SERVICE_URL: http://lims-rag:8000
+      REPORTS_SERVICE_URL: http://lims-reports:8000
       PROJECT_SERVICE_URL: http://project-service:8101
       LIBRARY_PREP_SERVICE_URL: http://library-prep-service:8102
       QAQC_SERVICE_URL: http://lims-qaqc:8089

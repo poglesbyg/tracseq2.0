@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy Cargo.toml
-COPY Cargo.toml ./
+# Copy standalone Cargo.toml for minimal build
+COPY Cargo.toml.standalone ./Cargo.toml
 
 # Create dummy source for dependency caching
 RUN mkdir src && echo "fn main() {}" > src/main.rs
@@ -20,10 +20,10 @@ RUN rm src/main.rs
 
 # Copy source code except main.rs
 COPY src ./src
-RUN rm -f src/main.rs
+RUN rm -f src/main.rs src/lib.rs
 
-# Copy our minimal main as the actual main
-COPY src/main_with_health.rs ./src/main.rs
+# Copy our enhanced minimal main as the actual main
+COPY src/main_minimal_working.rs ./src/main.rs
 
 # Build the application
 RUN cargo build --release
