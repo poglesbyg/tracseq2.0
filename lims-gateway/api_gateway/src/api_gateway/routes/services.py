@@ -27,7 +27,7 @@ router = APIRouter()
 
 # Service URLs from environment variables (matching Docker container names)
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://lims-auth:8000")
-SAMPLE_SERVICE_URL = os.getenv("SAMPLE_SERVICE_URL", "http://lims-samples:8000")
+SAMPLE_SERVICE_URL = os.getenv("SAMPLE_SERVICE_URL", "http://lims-samples-simple:8081")
 STORAGE_SERVICE_URL = os.getenv("STORAGE_SERVICE_URL", "http://lims-storage:8082")
 TEMPLATE_SERVICE_URL = os.getenv("TEMPLATE_SERVICE_URL", "http://lims-templates:8000")
 REPORTS_SERVICE_URL = os.getenv("REPORTS_SERVICE_URL", "http://lims-reports:8000")
@@ -36,7 +36,7 @@ DASHBOARD_SERVICE_URL = os.getenv("DASHBOARD_SERVICE_URL", "http://lims-dashboar
 SPREADSHEET_SERVICE_URL = os.getenv("SPREADSHEET_SERVICE_URL", "http://lims-spreadsheets:8088")
 
 # Additional services that may not be running but should be supported
-SEQUENCING_SERVICE_URL = os.getenv("SEQUENCING_SERVICE_URL", "http://lims-sequencing:8000")
+SEQUENCING_SERVICE_URL = os.getenv("SEQUENCING_SERVICE_URL", "http://lims-sequencing:8084")
 NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://lims-notification:8000")
 EVENT_SERVICE_URL = os.getenv("EVENT_SERVICE_URL", "http://lims-events:8000")
 TRANSACTION_SERVICE_URL = os.getenv("TRANSACTION_SERVICE_URL", "http://lims-transactions:8000")
@@ -170,32 +170,32 @@ async def templates_health():
 @router.get("/samples", tags=["samples"])
 async def get_samples(request: Request):
     """Get all samples"""
-    return await proxy_request(SAMPLE_SERVICE_URL, "/samples", request)
+    return await proxy_request(SAMPLE_SERVICE_URL, "/api/v1/samples", request)
 
 @router.post("/samples", tags=["samples"])
 async def create_sample(request: Request):
     """Create a new sample"""
-    return await proxy_request(SAMPLE_SERVICE_URL, "/api/samples", request)
+    return await proxy_request(SAMPLE_SERVICE_URL, "/api/v1/samples", request)
 
 @router.post("/samples/batch", tags=["samples"])
 async def create_samples_batch(request: Request):
     """Create multiple samples in batch"""
-    return await proxy_request(SAMPLE_SERVICE_URL, "/samples/batch", request)
+    return await proxy_request(SAMPLE_SERVICE_URL, "/api/v1/samples/batch", request)
 
 @router.get("/samples/{sample_id}", tags=["samples"])
 async def get_sample(request: Request, sample_id: str):
     """Get a specific sample"""
-    return await proxy_request(SAMPLE_SERVICE_URL, f"/api/samples/{sample_id}", request)
+    return await proxy_request(SAMPLE_SERVICE_URL, f"/api/v1/samples/{sample_id}", request)
 
 @router.put("/samples/{sample_id}", tags=["samples"])
 async def update_sample(request: Request, sample_id: str):
     """Update a sample"""
-    return await proxy_request(SAMPLE_SERVICE_URL, f"/api/samples/{sample_id}", request)
+    return await proxy_request(SAMPLE_SERVICE_URL, f"/api/v1/samples/{sample_id}", request)
 
 @router.delete("/samples/{sample_id}", tags=["samples"])
 async def delete_sample(request: Request, sample_id: str):
     """Delete a sample"""
-    return await proxy_request(SAMPLE_SERVICE_URL, f"/api/samples/{sample_id}", request)
+    return await proxy_request(SAMPLE_SERVICE_URL, f"/api/v1/samples/{sample_id}", request)
 
 # Storage Service Proxy Routes
 @router.get("/storage", tags=["storage"])
@@ -1064,32 +1064,32 @@ async def get_qc_review(review_id: str, request: Request):
 @router.get("/sequencing/jobs", tags=["sequencing"])
 async def get_sequencing_jobs(request: Request):
     """Get all sequencing jobs"""
-    return await proxy_request(SEQUENCING_SERVICE_URL, "/api/v1/jobs", request)
+    return await proxy_request(SEQUENCING_SERVICE_URL, "/api/v1/sequencing/jobs", request)
 
 @router.post("/sequencing/jobs", tags=["sequencing"])
 async def create_sequencing_job(request: Request):
     """Create a new sequencing job"""
-    return await proxy_request(SEQUENCING_SERVICE_URL, "/api/v1/jobs", request)
+    return await proxy_request(SEQUENCING_SERVICE_URL, "/api/v1/sequencing/jobs", request)
 
 @router.get("/sequencing/jobs/{job_id}", tags=["sequencing"])
 async def get_sequencing_job(job_id: str, request: Request):
     """Get sequencing job by ID"""
-    return await proxy_request(SEQUENCING_SERVICE_URL, f"/api/v1/jobs/{job_id}", request)
+    return await proxy_request(SEQUENCING_SERVICE_URL, f"/api/v1/sequencing/jobs/{job_id}", request)
 
 @router.put("/sequencing/jobs/{job_id}", tags=["sequencing"])
 async def update_sequencing_job(job_id: str, request: Request):
     """Update sequencing job"""
-    return await proxy_request(SEQUENCING_SERVICE_URL, f"/api/v1/jobs/{job_id}", request)
+    return await proxy_request(SEQUENCING_SERVICE_URL, f"/api/v1/sequencing/jobs/{job_id}", request)
 
 @router.get("/sequencing/runs", tags=["sequencing"])
 async def get_sequencing_runs(request: Request):
     """Get all sequencing runs"""
-    return await proxy_request(SEQUENCING_SERVICE_URL, "/api/v1/runs", request)
+    return await proxy_request(SEQUENCING_SERVICE_URL, "/api/v1/sequencing/runs", request)
 
 @router.get("/sequencing/platforms", tags=["sequencing"])
 async def get_sequencing_platforms(request: Request):
     """Get available sequencing platforms"""
-    return await proxy_request(SEQUENCING_SERVICE_URL, "/api/v1/platforms", request)
+    return await proxy_request(SEQUENCING_SERVICE_URL, "/api/v1/sequencing/platforms", request)
 
 # =============================================================================
 # SPREADSHEETS SERVICE PROXY ROUTES
@@ -1119,4 +1119,9 @@ async def get_spreadsheet_versions(request: Request):
 @router.post("/spreadsheets/upload", tags=["spreadsheets"])
 async def upload_spreadsheet(request: Request):
     """Upload a spreadsheet"""
-    return await proxy_request(SPREADSHEET_SERVICE_URL, "/api/v1/versions", request) 
+    return await proxy_request(SPREADSHEET_SERVICE_URL, "/api/v1/versions", request)
+
+@router.post("/spreadsheets/preview-sheets", tags=["spreadsheets"])
+async def preview_spreadsheet_sheets(request: Request):
+    """Get sheet names for spreadsheet preview"""
+    return await proxy_request(SPREADSHEET_SERVICE_URL, "/api/v1/spreadsheets/preview-sheets", request) 

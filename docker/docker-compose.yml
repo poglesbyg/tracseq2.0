@@ -154,26 +154,14 @@ services:
       timeout: 10s
       retries: 3
 
-  # Dashboard Service
+  # Dashboard Service (Simple Python)
   dashboard-service:
     build:
-      context: ../lims-core/dashboard_service
-      dockerfile: Dockerfile.simple
+      context: ../simple-services/dashboard-service
+      dockerfile: Dockerfile
     container_name: lims-dashboard
     environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
-      PORT: "3025"
-      RUST_LOG: "info,dashboard_service=debug"
-      # Service URLs for data aggregation
-      AUTH_SERVICE_URL: http://auth-service:8000
-      SAMPLE_SERVICE_URL: http://sample-service:8000
-      STORAGE_SERVICE_URL: http://storage-service:8082
-      TEMPLATE_SERVICE_URL: http://template-service:8000
-      SEQUENCING_SERVICE_URL: http://sequencing-service:8084
-      RAG_SERVICE_URL: http://rag-service:8000
-    depends_on:
-      - postgres
-      - redis
+      - PORT=3025
     ports:
       - "3025:3025"
     networks:
@@ -185,26 +173,14 @@ services:
       timeout: 10s
       retries: 3
 
-  # Spreadsheet Versioning Service
+  # Spreadsheet Service (Simple Python)
   spreadsheet-service:
     build:
-      context: ../lims-enhanced/spreadsheet_versioning_service
-      dockerfile: Dockerfile.simple
+      context: ../simple-services/spreadsheet-service
+      dockerfile: Dockerfile
     container_name: lims-spreadsheets
     environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
-      PORT: "8088"
-      RUST_LOG: "info,spreadsheet_versioning_service=debug"
-      MAX_FILE_SIZE_MB: "100"
-      MAX_VERSIONS_PER_SPREADSHEET: "50"
-      ENABLE_AUTO_VERSIONING: "true"
-      RETENTION_DAYS: "365"
-      DIFF_ALGORITHM: "structural_aware"
-      CONFLICT_STRATEGY: "manual_review"
-      AUTO_RESOLVE_THRESHOLD: "0.95"
-      REQUIRE_MANUAL_APPROVAL: "true"
-    depends_on:
-      - postgres
+      - PORT=8088
     ports:
       - "8088:8088"
     networks:
@@ -212,6 +188,85 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Sequencing Service (Simple Python)
+  sequencing-service:
+    build:
+      context: ../simple-services/sequencing-service
+      dockerfile: Dockerfile
+    container_name: lims-sequencing
+    environment:
+      - PORT=8084
+    ports:
+      - "8084:8084"
+    networks:
+      - lims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Samples Service (Simple Python - replaces failing Rust service)
+  simple-samples-service:
+    build:
+      context: ../simple-services/samples-service
+      dockerfile: Dockerfile
+    container_name: lims-samples-simple
+    environment:
+      - PORT=8081
+    ports:
+      - "8015:8081"
+    networks:
+      - lims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend UI (React application)
+  frontend-ui:
+    build:
+      context: ../lims-ui
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000
+    container_name: lims-frontend-ui
+    ports:
+      - "3001:80"
+    networks:
+      - lims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend Proxy (routes frontend API calls to API Gateway)
+  frontend-proxy:
+    build:
+      context: ../simple-services/frontend-proxy
+      dockerfile: Dockerfile
+    container_name: lims-frontend-proxy
+    environment:
+      - PORT=3000
+      - API_GATEWAY_URL=http://lims-gateway:8000
+    ports:
+      - "3000:3000"
+    networks:
+      - lims-network
+    restart: unless-stopped
+    depends_on:
+      - api-gateway
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -269,21 +324,15 @@ services:
       dockerfile: Dockerfile
     container_name: lims-gateway
     environment:
-      AUTH_SERVICE_URL: http://auth-service:8000
-      SAMPLE_SERVICE_URL: http://sample-service:8000
+      AUTH_SERVICE_URL: http://lims-auth:8000
+      SAMPLE_SERVICE_URL: http://lims-samples-simple:8081
       STORAGE_SERVICE_URL: http://lims-storage:8082
       RAG_SERVICE_URL: http://lims-rag:8000
       REPORTS_SERVICE_URL: http://lims-reports:8000
       TEMPLATE_SERVICE_URL: http://lims-templates:8000
       DASHBOARD_SERVICE_URL: http://lims-dashboard:3025
       SPREADSHEET_SERVICE_URL: http://lims-spreadsheets:8088
-      PROJECT_SERVICE_URL: http://project-service:8101
-      LIBRARY_PREP_SERVICE_URL: http://library-prep-service:8102
-      QAQC_SERVICE_URL: http://lims-qaqc:8089
-      TRANSACTION_SERVICE_URL: http://tracseq-transactions:8088
-      EVENT_SERVICE_URL: http://tracseq-events:8087
-      FLOW_CELL_SERVICE_URL: http://flow-cell-service:8104
-      SEQUENCING_SERVICE_URL: http://tracseq-sequencing:8084
+      SEQUENCING_SERVICE_URL: http://lims-sequencing:8084
       NOTIFICATION_SERVICE_URL: http://tracseq-notification:8085
       USE_REPORTS_SERVICE: "true"
     depends_on:
@@ -291,8 +340,10 @@ services:
       - sample-service
       - storage-service
       - reports-service
-      # - dashboard-service
-      # - spreadsheet-service
+      - dashboard-service
+      - spreadsheet-service
+      - sequencing-service
+      - simple-samples-service
     ports:
       - "8089:8000"  # API Gateway runs on 8000 internally
     networks:

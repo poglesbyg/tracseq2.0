@@ -144,6 +144,34 @@ async def upload_spreadsheet(file: UploadFile = File(...)):
         }
     }
 
+@app.post("/api/v1/spreadsheets/preview-sheets")
+async def preview_spreadsheet_sheets(request_data: dict):
+    """Get sheet names for spreadsheet preview"""
+    dataset_id = request_data.get("dataset_id")
+    
+    if not dataset_id:
+        raise HTTPException(status_code=400, detail="dataset_id is required")
+    
+    # Find the dataset
+    dataset = next((d for d in MOCK_DATASETS if d["id"] == dataset_id), None)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    # Return mock sheet names based on file type
+    if dataset["file_type"] == "xlsx":
+        sheets = ["Lab Results", "Summary", "Quality Control"]
+    else:
+        sheets = ["Main Data"]
+    
+    return {
+        "success": True,
+        "data": {
+            "dataset_id": dataset_id,
+            "sheets": sheets,
+            "default_sheet": sheets[0] if sheets else None
+        }
+    }
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8088))
     uvicorn.run(app, host="0.0.0.0", port=port) 
