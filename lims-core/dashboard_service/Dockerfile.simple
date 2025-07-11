@@ -1,0 +1,45 @@
+# Build stage
+FROM rust:1.82 as builder
+
+WORKDIR /app
+
+# Copy source code and use standalone Cargo.toml
+COPY Cargo.toml.standalone Cargo.toml
+COPY src ./src
+COPY migrations ./migrations
+
+# Build application
+RUN cargo build --release
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+# Install runtime dependencies
+RUN apt-get update && \
+    apt-get install -y \
+        ca-certificates \
+        libssl3 \
+        libpq5 \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the binary from builder
+COPY --from=builder /app/target/release/dashboard-service /app/
+
+# Create non-root user
+RUN useradd -m -u 1001 appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+# Expose port
+EXPOSE 3025
+
+# Set environment variables
+ENV RUST_LOG=info
+ENV DASHBOARD_PORT=3025
+
+# Run the binary
+CMD ["./dashboard-service"] 

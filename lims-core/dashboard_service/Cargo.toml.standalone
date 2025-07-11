@@ -45,6 +45,3 @@ prometheus = "0.13"
 
 # Cache
 moka = { version = "0.12", features = ["future"] }
-
-[lints]
-workspace = true

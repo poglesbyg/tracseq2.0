@@ -32,6 +32,8 @@ STORAGE_SERVICE_URL = os.getenv("STORAGE_SERVICE_URL", "http://lims-storage:8082
 TEMPLATE_SERVICE_URL = os.getenv("TEMPLATE_SERVICE_URL", "http://lims-templates:8000")
 REPORTS_SERVICE_URL = os.getenv("REPORTS_SERVICE_URL", "http://lims-reports:8000")
 RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://lims-rag:8000")
+DASHBOARD_SERVICE_URL = os.getenv("DASHBOARD_SERVICE_URL", "http://lims-dashboard:3025")
+SPREADSHEET_SERVICE_URL = os.getenv("SPREADSHEET_SERVICE_URL", "http://lims-spreadsheets:8088")
 
 # Additional services that may not be running but should be supported
 SEQUENCING_SERVICE_URL = os.getenv("SEQUENCING_SERVICE_URL", "http://lims-sequencing:8000")
@@ -42,7 +44,6 @@ QAQC_SERVICE_URL = os.getenv("QAQC_SERVICE_URL", "http://lims-qaqc:8000")
 PROJECT_SERVICE_URL = os.getenv("PROJECT_SERVICE_URL", "http://lims-projects:8000")
 LIBRARY_PREP_SERVICE_URL = os.getenv("LIBRARY_PREP_SERVICE_URL", "http://lims-library-prep:8000")
 FLOW_CELL_SERVICE_URL = os.getenv("FLOW_CELL_SERVICE_URL", "http://lims-flow-cells:8000")
-SPREADSHEET_SERVICE_URL = os.getenv("SPREADSHEET_SERVICE_URL", "http://tracseq-versioning-service:8000")
 
 # Infrastructure services
 POSTGRES_SERVICE_URL = os.getenv("POSTGRES_SERVICE_URL", "http://lims-postgres:5432")
@@ -168,86 +169,8 @@ async def templates_health():
 # Samples Service Proxy Routes  
 @router.get("/samples", tags=["samples"])
 async def get_samples(request: Request):
-    """Get all samples (mock implementation)"""
-    # Mock samples data for display
-    mock_samples = [
-        {
-            "id": "sample-001",
-            "name": "DNA Sample 001",
-            "barcode": "DNA-001-2024",
-            "sample_type": "DNA",
-            "status": "validated",
-            "concentration": 150.5,
-            "volume": 2.0,
-            "storage_location": "Freezer A1-B2",
-            "submitter": "Dr. Smith",
-            "department": "Genomics",
-            "created_at": "2024-12-15T10:30:00Z",
-            "updated_at": "2024-12-15T11:00:00Z",
-            "metadata": {
-                "patient_id": "P12345",
-                "collection_date": "2024-12-14",
-                "analysis_type": "WGS",
-                "priority": "high"
-            }
-        },
-        {
-            "id": "sample-002", 
-            "name": "RNA Sample 002",
-            "barcode": "RNA-002-2024",
-            "sample_type": "RNA",
-            "status": "in_storage",
-            "concentration": 89.3,
-            "volume": 1.5,
-            "storage_location": "Freezer B2-C3",
-            "submitter": "Dr. Johnson",
-            "department": "Transcriptomics",
-            "created_at": "2024-12-15T09:15:00Z",
-            "updated_at": "2024-12-15T09:45:00Z",
-            "metadata": {
-                "patient_id": "P12346",
-                "collection_date": "2024-12-13",
-                "analysis_type": "RNA-seq",
-                "priority": "medium"
-            }
-        },
-        {
-            "id": "sample-003",
-            "name": "Protein Sample 003", 
-            "barcode": "PRT-003-2024",
-            "sample_type": "Protein",
-            "status": "pending",
-            "concentration": 45.7,
-            "volume": 0.8,
-            "storage_location": "Freezer C1-D2",
-            "submitter": "Dr. Brown",
-            "department": "Proteomics",
-            "created_at": "2024-12-15T08:00:00Z",
-            "updated_at": "2024-12-15T08:30:00Z",
-            "metadata": {
-                "patient_id": "P12347",
-                "collection_date": "2024-12-12",
-                "analysis_type": "MS/MS",
-                "priority": "low"
-            }
-        }
-    ]
-    
-    return {
-        "success": True,
-        "data": mock_samples,
-        "pagination": {
-            "total": len(mock_samples),
-            "page": 1,
-            "per_page": 50,
-            "pages": 1
-        },
-        "filters": {
-            "status": ["pending", "validated", "in_storage", "completed"],
-            "sample_type": ["DNA", "RNA", "Protein"],
-            "department": ["Genomics", "Transcriptomics", "Proteomics"]
-        }
-    }
+    """Get all samples"""
+    return await proxy_request(SAMPLE_SERVICE_URL, "/samples", request)
 
 @router.post("/samples", tags=["samples"])
 async def create_sample(request: Request):
@@ -256,59 +179,8 @@ async def create_sample(request: Request):
 
 @router.post("/samples/batch", tags=["samples"])
 async def create_samples_batch(request: Request):
-    """Create multiple samples in batch (mock implementation)"""
-    try:
-        # Get the request body
-        body = await request.body()
-        data = json.loads(body) if body else {}
-        samples = data.get('samples', [])
-        
-        if not samples:
-            return JSONResponse(
-                status_code=400,
-                content={"error": "No samples provided", "message": "samples array is required"}
-            )
-        
-        # Mock successful batch creation response
-        created_samples = []
-        for i, sample in enumerate(samples):
-            # Generate a mock sample response
-            created_sample = {
-                "id": f"sample-batch-{i+1}-{hash(str(sample)) % 10000}",
-                "name": sample.get('name', f'Sample {i+1}'),
-                "barcode": f"BAT-{i+1:03d}-{hash(str(sample)) % 1000:03d}",
-                "sample_type": sample.get('sample_type', 'unknown'),
-                "status": "pending",
-                "concentration": sample.get('concentration'),
-                "volume": sample.get('volume'),
-                "storage_location": sample.get('storage_location'),
-                "submitter": sample.get('submitter', 'Batch Upload'),
-                "created_at": datetime.now().isoformat(),
-                "metadata": sample.get('metadata', {})
-            }
-            created_samples.append(created_sample)
-        
-        return {
-            "success": True,
-            "message": f"Successfully created {len(created_samples)} samples",
-            "samples": created_samples,
-            "batch_id": f"batch-{hash(str(samples)) % 100000}",
-            "total_created": len(created_samples),
-            "failed": 0,
-            "errors": []
-        }
-        
-    except json.JSONDecodeError:
-        return JSONResponse(
-            status_code=400,
-            content={"error": "Invalid JSON", "message": "Request body must be valid JSON"}
-        )
-    except Exception as e:
-        # logger.error(f"Error in create_samples_batch: {e}") # Original code had this line commented out
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal server error", "message": str(e)}
-        )
+    """Create multiple samples in batch"""
+    return await proxy_request(SAMPLE_SERVICE_URL, "/samples/batch", request)
 
 @router.get("/samples/{sample_id}", tags=["samples"])
 async def get_sample(request: Request, sample_id: str):
@@ -946,7 +818,7 @@ async def get_services_status():
         "templates": TEMPLATE_SERVICE_URL,
         "reports": REPORTS_SERVICE_URL,
         "rag": RAG_SERVICE_URL,
-        "dashboard": "http://lims-gateway-new:8000",  # Self-reference for dashboard
+        "dashboard": DASHBOARD_SERVICE_URL,
     }
     
     # Laboratory workflow services
@@ -1095,84 +967,8 @@ async def get_services_status():
 
 @router.get("/dashboard/stats", tags=["dashboard"])
 async def get_dashboard_stats(request: Request):
-    """Get dashboard statistics (mock implementation)"""
-    # Mock dashboard stats data
-    return {
-        "totalTemplates": 12,
-        "totalSamples": 847,
-        "pendingSequencing": 23,
-        "completedSequencing": 156,
-        "byStatus": {
-            "pending": 45,
-            "validated": 123,
-            "in_storage": 234,
-            "in_sequencing": 23,
-            "completed": 422
-        },
-        "averageProcessingTime": {
-            "validation": 2.3,
-            "storage": 1.8,
-            "sequencing": 24.5,
-            "overall": 28.6
-        },
-        "recentThroughput": {
-            "last24h": 12,
-            "last7d": 89,
-            "last30d": 347
-        },
-        "bottlenecks": [
-            {
-                "stage": "sequencing",
-                "count": 23,
-                "avgWaitTime": 4.2
-            },
-            {
-                "stage": "validation",
-                "count": 8,
-                "avgWaitTime": 2.1
-            }
-        ],
-        "pendingSamples": 45,
-        "completedSamples": 422,
-        "recentActivity": [
-            {
-                "id": "ACT-001",
-                "type": "sample_created",
-                "title": "New sample added",
-                "description": "Sample DNA-2024-001 created",
-                "timestamp": "2024-12-15T10:30:00Z",
-                "status": "completed",
-                "metadata": {
-                    "sample_id": "DNA-2024-001",
-                    "user": "Dr. Smith"
-                }
-            },
-            {
-                "id": "ACT-002", 
-                "type": "sequencing_completed",
-                "title": "Sequencing job completed",
-                "description": "Job SEQ-2024-045 finished successfully",
-                "timestamp": "2024-12-15T09:15:00Z",
-                "status": "completed",
-                "metadata": {
-                    "job_id": "SEQ-2024-045",
-                    "samples_processed": 24
-                }
-            },
-            {
-                "id": "ACT-003",
-                "type": "template_uploaded",
-                "title": "New template uploaded",
-                "description": "Template Lab-Protocol-v2.xlsx uploaded",
-                "timestamp": "2024-12-15T08:45:00Z",
-                "status": "completed",
-                "metadata": {
-                    "template_name": "Lab-Protocol-v2.xlsx",
-                    "user": "Lab Manager"
-                }
-            }
-        ]
-    }
+    """Get dashboard statistics"""
+    return await proxy_request(DASHBOARD_SERVICE_URL, "/api/dashboard", request)
 
 # =============================================================================
 # LIBRARY PREP SERVICE PROXY ROUTES  
@@ -1299,122 +1095,28 @@ async def get_sequencing_platforms(request: Request):
 # SPREADSHEETS SERVICE PROXY ROUTES
 # =============================================================================
 
-# Spreadsheets Service Routes (Mock Implementation)
+# Spreadsheets Service Routes
 @router.get("/spreadsheets/datasets", tags=["spreadsheets"])
 async def get_spreadsheet_datasets(request: Request):
-    """Get spreadsheet datasets (mock implementation)"""
-    # Mock data for spreadsheet datasets
-    mock_datasets = [
-        {
-            "id": "dataset-001",
-            "name": "Lab Results Q4 2024",
-            "description": "Quarterly laboratory results compilation",
-            "file_type": "xlsx",
-            "size_mb": 2.5,
-            "last_modified": "2024-12-15T10:30:00Z",
-            "created_by": "Dr. Smith",
-            "status": "active",
-            "row_count": 1250,
-            "column_count": 15
-        },
-        {
-            "id": "dataset-002", 
-            "name": "Sample Tracking Database",
-            "description": "Complete sample tracking and storage data",
-            "file_type": "csv",
-            "size_mb": 5.8,
-            "last_modified": "2024-12-14T16:45:00Z",
-            "created_by": "Lab Manager",
-            "status": "active",
-            "row_count": 3200,
-            "column_count": 22
-        },
-        {
-            "id": "dataset-003",
-            "name": "Equipment Maintenance Log",
-            "description": "Equipment maintenance and calibration records",
-            "file_type": "xlsx",
-            "size_mb": 1.2,
-            "last_modified": "2024-12-13T09:15:00Z", 
-            "created_by": "Maintenance Team",
-            "status": "archived",
-            "row_count": 580,
-            "column_count": 8
-        }
-    ]
-    
-    return {
-        "datasets": mock_datasets,
-        "total_count": len(mock_datasets),
-        "active_count": len([d for d in mock_datasets if d["status"] == "active"]),
-        "total_size_mb": sum(d["size_mb"] for d in mock_datasets)
-    }
+    """Get spreadsheet datasets"""
+    return await proxy_request(SPREADSHEET_SERVICE_URL, "/api/v1/spreadsheets", request)
 
 @router.post("/spreadsheets/datasets", tags=["spreadsheets"])
 async def create_spreadsheet_dataset(request: Request):
-    """Create a new spreadsheet dataset (mock implementation)"""
-    return {
-        "success": True,
-        "message": "Dataset created successfully",
-        "dataset_id": "dataset-004",
-        "status": "processing"
-    }
+    """Create a new spreadsheet dataset"""
+    return await proxy_request(SPREADSHEET_SERVICE_URL, "/api/v1/spreadsheets", request)
 
 @router.get("/spreadsheets/datasets/{dataset_id}", tags=["spreadsheets"])
 async def get_spreadsheet_dataset(dataset_id: str, request: Request):
-    """Get a specific spreadsheet dataset (mock implementation)"""
-    # Mock detailed dataset information
-    return {
-        "id": dataset_id,
-        "name": f"Dataset {dataset_id}",
-        "description": "Detailed dataset information",
-        "file_type": "xlsx",
-        "size_mb": 3.2,
-        "last_modified": "2024-12-15T10:30:00Z",
-        "created_by": "Dr. Smith",
-        "status": "active",
-        "row_count": 1500,
-        "column_count": 18,
-        "columns": [
-            {"name": "sample_id", "type": "string"},
-            {"name": "date_collected", "type": "date"},
-            {"name": "sample_type", "type": "string"},
-            {"name": "concentration", "type": "number"},
-            {"name": "volume", "type": "number"}
-        ],
-        "preview_data": [
-            ["SMPL-001", "2024-12-01", "DNA", 150.5, 50.0],
-            ["SMPL-002", "2024-12-01", "RNA", 200.3, 25.0],
-            ["SMPL-003", "2024-12-02", "Protein", 75.8, 100.0]
-        ]
-    }
+    """Get a specific spreadsheet dataset"""
+    return await proxy_request(SPREADSHEET_SERVICE_URL, f"/api/v1/spreadsheets/{dataset_id}", request)
 
 @router.get("/spreadsheets/versions", tags=["spreadsheets"])
 async def get_spreadsheet_versions(request: Request):
-    """Get spreadsheet versions (mock implementation)"""
-    return {
-        "versions": [
-            {
-                "id": "v1.0",
-                "created_at": "2024-12-01T10:00:00Z",
-                "created_by": "Dr. Smith",
-                "changes": "Initial version"
-            },
-            {
-                "id": "v1.1", 
-                "created_at": "2024-12-10T14:30:00Z",
-                "created_by": "Lab Manager",
-                "changes": "Added new sample types"
-            }
-        ]
-    }
+    """Get spreadsheet versions"""
+    return await proxy_request(SPREADSHEET_SERVICE_URL, "/api/v1/versions", request)
 
 @router.post("/spreadsheets/upload", tags=["spreadsheets"])
 async def upload_spreadsheet(request: Request):
-    """Upload a spreadsheet (mock implementation)"""
-    return {
-        "success": True,
-        "message": "Spreadsheet uploaded successfully",
-        "file_id": "file-12345",
-        "processing_status": "queued"
-    } 
+    """Upload a spreadsheet"""
+    return await proxy_request(SPREADSHEET_SERVICE_URL, "/api/v1/versions", request) 
