@@ -122,7 +122,7 @@ services:
       dockerfile: Dockerfile
     container_name: lims-templates
     environment:
-      - TEMPLATE_DATABASE_URL=postgresql://postgres:postgres@postgres:5432/lab_manager
+      - TEMPLATE_DATABASE_URL=postgresql://postgres:postgres@postgres:5432/lims_db
       - TEMPLATE_HOST=0.0.0.0
       - TEMPLATE_PORT=8000
       - RUST_LOG=info

@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from api_gateway.core.config import TracSeqAPIGatewayConfig, get_config
+from api_gateway.core.config import AppConfig, get_config
 
 # Configure structured logging
 structlog.configure(
@@ -46,14 +46,14 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     config = get_config()
     logger.info("🚀 Starting TracSeq API Gateway",
-                version=config.version,
+                version=config.app_version,
                 environment=config.environment)
 
     try:
         # Initialize HTTP client for proxying
         app.state.http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(config.request_timeout),
-            limits=httpx.Limits(max_connections=config.max_concurrent_requests)
+            timeout=httpx.Timeout(config.gateway.request_timeout),
+            limits=httpx.Limits(max_connections=1000)
         )
 
         logger.info("✅ TracSeq API Gateway startup complete")
@@ -76,7 +76,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="TracSeq API Gateway",
         description="Intelligent routing and management for TracSeq microservices",
-        version=config.version,
+        version=config.app_version,
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,
