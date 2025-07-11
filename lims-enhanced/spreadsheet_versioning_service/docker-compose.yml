@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: versioning_user
       POSTGRES_PASSWORD: versioning_password
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
       - versioning_postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql

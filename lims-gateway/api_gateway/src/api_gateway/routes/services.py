@@ -346,8 +346,94 @@ async def save_query(request: Request):
 
 @router.get("/reports/schema", tags=["reports"])
 async def get_reports_schema(request: Request):
-    """Get reports schema"""
-    return await proxy_request(REPORTS_SERVICE_URL, "/api/reports/schema", request)
+    """Get reports schema (mock implementation)"""
+    # Mock schema data for reports
+    return {
+        "schema": {
+            "tables": [
+                {
+                    "name": "samples",
+                    "description": "Sample tracking and metadata",
+                    "columns": [
+                        {"name": "id", "type": "uuid", "description": "Unique sample identifier"},
+                        {"name": "sample_name", "type": "string", "description": "Human-readable sample name"},
+                        {"name": "sample_type", "type": "enum", "values": ["DNA", "RNA", "Protein"], "description": "Type of biological sample"},
+                        {"name": "collection_date", "type": "date", "description": "Date sample was collected"},
+                        {"name": "volume_ml", "type": "decimal", "description": "Sample volume in milliliters"},
+                        {"name": "concentration_ng_ul", "type": "decimal", "description": "Concentration in ng/μL"},
+                        {"name": "storage_location", "type": "string", "description": "Current storage location"},
+                        {"name": "temperature_zone", "type": "enum", "values": ["-80C", "-20C", "4C", "RT"], "description": "Storage temperature"},
+                        {"name": "status", "type": "enum", "values": ["pending", "validated", "in_storage", "in_sequencing", "completed"], "description": "Sample processing status"}
+                    ]
+                },
+                {
+                    "name": "storage_locations",
+                    "description": "Storage facility locations and capacity",
+                    "columns": [
+                        {"name": "id", "type": "uuid", "description": "Location identifier"},
+                        {"name": "name", "type": "string", "description": "Location name"},
+                        {"name": "temperature_zone", "type": "string", "description": "Temperature zone"},
+                        {"name": "capacity", "type": "integer", "description": "Total capacity"},
+                        {"name": "current_usage", "type": "integer", "description": "Current usage count"},
+                        {"name": "utilization_percent", "type": "decimal", "description": "Usage percentage"}
+                    ]
+                },
+                {
+                    "name": "sequencing_jobs",
+                    "description": "Sequencing workflow jobs",
+                    "columns": [
+                        {"name": "id", "type": "uuid", "description": "Job identifier"},
+                        {"name": "job_name", "type": "string", "description": "Job name"},
+                        {"name": "platform", "type": "enum", "values": ["Illumina", "Oxford Nanopore", "PacBio"], "description": "Sequencing platform"},
+                        {"name": "status", "type": "enum", "values": ["queued", "running", "completed", "failed"], "description": "Job status"},
+                        {"name": "start_time", "type": "timestamp", "description": "Job start time"},
+                        {"name": "end_time", "type": "timestamp", "description": "Job completion time"},
+                        {"name": "sample_count", "type": "integer", "description": "Number of samples in job"}
+                    ]
+                },
+                {
+                    "name": "financial_transactions",
+                    "description": "Laboratory financial data",
+                    "columns": [
+                        {"name": "id", "type": "uuid", "description": "Transaction identifier"},
+                        {"name": "transaction_type", "type": "enum", "values": ["sample_processing", "sequencing", "storage", "maintenance"], "description": "Type of transaction"},
+                        {"name": "amount", "type": "decimal", "description": "Transaction amount"},
+                        {"name": "currency", "type": "string", "description": "Currency code"},
+                        {"name": "date", "type": "date", "description": "Transaction date"},
+                        {"name": "project_id", "type": "uuid", "description": "Associated project"}
+                    ]
+                }
+            ],
+            "views": [
+                {
+                    "name": "sample_summary",
+                    "description": "Aggregated sample statistics",
+                    "base_tables": ["samples"],
+                    "available_fields": ["sample_type", "status", "temperature_zone", "count", "avg_volume", "avg_concentration"]
+                },
+                {
+                    "name": "storage_utilization",
+                    "description": "Storage capacity and usage metrics",
+                    "base_tables": ["storage_locations", "samples"],
+                    "available_fields": ["location_name", "temperature_zone", "capacity", "current_usage", "utilization_percent"]
+                },
+                {
+                    "name": "sequencing_performance",
+                    "description": "Sequencing job performance metrics",
+                    "base_tables": ["sequencing_jobs"],
+                    "available_fields": ["platform", "status", "avg_duration", "success_rate", "sample_throughput"]
+                }
+            ],
+            "report_types": [
+                {"name": "summary", "description": "High-level summary reports"},
+                {"name": "detailed", "description": "Detailed analytical reports"},
+                {"name": "financial", "description": "Financial and billing reports"},
+                {"name": "performance", "description": "Performance and efficiency reports"}
+            ]
+        },
+        "version": "1.0",
+        "last_updated": "2024-12-15T10:30:00Z"
+    }
 
 # Health check
 @router.get("/reports/health", tags=["reports"])
@@ -877,27 +963,122 @@ async def get_sequencing_platforms(request: Request):
 # SPREADSHEETS SERVICE PROXY ROUTES
 # =============================================================================
 
+# Spreadsheets Service Routes (Mock Implementation)
 @router.get("/spreadsheets/datasets", tags=["spreadsheets"])
 async def get_spreadsheet_datasets(request: Request):
-    """Get all spreadsheet datasets"""
-    return await proxy_request(SPREADSHEET_SERVICE_URL, "/api/v1/datasets", request)
+    """Get spreadsheet datasets (mock implementation)"""
+    # Mock data for spreadsheet datasets
+    mock_datasets = [
+        {
+            "id": "dataset-001",
+            "name": "Lab Results Q4 2024",
+            "description": "Quarterly laboratory results compilation",
+            "file_type": "xlsx",
+            "size_mb": 2.5,
+            "last_modified": "2024-12-15T10:30:00Z",
+            "created_by": "Dr. Smith",
+            "status": "active",
+            "row_count": 1250,
+            "column_count": 15
+        },
+        {
+            "id": "dataset-002", 
+            "name": "Sample Tracking Database",
+            "description": "Complete sample tracking and storage data",
+            "file_type": "csv",
+            "size_mb": 5.8,
+            "last_modified": "2024-12-14T16:45:00Z",
+            "created_by": "Lab Manager",
+            "status": "active",
+            "row_count": 3200,
+            "column_count": 22
+        },
+        {
+            "id": "dataset-003",
+            "name": "Equipment Maintenance Log",
+            "description": "Equipment maintenance and calibration records",
+            "file_type": "xlsx",
+            "size_mb": 1.2,
+            "last_modified": "2024-12-13T09:15:00Z", 
+            "created_by": "Maintenance Team",
+            "status": "archived",
+            "row_count": 580,
+            "column_count": 8
+        }
+    ]
+    
+    return {
+        "datasets": mock_datasets,
+        "total_count": len(mock_datasets),
+        "active_count": len([d for d in mock_datasets if d["status"] == "active"]),
+        "total_size_mb": sum(d["size_mb"] for d in mock_datasets)
+    }
 
 @router.post("/spreadsheets/datasets", tags=["spreadsheets"])
 async def create_spreadsheet_dataset(request: Request):
-    """Create a new spreadsheet dataset"""
-    return await proxy_request(SPREADSHEET_SERVICE_URL, "/api/v1/datasets", request)
+    """Create a new spreadsheet dataset (mock implementation)"""
+    return {
+        "success": True,
+        "message": "Dataset created successfully",
+        "dataset_id": "dataset-004",
+        "status": "processing"
+    }
 
 @router.get("/spreadsheets/datasets/{dataset_id}", tags=["spreadsheets"])
 async def get_spreadsheet_dataset(dataset_id: str, request: Request):
-    """Get spreadsheet dataset by ID"""
-    return await proxy_request(SPREADSHEET_SERVICE_URL, f"/api/v1/datasets/{dataset_id}", request)
+    """Get a specific spreadsheet dataset (mock implementation)"""
+    # Mock detailed dataset information
+    return {
+        "id": dataset_id,
+        "name": f"Dataset {dataset_id}",
+        "description": "Detailed dataset information",
+        "file_type": "xlsx",
+        "size_mb": 3.2,
+        "last_modified": "2024-12-15T10:30:00Z",
+        "created_by": "Dr. Smith",
+        "status": "active",
+        "row_count": 1500,
+        "column_count": 18,
+        "columns": [
+            {"name": "sample_id", "type": "string"},
+            {"name": "date_collected", "type": "date"},
+            {"name": "sample_type", "type": "string"},
+            {"name": "concentration", "type": "number"},
+            {"name": "volume", "type": "number"}
+        ],
+        "preview_data": [
+            ["SMPL-001", "2024-12-01", "DNA", 150.5, 50.0],
+            ["SMPL-002", "2024-12-01", "RNA", 200.3, 25.0],
+            ["SMPL-003", "2024-12-02", "Protein", 75.8, 100.0]
+        ]
+    }
 
 @router.get("/spreadsheets/versions", tags=["spreadsheets"])
 async def get_spreadsheet_versions(request: Request):
-    """Get spreadsheet versions"""
-    return await proxy_request(SPREADSHEET_SERVICE_URL, "/api/v1/versions", request)
+    """Get spreadsheet versions (mock implementation)"""
+    return {
+        "versions": [
+            {
+                "id": "v1.0",
+                "created_at": "2024-12-01T10:00:00Z",
+                "created_by": "Dr. Smith",
+                "changes": "Initial version"
+            },
+            {
+                "id": "v1.1", 
+                "created_at": "2024-12-10T14:30:00Z",
+                "created_by": "Lab Manager",
+                "changes": "Added new sample types"
+            }
+        ]
+    }
 
 @router.post("/spreadsheets/upload", tags=["spreadsheets"])
 async def upload_spreadsheet(request: Request):
-    """Upload a spreadsheet"""
-    return await proxy_request(SPREADSHEET_SERVICE_URL, "/api/v1/upload", request) 
+    """Upload a spreadsheet (mock implementation)"""
+    return {
+        "success": True,
+        "message": "Spreadsheet uploaded successfully",
+        "file_id": "file-12345",
+        "processing_status": "queued"
+    } 
