@@ -15,6 +15,7 @@ export interface AppDefinition {
   component: ComponentType<{ windowContext?: WindowContext }>;
   defaultSize?: { width: number; height: number };
   dockIconClass?: string;
-  category: 'laboratory' | 'data' | 'analysis' | 'admin' | 'system';
+  category: 'customer-support' | 'science' | 'data' | 'laboratory' | 'analysis' | 'admin' | 'system';
+  section?: 'customer-support' | 'science' | 'data' | 'desktop';
   description?: string;
 }
