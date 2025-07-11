@@ -13,40 +13,34 @@ interface ServiceStatus {
 export default function ServicesStatus() {
   const services: ServiceStatus[] = [
     {
-      name: 'Template Service',
-      endpoint: '/api/templates/health',
-      description: 'Manages laboratory templates and workflows',
-      features: ['Template creation', 'Workflow management', 'Version control']
+      name: 'API Gateway',
+      endpoint: '/api/health',
+      description: 'Main API gateway and routing service',
+      features: ['Request routing', 'Load balancing', 'Health monitoring']
     },
     {
-      name: 'Sequencing Service', 
-      endpoint: '/api/sequencing/health',
-      description: 'Handles sequencing runs and data processing',
-      features: ['Run management', 'Quality metrics', 'Data processing']
+      name: 'Database',
+      endpoint: '/api/health', // Will extract database status from main health check
+      description: 'PostgreSQL database server',
+      features: ['Data persistence', 'Transaction support', 'Query optimization']
     },
     {
-      name: 'Notification Service',
-      endpoint: '/api/notifications/health',
-      description: 'Multi-channel notification system',
-      features: ['Email notifications', 'SMS alerts', 'Slack integration']
+      name: 'Sample Management',
+      endpoint: '/api/samples', // Test actual endpoint instead of health
+      description: 'Laboratory sample tracking and management',
+      features: ['Sample tracking', 'Barcode generation', 'Chain of custody']
     },
     {
-      name: 'Event Service',
-      endpoint: '/api/events/health',
-      description: 'Event-driven architecture support',
-      features: ['Event publishing', 'Subscription management', 'Event history']
+      name: 'Storage System',
+      endpoint: '/api/storage/locations', // Test actual endpoint
+      description: 'Hierarchical storage management',
+      features: ['Container hierarchy', 'Position tracking', 'Temperature monitoring']
     },
     {
-      name: 'Transaction Service',
-      endpoint: '/api/transactions/health',
-      description: 'Distributed transaction management',
-      features: ['Saga orchestration', 'Transaction rollback', 'Audit logging']
-    },
-    {
-      name: 'QA/QC Service',
-      endpoint: '/api/qaqc/health',
-      description: 'Quality assurance and control workflows',
-      features: ['Quality checks', 'Validation rules', 'QC reporting']
+      name: 'Reports & Analytics',
+      endpoint: '/api/reports/templates', // Test actual endpoint
+      description: 'SQL reporting and analytics platform',
+      features: ['Custom queries', 'Report templates', 'Data export']
     }
   ].map(service => ({ ...service, status: 'unknown' as const }));
 
@@ -56,11 +50,29 @@ export default function ServicesStatus() {
       const statusPromises = services.map(async (service) => {
         try {
           const response = await axios.get(service.endpoint);
+          
+          // Special handling for Database service - extract from API health response
+          if (service.name === 'Database' && response.data?.database) {
+            return { 
+              ...service, 
+              status: response.data.database.healthy ? 'healthy' : 'unhealthy' 
+            } as ServiceStatus;
+          }
+          
+          // For other services, check if we got a successful response
           return { 
             ...service, 
             status: response.status === 200 ? 'healthy' : 'unhealthy' 
           } as ServiceStatus;
-        } catch {
+        } catch (error: any) {
+          // Some endpoints might return 401 but still be working
+          if (error?.response?.status === 401) {
+            return { 
+              ...service, 
+              status: 'healthy' // Auth required means service is up
+            } as ServiceStatus;
+          }
+          
           return { 
             ...service, 
             status: 'unhealthy' 
@@ -109,9 +121,9 @@ export default function ServicesStatus() {
     <div className="px-4 sm:px-6 lg:px-8 py-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <h1 className="text-2xl font-semibold text-gray-900">Enhanced Services Status</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Core Services Status</h1>
           <p className="mt-2 text-sm text-gray-700">
-            Monitor the health and availability of TracSeq 2.0 enhanced microservices.
+            Monitor the health and availability of TracSeq 2.0 core microservices.
           </p>
         </div>
       </div>
@@ -170,10 +182,10 @@ export default function ServicesStatus() {
             </svg>
           </div>
           <div className="ml-3">
-            <h3 className="text-sm font-medium text-blue-800">About Enhanced Services</h3>
+            <h3 className="text-sm font-medium text-blue-800">About Core Services</h3>
             <div className="mt-2 text-sm text-blue-700">
               <p>
-                These enhanced microservices provide advanced features for the TracSeq 2.0 laboratory management system.
+                These core microservices provide essential functionality for the TracSeq 2.0 laboratory management system.
                 Services marked as "Unavailable" may be undergoing maintenance or require additional configuration.
               </p>
             </div>

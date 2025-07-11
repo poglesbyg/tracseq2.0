@@ -19,7 +19,7 @@ async fn main() -> Result<()> {
     info!("🏪 Starting Enhanced Storage Service - Production Version with Hierarchical Storage");
 
     // Load configuration from environment
-    let config = Config::from_env()?;
+    let config = Config::from_env().map_err(|e| anyhow::anyhow!("Failed to load configuration: {}", e))?;
     info!("📋 Configuration loaded successfully");
 
     // Create application state

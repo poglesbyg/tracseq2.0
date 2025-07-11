@@ -63,14 +63,14 @@ services:
   storage-service:
     build:
       context: ../lims-enhanced/enhanced_storage_service
-      dockerfile: Dockerfile.working  # Use working Dockerfile with regular Cargo.toml
+      dockerfile: Dockerfile.minimal  # Use minimal Dockerfile with standalone version
     container_name: lims-storage
     environment:
       STORAGE_DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db  # Keep for SQLx
       REDIS_URL: redis://redis:6379
       AUTH_SERVICE_URL: http://auth-service:8000
-      PORT: "8080"  # Match the Dockerfile EXPOSE
+      PORT: "8082"  # Match the standalone version default
       # Enable hierarchical storage features
       HIERARCHICAL_STORAGE_ENABLED: "true"
       # Enable analytics for production
@@ -88,7 +88,7 @@ services:
       - postgres
       - redis
     ports:
-      - "8013:8080"  # Match the Dockerfile EXPOSE port
+      - "8013:8082"  # Match the standalone version port
     networks:
       - lims-network
 
@@ -109,6 +109,50 @@ services:
       - "8014:8000"  # Using 8014 for reports service
     networks:
       - lims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  template-service:
+    build:
+      context: ../lims-core/template_service
+      dockerfile: Dockerfile
+    container_name: lims-templates
+    environment:
+      - TEMPLATE_DATABASE_URL=postgresql://postgres:postgres@postgres:5432/lab_manager
+      - TEMPLATE_HOST=0.0.0.0
+      - TEMPLATE_PORT=8000
+      - RUST_LOG=info
+      - AUTH_SERVICE_URL=http://auth-service:8000
+      - SAMPLE_SERVICE_URL=http://sample-service:8000
+      - TEMPLATE_MAX_PER_USER=100
+      - TEMPLATE_MAX_FIELDS=50
+      - TEMPLATE_CACHE_ENABLED=true
+      - FEATURE_FORM_BUILDER=true
+      - FEATURE_TEMPLATE_VERSIONING=true
+      - FEATURE_FILE_UPLOAD=true
+      - FILE_UPLOAD_PATH=/app/uploads
+      - FILE_MAX_SIZE_MB=25
+      - FILE_ALLOWED_EXTENSIONS=xlsx,csv,json,xml,txt
+    ports:
+      - "8083:8000"
+    depends_on:
+      - postgres
+      - auth-service
+      - sample-service
+    networks:
+      - lims-network
+    restart: unless-stopped
+    volumes:
+      - template_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # AI Services
   ollama:
@@ -165,7 +209,7 @@ services:
     environment:
       AUTH_SERVICE_URL: http://auth-service:8000
       SAMPLE_SERVICE_URL: http://sample-service:8000
-      STORAGE_SERVICE_URL: http://lims-storage:8080
+      STORAGE_SERVICE_URL: http://lims-storage:8082
       RAG_SERVICE_URL: http://tracseq-rag:8000
       REPORTS_SERVICE_URL: http://reports-service:8000
       PROJECT_SERVICE_URL: http://project-service:8101
@@ -174,7 +218,7 @@ services:
       TRANSACTION_SERVICE_URL: http://tracseq-transactions:8088
       EVENT_SERVICE_URL: http://tracseq-events:8087
       FLOW_CELL_SERVICE_URL: http://flow-cell-service:8104
-      TEMPLATE_SERVICE_URL: http://tracseq-templates:8083
+      TEMPLATE_SERVICE_URL: http://lims-templates:8000
       SEQUENCING_SERVICE_URL: http://tracseq-sequencing:8084
       NOTIFICATION_SERVICE_URL: http://tracseq-notification:8085
       USE_REPORTS_SERVICE: "true"
@@ -191,6 +235,7 @@ services:
 volumes:
   postgres_data:
   ollama_data:
+  template_uploads:
 
 networks:
   lims-network:

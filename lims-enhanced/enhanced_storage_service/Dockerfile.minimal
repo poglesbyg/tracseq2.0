@@ -18,10 +18,15 @@ RUN echo '[package]' > Cargo.toml && \
     echo 'tokio = { version = "1.0", features = ["full"] }' >> Cargo.toml && \
     echo 'axum = "0.7"' >> Cargo.toml && \
     echo 'serde_json = "1.0"' >> Cargo.toml && \
-    echo 'chrono = { version = "0.4", features = ["serde"] }' >> Cargo.toml
+    echo 'chrono = { version = "0.4", features = ["serde"] }' >> Cargo.toml && \
+    echo 'anyhow = "1.0"' >> Cargo.toml && \
+    echo 'sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid"] }' >> Cargo.toml && \
+    echo 'uuid = { version = "1.0", features = ["v4", "serde"] }' >> Cargo.toml && \
+    echo 'tracing = "0.1"' >> Cargo.toml && \
+    echo 'tracing-subscriber = { version = "0.3", features = ["env-filter"] }' >> Cargo.toml
 
-# Copy source and use minimal main
-COPY src/main_minimal.rs ./src/main.rs
+# Copy source and use standalone main
+COPY src/main_standalone.rs ./src/main.rs
 
 # Build the application
 RUN cargo build --release
