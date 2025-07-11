@@ -205,7 +205,7 @@ GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "8000"))
 GATEWAY_DEBUG = os.getenv("GATEWAY_DEBUG", "false").lower() == "true"
 
 # Service discovery URLs
-AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8080")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://lims-auth:8000")
 SAMPLE_SERVICE_URL = os.getenv("SAMPLE_SERVICE_URL", "http://sample-service:8081")
 STORAGE_SERVICE_URL = os.getenv("STORAGE_SERVICE_URL", "http://storage-service:8082")
 TEMPLATE_SERVICE_URL = os.getenv("TEMPLATE_SERVICE_URL", "http://lims-templates:8000")
