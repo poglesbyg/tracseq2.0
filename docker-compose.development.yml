@@ -1,0 +1,179 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: tracseq_postgres
+    environment:
+      POSTGRES_DB: lab_manager
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    networks:
+      - tracseq_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: tracseq_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - tracseq_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Dashboard Service (Python)
+  dashboard-service:
+    build:
+      context: ./simple-services/dashboard-service
+      dockerfile: Dockerfile
+    container_name: tracseq_dashboard
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lab_manager
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Samples Service (Python)
+  samples-service:
+    build:
+      context: ./simple-services/samples-service
+      dockerfile: Dockerfile
+    container_name: tracseq_samples
+    ports:
+      - "8081:8080"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lab_manager
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Sequencing Service (Python)
+  sequencing-service:
+    build:
+      context: ./simple-services/sequencing-service
+      dockerfile: Dockerfile
+    container_name: tracseq_sequencing
+    ports:
+      - "8082:8080"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lab_manager
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Spreadsheet Service (Python)
+  spreadsheet-service:
+    build:
+      context: ./simple-services/spreadsheet-service
+      dockerfile: Dockerfile
+    container_name: tracseq_spreadsheet
+    ports:
+      - "8083:8080"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lab_manager
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tracseq_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Frontend Proxy Service (Python)
+  frontend-proxy:
+    build:
+      context: ./simple-services/frontend-proxy
+      dockerfile: Dockerfile
+    container_name: tracseq_frontend_proxy
+    ports:
+      - "8084:8080"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lab_manager
+      - REDIS_URL=redis://redis:6379
+      - DASHBOARD_SERVICE_URL=http://dashboard-service:8080
+      - SAMPLES_SERVICE_URL=http://samples-service:8080
+      - SEQUENCING_SERVICE_URL=http://sequencing-service:8080
+      - SPREADSHEET_SERVICE_URL=http://spreadsheet-service:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      dashboard-service:
+        condition: service_healthy
+      samples-service:
+        condition: service_healthy
+      sequencing-service:
+        condition: service_healthy
+      spreadsheet-service:
+        condition: service_healthy
+    networks:
+      - tracseq_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  tracseq_network:
+    driver: bridge 

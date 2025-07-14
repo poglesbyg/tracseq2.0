@@ -18,14 +18,14 @@ use crate::{
 use self::proxy_routes::create_proxy_routes;
 
 /// Health and system routes
-pub fn health_routes() -> Router<Arc<AppComponents>> {
+pub fn health_routes() -> Router<AppComponents> {
     Router::new()
         .route("/health", get(health::health_check))
         .route("/api/dashboard/stats", get(dashboard::get_dashboard_stats))
 }
 
 /// Template management routes
-pub fn template_routes() -> Router<Arc<AppComponents>> {
+pub fn template_routes() -> Router<AppComponents> {
     Router::new()
         .route("/api/templates/upload", post(templates::upload_template))
         .route("/api/templates", get(templates::list_templates))
@@ -36,7 +36,7 @@ pub fn template_routes() -> Router<Arc<AppComponents>> {
 }
 
 /// RAG proxy routes - forward requests to RAG API Bridge on port 3002
-pub fn rag_proxy_routes() -> Router<Arc<AppComponents>> {
+pub fn rag_proxy_routes() -> Router<AppComponents> {
     Router::new()
         .route("/api/rag/submissions", get(rag_proxy::get_rag_submissions))
         .route("/api/rag/process", post(rag_proxy::process_rag_document))
@@ -45,7 +45,7 @@ pub fn rag_proxy_routes() -> Router<Arc<AppComponents>> {
 }
 
 /// Sample management routes
-pub fn sample_routes() -> Router<Arc<AppComponents>> {
+pub fn sample_routes() -> Router<AppComponents> {
     Router::new()
         .route("/api/samples", get(samples::list_samples))
         .route("/api/samples", post(samples::create_sample))
@@ -77,7 +77,7 @@ pub fn sample_routes() -> Router<Arc<AppComponents>> {
 }
 
 /// Sequencing management routes
-pub fn sequencing_routes() -> Router<Arc<AppComponents>> {
+pub fn sequencing_routes() -> Router<AppComponents> {
     Router::new()
         .route(
             "/api/sequencing/jobs",
@@ -98,13 +98,13 @@ pub fn sequencing_routes() -> Router<Arc<AppComponents>> {
 }
 
 /// Storage management routes (disabled - storage module removed)
-pub fn storage_routes() -> Router<Arc<AppComponents>> {
+pub fn storage_routes() -> Router<AppComponents> {
     Router::new()
         // Storage routes temporarily disabled
 }
 
 /// Reports and analytics routes
-pub fn reports_routes() -> Router<Arc<AppComponents>> {
+pub fn reports_routes() -> Router<AppComponents> {
     Router::new()
         .route("/api/reports/execute", post(reports::execute_report))
         .route("/api/reports/templates", get(reports::get_report_templates))
@@ -112,7 +112,7 @@ pub fn reports_routes() -> Router<Arc<AppComponents>> {
 }
 
 /// Spreadsheet processing routes
-pub fn spreadsheet_routes() -> Router<Arc<AppComponents>> {
+pub fn spreadsheet_routes() -> Router<AppComponents> {
     tracing::info!("🔧 Registering spreadsheet routes");
 
     let router = Router::new()
@@ -164,7 +164,7 @@ pub fn spreadsheet_routes() -> Router<Arc<AppComponents>> {
 }
 
 /// User management and authentication routes
-pub fn user_routes() -> Router<Arc<AppComponents>> {
+pub fn user_routes() -> Router<AppComponents> {
     // Public routes (no authentication required)
     let public_routes = Router::new()
         .route("/api/auth/login", post(users::login))
@@ -204,7 +204,7 @@ pub fn user_routes() -> Router<Arc<AppComponents>> {
 }
 
 /// Project management routes
-pub fn project_routes() -> Router<Arc<AppComponents>> {
+pub fn project_routes() -> Router<AppComponents> {
     Router::new()
         .route("/api/projects", get(projects::list_projects))
         .route("/api/projects", post(projects::create_project))
@@ -227,7 +227,7 @@ pub fn project_routes() -> Router<Arc<AppComponents>> {
 }
 
 /// Library preparation routes
-pub fn library_prep_routes() -> Router<Arc<AppComponents>> {
+pub fn library_prep_routes() -> Router<AppComponents> {
     Router::new()
         .route("/api/library-prep/protocols", get(library_prep::list_protocols))
         .route("/api/library-prep/protocols", post(library_prep::create_protocol))
@@ -243,7 +243,7 @@ pub fn library_prep_routes() -> Router<Arc<AppComponents>> {
 }
 
 /// Quality control routes
-pub fn qc_routes() -> Router<Arc<AppComponents>> {
+pub fn qc_routes() -> Router<AppComponents> {
     Router::new()
         .route("/api/qc/dashboard", get(qc::get_qc_dashboard))
         .route("/api/qc/reviews", get(qc::list_qc_reviews))
@@ -263,7 +263,7 @@ pub fn qc_routes() -> Router<Arc<AppComponents>> {
 }
 
 /// Flow cell design routes
-pub fn flow_cell_routes() -> Router<Arc<AppComponents>> {
+pub fn flow_cell_routes() -> Router<AppComponents> {
     Router::new()
         .route("/api/flow-cells/types", get(flow_cell::list_flow_cell_types))
         .route("/api/flow-cells/types/:id/stats", get(flow_cell::get_flow_cell_type_stats))
@@ -279,7 +279,7 @@ pub fn flow_cell_routes() -> Router<Arc<AppComponents>> {
 }
 
 /// Create authenticated routes (middleware applied at app level)
-pub fn create_authenticated_routes() -> Router<Arc<AppComponents>> {
+pub fn create_authenticated_routes() -> Router<AppComponents> {
     Router::new()
         .merge(template_routes())
         .merge(rag_proxy_routes())
@@ -296,7 +296,7 @@ pub fn create_authenticated_routes() -> Router<Arc<AppComponents>> {
 }
 
 /// Assemble all routes into a complete application router
-pub fn create_app_router() -> Router<Arc<AppComponents>> {
+pub fn create_app_router() -> Router<AppComponents> {
     // Check if proxy mode is enabled
     if proxy_handlers::is_proxy_mode_enabled() {
         tracing::info!("🔄 Creating router in PROXY MODE - routing to microservices");
@@ -308,7 +308,7 @@ pub fn create_app_router() -> Router<Arc<AppComponents>> {
 }
 
 /// Create router for proxy mode (routes to microservices)
-fn create_proxy_app_router() -> Router<Arc<AppComponents>> {
+fn create_proxy_app_router() -> Router<AppComponents> {
     Router::new()
         // Health check routes (always local)
         .route("/health", get(health::health_check))
@@ -327,7 +327,7 @@ fn create_proxy_app_router() -> Router<Arc<AppComponents>> {
 }
 
 /// Create router for monolith mode (uses local services)
-fn create_monolith_app_router() -> Router<Arc<AppComponents>> {
+fn create_monolith_app_router() -> Router<AppComponents> {
     Router::new()
         // Health check routes (no authentication required for monitoring)
         .route("/health", get(health::health_check))
@@ -499,14 +499,14 @@ fn create_cors_layer() -> CorsLayer {
 }
 
 /// Create a minimal router for testing
-pub fn create_test_router() -> Router<Arc<AppComponents>> {
+pub fn create_test_router() -> Router<AppComponents> {
     Router::new()
         .route("/health", get(health::health_check))
         .route("/api/templates", get(templates::list_templates))
 }
 
 /// Create API-only router (no file uploads)
-pub fn create_api_only_router() -> Router<Arc<AppComponents>> {
+pub fn create_api_only_router() -> Router<AppComponents> {
     Router::new()
         .merge(health_routes())
         .route("/api/templates", get(templates::list_templates))
