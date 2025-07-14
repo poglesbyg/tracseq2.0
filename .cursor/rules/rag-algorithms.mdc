@@ -1,6 +1,6 @@
 ---
-description: Specification for RAG (Retrieval Augmented Generation) algorithms focused on laboratory document processing and information extraction.
-globs: **/lab_submission_rag/**,**/rag/**,**/enhanced_rag_service/**
+description: Defines algorithms and validation rules for laboratory document retrieval, extraction, and data generation in TracSeq 2.0's RAG system.
+globs: */lab_submission_rag/**/*.py,*/enhanced_rag_service/**/*.py,*/lab_workflows/**/*.py
 alwaysApply: false
 ---
 
@@ -9,63 +9,62 @@ alwaysApply: false
 
 Core RAG Algorithm Components:
 
-1. Laboratory Document Processing Pipeline
-- Custom document chunking optimized for laboratory submissions:
-  * Administrative sections (submitter, project details)
-  * Sample specifications (type, concentration, storage)
-  * Sequencing requirements (platform, coverage, read length)
-- Context-aware text segmentation preserving laboratory metadata
-- Temperature and measurement unit standardization (-80°C, μg/μL)
+1. Laboratory Document Processing
+- Domain-specific chunking for laboratory submissions
+- Laboratory-specific relevance scoring based on:
+  * Sample information density 
+  * Quality control metrics
+  * Chain of custody requirements
+  * Storage specifications
+  * Protocol adherence
 
-2. Information Extraction Rules
-- Multi-stage extraction process:
-  * Basic field parsing with confidence scoring
-  * Domain validation against laboratory standards
-  * Quality control with threshold validation (0.7 minimum)
-  * Cross-reference validation for sample IDs
-- Laboratory-specific entity recognition for:
-  * Sample barcodes
-  * Equipment IDs
-  * Storage locations
-  * Protocol references
+2. Information Extraction Pipelines
+- Field extraction using LLM templates specialized for:
+  * Administrative metadata
+  * Sample specifications 
+  * Storage requirements
+  * Quality control parameters
+  * Chain of custody tracking
+- Confidence scoring based on field completeness and validation
 
-3. RAG Query Processing
-- Specialized prompt engineering for laboratory context
+3. Laboratory-Specific Query Processing
+- Context enrichment with:
+  * Active sample information
+  * Storage conditions
+  * Processing workflows
+  * Quality metrics
 - Response generation incorporating:
-  * Storage condition requirements
-  * Sample handling protocols
-  * Equipment compatibility rules
+  * Laboratory best practices
   * Safety guidelines
-- Knowledge base integration with laboratory standards
+  * Compliance requirements
+  * Protocol recommendations
 
-4. Quality Control System
-- Automated validation of extracted information:
-  * Required field completeness
-  * Unit compatibility
-  * Value range verification
-  * Cross-reference integrity
-- Self-correction mechanisms with domain expertise
+4. Multi-Agent Coordination
+- Specialized agents for:
+  * Document processing
+  * Quality control
+  * Storage allocation
+  * Notification handling
+- Agent orchestration based on:
+  * Sample priority
+  * Quality scores
+  * Resource availability
+  * Processing requirements
 
-5. Laboratory MLOps Integration
-- Model performance tracking with domain metrics
-- A/B testing for extraction accuracy
-- Continuous learning from laboratory feedback
-- Version control for model improvements
+5. Confidence Scoring System
+- Multi-factor scoring incorporating:
+  * Field extraction completeness
+  * Data validation results
+  * Pattern matching confidence
+  * Laboratory requirement compliance
+  * Cross-reference validation
 
-File Paths:
-```
-lab_submission_rag/
-  ├── lab_workflows/
-  │   ├── document_processing.py
-  │   ├── quality_control.py
-  │   └── multi_agent.py
-  ├── mlops/
-  │   ├── model_registry.py
-  │   └── experiment_tracker.py
-  └── rag/
-      ├── document_processor.py
-      └── enhanced_llm_interface.py
-```
+Key File Paths:
+- lab_submission_rag/lab_workflows/quality_control.py
+- lab_submission_rag/lab_workflows/document_processing.py
+- lab_submission_rag/lab_workflows/multi_agent.py
+- lab_submission_rag/rag/document_processor.py
+- lab_submission_rag/rag/enhanced_llm_interface.py
 
 $END$
 

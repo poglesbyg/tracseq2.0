@@ -10,46 +10,49 @@
 - Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
 
 
-The LIMS microservice system implements laboratory information management with several key business domains:
+LIMS Microservice System implements laboratory information management with AI-driven capabilities:
 
-## Core Sample Management
-Located in `lims-core/sample_service/`:
-- Sample lifecycle tracking through lab workflows
-- Chain of custody validation and audit trails  
-- Quality control checkpoints and validation rules
-- Integration with lab equipment and storage systems
+1. Core Laboratory Services:
+- Sample tracking and management 
+- Storage optimization with environmental monitoring
+- Workflow orchestration for laboratory processes
+- Compliance monitoring and reporting
+- File paths: `lims-core/sample_service/`, `lims-core/storage_service/`
 
-## AI-Enhanced Laboratory Operations
-Located in `lims-ai/lab_submission_rag/`:
-- Intelligent document processing for lab submissions
-- RAG-based lab protocol assistance and knowledge base
-- Multi-agent lab workflow orchestration
-- Quality prediction and anomaly detection
+2. AI/ML Components:
+- Document analysis using RAG (Retrieval Augmented Generation)
+- Anomaly detection for equipment monitoring
+- Predictive maintenance modeling
+- Laboratory assistant powered by LLMs
+- File paths: `lims-ai/lab_submission_rag/`, `lims-ai/enhanced_rag_service/`
 
-## Enhanced Storage Management 
-Located in `lims-enhanced/enhanced_storage_service/`:
-- Temperature zone management and monitoring
-- Digital twin simulation of storage facilities
-- IoT sensor integration and alerting
-- Predictive maintenance and capacity planning
-- Energy optimization and carbon footprint tracking
+3. Enhanced Storage Management:
+- IoT sensor integration for environmental monitoring
+- Digital twin modeling for storage optimization
+- Blockchain-based audit trail
+- Automated storage assignment
+- File paths: `lims-enhanced/enhanced_storage_service/`
 
-## Laboratory Event Processing
-Located in `lims-core/transaction_service/`:
-- Saga pattern for multi-step lab workflows
-- Compensation logic for failed lab procedures
-- Laboratory event auditing and tracking
-- Cross-service workflow orchestration
+4. Integration Layer:
+- API Gateway for service coordination
+- Event-driven architecture using Kafka
+- Circuit breaker patterns for resilience
+- Multi-cloud storage capabilities
+- File paths: `lims-core/api_gateway/`, `kafka/`
 
-The system emphasizes laboratory compliance, sample integrity, and AI-assisted workflow optimization. Key integrations connect laboratory equipment, storage systems, and external LIMS/ERP platforms while maintaining strict validation rules for laboratory operations.
-
-The business logic primarily revolves around:
-- Sample tracking and chain of custody
-- Laboratory workflow automation
+The system implements domain-specific workflows for:
+- Sample submission and tracking
 - Storage condition monitoring
-- Quality control procedures
-- AI-enhanced decision support
+- Quality control processes
 - Regulatory compliance
+- AI-assisted analysis
+
+Key business components focus on:
+- Laboratory workflow automation
+- Sample management and tracking
+- Storage optimization
+- AI-powered assistance
+- Compliance and audit trails
 
 $END$
 

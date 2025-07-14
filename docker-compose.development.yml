@@ -5,10 +5,12 @@ services:
   postgres:
     image: postgres:15
     container_name: tracseq_postgres
+    env_file:
+      - config/development.env
     environment:
-      POSTGRES_DB: lab_manager
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-lab_manager}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5433:5432"
     volumes:
@@ -44,11 +46,17 @@ services:
       context: ./simple-services/dashboard-service
       dockerfile: Dockerfile
     container_name: tracseq_dashboard
+    env_file:
+      - config/development.env
     ports:
-      - "8080:8080"
+      - "${DASHBOARD_SERVICE_PORT:-8080}:8080"
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lab_manager
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/lab_manager}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    volumes:
+      - app_logs:/app/logs
+      - app_uploads:/app/uploads
+      - app_storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,11 +76,17 @@ services:
       context: ./simple-services/samples-service
       dockerfile: Dockerfile
     container_name: tracseq_samples
+    env_file:
+      - config/development.env
     ports:
-      - "8081:8080"
+      - "${SAMPLES_SERVICE_PORT:-8081}:8080"
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lab_manager
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/lab_manager}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    volumes:
+      - app_logs:/app/logs
+      - app_uploads:/app/uploads
+      - app_storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,11 +106,17 @@ services:
       context: ./simple-services/sequencing-service
       dockerfile: Dockerfile
     container_name: tracseq_sequencing
+    env_file:
+      - config/development.env
     ports:
-      - "8082:8080"
+      - "${SEQUENCING_SERVICE_PORT:-8082}:8080"
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lab_manager
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/lab_manager}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    volumes:
+      - app_logs:/app/logs
+      - app_uploads:/app/uploads
+      - app_storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,11 +136,17 @@ services:
       context: ./simple-services/spreadsheet-service
       dockerfile: Dockerfile
     container_name: tracseq_spreadsheet
+    env_file:
+      - config/development.env
     ports:
-      - "8083:8080"
+      - "${SPREADSHEET_SERVICE_PORT:-8083}:8080"
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lab_manager
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/lab_manager}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    volumes:
+      - app_logs:/app/logs
+      - app_uploads:/app/uploads
+      - templates_data:/app/templates
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,15 +166,19 @@ services:
       context: ./simple-services/frontend-proxy
       dockerfile: Dockerfile
     container_name: tracseq_frontend_proxy
+    env_file:
+      - config/development.env
     ports:
-      - "8084:8080"
+      - "${FRONTEND_PROXY_PORT:-8084}:8080"
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/lab_manager
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/lab_manager}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - DASHBOARD_SERVICE_URL=http://dashboard-service:8080
       - SAMPLES_SERVICE_URL=http://samples-service:8080
       - SEQUENCING_SERVICE_URL=http://sequencing-service:8080
       - SPREADSHEET_SERVICE_URL=http://spreadsheet-service:8080
+    volumes:
+      - app_logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -171,8 +201,29 @@ services:
       retries: 5
 
 volumes:
+  # Database and cache persistence
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
+  
+  # Application data persistence
+  app_storage:
+    driver: local
+  app_uploads:
+    driver: local
+  app_logs:
+    driver: local
+  
+  # Template and configuration persistence
+  templates_data:
+    driver: local
+  
+  # Development cache volumes
+  node_modules:
+    driver: local
+  cargo_cache:
+    driver: local
 
 networks:
   tracseq_network:

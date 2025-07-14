@@ -1,41 +1,66 @@
-# Node (React frontend)
-lims-ui/node_modules/
-lims-ui/.next/
-lims-ui/dist/
-lims-ui/build/
-lims-ui/.turbo/
+# =============================================================================
+# Documentation-Specific .gigaignore for TracSeq 2.0 Docs
+# =============================================================================
 
-# Python (AI service)
-lims-ai/__pycache__/
-lims-ai/.venv/
-lims-ai/env/
-lims-ai/.mypy_cache/
-lims-ai/.pytest_cache/
-lims-ai/.ipynb_checkpoints/
-lims-ai/.ruff_cache/
+# ====================
+# Documentation Build Artifacts
+# ====================
 
-# Rust (Backend)
-lims-core/target/
-lims-core/.cargo/
-lims-core/Cargo.lock
+# Generated documentation
+build/
+_build/
+site/
+.docusaurus/
+node_modules/
+.next/
+dist/
 
-# General
-.env
-*.log
-*.sqlite
-*.db
+# ====================
+# Temporary Files
+# ====================
+
+# Temporary and cache files
 *.tmp
+*.temp
+.cache/
+.temp/
+*~
 .DS_Store
-*.swp
-*.swo
+Thumbs.db
+
+# ====================
+# Development Environment
+# ====================
+
+# IDE files
 .vscode/
 .idea/
-__pycache__/
+*.swp
+*.swo
 
-# Git
-.git/
-.gitignore
+# ====================
+# IMPORTANT: Keep All Documentation
+# ====================
 
-# Docker
-docker/volumes/
-**/tmp/
+# Always include these documentation files
+!*.md
+!**/*.md
+!*.rst
+!**/*.rst
+!*.txt
+!**/*.txt
+!*.adoc
+!**/*.adoc
+!*.asciidoc
+!**/*.asciidoc
+
+# Keep configuration files
+!package.json
+!requirements.txt
+!Dockerfile
+!docker-compose*.yml
+!mkdocs.yml
+!docusaurus.config.js
+!.cursorrules
+!.gigaignore
+!.gitignore

@@ -1,41 +1,249 @@
-# Node (React frontend)
-lims-ui/node_modules/
-lims-ui/.next/
-lims-ui/dist/
-lims-ui/build/
-lims-ui/.turbo/
+# =============================================================================
+# GigaAI Optimized .gigaignore for TracSeq 2.0 Laboratory Management System
+# =============================================================================
 
-# Python (AI service)
-lims-ai/__pycache__/
-lims-ai/.venv/
-lims-ai/env/
-lims-ai/.mypy_cache/
-lims-ai/.pytest_cache/
-lims-ai/.ipynb_checkpoints/
-lims-ai/.ruff_cache/
+# ====================
+# Build Artifacts & Dependencies
+# ====================
 
-# Rust (Backend)
-lims-core/target/
-lims-core/.cargo/
-lims-core/Cargo.lock
+# Rust build artifacts (all services)
+target/
+**/target/
+**/.cargo/
+Cargo.lock
+**/Cargo.lock
 
-# General
-.env
+# Node.js dependencies and build artifacts
+node_modules/
+**/node_modules/
+.next/
+dist/
+build/
+.turbo/
+.nuxt/
+.output/
+.vercel/
+.netlify/
+
+# Python dependencies and cache
+__pycache__/
+**/__pycache__/
+.venv/
+venv/
+env/
+.env/
+venv-*/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.ipynb_checkpoints/
+*.egg-info/
+.pdm-python
+
+# ====================
+# Runtime & Temporary Files
+# ====================
+
+# Logs and runtime data
+logs/
 *.log
-*.sqlite
-*.db
+*.pid
+*.out
+*.err
 *.tmp
-.DS_Store
-*.swp
-*.swo
+*.temp
+temp/
+tmp/
+**/tmp/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Cache and temporary directories
+.cache/
+.temp/
+.tmp/
+**/cache/
+**/temp/
+
+# ====================
+# Development Environment
+# ====================
+
+# IDE and editor files
 .vscode/
 .idea/
-__pycache__/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
 
-# Git
-.git/
-.gitignore
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# Docker
+# ====================
+# Security & Configuration
+# ====================
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.template
+secrets/
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# ====================
+# Docker & Infrastructure
+# ====================
+
+# Docker volumes and runtime data
 docker/volumes/
-**/tmp/
+**/volumes/
+docker-compose.override.yml
+.docker/
+
+# ====================
+# Test & Coverage
+# ====================
+
+# Test results and coverage
+test-results/
+coverage/
+.nyc_output/
+junit.xml
+*.lcov
+playwright-report/
+
+# ====================
+# Documentation Build Artifacts
+# ====================
+
+# Generated documentation
+docs/build/
+docs/_build/
+docs/site/
+.docusaurus/
+
+# ====================
+# Backup & Archive Files
+# ====================
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+backup_*/
+*_backup/
+exports/
+*.tar
+*.tar.gz
+*.zip
+*.rar
+
+# ====================
+# Large Binary Files
+# ====================
+
+# Media and binary files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.svg
+*.ico
+*.pdf
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.exe
+*.dll
+*.so
+*.dylib
+
+# ====================
+# Git & Version Control
+# ====================
+
+# Git metadata (but preserve .gitignore for reference)
+.git/
+.gitattributes
+
+# ====================
+# Service-Specific Exclusions
+# ====================
+
+# AI/ML model files and data
+*.model
+*.pkl
+*.h5
+*.onnx
+*.pt
+*.pth
+data/models/
+data/datasets/
+data/raw/
+data/processed/
+
+# Storage and uploads
+storage/
+uploads/
+**/uploads/
+
+# Legacy and deprecated code
+legacy/
+deprecated/
+old/
+archive/
+
+# ====================
+# Monitoring & Metrics
+# ====================
+
+# Prometheus metrics
+*.prom
+metrics/
+
+# ====================
+# IMPORTANT: Keep These Files
+# ====================
+
+# Always include these important files for context
+!README.md
+!*/README.md
+!CHANGELOG.md
+!*/CHANGELOG.md
+!*.md
+!Cargo.toml
+!*/Cargo.toml
+!package.json
+!*/package.json
+!pyproject.toml
+!*/pyproject.toml
+!requirements.txt
+!*/requirements.txt
+!Dockerfile
+!*/Dockerfile
+!docker-compose*.yml
+!.cursorrules
+!.gigaignore
+!.gitignore
