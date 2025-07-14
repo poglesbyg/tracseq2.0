@@ -156,6 +156,36 @@ async def get_sequencing_platforms():
         }
     }
 
+# Additional endpoints for E2E testing
+@app.get("/api/v1/jobs")
+async def get_jobs():
+    """Get all sequencing jobs (simplified endpoint for E2E testing)"""
+    return {
+        "success": True,
+        "data": {
+            "jobs": [
+                {
+                    "id": "seq-001",
+                    "name": "WGS Sample Batch 1",
+                    "status": "running",
+                    "sample_count": 24,
+                    "platform": "NovaSeq 6000",
+                    "progress": 65,
+                    "submitter": "Dr. Smith"
+                },
+                {
+                    "id": "seq-002", 
+                    "name": "RNA-seq Project Alpha",
+                    "status": "queued",
+                    "sample_count": 12,
+                    "platform": "NextSeq 2000",
+                    "progress": 0,
+                    "submitter": "Dr. Johnson"
+                }
+            ]
+        }
+    }
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port) 

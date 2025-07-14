@@ -1,0 +1,230 @@
+version: '3.8'
+
+services:
+  # Database (PostgreSQL)
+  postgres:
+    image: postgres:15-alpine
+    container_name: lims-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lims_db
+    ports:
+      - "5440:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../db/migrations:/docker-entrypoint-initdb.d/
+    networks:
+      - lims-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: lims-redis
+    ports:
+      - "6390:6379"
+    networks:
+      - lims-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # QAQC Service (Rust) - NEW DEPLOYMENT
+  qaqc-service:
+    build:
+      context: ../lims-laboratory/qaqc_service
+      dockerfile: Dockerfile
+    container_name: lims-qaqc-rust
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/lims_db
+      
+      # Service Configuration
+      QAQC_HOST: 0.0.0.0
+      QAQC_PORT: 8103
+      SKIP_MIGRATIONS: true
+      
+      # JWT Configuration
+      JWT_SECRET: this-is-a-secure-32-character-jwt-secret-key-change-in-production
+      
+      # Service URLs for integration
+      AUTH_SERVICE_URL: http://dashboard-service:8080
+      SAMPLE_SERVICE_URL: http://samples-service:8080
+      SEQUENCING_SERVICE_URL: http://sequencing-service:8080
+      SPREADSHEET_VERSIONING_SERVICE_URL: http://spreadsheet-service:8080
+      
+      # QAQC Configuration
+      DEFAULT_QUALITY_THRESHOLD: 80.0
+      ENABLE_REAL_TIME_MONITORING: true
+      COMPLIANCE_STANDARDS: ISO15189,CLIA,CAP
+      
+      # Performance settings
+      MAX_CONCURRENT_WORKFLOWS: 10
+      WORKFLOW_TIMEOUT_SECONDS: 300
+      METRICS_RETENTION_DAYS: 30
+      
+      # Logging
+      RUST_LOG: info
+      
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8103:8103"
+    networks:
+      - lims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8103/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Dashboard Service (Python)
+  dashboard-service:
+    build:
+      context: ../simple-services/dashboard-service
+      dockerfile: Dockerfile
+    container_name: lims-dashboard
+    environment:
+      - PORT=8080
+    ports:
+      - "8090:8080"
+    networks:
+      - lims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Samples Service (Python)
+  samples-service:
+    build:
+      context: ../simple-services/samples-service
+      dockerfile: Dockerfile
+    container_name: lims-samples
+    environment:
+      - PORT=8080
+    ports:
+      - "8091:8080"
+    networks:
+      - lims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Sequencing Service (Python)
+  sequencing-service:
+    build:
+      context: ../simple-services/sequencing-service
+      dockerfile: Dockerfile
+    container_name: lims-sequencing
+    environment:
+      - PORT=8080
+    ports:
+      - "8092:8080"
+    networks:
+      - lims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Spreadsheet Service (Python)
+  spreadsheet-service:
+    build:
+      context: ../simple-services/spreadsheet-service
+      dockerfile: Dockerfile
+    container_name: lims-spreadsheets
+    environment:
+      - PORT=8080
+    ports:
+      - "8093:8080"
+    networks:
+      - lims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Gateway (Updated to include QAQC service)
+  api-gateway:
+    build:
+      context: ../simple-services/api-gateway
+      dockerfile: Dockerfile
+    container_name: lims-gateway
+    environment:
+      # Service URLs
+      DASHBOARD_SERVICE_URL: http://dashboard-service:8080
+      SAMPLES_SERVICE_URL: http://samples-service:8080
+      SEQUENCING_SERVICE_URL: http://sequencing-service:8080
+      SPREADSHEET_SERVICE_URL: http://spreadsheet-service:8080
+      QAQC_SERVICE_URL: http://qaqc-service:8103
+      
+      # Logging
+      LOG_LEVEL: INFO
+      
+    depends_on:
+      - dashboard-service
+      - samples-service
+      - sequencing-service
+      - spreadsheet-service
+      - qaqc-service
+    ports:
+      - "8089:8000"
+    networks:
+      - lims-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend Proxy
+  frontend-proxy:
+    build:
+      context: ../simple-services/frontend-proxy
+      dockerfile: Dockerfile
+    container_name: lims-frontend-proxy
+    environment:
+      - PORT=3000
+      - API_GATEWAY_URL=http://api-gateway:8000
+    ports:
+      - "3000:3000"
+    networks:
+      - lims-network
+    restart: unless-stopped
+    depends_on:
+      - api-gateway
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  lims-network:
+    driver: bridge 

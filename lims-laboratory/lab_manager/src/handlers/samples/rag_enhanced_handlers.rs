@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use axum::{
     extract::{Multipart, State},
     http::StatusCode,
@@ -17,7 +18,7 @@ use crate::{
 
 /// Process a laboratory document using RAG and create samples from extracted data
 pub async fn process_document_and_create_samples(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
     mut multipart: Multipart,
 ) -> Result<Json<RagEnhancedSampleResult>, (StatusCode, String)> {
     let start_time = std::time::Instant::now();
@@ -175,7 +176,7 @@ pub async fn process_document_and_create_samples(
 
 /// Create samples from RAG-processed data with validation
 pub async fn create_samples_from_rag_data(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Json(rag_result): Json<RagEnhancedSampleResult>,
 ) -> Result<Json<BatchCreateSamplesResponse>, (StatusCode, String)> {
     if rag_result.samples.is_empty() {
@@ -283,7 +284,7 @@ pub async fn create_samples_from_rag_data(
 
 /// Query the RAG system for information about submitted samples
 pub async fn query_submission_information(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
     Json(query_request): Json<QueryRequest>,
 ) -> Result<Json<QueryResponse>, (StatusCode, String)> {
     // Initialize RAG service using app config
@@ -320,7 +321,7 @@ pub async fn query_submission_information(
 
 /// Get RAG system health and status
 pub async fn get_rag_system_status(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let rag_config = RagConfig {
         base_url: _state.config.rag.base_url.clone(),
@@ -342,7 +343,7 @@ pub async fn get_rag_system_status(
 
 /// Process document in preview mode (no sample creation)
 pub async fn preview_document_extraction(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
     mut multipart: Multipart,
 ) -> Result<Json<RagEnhancedSampleResult>, (StatusCode, String)> {
     let start_time = std::time::Instant::now();

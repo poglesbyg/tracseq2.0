@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc, NaiveDate};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
+use bigdecimal::BigDecimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct LibraryPrepProtocol {
@@ -15,7 +16,7 @@ pub struct LibraryPrepProtocol {
     pub protocol_steps: serde_json::Value,
     pub reagents: serde_json::Value,
     pub equipment_required: Option<Vec<String>>,
-    pub estimated_duration_hours: Option<sqlx::types::BigDecimal>,
+    pub estimated_duration_hours: Option<BigDecimal>,
     pub is_active: Option<bool>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -55,7 +56,7 @@ pub struct CreateLibraryPrepProtocolRequest {
     pub protocol_steps: serde_json::Value,
     pub reagents: serde_json::Value,
     pub equipment_required: Option<Vec<String>>,
-    pub estimated_duration_hours: Option<sqlx::types::BigDecimal>,
+    pub estimated_duration_hours: Option<BigDecimal>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,7 +69,7 @@ pub struct UpdateLibraryPrepProtocolRequest {
     pub protocol_steps: Option<serde_json::Value>,
     pub reagents: Option<serde_json::Value>,
     pub equipment_required: Option<Vec<String>>,
-    pub estimated_duration_hours: Option<sqlx::types::BigDecimal>,
+    pub estimated_duration_hours: Option<BigDecimal>,
     pub is_active: Option<bool>,
 }
 

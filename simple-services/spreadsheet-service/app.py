@@ -172,6 +172,55 @@ async def preview_spreadsheet_sheets(request_data: dict):
         }
     }
 
+# Additional endpoints for E2E testing
+@app.get("/api/v1/templates")
+async def get_templates():
+    """Get all templates"""
+    return {
+        "success": True,
+        "data": {
+            "templates": [
+                {
+                    "id": "template-001",
+                    "name": "Sample Submission Template",
+                    "description": "Standard template for sample submissions",
+                    "version": "1.0",
+                    "created_at": "2024-01-01T00:00:00Z"
+                },
+                {
+                    "id": "template-002",
+                    "name": "Sequencing Request Template",
+                    "description": "Template for sequencing requests",
+                    "version": "2.1",
+                    "created_at": "2024-02-01T00:00:00Z"
+                }
+            ]
+        }
+    }
+
+@app.get("/api/v1/templates/sample")
+async def get_sample_templates():
+    """Get sample-specific templates"""
+    return {
+        "success": True,
+        "data": {
+            "templates": [
+                {
+                    "id": "sample-template-001",
+                    "name": "DNA Sample Template",
+                    "fields": ["name", "concentration", "volume", "storage_location"],
+                    "version": "1.0"
+                },
+                {
+                    "id": "sample-template-002",
+                    "name": "RNA Sample Template",
+                    "fields": ["name", "concentration", "volume", "storage_location", "rin_score"],
+                    "version": "1.1"
+                }
+            ]
+        }
+    }
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port) 

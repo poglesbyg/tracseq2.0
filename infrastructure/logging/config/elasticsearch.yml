@@ -1,0 +1,40 @@
+cluster.name: "tracseq-cluster"
+node.name: "elasticsearch"
+node.roles: ["master", "data", "ingest"]
+
+# Network settings
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300
+
+# Discovery settings
+discovery.type: single-node
+cluster.initial_master_nodes: ["elasticsearch"]
+
+# Path settings
+path.data: /usr/share/elasticsearch/data
+path.logs: /usr/share/elasticsearch/logs
+
+# Memory settings
+bootstrap.memory_lock: true
+
+# Security settings (disabled for development)
+xpack.security.enabled: false
+xpack.security.enrollment.enabled: false
+xpack.security.http.ssl.enabled: false
+xpack.security.transport.ssl.enabled: false
+
+# Monitoring settings
+xpack.monitoring.collection.enabled: true
+
+# Index settings for laboratory data
+action.auto_create_index: "+*"
+
+# Custom index templates for TracSeq will be set via API
+# index.number_of_shards: 1
+# index.number_of_replicas: 0
+# index.refresh_interval: 1s
+
+# Logging level
+logger.level: INFO
+logger.org.elasticsearch.discovery: DEBUG 

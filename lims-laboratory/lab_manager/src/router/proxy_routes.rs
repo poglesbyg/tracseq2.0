@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use axum::{
     routing::{delete, get, post, put},
     Router,
@@ -16,7 +17,7 @@ use crate::{
 };
 
 /// Create routes that proxy to microservices
-pub fn create_proxy_routes() -> Router<AppComponents> {
+pub fn create_proxy_routes() -> Router<Arc<AppComponents>> {
     Router::new()
         // Service discovery and health
         .route("/api/services", get(list_microservices))

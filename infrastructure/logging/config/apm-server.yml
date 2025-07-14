@@ -1,0 +1,53 @@
+apm-server:
+  host: "0.0.0.0:8200"
+  rum:
+    enabled: true
+    event_rate.limit: 300
+    event_rate.lru_size: 1000
+    allow_origins: ['*']
+    allow_headers: ['*']
+    source_mapping.enabled: true
+    source_mapping.cache.expiration: 5m
+    source_mapping.index_pattern: "apm-*-sourcemap*"
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  indices:
+    - index: "tracseq-apm-traces-%{+yyyy.MM.dd}"
+      when.contains:
+        processor.event: "transaction"
+    - index: "tracseq-apm-errors-%{+yyyy.MM.dd}"
+      when.contains:
+        processor.event: "error"
+    - index: "tracseq-apm-metrics-%{+yyyy.MM.dd}"
+      when.contains:
+        processor.event: "metric"
+
+setup.template.settings:
+  index.number_of_shards: 1
+  index.number_of_replicas: 0
+
+setup.kibana:
+  host: "kibana:5601"
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/apm-server
+  name: apm-server
+  keepfiles: 7
+  permissions: 0644
+
+# Performance tuning
+queue.mem:
+  events: 4096
+  flush.min_events: 512
+  flush.timeout: 1s
+
+# Monitoring
+monitoring.enabled: true
+monitoring.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+
+name: tracseq-apm-server
+tags: ["tracseq", "laboratory", "apm"] 

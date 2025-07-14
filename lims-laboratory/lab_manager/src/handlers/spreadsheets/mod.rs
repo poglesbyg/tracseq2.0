@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use axum::{
     extract::{Multipart, Path, Query, State},
     http::StatusCode,
@@ -77,7 +78,7 @@ impl<T> ApiResponse<T> {
 
 /// Upload spreadsheet file
 pub async fn upload_spreadsheet(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Query(params): Query<UploadParams>,
     mut multipart: Multipart,
 ) -> Result<Json<UploadResponse>, StatusCode> {
@@ -166,7 +167,7 @@ pub async fn upload_spreadsheet(
 
 /// Search spreadsheet data
 pub async fn search_data(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Query(params): Query<SearchParams>,
     Query(raw_params): Query<HashMap<String, String>>,
 ) -> Result<Json<ApiResponse<SpreadsheetSearchResult>>, StatusCode> {
@@ -217,7 +218,7 @@ pub async fn search_data(
 
 /// Get dataset by ID
 pub async fn get_dataset(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Path(dataset_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<SpreadsheetDataset>>, StatusCode> {
     let service = &components.spreadsheet_service;
@@ -244,7 +245,7 @@ pub async fn get_dataset(
 
 /// List datasets
 pub async fn list_datasets(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Query(params): Query<ListParams>,
 ) -> Result<Json<ApiResponse<Vec<SpreadsheetDataset>>>, StatusCode> {
     let service = &components.spreadsheet_service;
@@ -267,7 +268,7 @@ pub async fn list_datasets(
 
 /// Delete dataset
 pub async fn delete_dataset(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Path(dataset_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<u64>>, StatusCode> {
     let service = &components.spreadsheet_service;
@@ -295,7 +296,7 @@ pub async fn delete_dataset(
 
 /// Get service health
 pub async fn health_check(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
 ) -> Result<Json<crate::services::ServiceHealth>, StatusCode> {
     let service = &components.spreadsheet_service;
     let health = service.health_check().await;
@@ -304,7 +305,7 @@ pub async fn health_check(
 
 /// Get supported file types
 pub async fn supported_types(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
 ) -> Result<Json<ApiResponse<Vec<&'static str>>>, StatusCode> {
     let service = &components.spreadsheet_service;
     let types = service.supported_file_types();
@@ -316,7 +317,7 @@ pub async fn supported_types(
 
 /// Get available filters for datasets
 pub async fn get_available_filters(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Json<ApiResponse<crate::models::spreadsheet::AvailableFilters>>, StatusCode> {
     let service = &components.spreadsheet_service;
@@ -343,7 +344,7 @@ pub async fn get_available_filters(
 
 /// Analyze dataset structure and content
 pub async fn analyze_dataset(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Path(dataset_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<crate::models::spreadsheet::DatasetAnalysis>>, StatusCode> {
     let service = &components.spreadsheet_service;
@@ -370,7 +371,7 @@ pub async fn analyze_dataset(
 
 /// Analyze individual column
 pub async fn analyze_column(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Path((dataset_id, column_name)): Path<(Uuid, String)>,
 ) -> Result<Json<ApiResponse<crate::models::spreadsheet::ColumnAnalysis>>, StatusCode> {
     let service = &components.spreadsheet_service;
@@ -409,7 +410,7 @@ pub async fn analyze_column(
 
 /// Get sheet names from uploaded Excel file
 pub async fn get_sheet_names(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     mut multipart: Multipart,
 ) -> Result<Json<ApiResponse<Vec<String>>>, StatusCode> {
     let service = &components.spreadsheet_service;
@@ -474,7 +475,7 @@ pub async fn get_sheet_names(
 
 /// Upload spreadsheet file with multiple sheets support
 pub async fn upload_spreadsheet_multiple_sheets(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     mut multipart: Multipart,
 ) -> Result<Json<ApiResponse<Vec<SpreadsheetDataset>>>, StatusCode> {
     let service = &components.spreadsheet_service;
@@ -612,7 +613,7 @@ pub type DatasetInfo = SpreadsheetDataset;
 
 /// Create a new dataset (stub implementation)
 pub async fn create_dataset(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
     Json(_request): Json<CreateDatasetRequest>,
 ) -> Result<Json<DatasetInfo>, (StatusCode, String)> {
     Err((
@@ -623,7 +624,7 @@ pub async fn create_dataset(
 
 /// Update an existing dataset (stub implementation)  
 pub async fn update_dataset(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
     Path(_dataset_id): Path<Uuid>,
     Json(_request): Json<UpdateDatasetRequest>,
 ) -> Result<Json<DatasetInfo>, (StatusCode, String)> {

@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -22,7 +23,7 @@ pub struct UpdateSequencingJobRequest {
 
 /// Create a new sequencing job
 pub async fn create_sequencing_job(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Json(job): Json<CreateJob>,
 ) -> Result<Json<SequencingJob>, (StatusCode, String)> {
     state
@@ -36,7 +37,7 @@ pub async fn create_sequencing_job(
 
 /// Get a sequencing job by ID
 pub async fn get_sequencing_job(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Path(job_id): Path<Uuid>,
 ) -> Result<Json<SequencingJob>, (StatusCode, String)> {
     match state.sequencing.manager.get_job(job_id).await {
@@ -51,7 +52,7 @@ pub async fn get_sequencing_job(
 
 /// List all sequencing jobs
 pub async fn list_sequencing_jobs(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
 ) -> Result<Json<Vec<SequencingJob>>, (StatusCode, String)> {
     state
         .sequencing
@@ -64,7 +65,7 @@ pub async fn list_sequencing_jobs(
 
 /// Update the status of a sequencing job
 pub async fn update_job_status(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Path(job_id): Path<Uuid>,
     Json(status): Json<JobStatus>,
 ) -> Result<Json<SequencingJob>, (StatusCode, String)> {
@@ -79,7 +80,7 @@ pub async fn update_job_status(
 
 /// Update a sequencing job
 pub async fn update_sequencing_job(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Path(job_id): Path<Uuid>,
     Json(update_request): Json<UpdateSequencingJobRequest>,
 ) -> Result<Json<SequencingJob>, (StatusCode, String)> {
@@ -100,7 +101,7 @@ pub async fn update_sequencing_job(
 
 /// Delete a sequencing job
 pub async fn delete_sequencing_job(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Path(job_id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     match state.sequencing.manager.get_job(job_id).await {

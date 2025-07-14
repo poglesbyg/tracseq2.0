@@ -177,6 +177,7 @@ services:
       - SAMPLES_SERVICE_URL=http://samples-service:8080
       - SEQUENCING_SERVICE_URL=http://sequencing-service:8080
       - SPREADSHEET_SERVICE_URL=http://spreadsheet-service:8080
+      - API_GATEWAY_URL=http://api-gateway:8000
     volumes:
       - app_logs:/app/logs
     depends_on:
@@ -192,6 +193,8 @@ services:
         condition: service_healthy
       spreadsheet-service:
         condition: service_healthy
+      api-gateway:
+        condition: service_healthy
     networks:
       - tracseq_network
     healthcheck:
@@ -199,6 +202,48 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+
+  # API Gateway Service (Simple Python)
+  api-gateway:
+    build:
+      context: ./simple-services/api-gateway
+      dockerfile: Dockerfile
+    container_name: tracseq_api_gateway
+    env_file:
+      - config/development.env
+    ports:
+      - "${API_GATEWAY_PORT:-8089}:8000"
+    environment:
+      - DASHBOARD_SERVICE_URL=http://dashboard-service:8080
+      - SAMPLES_SERVICE_URL=http://samples-service:8080
+      - SEQUENCING_SERVICE_URL=http://sequencing-service:8080
+      - SPREADSHEET_SERVICE_URL=http://spreadsheet-service:8080
+    
+    volumes:
+      - app_logs:/app/logs
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      dashboard-service:
+        condition: service_healthy
+      samples-service:
+        condition: service_healthy
+      sequencing-service:
+        condition: service_healthy
+      spreadsheet-service:
+        condition: service_healthy
+    
+    networks:
+      - tracseq_network
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   # Database and cache persistence

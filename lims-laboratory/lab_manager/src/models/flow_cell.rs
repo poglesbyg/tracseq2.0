@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
+use bigdecimal::BigDecimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct FlowCellType {
@@ -31,7 +32,7 @@ pub struct FlowCellDesign {
     pub lane_assignments: serde_json::Value,
     pub pooling_strategy: Option<serde_json::Value>,
     pub expected_coverage: Option<serde_json::Value>,
-    pub ai_optimization_score: Option<sqlx::types::BigDecimal>,
+    pub ai_optimization_score: Option<BigDecimal>,
     pub ai_suggestions: Option<serde_json::Value>,
     pub approved_by: Option<Uuid>,
     pub approved_at: Option<DateTime<Utc>>,
@@ -51,7 +52,7 @@ pub struct FlowCellLane {
     pub target_reads: Option<i64>,
     pub index_type: Option<String>,
     pub index_sequences: Option<serde_json::Value>,
-    pub loading_concentration_pm: Option<sqlx::types::BigDecimal>,
+    pub loading_concentration_pm: Option<BigDecimal>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

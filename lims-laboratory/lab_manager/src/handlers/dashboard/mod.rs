@@ -1,5 +1,6 @@
 use axum::{extract::State, http::StatusCode, Json};
 use serde::Serialize;
+use std::sync::Arc;
 
 use crate::assembly::AppComponents;
 
@@ -21,7 +22,7 @@ pub struct HealthStatus {
 
 /// Health check endpoint with database connectivity test
 pub async fn health_check(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
 ) -> Result<Json<HealthStatus>, (StatusCode, String)> {
     // Test database connectivity
     let database_connected = sqlx::query("SELECT 1")
@@ -44,7 +45,7 @@ pub async fn health_check(
 
 /// Get dashboard statistics with improved error handling
 pub async fn get_dashboard_stats(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
 ) -> Result<Json<DashboardStats>, (StatusCode, String)> {
     // Use separate queries with better error handling
     let total_templates = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM templates")

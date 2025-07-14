@@ -9,6 +9,7 @@ use chrono::{Utc, NaiveDate};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::sync::Arc;
+use bigdecimal::BigDecimal;
 
 use crate::{
     assembly::AppComponents,
@@ -52,7 +53,7 @@ pub struct CreateProjectRequest {
     pub principal_investigator_id: Uuid,
     pub project_manager_id: Option<Uuid>,
     pub department: Option<String>,
-    pub budget_approved: Option<sqlx::types::BigDecimal>,
+    pub budget_approved: Option<BigDecimal>,
     pub metadata: Option<serde_json::Value>,
 }
 
@@ -64,7 +65,7 @@ pub struct UpdateProjectRequest {
     pub priority: Option<String>,
     pub target_end_date: Option<NaiveDate>,
     pub actual_end_date: Option<NaiveDate>,
-    pub budget_used: Option<sqlx::types::BigDecimal>,
+    pub budget_used: Option<BigDecimal>,
     pub metadata: Option<serde_json::Value>,
 }
 

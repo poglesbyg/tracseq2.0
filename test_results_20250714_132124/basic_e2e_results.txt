@@ -1,0 +1,51 @@
+==================================================
+TracSeq 2.0 - Basic End-to-End Testing
+==================================================
+API Gateway: http://localhost:8089
+Frontend Proxy: http://localhost:8085
+==================================================
+
+[0;32m[INFO][0m Testing Health Endpoints via API Gateway...
+Testing: Dashboard Health... [0;32mPASS[0m
+Testing: Samples Health... [0;32mPASS[0m
+Testing: Sequencing Health... [0;32mPASS[0m
+Testing: Spreadsheet Health... [0;32mPASS[0m
+[0;32m[INFO][0m Testing Health Endpoints via Frontend Proxy...
+Testing: Dashboard Health (Proxy)... [0;32mPASS[0m
+Testing: Samples Health (Proxy)... [0;32mPASS[0m
+Testing: Sequencing Health (Proxy)... [0;32mPASS[0m
+Testing: Spreadsheet Health (Proxy)... [0;32mPASS[0m
+[0;32m[INFO][0m Testing Direct Service Access...
+Testing: Dashboard Direct... [0;32mPASS[0m
+Testing: Samples Direct... [0;32mPASS[0m
+Testing: Sequencing Direct... [0;32mPASS[0m
+Testing: Spreadsheet Direct... [0;32mPASS[0m
+[0;32m[INFO][0m Testing API Gateway Service Discovery...
+Testing: Service Discovery... [0;32mPASS[0m
+[0;32m[INFO][0m Testing Database Operations...
+Testing: Get All Samples... [0;32mPASS[0m
+Testing: Get All Users... [0;32mPASS[0m
+Testing: Get Storage Locations... [0;32mPASS[0m
+Testing: Get Sequencing Jobs... [0;32mPASS[0m
+Testing: Get Templates... [0;32mPASS[0m
+[0;32m[INFO][0m Testing Sample Submission Workflow...
+Testing: Create Sample... [0;32mPASS[0m
+[0;32m[INFO][0m Testing Cross-Service Communication...
+Testing: Dashboard Sample Access... [0;32mPASS[0m
+[0;32m[INFO][0m Testing Error Handling...
+Testing: Non-existent Endpoint... [0;32mPASS[0m
+Testing: Invalid Sample ID... [0;32mPASS[0m
+[0;32m[INFO][0m Testing Authentication Endpoints...
+Testing: Auth Status... [0;32mPASS[0m
+[0;32m[INFO][0m Testing Template Operations...
+Testing: Get Sample Templates... [0;32mPASS[0m
+
+==================================================
+TEST SUMMARY
+==================================================
+Total Tests: 24
+Passed: [0;32m24[0m
+Failed: [0;31m0[0m
+Success Rate: 100%
+==================================================
+[0;32m[INFO][0m All tests passed! ✅

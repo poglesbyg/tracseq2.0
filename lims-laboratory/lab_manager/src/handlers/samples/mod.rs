@@ -3,6 +3,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
@@ -21,7 +22,7 @@ pub use rag_enhanced_handlers::*;
 
 /// Create a new sample from the provided data
 pub async fn create_sample(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Json(sample): Json<CreateSample>,
 ) -> Result<Json<Sample>, (StatusCode, String)> {
     // Validate required fields
@@ -64,7 +65,7 @@ pub async fn create_sample(
 
 /// List all samples in the system
 pub async fn list_samples(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
 ) -> Result<Json<Vec<Sample>>, (StatusCode, String)> {
     state
         .sample_processing
@@ -77,7 +78,7 @@ pub async fn list_samples(
 
 /// Validate a sample by its ID
 pub async fn validate_sample(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Path(sample_id): Path<Uuid>,
 ) -> Result<Json<Sample>, (StatusCode, String)> {
     state
@@ -91,7 +92,7 @@ pub async fn validate_sample(
 
 /// Update a sample by its ID
 pub async fn update_sample(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Path(sample_id): Path<Uuid>,
     Json(updates): Json<UpdateSample>,
 ) -> Result<Json<Sample>, (StatusCode, String)> {
@@ -106,7 +107,7 @@ pub async fn update_sample(
 
 /// Get a single sample by its ID
 pub async fn get_sample(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Path(sample_id): Path<Uuid>,
 ) -> Result<Json<Sample>, (StatusCode, String)> {
     state
@@ -144,7 +145,7 @@ pub struct BatchError {
 
 /// Create multiple samples in a batch from template data
 pub async fn create_samples_batch(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Json(batch_request): Json<BatchCreateSamplesRequest>,
 ) -> Result<Json<BatchCreateSamplesResponse>, (StatusCode, String)> {
     tracing::info!("Creating batch of {} samples", batch_request.samples.len());
@@ -354,7 +355,7 @@ async fn store_sample_in_storage(
 
 /// Delete a sample by its ID
 pub async fn delete_sample(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Path(sample_id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // For safety in a laboratory environment, we typically don't permanently delete samples

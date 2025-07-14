@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use axum::{
     extract::{Multipart, Path, State},
     http::StatusCode,
@@ -20,7 +21,7 @@ pub use crate::models::template::{
 
 /// Upload a new template file with metadata
 pub async fn upload_template(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     mut multipart: Multipart,
 ) -> Result<Json<TemplateResponse>, (StatusCode, String)> {
     let mut file_content = Vec::new();
@@ -125,7 +126,7 @@ pub async fn upload_template(
 
 /// List all available templates
 pub async fn list_templates(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
 ) -> Result<Json<Vec<TemplateResponse>>, (StatusCode, String)> {
     let template_repo = state.repositories.factory.template_repository();
     let templates = template_repo
@@ -149,7 +150,7 @@ pub async fn list_templates(
 
 /// Get a single template by ID
 pub async fn get_template(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Path(template_id): Path<Uuid>,
 ) -> Result<Json<TemplateResponse>, (StatusCode, String)> {
     let template_repo = state.repositories.factory.template_repository();
@@ -172,7 +173,7 @@ pub async fn get_template(
 
 /// Update a template by ID
 pub async fn update_template(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Path(template_id): Path<Uuid>,
     Json(updates): Json<UpdateTemplate>,
 ) -> Result<Json<TemplateResponse>, (StatusCode, String)> {
@@ -195,7 +196,7 @@ pub async fn update_template(
 
 /// Get parsed spreadsheet data for a specific template
 pub async fn get_template_data(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Path(template_id): Path<Uuid>,
 ) -> Result<Json<ParsedTemplateResponse>, (StatusCode, String)> {
     // Create template service instance with repository
@@ -236,7 +237,7 @@ pub async fn get_template_data(
 
 /// Delete a template by ID
 pub async fn delete_template(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Path(template_id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Create template service instance with repository
@@ -273,7 +274,7 @@ pub async fn delete_template(
 
 /// Create a new template (without file upload)
 pub async fn create_template(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Json(create_request): Json<CreateTemplate>,
 ) -> Result<Json<TemplateResponse>, (StatusCode, String)> {
     let template_repo = state.repositories.factory.template_repository();

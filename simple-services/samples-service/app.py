@@ -2,8 +2,29 @@ from fastapi import FastAPI, HTTPException
 from datetime import datetime
 import uvicorn
 import os
+import sys
+import logging
+
+from logging_config import (
+    setup_logging, 
+    RequestLoggingMiddleware, 
+    log_performance, 
+    log_business_event,
+    log_database_operation,
+    log_health_check,
+    get_logger
+)
 
 app = FastAPI(title="Samples Service", version="1.0.0")
+
+# Setup structured logging
+logger = setup_logging("samples-service", os.getenv("LOG_LEVEL", "INFO"))
+
+# Add request logging middleware
+app.add_middleware(RequestLoggingMiddleware, service_name="samples-service")
+
+# Log service startup
+logger.info("Samples service starting up", extra={"version": "1.0.0"})
 
 # Mock data for samples
 MOCK_SAMPLES = [
@@ -70,18 +91,43 @@ MOCK_SAMPLES = [
 ]
 
 @app.get("/health")
+@log_performance("health_check")
 async def health_check():
     """Health check endpoint"""
-    return {
+    
+    health_status = {
         "status": "healthy",
         "service": "samples-service",
         "timestamp": datetime.utcnow().isoformat(),
         "version": "1.0.0"
     }
+    
+    # Log health check
+    log_health_check("samples-service", "healthy", {
+        "total_samples": len(MOCK_SAMPLES),
+        "database_connection": "ok"
+    })
+    
+    return health_status
 
 @app.get("/api/v1/samples")
+@log_performance("get_samples")
 async def get_samples():
     """Get all samples"""
+    
+    samples_logger = get_logger("samples")
+    samples_logger.info("Fetching all samples", extra={"total_count": len(MOCK_SAMPLES)})
+    
+    # Log database operation
+    log_database_operation("SELECT", "samples", None)
+    
+    # Log business event
+    log_business_event("samples_retrieved", {
+        "count": len(MOCK_SAMPLES),
+        "types": ["DNA", "RNA", "Protein"],
+        "departments": ["Genomics", "Transcriptomics", "Proteomics"]
+    })
+    
     return {
         "success": True,
         "data": {

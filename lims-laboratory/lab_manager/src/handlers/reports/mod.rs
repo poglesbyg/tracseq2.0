@@ -7,6 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use sqlx::{Column, Row, TypeInfo};
 use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
@@ -83,7 +84,7 @@ pub struct SaveTemplateRequest {
 
 /// Get database schema information
 pub async fn get_schema(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
 ) -> Result<Json<DatabaseSchema>, (StatusCode, String)> {
     let tables_query = r#"
         SELECT 
@@ -140,7 +141,7 @@ pub async fn get_schema(
 
 /// Execute a SQL query and return results
 pub async fn execute_report(
-    State(state): State<AppComponents>,
+    State(state): State<Arc<AppComponents>>,
     Json(query_request): Json<ReportQuery>,
 ) -> Result<Json<ReportResult>, (StatusCode, String)> {
     // Security: Validate the SQL query
@@ -200,7 +201,7 @@ pub async fn execute_report(
 
 /// Get predefined report templates
 pub async fn get_report_templates(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
 ) -> Result<Json<Vec<ReportTemplate>>, (StatusCode, String)> {
     let templates = vec![
         ReportTemplate {
@@ -324,14 +325,14 @@ fn convert_sql_value_to_json(
 
 /// List all reports (stub implementation)
 pub async fn list_reports(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
 ) -> Result<Json<Vec<CustomReport>>, (StatusCode, String)> {
     Ok(Json(Vec::new()))
 }
 
 /// Create a custom report (stub implementation)
 pub async fn create_custom_report(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
     Json(_request): Json<CreateReportRequest>,
 ) -> Result<Json<CustomReport>, (StatusCode, String)> {
     Err((
@@ -342,7 +343,7 @@ pub async fn create_custom_report(
 
 /// Get a report by ID (stub implementation)
 pub async fn get_report(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
     Path(_report_id): Path<Uuid>,
 ) -> Result<Json<CustomReport>, (StatusCode, String)> {
     Err((StatusCode::NOT_FOUND, "Report not found".to_string()))
@@ -350,7 +351,7 @@ pub async fn get_report(
 
 /// Update a report (stub implementation)
 pub async fn update_report(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
     Path(_report_id): Path<Uuid>,
     Json(_request): Json<CreateReportRequest>,
 ) -> Result<Json<CustomReport>, (StatusCode, String)> {
@@ -362,7 +363,7 @@ pub async fn update_report(
 
 /// Delete a report (stub implementation)
 pub async fn delete_report(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
     Path(_report_id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     Err((
@@ -376,7 +377,7 @@ pub use get_report_templates as get_available_templates;
 
 /// Save report template (stub implementation)
 pub async fn save_report_template(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
     Json(_request): Json<SaveTemplateRequest>,
 ) -> Result<Json<ReportTemplate>, (StatusCode, String)> {
     Err((

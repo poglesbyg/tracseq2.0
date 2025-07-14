@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use axum::{extract::State, http::StatusCode, Json};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -105,7 +106,7 @@ pub async fn health_check() -> Result<Json<HealthResponse>, StatusCode> {
 /// Comprehensive system health check
 /// GET /health/system
 pub async fn system_health_check(
-    State(app): State<AppComponents>,
+    State(app): State<Arc<AppComponents>>,
 ) -> Result<Json<SystemHealthResponse>, StatusCode> {
     let uptime = START_TIME.elapsed();
 
@@ -155,7 +156,7 @@ pub async fn system_health_check(
 /// Database-specific health check
 /// GET /health/database
 pub async fn database_health_check(
-    State(app): State<AppComponents>,
+    State(app): State<Arc<AppComponents>>,
 ) -> Result<Json<DatabaseHealthDetails>, StatusCode> {
     info!("Database health check requested");
 
@@ -182,7 +183,7 @@ pub async fn database_health_check(
 /// Application metrics endpoint
 /// GET /health/metrics
 pub async fn application_metrics(
-    State(app): State<AppComponents>,
+    State(app): State<Arc<AppComponents>>,
 ) -> Result<Json<ApplicationMetrics>, StatusCode> {
     info!("Application metrics requested");
 
@@ -214,7 +215,7 @@ pub async fn application_metrics(
 /// Readiness probe for Kubernetes
 /// GET /health/ready
 pub async fn readiness_check(
-    State(app): State<AppComponents>,
+    State(app): State<Arc<AppComponents>>,
 ) -> Result<Json<HealthResponse>, StatusCode> {
     info!("Readiness check requested");
 

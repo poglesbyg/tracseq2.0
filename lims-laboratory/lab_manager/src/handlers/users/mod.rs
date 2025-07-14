@@ -1,3 +1,4 @@
+use std::sync::Arc;
 pub mod auth_helpers;
 
 use std::net::SocketAddr;
@@ -24,7 +25,7 @@ use auth_helpers::{require_admin, require_auth, verify_auth_token};
 
 /// Login endpoint
 pub async fn login(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(request): Json<LoginRequest>,
@@ -74,7 +75,7 @@ pub async fn login(
 /// Shibboleth login redirect endpoint
 /// This endpoint redirects users to Shibboleth authentication
 pub async fn shibboleth_login_redirect(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Query(params): Query<serde_json::Value>,
 ) -> Result<Redirect, (StatusCode, Json<Value>)> {
     // Extract return URL from query parameters
@@ -108,7 +109,7 @@ pub async fn shibboleth_login_redirect(
 /// Shibboleth logout redirect endpoint
 /// This endpoint handles Shibboleth logout and redirects appropriately
 pub async fn shibboleth_logout_redirect(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Query(params): Query<serde_json::Value>,
 ) -> Result<Redirect, (StatusCode, Json<Value>)> {
     // Extract return URL from query parameters
@@ -132,7 +133,7 @@ pub async fn shibboleth_logout_redirect(
 
 /// Logout endpoint
 pub async fn logout(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     let (current_user, session) = verify_auth_token(&components, &headers).await?;
@@ -160,7 +161,7 @@ pub async fn logout(
 
 /// Get current user profile
 pub async fn get_current_user(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     let current_user = require_auth(&components, &headers).await?;
@@ -173,7 +174,7 @@ pub async fn get_current_user(
 
 /// Update current user profile
 pub async fn update_current_user(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Extension(current_user): Extension<User>,
     Json(request): Json<UpdateUserRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
@@ -222,7 +223,7 @@ pub async fn update_current_user(
 
 /// Change password
 pub async fn change_password(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Extension(current_user): Extension<User>,
     Json(request): Json<ChangePasswordRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
@@ -263,7 +264,7 @@ pub async fn change_password(
 
 /// Request password reset
 pub async fn request_password_reset(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Json(request): Json<ResetPasswordRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     // Validate request
@@ -294,7 +295,7 @@ pub async fn request_password_reset(
 
 /// Confirm password reset
 pub async fn confirm_password_reset(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Json(request): Json<ConfirmResetPasswordRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     // Validate request
@@ -334,7 +335,7 @@ pub async fn confirm_password_reset(
 
 /// Get user sessions
 pub async fn get_user_sessions(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Extension(current_user): Extension<User>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     match components
@@ -360,7 +361,7 @@ pub async fn get_user_sessions(
 
 /// Revoke a session
 pub async fn revoke_session(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Extension(current_user): Extension<User>,
     Path(session_id): Path<Uuid>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
@@ -387,7 +388,7 @@ pub async fn revoke_session(
 
 /// Revoke all sessions except current
 pub async fn revoke_all_sessions(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Extension(current_user): Extension<User>,
     Extension(session_id): Extension<Uuid>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
@@ -416,7 +417,7 @@ pub async fn revoke_all_sessions(
 
 /// Create new user (admin only)
 pub async fn create_user(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     headers: HeaderMap,
     Json(request): Json<CreateUserRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
@@ -463,7 +464,7 @@ pub async fn create_user(
 
 /// List users (admin only)
 pub async fn list_users(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Extension(current_user): Extension<User>,
     Query(query): Query<UserListQuery>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
@@ -504,7 +505,7 @@ pub async fn list_users(
 
 /// Get user by ID (admin only)
 pub async fn get_user(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Extension(current_user): Extension<User>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
@@ -548,7 +549,7 @@ pub async fn get_user(
 
 /// Update user (admin only)
 pub async fn update_user(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Extension(current_user): Extension<User>,
     Path(user_id): Path<Uuid>,
     Json(request): Json<UpdateUserRequest>,
@@ -607,7 +608,7 @@ pub async fn update_user(
 
 /// Delete user (admin only)
 pub async fn delete_user(
-    State(components): State<AppComponents>,
+    State(components): State<Arc<AppComponents>>,
     Extension(current_user): Extension<User>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {

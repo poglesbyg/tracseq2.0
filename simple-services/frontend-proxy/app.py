@@ -19,7 +19,7 @@ app.add_middleware(
 )
 
 # API Gateway URL
-API_GATEWAY_URL = os.getenv("API_GATEWAY_URL", "http://lims-gateway:8000")
+API_GATEWAY_URL = os.getenv("API_GATEWAY_URL", "http://api-gateway:8000")
 
 # Test users for development
 TEST_USERS = {

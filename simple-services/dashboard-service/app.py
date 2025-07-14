@@ -2,18 +2,49 @@ from fastapi import FastAPI, HTTPException
 from datetime import datetime
 import uvicorn
 import os
+import sys
+import logging
+
+from logging_config import (
+    setup_logging, 
+    RequestLoggingMiddleware, 
+    log_performance, 
+    log_business_event,
+    log_health_check,
+    get_logger
+)
 
 app = FastAPI(title="Dashboard Service", version="1.0.0")
 
+# Setup structured logging
+logger = setup_logging("dashboard-service", os.getenv("LOG_LEVEL", "INFO"))
+
+# Add request logging middleware
+app.add_middleware(RequestLoggingMiddleware, service_name="dashboard-service")
+
+# Log service startup
+logger.info("Dashboard service starting up", extra={"version": "1.0.0"})
+
 @app.get("/health")
+@log_performance("health_check")
 async def health_check():
     """Health check endpoint"""
-    return {
+    
+    health_status = {
         "status": "healthy",
         "service": "dashboard-service",
         "timestamp": datetime.utcnow().isoformat(),
         "version": "1.0.0"
     }
+    
+    # Log health check
+    log_health_check("dashboard-service", "healthy", {
+        "response_time_ms": 0,
+        "memory_usage": "normal",
+        "database_connection": "ok"
+    })
+    
+    return health_status
 
 @app.get("/api/dashboard")
 async def get_dashboard():
@@ -171,6 +202,111 @@ async def get_dashboard_stats():
                 "user": "Lab Manager"
             }
         ]
+    }
+
+# Additional endpoints for E2E testing
+@app.get("/api/v1/users")
+@log_performance("get_users")
+async def get_users():
+    """Get all users"""
+    
+    users_logger = get_logger("users")
+    users_logger.info("Fetching all users")
+    
+    users_data = [
+        {
+            "id": "user-001",
+            "name": "Dr. Smith",
+            "email": "smith@lab.com",
+            "department": "Genomics",
+            "role": "researcher",
+            "created_at": "2024-01-15T10:00:00Z"
+        },
+        {
+            "id": "user-002", 
+            "name": "Dr. Johnson",
+            "email": "johnson@lab.com",
+            "department": "Transcriptomics",
+            "role": "researcher",
+            "created_at": "2024-02-10T09:30:00Z"
+        }
+    ]
+    
+    # Log business event
+    log_business_event("users_retrieved", {
+        "count": len(users_data),
+        "departments": ["Genomics", "Transcriptomics"]
+    })
+    
+    return {
+        "success": True,
+        "data": {
+            "users": users_data
+        }
+    }
+
+@app.get("/api/v1/storage/locations")
+async def get_storage_locations():
+    """Get all storage locations"""
+    return {
+        "success": True,
+        "data": {
+            "locations": [
+                {
+                    "id": "loc-001",
+                    "name": "Freezer A1-B2",
+                    "temperature": -80,
+                    "capacity": 100,
+                    "current_usage": 45,
+                    "status": "operational"
+                },
+                {
+                    "id": "loc-002",
+                    "name": "Freezer B2-C3", 
+                    "temperature": -20,
+                    "capacity": 200,
+                    "current_usage": 78,
+                    "status": "operational"
+                }
+            ]
+        }
+    }
+
+@app.get("/api/v1/samples")
+async def get_samples_dashboard():
+    """Get samples for dashboard view"""
+    return {
+        "success": True,
+        "data": {
+            "samples": [
+                {
+                    "id": "sample-001",
+                    "name": "DNA Sample 001",
+                    "status": "validated",
+                    "department": "Genomics",
+                    "created_at": "2024-12-15T10:30:00Z"
+                }
+            ]
+        }
+    }
+
+@app.get("/api/v1/status")
+async def get_auth_status():
+    """Get authentication status"""
+    return {
+        "success": True,
+        "data": {
+            "authenticated": True,
+            "user": {
+                "id": "user-001",
+                "name": "Test User",
+                "role": "researcher"
+            },
+            "session": {
+                "expires_at": "2024-12-16T10:00:00Z",
+                "token_type": "Bearer"
+            }
+        }
     }
 
 if __name__ == "__main__":

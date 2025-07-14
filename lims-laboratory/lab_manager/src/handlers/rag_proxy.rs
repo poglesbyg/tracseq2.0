@@ -5,12 +5,13 @@ use axum::{
 };
 use reqwest::Client;
 use serde_json::Value;
+use std::sync::Arc;
 
 use crate::assembly::AppComponents;
 
 /// Get RAG submissions by proxying to the RAG API Bridge
 pub async fn get_rag_submissions(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let client = Client::new();
     let rag_service_url =
@@ -44,7 +45,7 @@ pub async fn get_rag_submissions(
 
 /// Process document by proxying to the RAG API Bridge
 pub async fn process_rag_document(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
     multipart: Multipart,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let client = Client::new();
@@ -109,7 +110,7 @@ pub async fn process_rag_document(
 
 /// Get RAG statistics by proxying to the RAG API Bridge
 pub async fn get_rag_stats(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let client = Client::new();
     let rag_service_url =
@@ -143,7 +144,7 @@ pub async fn get_rag_stats(
 
 /// Get RAG system health by proxying to the RAG API Bridge
 pub async fn get_rag_health(
-    State(_state): State<AppComponents>,
+    State(_state): State<Arc<AppComponents>>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let client = Client::new();
     let rag_service_url =
